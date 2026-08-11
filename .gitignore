@@ -1,0 +1,23 @@
+# Gradle
+.gradle/
+build/
+app/build/
+*.apk
+*.aab
+
+# Local config (device/SDK paths — machine specific, never shared)
+local.properties
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+.DS_Store
+
+# Signing — never commit
+/keystore/release.keystore
+/keystore/credentials.txt
+
+# Captures
+captures/
+.externalNativeBuild/
+.cxx/

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android requires a real layout resource for initialLayout/previewLayout
+  even though Glance replaces it with the composable content at runtime.
+  This is only ever briefly visible (widget picker preview / first frame).
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FAF7F0">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="My Bible"
+        android:textColor="#2B2820"
+        android:textSize="14sp" />
+
+</FrameLayout>

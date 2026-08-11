@@ -1,0 +1,86 @@
+name: Build Kotlin APK
+
+# Runs on every push to main, and can also be triggered manually from the
+# Actions tab ("Run workflow"). No local Android Studio or SDK needed —
+# GitHub's runner has everything, and the finished APK is attached to the
+# run as a downloadable artifact.
+#
+# Unlike the Capacitor app's workflow, this one doesn't need npm/Capacitor
+# sync steps — it's a plain Gradle Android project — so a debug APK builds
+# and uploads on every run with no secrets required. A *signed release* APK
+# additionally builds if the four KEYSTORE_* secrets are set (same pattern
+# as the Capacitor app's workflow; see README.md).
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.9
+
+      - name: Build debug APK
+        run: gradle assembleDebug --no-daemon
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: my-bible-kotlin-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+
+      # secrets can't be read in a job-level `if:`, so this step checks for
+      # them and every later step is gated on its output instead.
+      - name: Check for signing secrets
+        id: check
+        run: |
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "KEYSTORE_BASE64 secret not set yet — skipping signed release build. See README.md."
+          fi
+
+      - name: Decode keystore
+        if: steps.check.outputs.enabled == 'true'
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/release.keystore
+
+      - name: Build signed release APK
+        if: steps.check.outputs.enabled == 'true'
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          gradle assembleRelease --no-daemon \
+            -Pandroid.injected.signing.store.file=$(pwd)/app/release.keystore \
+            -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
+
+      - name: Remove decoded keystore
+        if: always()
+        run: rm -f app/release.keystore
+
+      - name: Upload signed release APK
+        if: steps.check.outputs.enabled == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: my-bible-kotlin-release-apk
+          path: app/build/outputs/apk/release/app-release.apk

@@ -1,0 +1,12 @@
+All fonts in this directory are licensed under the SIL Open Font License
+(OFL), which permits bundling in an application:
+  - Lora (Cyreal) — lora_regular.ttf / lora_bold.ttf
+  - GFS Porson (Greek Font Society) — eb_garamond_regular.otf
+  - DejaVu Serif (DejaVu fonts team) — merriweather_regular.ttf / _bold.ttf
+  - GFS Baskerville (Greek Font Society) — playfair_display_regular.otf
+  - Caladea (Google/Huerta Tipográfica) — gelasio_regular.ttf / _bold.ttf
+
+The garamond/merriweather/playfair/gelasio files are open-license stand-ins,
+not the exact named Google Fonts (see AppFonts.kt for why, and how to swap
+in the authentic files later — just replace the .ttf under the same
+filename and rebuild).

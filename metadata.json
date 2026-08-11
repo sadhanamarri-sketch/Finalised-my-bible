@@ -1,0 +1,6 @@
+{
+  "name": "My Bible",
+  "description": "KJV Bible with English, Telugu, Greek interlinear, line spacing and font selection",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
