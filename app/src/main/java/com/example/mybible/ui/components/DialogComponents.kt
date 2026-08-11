@@ -248,12 +248,7 @@ fun GreekWordSheet(
                 foundEntry != null -> {
                     val body = foundEntry.definition.ifBlank { foundEntry.gloss }
                     if (body.isNotBlank()) {
-                        Text(
-                            text = body,
-                            fontSize = 16.sp,
-                            lineHeight = 23.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        LexiconDefinitionText(definition = body)
                     }
                 }
             }
@@ -389,12 +384,7 @@ fun HebrewWordSheet(
                 foundEntry != null -> {
                     val body = foundEntry.definition.ifBlank { foundEntry.gloss }
                     if (body.isNotBlank()) {
-                        Text(
-                            text = body,
-                            fontSize = 16.sp,
-                            lineHeight = 23.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        LexiconDefinitionText(definition = body)
                     }
                 }
             }
