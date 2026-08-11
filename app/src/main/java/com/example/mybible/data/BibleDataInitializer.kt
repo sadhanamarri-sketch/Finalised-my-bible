@@ -22,7 +22,7 @@ private const val HEBREW_WORD_THRESHOLD = 200_000
 private const val CROSS_REFERENCE_THRESHOLD = 150_000
 
 /**
- * Bump this whenever the bundled Telugu JSON data under `assets/telugu` changes (new
+ * Bump this whenever the bundled `assets/telugu/*.json` data changes (new
  * source text, corrections, etc.) so [BibleDataInitializer] re-imports it
  * even on devices that already have a full verse count from an older
  * bundle. History:

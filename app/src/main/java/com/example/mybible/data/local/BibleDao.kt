@@ -101,6 +101,12 @@ interface BibleDao {
     @Query("SELECT COUNT(*) FROM lexicon_entries")
     suspend fun countLexiconEntries(): Int
 
+    // Same lexicon_entries table (strongs is unique regardless of language —
+    // "G..." and "H..." never collide), just counted separately so Hebrew's
+    // TBESH import can be tracked/retried independently of Greek's TBESG.
+    @Query("SELECT COUNT(*) FROM lexicon_entries WHERE strongs LIKE 'H%'")
+    suspend fun countHebrewLexiconEntries(): Int
+
     // ---- Webster's 1828 Dictionary (English word lookup) ----
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

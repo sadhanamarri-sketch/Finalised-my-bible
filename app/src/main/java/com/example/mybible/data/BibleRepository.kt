@@ -998,16 +998,33 @@ class BibleRepository(private val context: Context) {
         }
     }
 
-    // ---- Hebrew lexicon lookup (Strong's H-numbers) ----
-    // There's no bundled/downloaded TBESH (the Hebrew counterpart to TBESG)
-    // yet — only the TAHOT interlinear data itself, which already carries
-    // its own inline gloss/grammar per word (shown immediately in
-    // HebrewWordSheet, same as Greek's inline gloss). This still queries
-    // the shared lexicon_entries table (harmless if it finds nothing, since
-    // that table's primary key is just "strongs" with no language
-    // restriction) so that if TBESH is ever imported into the same table
-    // under its H-prefixed keys, lookups here start finding entries with no
-    // further changes needed here.
+    // ---- Hebrew lexicon lookup (Strong's H-numbers, TBESH) ----
+    // Same on-demand download as Greek's TBESG — first tap on a Hebrew word
+    // triggers ensureHebrewLexiconImported() below, which downloads TBESH
+    // once and caches it in the same lexicon_entries table Greek uses (safe:
+    // "G..." and "H..." keys never collide).
+    // Hebrew lexicon (TBESH) import — same on-demand, single-flight pattern
+    // as ensureLexiconImported() above, just its own flag/mutex/counter so
+    // Hebrew's TBESH download is tracked independently of Greek's TBESG
+    // (they're two different STEPBible files; one having already downloaded
+    // says nothing about the other).
+    private val hebrewLexiconImportMutex = Mutex()
+    private var hebrewLexiconImported = false
+
+    private suspend fun ensureHebrewLexiconImported(): Boolean {
+        if (hebrewLexiconImported) return true
+        return hebrewLexiconImportMutex.withLock {
+            if (hebrewLexiconImported) return@withLock true
+            if (bibleDao.countHebrewLexiconEntries() > 100) {
+                hebrewLexiconImported = true
+                return@withLock true
+            }
+            val imported = TbeshImporter.importInto(bibleDao)
+            if (imported > 0) hebrewLexiconImported = true
+            hebrewLexiconImported
+        }
+    }
+
     private fun normalizeHebrewLexiconKey(dStrong: String?): String? {
         if (dStrong.isNullOrBlank()) return null
         val match = Regex("^H\\d+").find(dStrong.uppercase()) ?: return null
@@ -1016,6 +1033,7 @@ class BibleRepository(private val context: Context) {
 
     suspend fun getHebrewLexiconEntry(dStrong: String?): LexiconLookupResult = withContext(Dispatchers.IO) {
         val key = normalizeHebrewLexiconKey(dStrong) ?: return@withContext LexiconLookupResult.NoStrongsNumber
+        if (!ensureHebrewLexiconImported()) return@withContext LexiconLookupResult.NetworkError
         val entity = bibleDao.getLexiconEntry(key)
         if (entity == null || (entity.definition.isBlank() && entity.gloss.isBlank())) {
             LexiconLookupResult.NotFound
