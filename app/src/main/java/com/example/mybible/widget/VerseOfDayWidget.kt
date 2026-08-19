@@ -3,6 +3,7 @@ package com.example.mybible.widget
 import android.content.Context
 import android.content.Intent
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.ColorFilter
@@ -11,6 +12,7 @@ import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
+import androidx.glance.LocalSize
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
@@ -24,6 +26,7 @@ import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
+import androidx.glance.layout.fillMaxHeight
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
@@ -38,19 +41,32 @@ import com.example.mybible.R
 import com.example.mybible.ui.NavTab
 
 /**
- * Home screen widget: fixed 4x2 quick-access card. Redesigned from the
- * original Verse-of-the-Day layout to mirror the "Continue Reading" pill +
- * 4-icon quick-action row pattern (Highlights / Studied / Notes / Search),
- * styled to match the app's Classic Dark theme.
+ * Home screen widget: resizable quick-access card, 4x2 by default and
+ * shrinkable down to 4x1. Redesigned from the original Verse-of-the-Day
+ * layout to mirror the "Continue Reading" pill + 4-icon quick-action row
+ * pattern (Highlights / Studied / Notes / Search), styled to match the
+ * app's Classic Dark theme.
  *
- * [VerseOfDayRepository]/[VerseOfDayData] are no longer used by this widget
- * but are left in place rather than deleted, in case a curated
- * verse-of-the-day surface is wanted elsewhere later.
+ * At 4x1 the Verse of the Day card is dropped (see [WidgetContent]'s
+ * `isCompact` branch) and the Continue Reading pill grows to fill the
+ * freed space.
+ *
+ * [VerseOfDayRepository]/[VerseOfDayData] are still used for the 4x2 verse
+ * card, but are skipped entirely when rendering the compact 4x1 layout.
  */
 class VerseOfDayWidget : GlanceAppWidget() {
 
-    // Single fixed layout
-    override val sizeMode = SizeMode.Single
+    companion object {
+        // Matches the two sizes declared in verse_of_day_widget_info.xml:
+        // the default 4x2 footprint (minWidth/minHeight) and the smallest
+        // resize target, 4x1 (minResizeHeight), using Android's standard
+        // cell-size formula (70dp * cells - 30dp). Glance picks whichever
+        // of these is the closest fit to the widget's actual current size.
+        private val SIZE_REGULAR = DpSize(250.dp, 110.dp)
+        private val SIZE_COMPACT = DpSize(250.dp, 40.dp)
+    }
+
+    override val sizeMode = SizeMode.Responsive(setOf(SIZE_COMPACT, SIZE_REGULAR))
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val palette = WidgetColors.forCurrentTheme(context)
@@ -78,6 +94,12 @@ private fun WidgetContent(
     verse: VerseOfDay
 ) {
     val context = LocalContext.current
+    // At the 4x1 resize target (see SIZE_COMPACT / minResizeHeight in
+    // verse_of_day_widget_info.xml) there isn't room for the Verse-of-the-Day
+    // card, so it's dropped entirely and the Continue Reading row grows
+    // (defaultWeight + larger type/padding below) to fill the freed space
+    // instead of leaving it blank.
+    val isCompact = LocalSize.current.height < 80.dp
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
@@ -85,93 +107,98 @@ private fun WidgetContent(
             .cornerRadius(24.dp)
             .padding(14.dp)
     ) {
-        // --- 1. Verse of the Day (Top - expands naturally to fill top area) ---
-        // Outer box paints the border color; a 1dp inset reveals it as a
-        // ring around the inner card (Glance has no Modifier.border()).
-        Column(
-            modifier = GlanceModifier
-                .fillMaxWidth()
-                .defaultWeight()
-                .background(palette.cardBorder)
-                .cornerRadius(19.dp)
-                .padding(1.dp)
-        ) {
-        Column(
-            modifier = GlanceModifier
-                .fillMaxSize()
-                .background(palette.buttonBackground)
-                .cornerRadius(18.dp)
-                .padding(14.dp)
-                .clickable(
-                    actionStartActivity(
-                        Intent(context, MainActivity::class.java)
-                            .putExtra(WidgetActionKeys.EXTRA_VERSE_BOOK, verse.book)
-                            .putExtra(WidgetActionKeys.EXTRA_VERSE_CHAPTER, verse.chapter)
-                            .putExtra(WidgetActionKeys.EXTRA_VERSE_VERSE, verse.verse)
-                    )
-                )
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = GlanceModifier.fillMaxWidth()
+        if (!isCompact) {
+            // --- 1. Verse of the Day (Top - expands naturally to fill top area) ---
+            // Outer box paints the border color; a 1dp inset reveals it as a
+            // ring around the inner card (Glance has no Modifier.border()).
+            Column(
+                modifier = GlanceModifier
+                    .fillMaxWidth()
+                    .defaultWeight()
+                    .background(palette.cardBorder)
+                    .cornerRadius(19.dp)
+                    .padding(1.dp)
             ) {
-                Image(
-                    provider = ImageProvider(R.drawable.ic_widget_sparkle),
-                    contentDescription = null,
-                    colorFilter = ColorFilter.tint(palette.accent),
-                    modifier = GlanceModifier.size(18.dp)
-                )
-                Spacer(modifier = GlanceModifier.width(8.dp))
-                Text(
-                    text = "VERSE OF THE DAY",
-                    style = TextStyle(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp,
-                        color = palette.accent
+            Column(
+                modifier = GlanceModifier
+                    .fillMaxSize()
+                    .background(palette.buttonBackground)
+                    .cornerRadius(18.dp)
+                    .padding(14.dp)
+                    .clickable(
+                        actionStartActivity(
+                            Intent(context, MainActivity::class.java)
+                                .putExtra(WidgetActionKeys.EXTRA_VERSE_BOOK, verse.book)
+                                .putExtra(WidgetActionKeys.EXTRA_VERSE_CHAPTER, verse.chapter)
+                                .putExtra(WidgetActionKeys.EXTRA_VERSE_VERSE, verse.verse)
+                        )
                     )
-                )
-                Text(
-                    text = " • ${verse.reference}",
-                    style = TextStyle(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
-                        color = palette.buttonText
-                    ),
-                    maxLines = 1
-                )
-            }
-            Spacer(modifier = GlanceModifier.height(8.dp))
-            // Vertically centers the quote in whatever space is left under
-            // the header — verses range from ~39 to ~185 characters (see
-            // VerseOfDayRepository), so a fixed top-aligned Text left a
-            // visible dead gap under short verses while the card's height
-            // stayed constant (driven by the outer Column's defaultWeight,
-            // which fills the widget's fixed layout regardless of content).
-            // Centering means short verses just sit centered — which reads
-            // as deliberate — instead of glued to the top with empty space
-            // below; long verses still get the full available height.
-            Box(
-                modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
-                contentAlignment = Alignment.CenterStart
             ) {
-                Text(
-                    text = "\"${verse.text}\"",
-                    style = TextStyle(
-                        fontSize = 12.5.sp,
-                        color = palette.buttonText
-                    ),
-                    maxLines = 4
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = GlanceModifier.fillMaxWidth()
+                ) {
+                    Image(
+                        provider = ImageProvider(R.drawable.ic_widget_sparkle),
+                        contentDescription = null,
+                        colorFilter = ColorFilter.tint(palette.accent),
+                        modifier = GlanceModifier.size(18.dp)
+                    )
+                    Spacer(modifier = GlanceModifier.width(8.dp))
+                    Text(
+                        text = "VERSE OF THE DAY",
+                        style = TextStyle(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            color = palette.accent
+                        )
+                    )
+                    Text(
+                        text = " • ${verse.reference}",
+                        style = TextStyle(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = palette.buttonText
+                        ),
+                        maxLines = 1
+                    )
+                }
+                Spacer(modifier = GlanceModifier.height(8.dp))
+                // Vertically centers the quote in whatever space is left under
+                // the header — verses range from ~39 to ~185 characters (see
+                // VerseOfDayRepository), so a fixed top-aligned Text left a
+                // visible dead gap under short verses while the card's height
+                // stayed constant (driven by the outer Column's defaultWeight,
+                // which fills the widget's fixed layout regardless of content).
+                // Centering means short verses just sit centered — which reads
+                // as deliberate — instead of glued to the top with empty space
+                // below; long verses still get the full available height.
+                Box(
+                    modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Text(
+                        text = "\"${verse.text}\"",
+                        style = TextStyle(
+                            fontSize = 12.5.sp,
+                            color = palette.buttonText
+                        ),
+                        maxLines = 4
+                    )
+                }
             }
-        }
-        }
+            }
 
-        Spacer(modifier = GlanceModifier.height(10.dp))
+            Spacer(modifier = GlanceModifier.height(10.dp))
+        }
 
         // --- 2. Continue Reading {chapter name, chapter number} ---
+        // Compact (4x1, no verse card above) grows to fill the vertical
+        // space that would otherwise sit empty, with larger icon/type to match.
         Row(
             modifier = GlanceModifier
                 .fillMaxWidth()
+                .then(if (isCompact) GlanceModifier.defaultWeight() else GlanceModifier)
                 .background(palette.cardBorder)
                 .cornerRadius(17.dp)
                 .padding(1.dp)
@@ -179,9 +206,13 @@ private fun WidgetContent(
         Row(
             modifier = GlanceModifier
                 .fillMaxWidth()
+                .then(if (isCompact) GlanceModifier.fillMaxHeight() else GlanceModifier)
                 .background(palette.buttonBackground)
                 .cornerRadius(16.dp)
-                .padding(horizontal = 13.dp, vertical = 8.dp)
+                .padding(
+                    horizontal = if (isCompact) 16.dp else 13.dp,
+                    vertical = if (isCompact) 14.dp else 8.dp
+                )
                 .clickable(
                     actionStartActivity(
                         Intent(context, MainActivity::class.java)
@@ -195,14 +226,14 @@ private fun WidgetContent(
                 provider = ImageProvider(R.drawable.ic_widget_book),
                 contentDescription = null,
                 colorFilter = ColorFilter.tint(palette.accent),
-                modifier = GlanceModifier.size(18.dp)
+                modifier = GlanceModifier.size(if (isCompact) 22.dp else 18.dp)
             )
             Spacer(modifier = GlanceModifier.width(10.dp))
             Text(
                 text = "Continue reading",
                 style = TextStyle(
                     fontWeight = FontWeight.Medium,
-                    fontSize = 13.sp,
+                    fontSize = if (isCompact) 15.sp else 13.sp,
                     color = palette.buttonText
                 )
             )
@@ -211,7 +242,7 @@ private fun WidgetContent(
                 text = "$lastBook $lastChapter",
                 style = TextStyle(
                     fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
+                    fontSize = if (isCompact) 15.sp else 13.sp,
                     color = palette.accent
                 ),
                 maxLines = 1
