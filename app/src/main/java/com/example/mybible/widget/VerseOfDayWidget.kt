@@ -47,9 +47,10 @@ import com.example.mybible.ui.NavTab
  * pattern (Highlights / Studied / Notes / Search), styled to match the
  * app's Classic Dark theme.
  *
- * At 4x1 the Verse of the Day card is dropped (see [WidgetContent]'s
- * `isCompact` branch) and the Continue Reading pill grows to fill the
- * freed space.
+ * At 4x1 there's only room for one row, so both the Verse of the Day card
+ * and the quick-action icon row are dropped (see [WidgetContent]'s
+ * `isCompact` branch) and the Continue Reading pill alone grows to fill
+ * the widget.
  *
  * [VerseOfDayRepository]/[VerseOfDayData] are still used for the 4x2 verse
  * card, but are skipped entirely when rendering the compact 4x1 layout.
@@ -96,9 +97,10 @@ private fun WidgetContent(
     val context = LocalContext.current
     // At the 4x1 resize target (see SIZE_COMPACT / minResizeHeight in
     // verse_of_day_widget_info.xml) there isn't room for the Verse-of-the-Day
-    // card, so it's dropped entirely and the Continue Reading row grows
-    // (defaultWeight + larger type/padding below) to fill the freed space
-    // instead of leaving it blank.
+    // card or the quick-action icon row, so both are dropped entirely and
+    // the Continue Reading row alone grows (defaultWeight + larger
+    // type/padding below) to fill the whole widget instead of leaving
+    // dead space or clipping.
     val isCompact = LocalSize.current.height < 80.dp
     Column(
         modifier = GlanceModifier
@@ -193,8 +195,9 @@ private fun WidgetContent(
         }
 
         // --- 2. Continue Reading {chapter name, chapter number} ---
-        // Compact (4x1, no verse card above) grows to fill the vertical
-        // space that would otherwise sit empty, with larger icon/type to match.
+        // Compact (4x1, no verse card above and no icon row below) grows to
+        // fill the entire remaining vertical space, with larger icon/type
+        // to match.
         Row(
             modifier = GlanceModifier
                 .fillMaxWidth()
@@ -226,14 +229,14 @@ private fun WidgetContent(
                 provider = ImageProvider(R.drawable.ic_widget_book),
                 contentDescription = null,
                 colorFilter = ColorFilter.tint(palette.accent),
-                modifier = GlanceModifier.size(if (isCompact) 22.dp else 18.dp)
+                modifier = GlanceModifier.size(if (isCompact) 26.dp else 18.dp)
             )
             Spacer(modifier = GlanceModifier.width(10.dp))
             Text(
                 text = "Continue reading",
                 style = TextStyle(
                     fontWeight = FontWeight.Medium,
-                    fontSize = if (isCompact) 15.sp else 13.sp,
+                    fontSize = if (isCompact) 17.sp else 13.sp,
                     color = palette.buttonText
                 )
             )
@@ -242,7 +245,7 @@ private fun WidgetContent(
                 text = "$lastBook $lastChapter",
                 style = TextStyle(
                     fontWeight = FontWeight.Bold,
-                    fontSize = if (isCompact) 15.sp else 13.sp,
+                    fontSize = if (isCompact) 17.sp else 13.sp,
                     color = palette.accent
                 ),
                 maxLines = 1
@@ -250,42 +253,44 @@ private fun WidgetContent(
         }
         }
 
-        Spacer(modifier = GlanceModifier.height(10.dp))
+        if (!isCompact) {
+            Spacer(modifier = GlanceModifier.height(10.dp))
 
-        // --- 3. Big Quick-Action Circular Buttons (Claude Widget Style) ---
-        Row(
-            modifier = GlanceModifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            QuickActionButton(
-                iconRes = R.drawable.ic_widget_highlight,
-                contentDescription = "Highlights",
-                tab = NavTab.HIGHLIGHTS,
-                palette = palette,
-                modifier = GlanceModifier.defaultWeight()
-            )
-            QuickActionButton(
-                iconRes = R.drawable.ic_widget_check,
-                contentDescription = "Studied",
-                tab = NavTab.STUDIED,
-                palette = palette,
-                modifier = GlanceModifier.defaultWeight()
-            )
-            QuickActionButton(
-                iconRes = R.drawable.ic_widget_notes,
-                contentDescription = "Notes",
-                tab = NavTab.NOTES,
-                palette = palette,
-                modifier = GlanceModifier.defaultWeight()
-            )
-            QuickActionButton(
-                iconRes = R.drawable.ic_widget_search,
-                contentDescription = "Search",
-                tab = NavTab.SEARCH,
-                palette = palette,
-                modifier = GlanceModifier.defaultWeight()
-            )
+            // --- 3. Big Quick-Action Circular Buttons (Claude Widget Style) ---
+            Row(
+                modifier = GlanceModifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                QuickActionButton(
+                    iconRes = R.drawable.ic_widget_highlight,
+                    contentDescription = "Highlights",
+                    tab = NavTab.HIGHLIGHTS,
+                    palette = palette,
+                    modifier = GlanceModifier.defaultWeight()
+                )
+                QuickActionButton(
+                    iconRes = R.drawable.ic_widget_check,
+                    contentDescription = "Studied",
+                    tab = NavTab.STUDIED,
+                    palette = palette,
+                    modifier = GlanceModifier.defaultWeight()
+                )
+                QuickActionButton(
+                    iconRes = R.drawable.ic_widget_notes,
+                    contentDescription = "Notes",
+                    tab = NavTab.NOTES,
+                    palette = palette,
+                    modifier = GlanceModifier.defaultWeight()
+                )
+                QuickActionButton(
+                    iconRes = R.drawable.ic_widget_search,
+                    contentDescription = "Search",
+                    tab = NavTab.SEARCH,
+                    palette = palette,
+                    modifier = GlanceModifier.defaultWeight()
+                )
+            }
         }
     }
 }
