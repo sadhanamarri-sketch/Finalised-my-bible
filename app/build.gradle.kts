@@ -53,19 +53,46 @@ android {
             // unconfigured and the release build falls back to being
             // unsigned locally — CI always supplies the env vars above.
         }
+
+        // Checked-in debug keystore (keystore/debug.keystore, standard
+        // Android debug credentials — not a secret, same convention as
+        // Android Studio's own auto-generated ~/.android/debug.keystore).
+        // Without this, the Android Gradle Plugin falls back to
+        // auto-generating a debug keystore per machine — fine for local
+        // Android Studio use where that file persists across builds, but
+        // CI (build-apk.yml's `gradle assembleDebug`) runs on a fresh
+        // runner every time with no such file, so every CI-built debug
+        // APK used to get signed with a brand-new random cert. Android
+        // refuses to install-over an app already present with a different
+        // cert, forcing a full uninstall before every single update —
+        // which wipes app data and every placed home screen widget.
+        // Pinning a stable keystore here means the same debug APK
+        // filename can just be reinstalled (`adb install -r`, or tapping
+        // "Update" on the file) without losing widgets between builds.
+        // "debug" already exists — the Android Gradle Plugin pre-populates
+        // it pointing at the machine-local ~/.android/debug.keystore — so
+        // this must use getByName() to override it, not create(), which
+        // would fail with "signingConfig 'debug' already exists".
+        getByName("debug") {
+            storeFile = file("${rootDir}/keystore/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 
     buildTypes {
         debug {
+            signingConfig = signingConfigs.getByName("debug")
             // Gives debug builds a separate applicationId
             // (com.mybible.kotlin.debug) so they install as a completely
             // different app from release rather than colliding with it —
             // Android identifies an installed app by (applicationId,
             // signing cert), and debug/release are always signed with
-            // different certs (Android Studio's auto-generated debug
-            // keystore vs. your release.keystore), so without this suffix
-            // installing one over the other fails with a signature
-            // mismatch instead of a clean install/update.
+            // different certs (this checked-in debug keystore vs. your
+            // release.keystore), so without this suffix installing one
+            // over the other fails with a signature mismatch instead of a
+            // clean install/update.
             applicationIdSuffix = ".debug"
             // App label shows "My Bible Dev" so it's visually distinct from
             // the release install on the launcher/app switcher, in addition
