@@ -46,7 +46,13 @@ private val PaperColorScheme = lightColorScheme(
     // purple tint.
     outline = Color(0xFF6B625B),
     outlineVariant = Color(0xFFE5E0D5),
-    tertiary = Color(0xFFA9852F),   // --gold (light)
+    // The original Capacitor --gold (#A9852F) reads at only ~3.1:1 against
+    // this cream background — under WCAG AA's 4.5:1 for normal text, and
+    // this color runs every gold section-label heading and reference chip
+    // in the app. Darkened (same ~42° hue, lower lightness) to ~5.4:1,
+    // matching the contrast weight of the ink-soft/redletter text colors
+    // above rather than standing out as the one hard-to-read color.
+    tertiary = Color(0xFF7A5F1E),   // --gold (light), darkened for contrast
     error = Color(0xFFB7362A)       // --redletter (light)
 )
 
@@ -68,7 +74,9 @@ private val SepiaColorScheme = lightColorScheme(
     onSurfaceVariant = Color(0xFF6E6056),
     outline = Color(0xFF6E6056),
     outlineVariant = Color(0xFFDECDB9),
-    tertiary = Color(0xFFA9852F),
+    // Same darkened gold as Paper (~5.1:1 against this slightly darker tan
+    // background) — the original #A9852F was only ~2.9:1 here.
+    tertiary = Color(0xFF7A5F1E),
     error = Color(0xFFA8402C)
 )
 
