@@ -2,4 +2,5 @@
 <resources>
     <string name="app_name">My Bible</string>
     <string name="verse_widget_description">Today\'s verse and quick access to continue reading</string>
+    <string name="continue_reading_widget_description">Continue Reading button — drag it taller to reveal Highlights, Studied, Notes, and Search shortcuts</string>
 </resources>

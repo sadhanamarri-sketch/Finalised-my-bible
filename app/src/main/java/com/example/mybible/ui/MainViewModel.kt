@@ -420,6 +420,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 com.example.mybible.widget.VerseOfDayWidget().updateAll(appContext)
+                com.example.mybible.widget.ContinueReadingWidget().updateAll(appContext)
                 Log.d(
                     "ContinueReadingWidget",
                     "updateAll() succeeded for ${_currentBook.value} ${_currentChapter.value}"

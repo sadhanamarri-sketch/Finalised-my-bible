@@ -37,6 +37,21 @@
                 android:resource="@xml/verse_of_day_widget_info" />
         </receiver>
 
+        <!-- Fixed 4x1 sibling widget: just the Continue Reading pill, picked
+             separately from the widget picker (see ContinueReadingWidget.kt
+             class doc for why this is a separate widget rather than a
+             resize target of VerseOfDayWidgetReceiver above). -->
+        <receiver
+            android:name=".widget.ContinueReadingWidgetReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/continue_reading_widget_info" />
+        </receiver>
+
         <receiver
             android:name=".reminders.ReminderReceiver"
             android:exported="false" />
