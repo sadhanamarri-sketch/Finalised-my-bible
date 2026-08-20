@@ -181,38 +181,47 @@ fun EnglishDictionarySheet(
                 )
             } else {
                 LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.heightIn(max = 300.dp)
                 ) {
                     items(entry.meanings) { meaning ->
-                        Column {
-                            if (meaning.partOfSpeech.isNotBlank()) {
-                                Text(
-                                    text = meaning.partOfSpeech.uppercase(),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 1.2.sp,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                            }
-                            meaning.definitions.forEachIndexed { idx, def ->
-                                Row(
-                                    modifier = Modifier.padding(vertical = 2.dp),
-                                    verticalAlignment = Alignment.Top
-                                ) {
+                        // Elevated Card per part-of-speech group — matches
+                        // the same list-row treatment used by Search,
+                        // Notes, Highlighted Verses and Cross References.
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                if (meaning.partOfSpeech.isNotBlank()) {
                                     Text(
-                                        text = "${idx + 1}. ",
-                                        fontSize = 14.sp,
+                                        text = meaning.partOfSpeech.uppercase(),
+                                        fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
+                                        letterSpacing = 1.2.sp,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(bottom = 4.dp)
                                     )
-                                    Text(
-                                        text = def,
-                                        fontSize = 14.sp,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        lineHeight = 20.sp
-                                    )
+                                }
+                                meaning.definitions.forEachIndexed { idx, def ->
+                                    Row(
+                                        modifier = Modifier.padding(vertical = 2.dp),
+                                        verticalAlignment = Alignment.Top
+                                    ) {
+                                        Text(
+                                            text = "${idx + 1}. ",
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            text = def,
+                                            fontSize = 14.sp,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            lineHeight = 20.sp
+                                        )
+                                    }
                                 }
                             }
                         }
