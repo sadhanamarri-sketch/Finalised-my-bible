@@ -225,11 +225,24 @@ class MainActivity : ComponentActivity() {
 
             // While Reader shows a "Return to X" banner (followed a cross-
             // reference, search result, or lexicon citation into the
-            // Reader), system back should do exactly what tapping the
-            // banner's Return button does — hop back to that list/page —
-            // instead of falling through to the default Activity back
-            // behavior (backgrounding/exiting the app), since activeTab ==
-            // READER disables the blanket handler above.
+            // Reader), system back should act instead of falling through to
+            // the default Activity back behavior (backgrounding/exiting the
+            // app) — activeTab == READER disables the blanket handler above.
+            //
+            // What it does depends on whether the detour has a meaningful
+            // "verse reading started from" to undo back to:
+            //  - Cross-reference and lexicon citation detours both started
+            //    from a specific verse while reading (e.g. Romans 2:3,
+            //    before following a reference to Romans 11:2) — system
+            //    back's conventional meaning is "take me back to where I
+            //    was", i.e. that source verse, NOT the list/definition page
+            //    the banner's own Return button goes to (that's a
+            //    deliberate separate "let me pick another reference from
+            //    here" action, left as-is on the button).
+            //  - Search has no equivalent "origin verse" — it's opened as
+            //    its own destination from anywhere, not from a specific
+            //    verse — so its results list genuinely is the most useful
+            //    thing to go back to, same as tapping Return.
             val crossReferenceReturnAvailable by viewModel.crossReferenceReturnAvailable.collectAsState()
             val searchReturnAvailable by viewModel.searchReturnAvailable.collectAsState()
             val lexiconReturnTab by viewModel.lexiconReturnTab.collectAsState()
@@ -238,9 +251,9 @@ class MainActivity : ComponentActivity() {
                     (crossReferenceReturnAvailable || searchReturnAvailable || lexiconReturnTab != null)
             ) {
                 when {
-                    crossReferenceReturnAvailable -> viewModel.returnToCrossReferences()
+                    crossReferenceReturnAvailable -> viewModel.backToCrossReferenceSourceVerse()
                     searchReturnAvailable -> viewModel.returnToSearchResults()
-                    else -> viewModel.returnToLexicon()
+                    else -> viewModel.backToLexiconOriginVerse()
                 }
             }
 

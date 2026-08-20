@@ -845,10 +845,10 @@ fun ReaderScreen(
                                 }
                             },
                             onGreekWordClick = { gWord ->
-                                runUnlessBlurred { viewModel.selectGreekWord(gWord, verse.number) }
+                                runUnlessBlurred { viewModel.selectGreekWord(gWord, verse) }
                             },
                             onHebrewWordClick = { hWord ->
-                                runUnlessBlurred { viewModel.selectHebrewWord(hWord, verse.number) }
+                                runUnlessBlurred { viewModel.selectHebrewWord(hWord, verse) }
                             },
                             onCrossReferenceMarkerClick = {
                                 // Bypasses the verse action sheet entirely —

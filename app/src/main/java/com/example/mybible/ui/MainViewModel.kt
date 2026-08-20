@@ -794,7 +794,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // GreekWordScreen/HebrewWordScreen is showing (AnimatedContent tears
     // down the inactive tab's composable), so without this, switching back
     // to the Reader tab has nothing to restore its scroll position from.
-    private val _lexiconBaseVerse = MutableStateFlow<Int?>(null)
+    //
+    // Stored as a full Verse (not just a verse number): a citation tapped
+    // inside the definition can jump the Reader to a different book/
+    // chapter entirely (see openVerseMentionPreview's "Open in Reader"),
+    // so by the time either closeGreekWordPage/closeHebrewWordPage or
+    // backToLexiconOriginVerse runs, currentBook/currentChapter no longer
+    // necessarily match the chapter this word was originally tapped in —
+    // a bare verse number would silently resolve against the wrong
+    // chapter's verse list.
+    private val _lexiconBaseVerse = MutableStateFlow<Verse?>(null)
 
     // Opens GreekWordScreen for this word — same "land on a full page,
     // fetch lazily" shape as CrossReferenceScreen/openCrossReferences.
@@ -802,7 +811,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // (used internally by closeGreekWordPage(), and safe to leave as a
     // dedicated no-op path for any future non-navigating "just clear it"
     // caller); baseVerse is only meaningful on that real-selection path.
-    fun selectGreekWord(greekWord: GreekWord?, baseVerse: Int? = null) {
+    fun selectGreekWord(greekWord: GreekWord?, baseVerse: Verse? = null) {
         _selectedGreekWord.value = greekWord
         lexiconLookupJob?.cancel()
         _lexiconResult.value = null
@@ -822,13 +831,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // GreekWordScreen's own back button — mirrors endCrossReferenceSession()
     // + selectTab(READER), plus focusing the base verse (see
-    // focusLexiconBaseVerseAndReturn).
+    // jumpToLexiconBaseVerse).
     fun closeGreekWordPage() {
         selectGreekWord(null)
-        focusLexiconBaseVerseAndReturn()
+        jumpToLexiconBaseVerse()
+        selectTab(NavTab.READER)
     }
 
-    fun selectHebrewWord(hebrewWord: HebrewWord?, baseVerse: Int? = null) {
+    fun selectHebrewWord(hebrewWord: HebrewWord?, baseVerse: Verse? = null) {
         _selectedHebrewWord.value = hebrewWord
         hebrewLexiconLookupJob?.cancel()
         _hebrewLexiconResult.value = null
@@ -848,23 +858,43 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun closeHebrewWordPage() {
         selectHebrewWord(null)
-        focusLexiconBaseVerseAndReturn()
+        jumpToLexiconBaseVerse()
+        selectTab(NavTab.READER)
     }
 
-    // Shared by closeGreekWordPage/closeHebrewWordPage: spotlight-jump back
-    // to the verse the lookup was opened from (same "focus" treatment as a
-    // cross-reference/search jump — see jumpToVerse's doc), then return to
-    // Reader. Falls back to a plain tab switch if somehow no base verse was
-    // recorded, rather than forcing a jump to nothing.
-    private fun focusLexiconBaseVerseAndReturn() {
+    // Shared by closeGreekWordPage/closeHebrewWordPage and
+    // backToLexiconOriginVerse below: spotlight-jump back to the verse the
+    // lookup was opened from — across book/chapter if a followed citation
+    // moved the Reader elsewhere (see _lexiconBaseVerse's doc) — via the
+    // same real "jump to verse X" path used by cross-reference/search
+    // jumps (see jumpToVerse's doc), rather than just poking
+    // focusedVerseNumber. A no-op if somehow no base verse was recorded,
+    // rather than forcing a jump to nothing.
+    private fun jumpToLexiconBaseVerse() {
         val base = _lexiconBaseVerse.value
         _lexiconBaseVerse.value = null
         if (base != null) {
-            _focusedVerseNumber.value = base
-            _focusedVerseBlurEnabled.value = true
-            _focusedVersePinToTop.value = false
+            jumpToVerse(base.book, base.chapter, base.number)
+            _isBlurModeEnabled.value = false
         }
-        selectTab(NavTab.READER)
+    }
+
+    // System back while Reader shows the "Return to Greek/Hebrew word"
+    // banner — undoes the whole lexicon detour and lands back on the verse
+    // the word lookup was originally opened from, rather than the lexicon
+    // definition page (which is what the banner's own Return button does —
+    // see returnToLexicon()). That's system back's conventional meaning
+    // ("take me back to where I was"), distinct from the button's
+    // deliberate "let me pick another reference from here" — see
+    // MainActivity's back-handling comment for the parallel
+    // cross-reference case. Also clears whichever word was selected so a
+    // stray later tab switch into Greek/Hebrew word doesn't resurrect a
+    // stale definition.
+    fun backToLexiconOriginVerse() {
+        _lexiconReturnTab.value = null
+        selectGreekWord(null)
+        selectHebrewWord(null)
+        jumpToLexiconBaseVerse()
     }
 
     // Opens CrossReferenceScreen for this verse — same shape as a search:
@@ -889,10 +919,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // Hops back to CrossReferenceScreen from the Reader's "Return to cross
     // references" banner — same scroll position, same list. Mirrors
-    // returnToSearchResults().
+    // returnToSearchResults(). This is the banner's own Return button;
+    // system back does something different — see
+    // backToCrossReferenceSourceVerse below.
     fun returnToCrossReferences() {
         _crossReferenceReturnAvailable.value = false
         selectTab(NavTab.CROSS_REFERENCES)
+    }
+
+    // System back while Reader shows the "Return to cross references"
+    // banner — undoes the whole cross-reference detour and lands back on
+    // the verse reading started from (e.g. Romans 2:3), rather than the
+    // cross-reference list (Romans 11:2's references), which is what the
+    // banner's own Return button goes to. That's system back's
+    // conventional meaning ("take me back to where I was"), distinct from
+    // the button's deliberate "let me pick another reference from here."
+    // Ends the session too, same as dismissCrossReferenceReturnBanner():
+    // there's no list left to come back to once you've backed out past it.
+    fun backToCrossReferenceSourceVerse() {
+        val source = _crossReferenceSourceVerse.value
+        _crossReferenceReturnAvailable.value = false
+        endCrossReferenceSession()
+        if (source != null) {
+            jumpToVerse(source.book, source.chapter, source.number)
+            _isBlurModeEnabled.value = false
+        }
     }
 
     // "Cancel" on the banner — end the session (mirrors
