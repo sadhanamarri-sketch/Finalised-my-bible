@@ -82,17 +82,17 @@ object WidgetColors {
 
     fun forCurrentTheme(context: Context): WidgetPalette {
         val prefs = context.getSharedPreferences(WIDGET_PREFS_NAME, Context.MODE_PRIVATE)
-        // Default of PAPER (not CLASSIC_DARK) matches ThemeMode's own real
-        // default in BibleRepository.getSavedTheme() — a fresh install that
-        // has never explicitly saved a theme should show the same paper
-        // look on the widget as it does in the app itself.
-        return when (prefs.getString(WIDGET_THEME_KEY, "PAPER")) {
+        // Default of CLASSIC_DARK matches ThemeMode's own real default in
+        // BibleRepository.getSavedTheme() — a fresh install that has never
+        // explicitly saved a theme should show the same look on the widget
+        // as it does in the app itself.
+        return when (prefs.getString(WIDGET_THEME_KEY, "CLASSIC_DARK")) {
             "SEPIA" -> SEPIA
             "LIGHT" -> LIGHT
             "DARK" -> DARK
             "CLASSIC_DARK" -> CLASSIC_DARK
             "PAPER" -> PAPER
-            else -> PAPER
+            else -> CLASSIC_DARK
         }
     }
 }

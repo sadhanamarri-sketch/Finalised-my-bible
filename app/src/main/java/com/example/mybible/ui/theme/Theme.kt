@@ -151,7 +151,7 @@ private val ClassicDarkColorScheme = darkColorScheme(
 
 @Composable
 fun MyBibleTheme(
-    themeMode: ThemeMode = ThemeMode.PAPER,
+    themeMode: ThemeMode = ThemeMode.CLASSIC_DARK,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when (themeMode) {

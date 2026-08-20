@@ -90,8 +90,8 @@ class BibleRepository(private val context: Context) {
     private val prefs = context.getSharedPreferences("my_bible_prefs", Context.MODE_PRIVATE)
 
     fun getSavedTheme(): ThemeMode {
-        val themeStr = prefs.getString("theme_mode", ThemeMode.PAPER.name) ?: ThemeMode.PAPER.name
-        return try { ThemeMode.valueOf(themeStr) } catch (e: Exception) { ThemeMode.PAPER }
+        val themeStr = prefs.getString("theme_mode", ThemeMode.CLASSIC_DARK.name) ?: ThemeMode.CLASSIC_DARK.name
+        return try { ThemeMode.valueOf(themeStr) } catch (e: Exception) { ThemeMode.CLASSIC_DARK }
     }
 
     fun saveTheme(theme: ThemeMode) {
