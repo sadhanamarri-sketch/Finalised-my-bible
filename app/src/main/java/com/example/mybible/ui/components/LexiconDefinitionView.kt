@@ -58,14 +58,66 @@ private fun AnnotatedString.Builder.appendHighlighted(text: String, refColor: Co
 // U+27E7 brackets, verified absent from the source lexicon text itself.
 private val REF_MARKER_RE = Regex("⟦([^|⟧]*)\\|([^⟧]*)⟧")
 
+private fun AnnotatedString.Builder.appendRefStyled(text: String, refColor: Color, clickable: Boolean) {
+    withStyle(
+        SpanStyle(
+            color = refColor,
+            fontWeight = FontWeight.Medium,
+            textDecoration = if (clickable) TextDecoration.Underline else null
+        )
+    ) {
+        append(text)
+    }
+}
+
+// A marker's display text is often a *chain* of citations sharing one
+// "⟦key|display⟧" wrapper — e.g. "Rom.3:14, 17" or "Heb.5:4, 7:11, 9:4" —
+// not a single reference. Resolving the whole thing to one verse (the
+// key's first citation) and underlining the entire span used to make "17"
+// or "7:11" look individually tappable while actually jumping to whatever
+// the first citation was. ScriptureRefResolver.findCitations splits the
+// display text itself into its individual verse mentions so each one gets
+// its own annotation and underline; appendSingleCitation is the fallback
+// for the minority of markers that don't split (see findCitations' doc),
+// preserving the original whole-span behavior for those.
+private fun AnnotatedString.Builder.appendSingleCitation(display: String, resolved: ScriptureRefResolver.Ref?, refColor: Color) {
+    val start = length
+    appendRefStyled(display, refColor, clickable = resolved != null)
+    if (resolved != null) {
+        addStringAnnotation(REF_ANNOTATION_TAG, "${resolved.book}|${resolved.chapter}|${resolved.verse}", start, length)
+    }
+}
+
+private fun AnnotatedString.Builder.appendMultiCitation(
+    display: String,
+    citations: List<ScriptureRefResolver.Citation>,
+    refColor: Color
+) {
+    var cursor = 0
+    for (citation in citations) {
+        if (citation.range.first > cursor) {
+            appendRefStyled(display.substring(cursor, citation.range.first), refColor, clickable = false)
+        }
+        val start = length
+        appendRefStyled(display.substring(citation.range.first, citation.range.last + 1), refColor, clickable = true)
+        addStringAnnotation(REF_ANNOTATION_TAG, "${citation.ref.book}|${citation.ref.chapter}|${citation.ref.verse}", start, length)
+        cursor = citation.range.last + 1
+    }
+    if (cursor < display.length) {
+        appendRefStyled(display.substring(cursor), refColor, clickable = false)
+    }
+}
+
 /**
  * Builds an [AnnotatedString] where "⟦key|display⟧" markers become their
- * display text, underlined and carrying a [REF_ANNOTATION_TAG] annotation
- * when [ScriptureRefResolver] can resolve the key to a navigable verse
- * (most citations — see its doc for the residue that can't be, like
- * Apocryphal references this KJV-only app has no text for), and any bare
- * reference-shaped text outside markers is still just highlighted, not
- * clickable, exactly as before.
+ * display text with each individual verse mention inside it — a marker's
+ * display text is frequently a chain like "Rom.3:14, 17", not a single
+ * citation — underlined and carrying its own [REF_ANNOTATION_TAG]
+ * annotation (see appendMultiCitation/ScriptureRefResolver.findCitations),
+ * falling back to one span for the whole marker when the display text
+ * can't be split (appendSingleCitation). Any bare reference-shaped text
+ * outside markers is still just highlighted, not clickable, exactly as
+ * before.
  */
 private fun buildRefAnnotatedString(text: String, refColor: Color): AnnotatedString = buildAnnotatedString {
     var last = 0
@@ -73,19 +125,11 @@ private fun buildRefAnnotatedString(text: String, refColor: Color): AnnotatedStr
         if (match.range.first > last) appendHighlighted(text.substring(last, match.range.first), refColor)
         val key = match.groupValues[1]
         val display = match.groupValues[2]
-        val resolved = ScriptureRefResolver.resolve(key)
-        val start = length
-        withStyle(
-            SpanStyle(
-                color = refColor,
-                fontWeight = FontWeight.Medium,
-                textDecoration = if (resolved != null) TextDecoration.Underline else null
-            )
-        ) {
-            append(display)
-        }
-        if (resolved != null) {
-            addStringAnnotation(REF_ANNOTATION_TAG, "${resolved.book}|${resolved.chapter}|${resolved.verse}", start, length)
+        val citations = ScriptureRefResolver.findCitations(display)
+        if (citations.isNotEmpty()) {
+            appendMultiCitation(display, citations, refColor)
+        } else {
+            appendSingleCitation(display, ScriptureRefResolver.resolve(key), refColor)
         }
         last = match.range.last + 1
     }
