@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Fixed 4x1 widget: just the "Continue Reading" pill (see
-  ContinueReadingWidget.kt), a separate pick from the widget picker rather
-  than a resize target of the 4x2 verse_of_day_widget_info widget — see
-  that Kotlin file's class doc for why. minHeight uses Android's standard
-  single-row cell formula (70dp * 1 - 30dp).
+  Default 4x1 footprint: just the "Continue Reading" pill (see
+  ContinueReadingWidget.kt). Dragging it taller to roughly 4x2 reveals a
+  quick-action icon row below the pill — see that Kotlin file's class doc.
+  This is a separate widget-picker entry rather than a resize target of the
+  4x2 verse_of_day_widget_info widget, which stays its own fixed size.
+  minHeight uses Android's standard single-row cell formula (70dp * 1 - 30dp).
 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:minWidth="250dp"

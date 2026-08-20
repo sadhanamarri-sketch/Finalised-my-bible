@@ -11,6 +11,7 @@ import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
+import androidx.glance.LocalSize
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
@@ -38,21 +39,22 @@ import com.example.mybible.R
 import com.example.mybible.ui.NavTab
 
 /**
- * Compact home screen widget: a fixed 4x1 footprint. The "Continue
- * Reading" pill fills the middle, flanked by two stacked icon columns —
- * Highlights/Notes on the left, Studied/Search on the right — so all four
- * quick actions from [VerseOfDayWidget]'s 4x2 icon row are still reachable
- * in one row of height. A separate, fixed-size sibling to
- * [VerseOfDayWidget] (4x2, with the Verse of the Day card) rather than a
- * resize target of it — a live drag-resize of a Glance widget only
- * recomposes once the drag is released, and the launcher's live-crop
- * preview mid-drag made an in-place "shrink to 4x1" experience look broken
- * no matter the layout. Picking this widget from the widget picker instead
- * gives a fixed, reliable 4x1 footprint from the start.
+ * Home screen widget: a fixed-width 4-column widget whose default footprint
+ * is a single row (4x1) holding just the "Continue Reading" pill — kept as
+ * the sole focus at that size since it's meant to attract attention, not
+ * compete with icons for it. Dragging it taller (roughly 4x2 and up)
+ * reveals the Highlights / Studied / Notes / Search quick-action row below
+ * the pill, mirroring [VerseOfDayWidget]'s 4x2 icon row.
+ *
+ * sizeMode = SizeMode.Exact ties [LocalSize] to the widget's real, live
+ * measured size and recomposes on every resize (Glance handles
+ * onAppWidgetOptionsChanged internally), so the isExpanded branch in
+ * [ContinueReadingContent] responds to the user actually dragging the
+ * widget taller.
  */
 class ContinueReadingWidget : GlanceAppWidget() {
 
-    override val sizeMode = SizeMode.Single
+    override val sizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val palette = WidgetColors.forCurrentTheme(context)
@@ -70,8 +72,6 @@ class ContinueReadingWidget : GlanceAppWidget() {
     }
 }
 
-private val ICON_COLUMN_WIDTH = 34.dp
-
 @Composable
 private fun ContinueReadingContent(
     palette: WidgetPalette,
@@ -79,40 +79,23 @@ private fun ContinueReadingContent(
     lastChapter: Int
 ) {
     val context = LocalContext.current
-    Row(
+    // Default footprint is ~40dp tall (1 row); 4x2 and up is ~110dp+ (see
+    // continue_reading_widget_info.xml), so 80dp cleanly separates the two.
+    val isExpanded = LocalSize.current.height >= 80.dp
+    Column(
         modifier = GlanceModifier
             .fillMaxSize()
             .background(palette.background)
             .cornerRadius(24.dp)
             .padding(10.dp)
     ) {
-        Column(modifier = GlanceModifier.fillMaxHeight().width(ICON_COLUMN_WIDTH)) {
-            StackedIconButton(
-                iconRes = R.drawable.ic_widget_highlight,
-                contentDescription = "Highlights",
-                tab = NavTab.HIGHLIGHTS,
-                palette = palette,
-                modifier = GlanceModifier.fillMaxWidth().defaultWeight()
-            )
-            Spacer(modifier = GlanceModifier.height(6.dp))
-            StackedIconButton(
-                iconRes = R.drawable.ic_widget_notes,
-                contentDescription = "Notes",
-                tab = NavTab.NOTES,
-                palette = palette,
-                modifier = GlanceModifier.fillMaxWidth().defaultWeight()
-            )
-        }
-
-        Spacer(modifier = GlanceModifier.width(8.dp))
-
         // Outer box paints the border color; a 1dp inset reveals it as a
         // ring around the inner pill (Glance has no Modifier.border()) —
         // same trick used by the Continue Reading row on VerseOfDayWidget.
         Row(
             modifier = GlanceModifier
-                .defaultWeight()
-                .fillMaxHeight()
+                .fillMaxWidth()
+                .then(if (isExpanded) GlanceModifier.defaultWeight() else GlanceModifier.fillMaxHeight())
                 .background(palette.cardBorder)
                 .cornerRadius(19.dp)
                 .padding(1.dp)
@@ -122,7 +105,7 @@ private fun ContinueReadingContent(
                     .fillMaxSize()
                     .background(palette.buttonBackground)
                     .cornerRadius(18.dp)
-                    .padding(horizontal = 10.dp)
+                    .padding(horizontal = 16.dp)
                     .clickable(
                         actionStartActivity(
                             Intent(context, MainActivity::class.java)
@@ -136,14 +119,14 @@ private fun ContinueReadingContent(
                     provider = ImageProvider(R.drawable.ic_widget_book),
                     contentDescription = null,
                     colorFilter = ColorFilter.tint(palette.accent),
-                    modifier = GlanceModifier.size(20.dp)
+                    modifier = GlanceModifier.size(26.dp)
                 )
-                Spacer(modifier = GlanceModifier.width(8.dp))
+                Spacer(modifier = GlanceModifier.width(10.dp))
                 Text(
                     text = "Continue reading",
                     style = TextStyle(
                         fontWeight = FontWeight.Medium,
-                        fontSize = 14.sp,
+                        fontSize = 17.sp,
                         color = palette.buttonText
                     ),
                     maxLines = 1
@@ -153,7 +136,7 @@ private fun ContinueReadingContent(
                     text = "$lastBook $lastChapter",
                     style = TextStyle(
                         fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
+                        fontSize = 17.sp,
                         color = palette.accent
                     ),
                     maxLines = 1
@@ -161,36 +144,55 @@ private fun ContinueReadingContent(
             }
         }
 
-        Spacer(modifier = GlanceModifier.width(8.dp))
+        if (isExpanded) {
+            Spacer(modifier = GlanceModifier.height(10.dp))
 
-        Column(modifier = GlanceModifier.fillMaxHeight().width(ICON_COLUMN_WIDTH)) {
-            StackedIconButton(
-                iconRes = R.drawable.ic_widget_check,
-                contentDescription = "Studied",
-                tab = NavTab.STUDIED,
-                palette = palette,
-                modifier = GlanceModifier.fillMaxWidth().defaultWeight()
-            )
-            Spacer(modifier = GlanceModifier.height(6.dp))
-            StackedIconButton(
-                iconRes = R.drawable.ic_widget_search,
-                contentDescription = "Search",
-                tab = NavTab.SEARCH,
-                palette = palette,
-                modifier = GlanceModifier.fillMaxWidth().defaultWeight()
-            )
+            Row(
+                modifier = GlanceModifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                QuickActionButton(
+                    iconRes = R.drawable.ic_widget_highlight,
+                    contentDescription = "Highlights",
+                    tab = NavTab.HIGHLIGHTS,
+                    palette = palette,
+                    modifier = GlanceModifier.defaultWeight()
+                )
+                QuickActionButton(
+                    iconRes = R.drawable.ic_widget_check,
+                    contentDescription = "Studied",
+                    tab = NavTab.STUDIED,
+                    palette = palette,
+                    modifier = GlanceModifier.defaultWeight()
+                )
+                QuickActionButton(
+                    iconRes = R.drawable.ic_widget_notes,
+                    contentDescription = "Notes",
+                    tab = NavTab.NOTES,
+                    palette = palette,
+                    modifier = GlanceModifier.defaultWeight()
+                )
+                QuickActionButton(
+                    iconRes = R.drawable.ic_widget_search,
+                    contentDescription = "Search",
+                    tab = NavTab.SEARCH,
+                    palette = palette,
+                    modifier = GlanceModifier.defaultWeight()
+                )
+            }
         }
     }
 }
 
 /**
- * Small round quick-action icon, one cell of the stacked left/right
- * columns flanking the Continue Reading pill. Same bordered-circle look as
- * VerseOfDayWidget's QuickActionButton, just sized down to fit two per
- * column within the widget's 4x1 height.
+ * Quick-action circular icon button for the expanded (4x2+) layout. Same
+ * bordered-circle look as VerseOfDayWidget's QuickActionButton, sized down
+ * slightly (44dp vs 52dp) since this widget's pill above already claims a
+ * chunk of the vertical space a fresh 4x2 drag grants.
  */
 @Composable
-private fun StackedIconButton(
+private fun QuickActionButton(
     iconRes: Int,
     contentDescription: String,
     tab: NavTab,
@@ -200,14 +202,13 @@ private fun StackedIconButton(
     val context = LocalContext.current
     Row(
         modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalAlignment = Alignment.CenterVertically
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Row(
             modifier = GlanceModifier
-                .size(28.dp)
+                .size(44.dp)
                 .background(palette.cardBorder)
-                .cornerRadius(14.dp)
+                .cornerRadius(22.dp)
                 .padding(1.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalAlignment = Alignment.CenterVertically
@@ -216,7 +217,7 @@ private fun StackedIconButton(
                 modifier = GlanceModifier
                     .fillMaxSize()
                     .background(palette.buttonBackground)
-                    .cornerRadius(13.dp)
+                    .cornerRadius(21.dp)
                     .clickable(
                         actionStartActivity(
                             Intent(context, MainActivity::class.java)
@@ -230,7 +231,7 @@ private fun StackedIconButton(
                     provider = ImageProvider(iconRes),
                     contentDescription = contentDescription,
                     colorFilter = ColorFilter.tint(palette.buttonText),
-                    modifier = GlanceModifier.size(15.dp)
+                    modifier = GlanceModifier.size(20.dp)
                 )
             }
         }
