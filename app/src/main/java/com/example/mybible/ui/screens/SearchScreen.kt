@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.components.BackTopBar
+import com.example.mybible.ui.components.DsSwitch
 
 @Composable
 fun SearchScreen(
@@ -136,7 +137,7 @@ fun SearchScreen(
                     }
                 }
             },
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(8.dp),
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(
@@ -145,6 +146,16 @@ fun SearchScreen(
                     keyboardController?.hide()
                     focusManager.clearFocus()
                 }
+            ),
+            // Gold focus ring instead of Material's default primary blue —
+            // matches the flat/line-bordered look the rest of the app's
+            // inputs use (see NeTextField) rather than the stock Material
+            // outlined-field treatment.
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.tertiary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                focusedLabelColor = MaterialTheme.colorScheme.tertiary,
+                cursorColor = MaterialTheme.colorScheme.primary
             ),
             modifier = Modifier
                 .fillMaxWidth()
@@ -178,6 +189,10 @@ fun SearchScreen(
             Spacer(modifier = Modifier.height(6.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(searchHistory) { term ->
+                    // Bordered pill instead of Material's default filled
+                    // AssistChip — matches the neutral chip look used for
+                    // note references (see NoteEditorScreen's ref-chip)
+                    // rather than a solid Material surface-tint fill.
                     AssistChip(
                         onClick = { viewModel.searchFromHistory(term) },
                         label = { Text(term, fontSize = 13.sp) },
@@ -196,7 +211,17 @@ fun SearchScreen(
                                     .size(14.dp)
                                     .clickable { viewModel.removeSearchHistoryItem(term) }
                             )
-                        }
+                        },
+                        colors = AssistChipDefaults.assistChipColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            labelColor = MaterialTheme.colorScheme.onSurface,
+                            leadingIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            trailingIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        border = AssistChipDefaults.assistChipBorder(
+                            enabled = true,
+                            borderColor = MaterialTheme.colorScheme.outlineVariant
+                        )
                     )
                 }
             }
@@ -226,7 +251,7 @@ fun SearchScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.width(6.dp))
-                Switch(
+                DsSwitch(
                     checked = caseSensitive,
                     onCheckedChange = { viewModel.setSearchCaseSensitive(it) },
                     modifier = Modifier.testTag("search_case_sensitive_toggle")
@@ -255,33 +280,37 @@ fun SearchScreen(
                 )
             }
         } else {
+            // Flat rows separated by a hairline, not Material Cards — same
+            // list treatment as Cross References/Highlighted Verses,
+            // rather than a stack of elevated surfaces.
             LazyColumn(
                 state = listState,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(searchResults) { verse ->
-                    Card(
-                        onClick = { viewModel.openSearchResult(verse) },
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { viewModel.openSearchResult(verse) }
+                            .padding(vertical = 12.dp)
                     ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(
-                                text = "${verse.book} ${verse.chapter}:${verse.number}",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = verse.text,
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
+                        Text(
+                            text = "${verse.book} ${verse.chapter}:${verse.number}",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp,
+                            color = MaterialTheme.colorScheme.tertiary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = verse.text,
+                            fontSize = 15.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+                            lineHeight = 21.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                     }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceContainerHigh)
                 }
             }
         }

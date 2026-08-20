@@ -167,7 +167,7 @@ private fun LexiconWordPageContent(
             fontSize = 11.sp,
             letterSpacing = 1.5.sp,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
+            color = MaterialTheme.colorScheme.tertiary
         )
         Spacer(modifier = Modifier.height(4.dp))
 
@@ -182,7 +182,7 @@ private fun LexiconWordPageContent(
                 text = transliteration,
                 fontSize = 15.5.sp,
                 fontStyle = FontStyle.Italic,
-                color = MaterialTheme.colorScheme.secondary,
+                color = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.padding(top = 2.dp)
             )
         }
@@ -217,7 +217,7 @@ private fun LexiconWordPageContent(
                         text = foundEntry!!.transliteration,
                         fontSize = 13.sp,
                         fontStyle = FontStyle.Italic,
-                        color = MaterialTheme.colorScheme.secondary,
+                        color = MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier.padding(top = 2.dp)
                     )
                 }

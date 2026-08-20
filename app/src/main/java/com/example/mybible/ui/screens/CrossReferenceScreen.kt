@@ -1,5 +1,8 @@
 package com.example.mybible.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,6 +14,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -76,29 +80,34 @@ fun CrossReferenceScreen(
         ) {
             // Base verse — the verse these cross-references were opened
             // from, pinned at the top so it stays visible while scrolling
-            // the list below.
+            // the list below. Flat bordered box, not an elevated Card —
+            // same "boxed preview" treatment NoteEditorScreen gives its
+            // note-body preview, rather than a Material surface-tint fill.
             if (sourceVerse != null) {
                 val verse = sourceVerse!!
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(10.dp))
+                        .padding(14.dp)
                 ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Text(
-                            text = "${verse.book} ${verse.chapter}:${verse.number}",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = verse.text,
-                            fontSize = 14.sp,
-                            fontFamily = FontFamily.Serif,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
+                    Text(
+                        text = "${verse.book} ${verse.chapter}:${verse.number}",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = verse.text,
+                        fontSize = 15.sp,
+                        fontFamily = FontFamily.Serif,
+                        lineHeight = 21.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 }
                 Spacer(modifier = Modifier.height(12.dp))
             }
@@ -125,52 +134,54 @@ fun CrossReferenceScreen(
                     }
                 }
                 else -> {
+                    // Flat rows separated by a hairline, not a stack of
+                    // elevated Cards — matches Search/Highlighted Verses.
                     LazyColumn(
                         state = listState,
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
                         items(crossReferences!!) { item ->
-                            Card(
-                                onClick = {
-                                    viewModel.navigateToCrossReference(
-                                        item.targetBook,
-                                        item.targetChapter,
-                                        item.targetVerse
-                                    )
-                                },
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "${item.targetBook} ${item.targetChapter}:${item.targetVerse}",
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                        Icon(
-                                            imageVector = Icons.Default.ArrowForward,
-                                            contentDescription = "Navigate",
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(16.dp)
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        viewModel.navigateToCrossReference(
+                                            item.targetBook,
+                                            item.targetChapter,
+                                            item.targetVerse
                                         )
                                     }
-                                    Spacer(modifier = Modifier.height(4.dp))
+                                    .padding(vertical = 12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     Text(
-                                        text = item.previewText,
+                                        text = "${item.targetBook} ${item.targetChapter}:${item.targetVerse}",
                                         fontSize = 13.sp,
-                                        fontFamily = FontFamily.Serif,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 0.5.sp,
+                                        color = MaterialTheme.colorScheme.tertiary
+                                    )
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowForward,
+                                        contentDescription = "Navigate",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp)
                                     )
                                 }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = item.previewText,
+                                    fontSize = 15.sp,
+                                    fontFamily = FontFamily.Serif,
+                                    lineHeight = 21.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
                             }
+                            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceContainerHigh)
                         }
                     }
                 }

@@ -143,7 +143,7 @@ fun EnglishDictionarySheet(
                     text = entry!!.phonetic!!,
                     fontSize = 14.sp,
                     fontStyle = FontStyle.Italic,
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
                 )
             } else if (entry?.resolvedFrom != null) {
@@ -156,7 +156,7 @@ fun EnglishDictionarySheet(
                     text = "Showing definition for \"${entry.resolvedFrom}\"",
                     fontSize = 13.sp,
                     fontStyle = FontStyle.Italic,
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
                 )
             } else {
@@ -205,7 +205,7 @@ fun EnglishDictionarySheet(
                                         text = "${idx + 1}. ",
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.secondary
+                                        color = MaterialTheme.colorScheme.primary
                                     )
                                     Text(
                                         text = def,
@@ -355,7 +355,7 @@ fun VerseMentionPreviewSheet(
                 text = "$book $chapter:$verse",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.tertiary
             )
             Spacer(modifier = Modifier.height(10.dp))
             Text(
@@ -510,7 +510,7 @@ fun ManageHighlightColorsSheet(
                         }
                     }
 
-                    Switch(
+                    DsSwitch(
                         checked = def.enabled,
                         onCheckedChange = { checked ->
                             if (!(isOnlyEnabledLeft && !checked)) onSetEnabled(def.colorHex, checked)

@@ -1,6 +1,7 @@
 package com.example.mybible.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -303,16 +304,21 @@ private fun TestamentProgressCard(
     ntProgress: Float,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(16.dp),
-        modifier = modifier.fillMaxWidth()
+    // Flat bordered box, not an elevated Card — matches the "boxed
+    // preview" treatment used elsewhere (NoteEditorScreen's note-body
+    // preview, CrossReferenceScreen's source-verse box) instead of a
+    // Material surface-tint fill.
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
+            .padding(20.dp)
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
-            TestamentProgressRow(label = "Old Testament", progress = otProgress)
-            Spacer(modifier = Modifier.height(14.dp))
-            TestamentProgressRow(label = "New Testament", progress = ntProgress)
-        }
+        TestamentProgressRow(label = "Old Testament", progress = otProgress)
+        Spacer(modifier = Modifier.height(14.dp))
+        TestamentProgressRow(label = "New Testament", progress = ntProgress)
     }
 }
 
@@ -350,39 +356,41 @@ private fun RecentStudiedCard(
     onGroupClick: (RecentGroup) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(16.dp),
-        modifier = modifier.fillMaxWidth()
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
+            .padding(horizontal = 20.dp, vertical = 16.dp)
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Recently Studied",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(text = dayLabel, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-            groups.forEachIndexed { index, group ->
-                Text(
-                    text = "${group.book} ${group.chapter} \u2014 ${formatVerseRanges(group.verses)}",
-                    fontSize = 13.5.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onGroupClick(group) }
-                        .padding(vertical = 5.dp)
-                )
-                if (index != groups.lastIndex) {
-                    Spacer(modifier = Modifier.height(2.dp))
-                }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Recently Studied",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(text = dayLabel, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+        groups.forEachIndexed { index, group ->
+            Text(
+                text = "${group.book} ${group.chapter} \u2014 ${formatVerseRanges(group.verses)}",
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onGroupClick(group) }
+                    .padding(vertical = 5.dp)
+            )
+            if (index != groups.lastIndex) {
+                Spacer(modifier = Modifier.height(2.dp))
             }
         }
     }

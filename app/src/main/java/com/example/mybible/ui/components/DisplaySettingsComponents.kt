@@ -93,10 +93,15 @@ fun DsToggleRow(
 fun DsSwitch(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
     val trackColor by animateColorAsState(
-        if (checked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outlineVariant,
+        when {
+            !enabled -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            checked -> MaterialTheme.colorScheme.error
+            else -> MaterialTheme.colorScheme.outlineVariant
+        },
         label = "dsSwitchTrack"
     )
     Box(
@@ -104,7 +109,7 @@ fun DsSwitch(
             .size(width = 46.dp, height = 28.dp)
             .clip(RoundedCornerShape(14.dp))
             .background(trackColor)
-            .clickable { onCheckedChange(!checked) }
+            .clickable(enabled = enabled) { onCheckedChange(!checked) }
             .padding(2.dp),
         contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart
     ) {
@@ -112,7 +117,7 @@ fun DsSwitch(
             modifier = Modifier
                 .size(24.dp)
                 .clip(CircleShape)
-                .background(androidx.compose.ui.graphics.Color.White)
+                .background(androidx.compose.ui.graphics.Color.White.copy(alpha = if (enabled) 1f else 0.7f))
         )
     }
 }
