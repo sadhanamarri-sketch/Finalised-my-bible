@@ -24,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -77,22 +78,31 @@ fun BackTopBar(
     // the Notes editor/reader screens use this instead of bottom buttons.
     actions: @Composable RowScope.() -> Unit = {}
 ) {
-    TopAppBar(
-        title = {
-            Text(text = title, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-        },
-        navigationIcon = {
-            IconButton(onClick = onBack, modifier = Modifier.testTag("back_to_reader")) {
-                Icon(imageVector = backIcon, contentDescription = backContentDescription)
-            }
-        },
-        actions = actions,
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-            titleContentColor = MaterialTheme.colorScheme.onSurface
-        ),
-        modifier = modifier
-    )
+    Column(modifier = modifier) {
+        TopAppBar(
+            title = {
+                // Serif, not the default Material sans — every other
+                // "title" in the app (note titles, DsToggleRow labels, the
+                // Reader's verse-ref chip) reads in the same serif family;
+                // this was the one holdout still in plain Material type.
+                Text(text = title, fontSize = 19.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Serif)
+            },
+            navigationIcon = {
+                IconButton(onClick = onBack, modifier = Modifier.testTag("back_to_reader")) {
+                    Icon(imageVector = backIcon, contentDescription = backContentDescription)
+                }
+            },
+            actions = actions,
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+                titleContentColor = MaterialTheme.colorScheme.onSurface
+            )
+        )
+        // Flat hairline instead of Material's shadow-based elevation —
+        // matches the line-bordered look used throughout the app (e.g.
+        // NoteReaderScreen's own header divider) rather than a drop shadow.
+        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceContainerHigh, thickness = 1.dp)
+    }
 }
 
 // Reader's "picking mode" banner — the accent-colored bar shown while the
