@@ -72,9 +72,16 @@ fun HighlightedVersesScreen(
                 .background(MaterialTheme.colorScheme.background)
         ) {
             if (colors.size > 1) {
-                Row(
+                // FlowRow, not Row: a plain Row doesn't wrap, so once there
+                // are enough color labels to overflow the screen width the
+                // rest were simply clipped off-screen with no way to reach
+                // them. FlowRow wraps overflow chips onto additional rows
+                // instead, so every color stays reachable regardless of
+                // count.
+                FlowRow(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     colors.forEach { color ->
                         val selected = selectedColor == color

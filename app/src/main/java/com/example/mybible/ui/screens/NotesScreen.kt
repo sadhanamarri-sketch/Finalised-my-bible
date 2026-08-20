@@ -43,7 +43,6 @@ import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.components.BackTopBar
 import com.example.mybible.ui.components.DateField
-import com.example.mybible.ui.components.LinkifiedNoteText
 import com.example.mybible.ui.components.NeSectionLabel
 
 // Formats an ISO "yyyy-MM-dd" note date as "22nd Aug 2026" — matches the
@@ -364,16 +363,21 @@ fun NotesScreen(
 
                             // Note body preview — clipped to a few lines;
                             // "Read more" (below) opens the full note
-                            // reader rather than expanding inline.
-                            LinkifiedNoteText(
+                            // reader rather than expanding inline. Plain
+                            // Text, not LinkifiedNoteText: the whole card is
+                            // already tap-to-open-reader (see the Column's
+                            // own .clickable above), and a verse mention
+                            // being separately clickable here stole that tap
+                            // instead of opening the reader. Verse mentions
+                            // are only meant to be tappable once you're
+                            // actually inside the reader — see
+                            // NoteReaderScreen's use of LinkifiedNoteText.
+                            Text(
                                 text = note.text,
-                                onMentionClick = { b, c, v -> viewModel.openVerseMentionPreview(b, c, v) },
-                                style = androidx.compose.ui.text.TextStyle(
-                                    fontFamily = com.example.mybible.ui.theme.GelasioFontFamily,
-                                    fontSize = 17.5.sp,
-                                    lineHeight = 25.sp,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                ),
+                                fontFamily = com.example.mybible.ui.theme.GelasioFontFamily,
+                                fontSize = 17.5.sp,
+                                lineHeight = 25.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 3,
                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                                 modifier = Modifier.padding(top = 6.dp)
