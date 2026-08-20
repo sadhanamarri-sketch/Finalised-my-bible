@@ -37,7 +37,7 @@ import java.util.Date
 import java.util.Locale
 
 enum class NavTab {
-    READER, STUDIED, NOTES, SEARCH, SETTINGS, HIGHLIGHTS, CROSS_REFERENCES
+    READER, STUDIED, NOTES, SEARCH, SETTINGS, HIGHLIGHTS, CROSS_REFERENCES, GREEK_WORD, HEBREW_WORD
 }
 
 // Mirrors Capacitor's pickingMode (notes) and selectMode (studied) — a
@@ -198,9 +198,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _selectedHebrewWord = MutableStateFlow<HebrewWord?>(null)
     val selectedHebrewWord: StateFlow<HebrewWord?> = _selectedHebrewWord.asStateFlow()
 
-    // Greek Lexicon (TBESG) Lookup state — the sheet's inline gloss comes
-    // straight off selectedGreekWord above; this is the fuller entry fetched
-    // lazily once the sheet opens, mirroring Capacitor's openGreekWordSheet().
+    // Greek Lexicon (TBESG) Lookup state — GreekWordScreen's inline gloss
+    // comes straight off selectedGreekWord above; this is the fuller entry
+    // fetched lazily once the page opens, mirroring Capacitor's
+    // openGreekWordSheet() (the page here, its bottom sheet there).
     private val _lexiconResult = MutableStateFlow<LexiconLookupResult?>(null)
     val lexiconResult: StateFlow<LexiconLookupResult?> = _lexiconResult.asStateFlow()
 
@@ -220,6 +221,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val isLoadingHebrewLexicon: StateFlow<Boolean> = _isLoadingHebrewLexicon.asStateFlow()
 
     private var hebrewLexiconLookupJob: Job? = null
+
+    // Scroll position within GreekWordScreen/HebrewWordScreen's definition
+    // text, saved/restored across the trip to Reader and back the same way
+    // Search/CrossReferenceScreen do (see _searchScrollIndex etc. below) —
+    // a single Int since the page is one continuously-scrolling Column, not
+    // a LazyColumn of discrete items.
+    private val _greekWordScrollPosition = MutableStateFlow(0)
+    val greekWordScrollPosition: StateFlow<Int> = _greekWordScrollPosition.asStateFlow()
+
+    private val _hebrewWordScrollPosition = MutableStateFlow(0)
+    val hebrewWordScrollPosition: StateFlow<Int> = _hebrewWordScrollPosition.asStateFlow()
+
+    fun saveGreekWordScrollPosition(position: Int) {
+        _greekWordScrollPosition.value = position
+    }
+
+    fun saveHebrewWordScrollPosition(position: Int) {
+        _hebrewWordScrollPosition.value = position
+    }
 
     // Cross References page (see CrossReferenceScreen) — same
     // persisted-list-and-scroll-position pattern as Search (see
@@ -693,6 +713,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _selectedVerse.value = verse
     }
 
+    // Opens GreekWordScreen for this word — same "land on a full page,
+    // fetch lazily" shape as CrossReferenceScreen/openCrossReferences.
+    // Passing null instead clears the selection without switching tabs
+    // (used internally by closeGreekWordPage(), and safe to leave as a
+    // dedicated no-op path for any future non-navigating "just clear it"
+    // caller).
     fun selectGreekWord(greekWord: GreekWord?) {
         _selectedGreekWord.value = greekWord
         lexiconLookupJob?.cancel()
@@ -700,12 +726,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _isLoadingLexicon.value = false
         if (greekWord == null) return
 
+        _greekWordScrollPosition.value = 0
         _isLoadingLexicon.value = true
         lexiconLookupJob = viewModelScope.launch {
             val result = repository.getLexiconEntry(greekWord.strongs)
             _lexiconResult.value = result
             _isLoadingLexicon.value = false
         }
+        selectTab(NavTab.GREEK_WORD)
+    }
+
+    // GreekWordScreen's own back button — mirrors endCrossReferenceSession()
+    // + selectTab(READER).
+    fun closeGreekWordPage() {
+        selectGreekWord(null)
+        selectTab(NavTab.READER)
     }
 
     fun selectHebrewWord(hebrewWord: HebrewWord?) {
@@ -715,12 +750,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _isLoadingHebrewLexicon.value = false
         if (hebrewWord == null) return
 
+        _hebrewWordScrollPosition.value = 0
         _isLoadingHebrewLexicon.value = true
         hebrewLexiconLookupJob = viewModelScope.launch {
             val result = repository.getHebrewLexiconEntry(hebrewWord.strongs)
             _hebrewLexiconResult.value = result
             _isLoadingHebrewLexicon.value = false
         }
+        selectTab(NavTab.HEBREW_WORD)
+    }
+
+    fun closeHebrewWordPage() {
+        selectHebrewWord(null)
+        selectTab(NavTab.READER)
     }
 
     // Opens CrossReferenceScreen for this verse — same shape as a search:

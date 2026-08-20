@@ -10,7 +10,7 @@ import kotlinx.coroutines.withContext
  * for Hebrew — abridged BDB, CC BY 4.0, Tyndale House Cambridge /
  * STEPBible.org). This is what was missing before: TAHOT (imported by
  * [HebrewImporter]) gives the interlinear word-by-word gloss, but the
- * fuller "STRONG'S H..." definition shown in HebrewWordSheet comes from
+ * fuller "STRONG'S H..." definition shown in HebrewWordScreen comes from
  * this lexicon — same relationship TBESG has to TAGNT for Greek.
  *
  * Same TSV shape and same repo/folder as TBESG (just Hebrew's file, in the

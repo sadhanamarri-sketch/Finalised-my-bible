@@ -189,12 +189,6 @@ class MainActivity : ComponentActivity() {
 
             val showBookPicker by viewModel.showBookPicker.collectAsState()
             val currentBook by viewModel.currentBook.collectAsState()
-            val selectedGreekWord by viewModel.selectedGreekWord.collectAsState()
-            val lexiconResult by viewModel.lexiconResult.collectAsState()
-            val isLoadingLexicon by viewModel.isLoadingLexicon.collectAsState()
-            val selectedHebrewWord by viewModel.selectedHebrewWord.collectAsState()
-            val hebrewLexiconResult by viewModel.hebrewLexiconResult.collectAsState()
-            val isLoadingHebrewLexicon by viewModel.isLoadingHebrewLexicon.collectAsState()
             val selectedEnglishWord by viewModel.selectedEnglishWord.collectAsState()
             val dictionaryEntry by viewModel.dictionaryEntry.collectAsState()
             val isLoadingDictionary by viewModel.isLoadingDictionary.collectAsState()
@@ -269,6 +263,8 @@ class MainActivity : ComponentActivity() {
                             NavTab.NOTES -> NotesScreen(viewModel = viewModel)
                             NavTab.SEARCH -> SearchScreen(viewModel = viewModel)
                             NavTab.CROSS_REFERENCES -> CrossReferenceScreen(viewModel = viewModel)
+                            NavTab.GREEK_WORD -> GreekWordScreen(viewModel = viewModel)
+                            NavTab.HEBREW_WORD -> HebrewWordScreen(viewModel = viewModel)
                             NavTab.HIGHLIGHTS -> {
                                 val highlightedItems by viewModel.highlightedVerseItems.collectAsState()
                                 HighlightedVersesScreen(
@@ -346,26 +342,6 @@ class MainActivity : ComponentActivity() {
                                 viewModel.setShowBookPicker(false)
                             },
                             getVerseCount = { book, chap -> viewModel.getVerseCount(book, chap) }
-                        )
-                    }
-
-                    // Greek Word Lexicon Sheet (TBESG)
-                    if (selectedGreekWord != null) {
-                        GreekWordSheet(
-                            greekWord = selectedGreekWord!!,
-                            lexiconResult = lexiconResult,
-                            isLoading = isLoadingLexicon,
-                            onDismiss = { viewModel.selectGreekWord(null) }
-                        )
-                    }
-
-                    // Hebrew Word Sheet (TAHOT)
-                    if (selectedHebrewWord != null) {
-                        HebrewWordSheet(
-                            hebrewWord = selectedHebrewWord!!,
-                            lexiconResult = hebrewLexiconResult,
-                            isLoading = isLoadingHebrewLexicon,
-                            onDismiss = { viewModel.selectHebrewWord(null) }
                         )
                     }
 
