@@ -1,5 +1,6 @@
 package com.example.mybible.ui.screens
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
@@ -17,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
@@ -32,6 +35,7 @@ import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.components.BackTopBar
 import com.example.mybible.ui.components.DsSwitch
+import com.example.mybible.ui.components.resolveEnglishFontStyle
 
 @Composable
 fun SearchScreen(
@@ -45,6 +49,7 @@ fun SearchScreen(
     val savedScrollIndex by viewModel.searchScrollIndex.collectAsState()
     val savedScrollOffset by viewModel.searchScrollOffset.collectAsState()
     val searchHistory by viewModel.searchHistory.collectAsState()
+    val englishFontFamilyName by viewModel.englishFontFamilyName.collectAsState()
 
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = savedScrollIndex,
@@ -280,37 +285,55 @@ fun SearchScreen(
                 )
             }
         } else {
-            // Flat rows separated by a hairline, not Material Cards — same
-            // list treatment as Cross References/Highlighted Verses,
-            // rather than a stack of elevated surfaces.
+            // Coral-bordered cards, each with a trailing arrow — matches
+            // Cross References' row shape, with its own outline instead of
+            // a shared hairline between rows.
+            val englishFontStyle = resolveEnglishFontStyle(englishFontFamilyName)
             LazyColumn(
                 state = listState,
+                verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(searchResults) { verse ->
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
                             .clickable { viewModel.openSearchResult(verse) }
-                            .padding(vertical = 12.dp)
+                            .padding(12.dp)
                     ) {
-                        Text(
-                            text = "${verse.book} ${verse.chapter}:${verse.number}",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.5.sp,
-                            color = MaterialTheme.colorScheme.tertiary
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "${verse.book} ${verse.chapter}:${verse.number}".uppercase(),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp,
+                                color = MaterialTheme.colorScheme.tertiary
+                            )
+                            Icon(
+                                imageVector = Icons.Default.ArrowForward,
+                                contentDescription = "Navigate",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = verse.text,
                             fontSize = 15.sp,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+                            fontFamily = englishFontStyle.family,
+                            fontWeight = englishFontStyle.weight,
+                            fontStyle = englishFontStyle.style,
+                            letterSpacing = englishFontStyle.letterSpacing,
                             lineHeight = 21.sp,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceContainerHigh)
                 }
             }
         }
