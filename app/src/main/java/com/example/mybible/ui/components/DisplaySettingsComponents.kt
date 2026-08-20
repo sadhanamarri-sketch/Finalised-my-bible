@@ -17,7 +17,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -86,8 +88,13 @@ fun DsToggleRow(
 
 /**
  * Hand-built pill switch matching Capacitor's ".ds-switch" exactly: 46x28
- * rounded track, white 24dp thumb, off = outline/line color, on = the
- * theme's redletter/error tone (not the general accent).
+ * rounded track, off = outline/line color, on = the theme's redletter/error
+ * tone (not the general accent). The thumb picks white or black based on
+ * the *actual* track color's luminance (same pattern as the highlight-color
+ * swatch checkmark in VerseComponents) rather than a literal white — a
+ * fixed white thumb read fine against Classic Dark's dark track colors, but
+ * outlineVariant resolves much lighter in the Paper/Sepia/Light themes,
+ * where a white thumb nearly disappeared into it.
  */
 @Composable
 fun DsSwitch(
@@ -104,6 +111,7 @@ fun DsSwitch(
         },
         label = "dsSwitchTrack"
     )
+    val thumbColor = if (trackColor.luminance() < 0.5f) Color.White else Color.Black
     Box(
         modifier = modifier
             .size(width = 46.dp, height = 28.dp)
@@ -117,7 +125,7 @@ fun DsSwitch(
             modifier = Modifier
                 .size(24.dp)
                 .clip(CircleShape)
-                .background(androidx.compose.ui.graphics.Color.White.copy(alpha = if (enabled) 1f else 0.7f))
+                .background(thumbColor.copy(alpha = if (enabled) 1f else 0.7f))
         )
     }
 }

@@ -340,14 +340,14 @@ fun VerseCard(
                                         text = gWord.greek,
                                         fontSize = greekFontSizeSp.sp,
                                         fontWeight = FontWeight.Normal,
-                                        color = Color.White,
+                                        color = MaterialTheme.colorScheme.onSurface,
                                         fontFamily = FontFamily.Serif
                                     )
                                     Text(
                                         text = gWord.transliteration,
                                         fontSize = (greekFontSizeSp - 1).sp,
                                         fontStyle = FontStyle.Italic,
-                                        color = Color.White
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
                                         text = gWord.englishGloss,
@@ -394,14 +394,14 @@ fun VerseCard(
                                             text = hWord.hebrew,
                                             fontSize = hebrewFontSizeSp.sp,
                                             fontWeight = FontWeight.Normal,
-                                            color = Color.White,
+                                            color = MaterialTheme.colorScheme.onSurface,
                                             fontFamily = FontFamily.Serif
                                         )
                                         Text(
                                             text = hWord.transliteration,
                                             fontSize = (hebrewFontSizeSp - 1).sp,
                                             fontStyle = FontStyle.Italic,
-                                            color = Color.White
+                                            color = MaterialTheme.colorScheme.onSurface
                                         )
                                         Text(
                                             text = hWord.englishGloss,

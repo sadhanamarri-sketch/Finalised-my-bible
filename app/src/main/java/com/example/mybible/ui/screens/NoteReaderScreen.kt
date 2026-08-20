@@ -22,7 +22,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -37,10 +36,12 @@ import com.example.mybible.ui.components.LinkifiedNoteText
  * Material TopAppBar look the rest of this app's full-page screens use.
  *
  * Layout, top to bottom:
- *  - Header: white back-arrow icon (left) / the note's own title, centered,
+ *  - Header: back-arrow icon (left) / the note's own title, centered,
  *    uppercase and styled to match the Notes-list card title (bold
  *    sans-serif, gold/tertiary), falling back to "Untitled note" when
- *    untitled / white pen (edit) icon (right), thin bottom border.
+ *    untitled / pen (edit) icon (right), thin bottom border. Both icons
+ *    use onBackground (not a literal white) so they stay visible in the
+ *    light-toned themes too, not just the dark ones.
  *    Capacitor's header title is always the literal word "Note" instead —
  *    this is a deliberate deviation so it's clear which note is open at a
  *    glance, same reasoning as the full-screen note-text writer's header.
@@ -104,7 +105,7 @@ fun NoteReaderScreen(
                 Icon(
                     imageVector = Icons.Default.ArrowBack,
                     contentDescription = "Back",
-                    tint = Color.White,
+                    tint = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.clickable(onClick = onBack)
                 )
                 Text(
@@ -124,7 +125,7 @@ fun NoteReaderScreen(
                     Icon(
                         imageVector = Icons.Default.Edit,
                         contentDescription = "Edit",
-                        tint = Color.White,
+                        tint = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.clickable(onClick = onEdit)
                     )
                 } else {
