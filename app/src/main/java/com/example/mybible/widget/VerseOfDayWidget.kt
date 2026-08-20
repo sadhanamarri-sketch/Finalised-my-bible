@@ -3,7 +3,6 @@ package com.example.mybible.widget
 import android.content.Context
 import android.content.Intent
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.ColorFilter
@@ -57,17 +56,14 @@ import com.example.mybible.ui.NavTab
  */
 class VerseOfDayWidget : GlanceAppWidget() {
 
-    companion object {
-        // Matches the two sizes declared in verse_of_day_widget_info.xml:
-        // the default 4x2 footprint (minWidth/minHeight) and the smallest
-        // resize target, 4x1 (minResizeHeight), using Android's standard
-        // cell-size formula (70dp * cells - 30dp). Glance picks whichever
-        // of these is the closest fit to the widget's actual current size.
-        private val SIZE_REGULAR = DpSize(250.dp, 110.dp)
-        private val SIZE_COMPACT = DpSize(250.dp, 40.dp)
-    }
-
-    override val sizeMode = SizeMode.Responsive(setOf(SIZE_COMPACT, SIZE_REGULAR))
+    // SizeMode.Responsive with only two sizes is unreliable here: hosts can
+    // treat a 2-entry set as a landscape/portrait pair rather than picking
+    // by actual widget bounds, so live drag-resizing (4x2 -> 4x1) may never
+    // switch content. Exact ties LocalSize.current to the widget's real,
+    // live measured size (via onAppWidgetOptionsChanged, handled internally
+    // by Glance) and recomposes on every resize, which is what the
+    // isCompact branch in WidgetContent below actually needs.
+    override val sizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val palette = WidgetColors.forCurrentTheme(context)
@@ -95,12 +91,15 @@ private fun WidgetContent(
     verse: VerseOfDay
 ) {
     val context = LocalContext.current
-    // At the 4x1 resize target (see SIZE_COMPACT / minResizeHeight in
-    // verse_of_day_widget_info.xml) there isn't room for the Verse-of-the-Day
-    // card or the quick-action icon row, so both are dropped entirely and
-    // the Continue Reading row alone grows (defaultWeight + larger
-    // type/padding below) to fill the whole widget instead of leaving
-    // dead space or clipping.
+    // sizeMode = SizeMode.Exact (above) keeps LocalSize.current in sync with
+    // the widget's real, live measured height as the user drags it — a 4x2
+    // widget is ~110dp+ tall (minHeight), a 4x1 resize is ~40dp tall
+    // (minResizeHeight, in verse_of_day_widget_info.xml), so 80dp sits
+    // cleanly between the two. Below that threshold there isn't room for
+    // the Verse-of-the-Day card or the quick-action icon row, so both are
+    // dropped entirely and the Continue Reading row alone grows
+    // (defaultWeight + larger type/padding below) to fill the whole widget
+    // instead of leaving dead space or clipping.
     val isCompact = LocalSize.current.height < 80.dp
     Column(
         modifier = GlanceModifier
