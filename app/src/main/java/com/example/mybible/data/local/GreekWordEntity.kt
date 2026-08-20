@@ -12,7 +12,11 @@ import androidx.room.PrimaryKey
  */
 @Entity(
     tableName = "greek_words",
-    indices = [Index(value = ["book", "chapter", "verse"])]
+    // unique on (book, chapter, verse, orderIndex) — see the identical
+    // note on HebrewWordEntity's indices for why this is required for
+    // @Insert(onConflict = REPLACE) in insertGreekWords() to actually
+    // overwrite instead of duplicate on a retried import.
+    indices = [Index(value = ["book", "chapter", "verse", "orderIndex"], unique = true)]
 )
 data class GreekWordEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,

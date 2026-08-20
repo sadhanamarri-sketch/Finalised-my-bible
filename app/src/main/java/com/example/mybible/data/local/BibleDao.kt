@@ -57,6 +57,14 @@ interface BibleDao {
     @Query("SELECT COUNT(*) FROM greek_words")
     suspend fun countGreekWords(): Int
 
+    // TAGNT downloads in 2 file-parts (gospels, Acts-Revelation — see
+    // GreekImporter); each part is all-or-nothing (a failed fetch inserts
+    // zero words for every book in that part; see BibleDataInitializer's
+    // maybeImportGreek doc for why aggregate countGreekWords() alone can't
+    // detect a missing part). Distinct book count catches that precisely.
+    @Query("SELECT COUNT(DISTINCT book) FROM greek_words")
+    suspend fun countDistinctGreekBooks(): Int
+
     // ---- Hebrew interlinear (TAHOT) ----
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -67,6 +75,12 @@ interface BibleDao {
 
     @Query("SELECT COUNT(*) FROM hebrew_words")
     suspend fun countHebrewWords(): Int
+
+    // TAHOT downloads in 4 file-parts (Gen-Deu, Jos-Est, Job-Sng, Isa-Mal —
+    // see HebrewImporter); see countDistinctGreekBooks() above for why this
+    // is needed alongside the aggregate count.
+    @Query("SELECT COUNT(DISTINCT book) FROM hebrew_words")
+    suspend fun countDistinctHebrewBooks(): Int
 
     // ---- Cross references (Treasury of Scripture Knowledge) ----
 
