@@ -529,8 +529,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         repository.setRedLetterEnabled(enabled)
     }
 
-    fun toggleTeluguInline() {
+    // anchorVerse: the verse currently at/near the top of the reader's
+    // viewport, if known. loadCurrentChapter() below re-fetches _verses
+    // with a new list identity (same chapter, just with/without Telugu
+    // text), and ReaderScreen's scroll effect is keyed on that list — with
+    // no focusedVerseNumber to land on, it falls back to scrolling to the
+    // very top of the chapter, which reads as "toggling Telugu jumped me
+    // back to verse 1." Setting it here (unblurred — this is a position
+    // restore, not a real "jump to this verse") makes that effect land back
+    // where the user already was instead.
+    fun toggleTeluguInline(anchorVerse: Int? = null) {
         _showTeluguInline.value = !_showTeluguInline.value
+        if (anchorVerse != null) {
+            _focusedVerseNumber.value = anchorVerse
+            _focusedVerseBlurEnabled.value = false
+        }
         loadCurrentChapter()
     }
 

@@ -872,7 +872,15 @@ fun ReaderScreen(
                         glyph = "\u0C05",
                         active = showTeluguInline,
                         contentDescription = "Telugu inline translation",
-                        onClick = { viewModel.toggleTeluguInline() },
+                        onClick = {
+                            // Item 0 in the LazyColumn is the "$currentBook
+                            // $currentChapter" header (see itemsIndexed(verses)
+                            // below), so verse array index = list index - 1.
+                            // See toggleTeluguInline's doc for why this is
+                            // needed at all.
+                            val anchorVerse = verses.getOrNull(listState.firstVisibleItemIndex - 1)?.number
+                            viewModel.toggleTeluguInline(anchorVerse)
+                        },
                         modifier = Modifier.testTag("pill_telugu_toggle"),
                         offsetY = 1.dp
                     )
