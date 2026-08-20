@@ -44,7 +44,7 @@ import com.example.mybible.ui.components.LinkifiedNoteText
  *    Capacitor's header title is always the literal word "Note" instead —
  *    this is a deliberate deviation so it's clear which note is open at a
  *    glance, same reasoning as the full-screen note-text writer's header.
- *  - Ref line: coral outlined pill per reference (matches the same
+ *  - Ref line: gold outlined pill per reference (matches the same
  *    ref-chip style used in the Notes list and editor), or the note's
  *    date if it has no references, or "Note" if it has neither — matching
  *    Capacitor's `n.refs.length ? ... : (n.date ? formatDateStr(n.date) :
@@ -145,7 +145,7 @@ fun NoteReaderScreen(
             ) {
                 if (noteItem.refs.isNotEmpty()) {
                     // Boxed pills — matches the same ref-chip style used
-                    // in the Notes list and Note editor (coral outlined
+                    // in the Notes list and Note editor (gold outlined
                     // rounded rectangle), rather than a comma-joined
                     // underlined line.
                     FlowRow(
@@ -157,12 +157,12 @@ fun NoteReaderScreen(
                             Text(
                                 text = "${ref.book} ${ref.chapter}:${ref.verse}",
                                 fontSize = 14.sp,
-                                color = MaterialTheme.colorScheme.primary,
+                                color = MaterialTheme.colorScheme.tertiary,
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(10.dp))
                                     .border(
                                         width = 1.dp,
-                                        color = MaterialTheme.colorScheme.primary,
+                                        color = MaterialTheme.colorScheme.tertiary,
                                         shape = RoundedCornerShape(10.dp)
                                     )
                                     .then(
