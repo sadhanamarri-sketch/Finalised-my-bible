@@ -434,6 +434,19 @@ fun EnglishDictionarySheet(
                     color = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
                 )
+            } else if (entry?.resolvedFrom != null) {
+                // Webster's 1828 doesn't have "tribulations" as its own
+                // headword, only "tribulation" — see
+                // BibleRepository.lookupWebsterStem. Make clear the
+                // definition below belongs to that base form, not a
+                // literal entry for the word tapped.
+                Text(
+                    text = "Showing definition for \"${entry.resolvedFrom}\"",
+                    fontSize = 13.sp,
+                    fontStyle = FontStyle.Italic,
+                    color = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
+                )
             } else {
                 Spacer(modifier = Modifier.height(12.dp))
             }

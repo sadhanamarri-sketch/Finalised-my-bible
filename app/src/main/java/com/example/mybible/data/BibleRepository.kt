@@ -43,6 +43,26 @@ private const val DEFAULT_GREEK_FONT_SIZE = 17  // Capacitor: 15px
 // actually moves a slider.
 private const val DEFAULT_LINE_HEIGHT_RATIO = 1.85f
 
+// Archaic KJV verb contractions that don't follow any regular suffix
+// pattern (see BibleRepository.lookupWebsterStem) — common enough in the
+// text to special-case directly against their modern base form(s), tried
+// in order. Not exhaustive, just the handful frequent enough to be worth
+// it: "saith"/"doth"/"hath" etc. appear throughout narrative KJV prose.
+private val IRREGULAR_ARCHAIC_FORMS: Map<String, List<String>> = mapOf(
+    "saith" to listOf("say"),
+    "sayest" to listOf("say"),
+    "hath" to listOf("have"),
+    "hast" to listOf("have"),
+    "doth" to listOf("do"),
+    "doest" to listOf("do"),
+    "dost" to listOf("do"),
+    "art" to listOf("are", "be"),
+    "wilt" to listOf("will"),
+    "shalt" to listOf("shall"),
+    "wast" to listOf("was", "be"),
+    "wert" to listOf("were", "be")
+)
+
 /** Outcome of [BibleRepository.getLexiconEntry] — see that function's doc. */
 sealed class LexiconLookupResult {
     data class Found(val entry: LexiconEntry) : LexiconLookupResult()
@@ -912,10 +932,75 @@ class BibleRepository(private val context: Context) {
         if (word.isEmpty()) return@withContext null
         if (dictCache.containsKey(word)) return@withContext dictCache[word]
 
-        val entity = bibleDao.getWebsterEntry(word)
-        val result = entity?.let { parseWebsterDefinition(word, it.definition) }
+        val exact = bibleDao.getWebsterEntry(word)
+        val result = if (exact != null) {
+            parseWebsterDefinition(word, exact.definition)
+        } else {
+            lookupWebsterStem(word)
+        }
         dictCache[word] = result
         result
+    }
+
+    // Webster's 1828 lists base headwords only ("tribulation"), not every
+    // inflected form the KJV text actually uses ("tribulations", "loveth",
+    // "walkest", ...) — normal for a period dictionary, not missing data.
+    // When the exact word isn't a headword, try a short list of plausible
+    // base forms — most specific/likely-correct suffix first — and use
+    // whichever one actually resolves against the same offline dataset,
+    // instead of reporting "no definition" for a word one suffix-strip
+    // away from a real entry.
+    private suspend fun lookupWebsterStem(word: String): EnglishDictionaryEntry? {
+        // A handful of archaic KJV verb forms are genuinely irregular
+        // (contractions, not suffixed forms), so no suffix-strip rule below
+        // finds them: "saith" isn't "say" + a stripped suffix, it's just a
+        // different spelling. Common enough in the text to special-case
+        // directly rather than leave unresolved.
+        IRREGULAR_ARCHAIC_FORMS[word]?.let { candidates ->
+            for (base in candidates) {
+                val entity = bibleDao.getWebsterEntry(base)
+                if (entity != null) {
+                    return parseWebsterDefinition(word, entity.definition)?.copy(resolvedFrom = base)
+                }
+            }
+        }
+
+        val candidates = mutableListOf<String>()
+        when {
+            word.endsWith("ies") && word.length > 4 ->
+                candidates += word.dropLast(3) + "y" // prophecies -> prophecy
+            word.endsWith("ves") && word.length > 4 -> {
+                candidates += word.dropLast(3) + "f"  // wolves -> wolf
+                candidates += word.dropLast(3) + "fe" // lives -> life
+            }
+            word.endsWith("ches") || word.endsWith("shes") || word.endsWith("xes") || word.endsWith("sses") ->
+                candidates += word.dropLast(2) // churches -> church
+        }
+        if (word.endsWith("s") && !word.endsWith("ss") && word.length > 2) {
+            candidates += word.dropLast(1) // sins -> sin, disciples -> disciple
+        }
+        if (word.endsWith("eth") && word.length > 4) {
+            candidates += word.dropLast(3) // walketh -> walk
+            candidates += word.dropLast(2) // loveth -> love, believeth -> believe (base already ends in "e")
+        }
+        if (word.endsWith("est") && word.length > 4) {
+            candidates += word.dropLast(3) // walkest -> walk
+            candidates += word.dropLast(2) // believest -> believe (base already ends in "e")
+        }
+        if (word.endsWith("ed") && word.length > 3) {
+            candidates += word.dropLast(2)
+        }
+        if (word.endsWith("ing") && word.length > 4) {
+            candidates += word.dropLast(3)
+        }
+
+        for (candidate in candidates.distinct()) {
+            val entity = bibleDao.getWebsterEntry(candidate)
+            if (entity != null) {
+                return parseWebsterDefinition(word, entity.definition)?.copy(resolvedFrom = candidate)
+            }
+        }
+        return null
     }
 
     // Splits WebsterEntity.definition ("<pos>\n1. sense one\n2. sense two…",
