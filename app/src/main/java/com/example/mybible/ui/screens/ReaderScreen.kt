@@ -681,6 +681,28 @@ fun ReaderScreen(
                         // (see xrefFocusActive above).
                         val effectiveBlurEnabled = isBlurModeEnabled || xrefFocusActive
 
+                        // Every tap-driven callback below (whole-verse tap,
+                        // and the word-level Greek/Hebrew/English/xref-marker
+                        // taps, which are separate click targets inside
+                        // VerseCard that don't go through onVerseClick at
+                        // all) routes through here first: tapping anything on
+                        // a blurred, non-focused verse dismisses blur/focus
+                        // instead of acting on it. Previously only
+                        // onVerseClick had any blur awareness, so a word tap
+                        // could still open a lookup for a verse you couldn't
+                        // even read.
+                        fun runUnlessBlurred(action: () -> Unit) {
+                            if (effectiveBlurEnabled && !isFocused) {
+                                if (isBlurModeEnabled) viewModel.toggleBlurMode()
+                                if (xrefFocusActive) {
+                                    xrefFocusActive = false
+                                    viewModel.clearVerseFocus()
+                                }
+                            } else {
+                                action()
+                            }
+                        }
+
                         // While a pick mode is active, tapping a verse means
                         // "add/toggle this verse" instead of opening the
                         // normal selection toolbar — mirrors Capacitor's
@@ -720,12 +742,14 @@ fun ReaderScreen(
                             greekFontSizeSp = greekFontSizeSp,
                             hebrewFontSizeSp = hebrewFontSizeSp,
                             onVerseClick = {
-                                if (readerPickMode != ReaderPickMode.NONE) {
-                                    viewModel.onPickModeVerseTap(verse)
-                                } else if (selectedVerse?.number == verse.number) {
-                                    viewModel.setSelectedVerse(null)
-                                } else {
-                                    viewModel.setSelectedVerse(verse)
+                                runUnlessBlurred {
+                                    if (readerPickMode != ReaderPickMode.NONE) {
+                                        viewModel.onPickModeVerseTap(verse)
+                                    } else if (selectedVerse?.number == verse.number) {
+                                        viewModel.setSelectedVerse(null)
+                                    } else {
+                                        viewModel.setSelectedVerse(verse)
+                                    }
                                 }
                             },
                             onVerseLongClick = {
@@ -744,20 +768,20 @@ fun ReaderScreen(
                                 }
                             },
                             onGreekWordClick = { gWord ->
-                                viewModel.selectGreekWord(gWord)
+                                runUnlessBlurred { viewModel.selectGreekWord(gWord) }
                             },
                             onHebrewWordClick = { hWord ->
-                                viewModel.selectHebrewWord(hWord)
+                                runUnlessBlurred { viewModel.selectHebrewWord(hWord) }
                             },
                             onCrossReferenceMarkerClick = {
                                 // Bypasses the verse action sheet entirely —
                                 // tapping the dagger jumps straight to cross
                                 // references, reusing the same sheet/history
                                 // stack a manual "Cross References" tap would.
-                                viewModel.openCrossReferences(verse)
+                                runUnlessBlurred { viewModel.openCrossReferences(verse) }
                             },
                             onEnglishWordClick = { word ->
-                                viewModel.openEnglishWordLookup(word)
+                                runUnlessBlurred { viewModel.openEnglishWordLookup(word) }
                             }
                         )
                     }
