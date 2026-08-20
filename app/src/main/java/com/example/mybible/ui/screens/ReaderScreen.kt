@@ -145,6 +145,13 @@ fun ReaderScreen(
     var xrefFocusActive by remember { mutableStateOf(false) }
     var xrefFocusLandedIndex by remember { mutableStateOf(-1) }
     var xrefFocusLandedOffset by remember { mutableStateOf(0) }
+    // Tracks which chapter the effect below last ran for, so it can tell a
+    // genuine chapter change (which should reset scroll to the top when
+    // there's no focus target) apart from focusedVerseNumber simply being
+    // cleared within the *same* chapter — e.g. tapping a blurred verse to
+    // dismiss focus, or scrolling away from the landed verse — neither of
+    // which should snap the reader back to the top of the chapter.
+    var lastFocusEffectChapterKey by remember { mutableStateOf<Pair<String, Int>?>(null) }
 
     // Scroll to top (or the focused cross-reference/search verse) when the
     // chapter changes. Keyed on `verses` too, not just currentBook/
@@ -163,11 +170,17 @@ fun ReaderScreen(
     // key a same-chapter xref tap wouldn't re-scroll or re-focus at all.
     LaunchedEffect(currentBook, currentChapter, verses, focusedVerseNumber, focusedVerseBlurEnabled, focusedVersePinToTop) {
         if (verses.isEmpty()) return@LaunchedEffect
-        // A different chapter means a different set of row heights at the
-        // same indices (e.g. leaving Psalm 119 for a 3-verse chapter) — old
-        // cached heights would skew centerItemIndex's ramp math until
-        // re-measured, so start clean each time the chapter actually changes.
-        itemHeights.clear()
+        val chapterKey = currentBook to currentChapter
+        val isNewChapter = chapterKey != lastFocusEffectChapterKey
+        lastFocusEffectChapterKey = chapterKey
+        if (isNewChapter) {
+            // A different chapter means a different set of row heights at
+            // the same indices (e.g. leaving Psalm 119 for a 3-verse
+            // chapter) — old cached heights would skew centerItemIndex's
+            // ramp math until re-measured, so start clean each time the
+            // chapter actually changes.
+            itemHeights.clear()
+        }
         if (focusedVerseNumber != null) {
             val idx = verses.indexOfFirst { it.number == focusedVerseNumber }
             if (idx >= 0) {
@@ -202,8 +215,14 @@ fun ReaderScreen(
                 listState.scrollToItem(0)
                 xrefFocusActive = false
             }
-        } else {
+        } else if (isNewChapter) {
             listState.scrollToItem(0)
+            xrefFocusActive = false
+        } else {
+            // Same chapter, no focus target — this is focus being cleared
+            // (blur dismissed by tap, or the user scrolled away from the
+            // landed verse), not a fresh chapter open, so leave the scroll
+            // position exactly where the reader already is.
             xrefFocusActive = false
         }
     }

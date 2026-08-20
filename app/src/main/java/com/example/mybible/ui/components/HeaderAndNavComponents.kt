@@ -229,7 +229,8 @@ fun BookChapterPickerSheet(
                         else -> "Books"
                     },
                     fontSize = 17.sp,
-                    fontWeight = FontWeight.Normal
+                    fontWeight = FontWeight.Normal,
+                    color = MaterialTheme.colorScheme.onBackground
                 )
                 TextButton(
                     onClick = onDismiss,
