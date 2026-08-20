@@ -31,7 +31,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontFamily
-import com.example.mybible.ui.theme.GelasioFontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -431,14 +430,14 @@ fun NoteEditorScreen(
                 if (text.isEmpty()) {
                     Text(
                         text = "Write your note\u2026",
-                        fontFamily = GelasioFontFamily,
+                        fontFamily = FontFamily.Serif,
                         fontSize = 18.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
                     Text(
                         text = text,
-                        fontFamily = GelasioFontFamily,
+                        fontFamily = FontFamily.Serif,
                         fontSize = 18.sp,
                         lineHeight = 27.sp,
                         color = MaterialTheme.colorScheme.onSurface
@@ -559,7 +558,7 @@ private fun NoteTextFullScreenEditor(
                     value = draft,
                     onValueChange = { draft = it },
                     textStyle = androidx.compose.ui.text.TextStyle(
-                        fontFamily = GelasioFontFamily,
+                        fontFamily = FontFamily.Serif,
                         fontSize = 18.sp,
                         lineHeight = 29.sp,
                         color = MaterialTheme.colorScheme.onSurface
@@ -573,7 +572,7 @@ private fun NoteTextFullScreenEditor(
                 if (draft.isEmpty()) {
                     Text(
                         text = "Write your note\u2026",
-                        fontFamily = GelasioFontFamily,
+                        fontFamily = FontFamily.Serif,
                         fontSize = 18.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
