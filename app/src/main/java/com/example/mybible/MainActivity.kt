@@ -323,6 +323,7 @@ class MainActivity : ComponentActivity() {
                                 val highlightedItems by viewModel.highlightedVerseItems.collectAsState()
                                 HighlightedVersesScreen(
                                     highlights = highlightedItems,
+                                    themeMode = themeMode,
                                     onOpenVerse = { viewModel.openHighlightedVerse(it) },
                                     onClose = { viewModel.selectTab(NavTab.READER) }
                                 )

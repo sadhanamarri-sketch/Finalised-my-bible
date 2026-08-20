@@ -21,10 +21,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.mybible.model.ThemeMode
 import com.example.mybible.ui.components.BackTopBar
 
 data class HighlightedVerseItem(
@@ -51,6 +53,7 @@ data class HighlightedVerseItem(
 @Composable
 fun HighlightedVersesScreen(
     highlights: List<HighlightedVerseItem>,
+    themeMode: ThemeMode,
     onOpenVerse: (HighlightedVerseItem) -> Unit,
     onClose: () -> Unit
 ) {
@@ -98,7 +101,18 @@ fun HighlightedVersesScreen(
                             label = { Text(color) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                selectedLabelColor = MaterialTheme.colorScheme.primary
+                                // Classic Dark's primaryContainer (accent-solid,
+                                // a rust/coral) and primary (a lighter coral)
+                                // sit too close in hue/lightness for the
+                                // normal primary-on-primaryContainer label to
+                                // read clearly, so this theme specifically
+                                // gets plain black label text on the selected
+                                // chip instead.
+                                selectedLabelColor = if (themeMode == ThemeMode.CLASSIC_DARK) {
+                                    Color.Black
+                                } else {
+                                    MaterialTheme.colorScheme.primary
+                                }
                             ),
                             border = FilterChipDefaults.filterChipBorder(
                                 enabled = true,
