@@ -195,7 +195,6 @@ class MainActivity : ComponentActivity() {
             val selectedHebrewWord by viewModel.selectedHebrewWord.collectAsState()
             val hebrewLexiconResult by viewModel.hebrewLexiconResult.collectAsState()
             val isLoadingHebrewLexicon by viewModel.isLoadingHebrewLexicon.collectAsState()
-            val selectedCrossReferences by viewModel.selectedCrossReferences.collectAsState()
             val selectedEnglishWord by viewModel.selectedEnglishWord.collectAsState()
             val dictionaryEntry by viewModel.dictionaryEntry.collectAsState()
             val isLoadingDictionary by viewModel.isLoadingDictionary.collectAsState()
@@ -269,6 +268,7 @@ class MainActivity : ComponentActivity() {
                             NavTab.STUDIED -> StudiedScreen(viewModel = viewModel)
                             NavTab.NOTES -> NotesScreen(viewModel = viewModel)
                             NavTab.SEARCH -> SearchScreen(viewModel = viewModel)
+                            NavTab.CROSS_REFERENCES -> CrossReferenceScreen(viewModel = viewModel)
                             NavTab.HIGHLIGHTS -> {
                                 val highlightedItems by viewModel.highlightedVerseItems.collectAsState()
                                 HighlightedVersesScreen(
@@ -330,7 +330,12 @@ class MainActivity : ComponentActivity() {
                             currentBook = currentBook,
                             onDismiss = { viewModel.setShowBookPicker(false) },
                             onSelectBookAndChapter = { book, chap ->
-                                viewModel.clearXrefHistory()
+                                // Clears any stale "spotlight this verse"
+                                // target from an earlier jump so a plain
+                                // book/chapter browse (no specific verse)
+                                // doesn't inherit it — see clearVerseFocus()'s
+                                // doc for what that broke previously.
+                                viewModel.clearVerseFocus()
                                 viewModel.disableBlurModeForNavigation()
                                 viewModel.loadChapter(book, chap)
                                 viewModel.setShowBookPicker(false)
@@ -361,17 +366,6 @@ class MainActivity : ComponentActivity() {
                             lexiconResult = hebrewLexiconResult,
                             isLoading = isLoadingHebrewLexicon,
                             onDismiss = { viewModel.selectHebrewWord(null) }
-                        )
-                    }
-
-                    // Cross Reference Bottom Sheet
-                    if (selectedCrossReferences != null) {
-                        CrossReferenceSheet(
-                            crossReferences = selectedCrossReferences!!,
-                            onSelectReference = { targetBook, targetChapter, targetVerse ->
-                                viewModel.navigateToCrossReference(targetBook, targetChapter, targetVerse)
-                            },
-                            onDismiss = { viewModel.dismissCrossReferences() }
                         )
                     }
 

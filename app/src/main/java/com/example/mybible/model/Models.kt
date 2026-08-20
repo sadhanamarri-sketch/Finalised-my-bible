@@ -3,13 +3,6 @@ package com.example.mybible.model
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class Position(
-    val book: String,
-    val chapter: Int,
-    val verse: Int
-)
-
-@Serializable
 data class DictionaryMeaning(
     val partOfSpeech: String,
     val definitions: List<String>

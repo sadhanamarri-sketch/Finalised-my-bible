@@ -89,7 +89,7 @@ fun ReaderScreen(
     val englishFontFamilyName by viewModel.englishFontFamilyName.collectAsState()
 
     val isBlurModeEnabled by viewModel.isBlurModeEnabled.collectAsState()
-    val xrefHistory by viewModel.xrefHistory.collectAsState()
+    val crossReferenceReturnAvailable by viewModel.crossReferenceReturnAvailable.collectAsState()
     val focusedVerseNumber by viewModel.focusedVerseNumber.collectAsState()
     val focusedVerseBlurEnabled by viewModel.focusedVerseBlurEnabled.collectAsState()
     val searchReturnAvailable by viewModel.searchReturnAvailable.collectAsState()
@@ -305,7 +305,7 @@ fun ReaderScreen(
     // a cross-reference back-bar is showing, a sheet/menu is open, or a
     // verse is selected (selection already swaps the pill for the action
     // toolbar, but this also covers the moment the toolbar is dismissing).
-    val canHideBars = xrefHistory.isEmpty() && !searchReturnAvailable && !showReaderMenu && selectedVerse == null &&
+    val canHideBars = !crossReferenceReturnAvailable && !searchReturnAvailable && !showReaderMenu && selectedVerse == null &&
         readerPickMode == ReaderPickMode.NONE &&
         readerPickMode == ReaderPickMode.NONE
 
@@ -442,9 +442,13 @@ fun ReaderScreen(
                     onDone = { viewModel.finishPicking() }
                 )
             }
-            // Cross Reference Navigation Back Bar
-            if (readerPickMode == ReaderPickMode.NONE && xrefHistory.isNotEmpty()) {
-                val lastPos = xrefHistory.last()
+            // "Return to cross references" banner — shown after tapping a
+            // cross-reference result, so the user can hop straight back to
+            // the same list/scroll position instead of re-opening it, or
+            // dismiss it to just keep reading. Mirrors the "return to
+            // search results" banner below; mutually exclusive with it,
+            // same fixed top slot.
+            if (readerPickMode == ReaderPickMode.NONE && crossReferenceReturnAvailable) {
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer,
                     modifier = Modifier.fillMaxWidth()
@@ -464,20 +468,20 @@ fun ReaderScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.ArrowBack,
-                                contentDescription = "Back",
+                                contentDescription = "Cross references",
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Back to ${lastPos.book} ${lastPos.chapter}:${lastPos.verse}",
+                                text = "Return to cross references",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.weight(1f)
                             )
                             Button(
-                                onClick = { viewModel.goBackCrossReference() },
+                                onClick = { viewModel.returnToCrossReferences() },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MaterialTheme.colorScheme.primary,
                                     contentColor = MaterialTheme.colorScheme.onPrimary
@@ -485,16 +489,16 @@ fun ReaderScreen(
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                                 modifier = Modifier.height(30.dp)
                             ) {
-                                Text("Jump Back", fontSize = 12.sp)
+                                Text("Return", fontSize = 12.sp)
                             }
                         }
                         IconButton(
-                            onClick = { viewModel.clearXrefHistory() },
+                            onClick = { viewModel.dismissCrossReferenceReturnBanner() },
                             modifier = Modifier.size(24.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = "Clear History",
+                                contentDescription = "Dismiss",
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.size(16.dp)
                             )
@@ -507,8 +511,8 @@ fun ReaderScreen(
             // search result, so the user can hop straight back to the same
             // results/scroll position instead of re-searching, or dismiss
             // it to just keep reading. Mutually exclusive with the
-            // cross-reference bar, same fixed top slot.
-            if (readerPickMode == ReaderPickMode.NONE && xrefHistory.isEmpty() && searchReturnAvailable) {
+            // cross-reference banner above, same fixed top slot.
+            if (readerPickMode == ReaderPickMode.NONE && !crossReferenceReturnAvailable && searchReturnAvailable) {
                 Surface(
                     color = MaterialTheme.colorScheme.secondaryContainer,
                     modifier = Modifier.fillMaxWidth()

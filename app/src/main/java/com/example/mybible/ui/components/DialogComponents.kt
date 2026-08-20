@@ -34,7 +34,6 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import com.example.mybible.data.LexiconLookupResult
 import com.example.mybible.data.MorphologyParser
-import com.example.mybible.model.CrossReferenceItem
 import com.example.mybible.model.EnglishDictionaryEntry
 import com.example.mybible.model.GreekWord
 import com.example.mybible.model.HebrewWord
@@ -390,98 +389,6 @@ fun HebrewWordSheet(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun CrossReferenceSheet(
-    crossReferences: List<CrossReferenceItem>,
-    onSelectReference: (String, Int, Int) -> Unit,
-    onDismiss: () -> Unit
-) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.background
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Cross References (Treasury)",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = "Tap to Navigate",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.secondary,
-                    fontStyle = FontStyle.Italic
-                )
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.heightIn(max = 340.dp)
-            ) {
-                items(crossReferences) { item ->
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                onSelectReference(item.targetBook, item.targetChapter, item.targetVerse)
-                            }
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "${item.targetBook} ${item.targetChapter}:${item.targetVerse}",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Icon(
-                                    imageVector = Icons.Default.ArrowForward,
-                                    contentDescription = "Navigate",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = item.previewText,
-                                fontSize = 14.sp,
-                                fontFamily = FontFamily.Serif,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            OutlinedButton(
-                onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Close")
-            }
         }
     }
 }

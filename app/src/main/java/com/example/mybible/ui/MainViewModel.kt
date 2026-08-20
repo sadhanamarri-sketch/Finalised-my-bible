@@ -37,7 +37,7 @@ import java.util.Date
 import java.util.Locale
 
 enum class NavTab {
-    READER, STUDIED, NOTES, SEARCH, SETTINGS, HIGHLIGHTS
+    READER, STUDIED, NOTES, SEARCH, SETTINGS, HIGHLIGHTS, CROSS_REFERENCES
 }
 
 // Mirrors Capacitor's pickingMode (notes) and selectMode (studied) — a
@@ -131,10 +131,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isBlurModeEnabled = MutableStateFlow(false)
     val isBlurModeEnabled: StateFlow<Boolean> = _isBlurModeEnabled.asStateFlow()
 
-    // Cross Reference Navigation & Focused Verse
-    private val _xrefHistory = MutableStateFlow<List<Position>>(emptyList())
-    val xrefHistory: StateFlow<List<Position>> = _xrefHistory.asStateFlow()
-
+    // Focused Verse
     private val _focusedVerseNumber = MutableStateFlow<Int?>(null)
     val focusedVerseNumber: StateFlow<Int?> = _focusedVerseNumber.asStateFlow()
 
@@ -224,14 +221,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private var hebrewLexiconLookupJob: Job? = null
 
-    private val _selectedCrossReferences = MutableStateFlow<List<CrossReferenceItem>?>(null)
-    val selectedCrossReferences: StateFlow<List<CrossReferenceItem>?> = _selectedCrossReferences.asStateFlow()
+    // Cross References page (see CrossReferenceScreen) — same
+    // persisted-list-and-scroll-position pattern as Search (see
+    // _searchResults / _searchScrollIndex below): the list and source verse
+    // survive navigating to the Reader to follow a reference, so "return to
+    // cross references" lands back on the same list instead of a fresh
+    // lookup.
+    private val _crossReferenceList = MutableStateFlow<List<CrossReferenceItem>?>(null)
+    val crossReferenceList: StateFlow<List<CrossReferenceItem>?> = _crossReferenceList.asStateFlow()
 
-    // The verse whose cross-references are currently open — the source verse
-    // for the "return to" breadcrumb in navigateToCrossReference(). Tracked
-    // separately from _selectedVerse since opening xrefs via the dagger
-    // marker never selects the verse.
+    // The verse the currently-open cross-reference list was opened *from*.
+    // Tracked separately from _selectedVerse since opening xrefs via the
+    // dagger marker never selects the verse. Shown as the "base verse" at
+    // the top of CrossReferenceScreen.
     private val _crossReferenceSourceVerse = MutableStateFlow<Verse?>(null)
+    val crossReferenceSourceVerse: StateFlow<Verse?> = _crossReferenceSourceVerse.asStateFlow()
+
+    private val _crossReferenceScrollIndex = MutableStateFlow(0)
+    val crossReferenceScrollIndex: StateFlow<Int> = _crossReferenceScrollIndex.asStateFlow()
+
+    private val _crossReferenceScrollOffset = MutableStateFlow(0)
+    val crossReferenceScrollOffset: StateFlow<Int> = _crossReferenceScrollOffset.asStateFlow()
+
+    fun saveCrossReferenceScrollPosition(index: Int, offset: Int) {
+        _crossReferenceScrollIndex.value = index
+        _crossReferenceScrollOffset.value = offset
+    }
+
+    // Whether a "return to cross references" banner should be showing in
+    // the Reader — set when a cross-reference result is tapped, cleared
+    // when the user either returns via the banner or dismisses it. Same
+    // pattern as _searchReturnAvailable below.
+    private val _crossReferenceReturnAvailable = MutableStateFlow(false)
+    val crossReferenceReturnAvailable: StateFlow<Boolean> = _crossReferenceReturnAvailable.asStateFlow()
 
     // Verse-mention preview sheet — opened by tapping a linkified reference
     // inside note text (see data/VerseMentionLinkifier.kt). Matches
@@ -440,11 +462,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Used by the picker's verse grid: jumping straight to a verse (rather
-    // than a cross-reference jump) is fresh navigation, so it clears any
-    // prior xref-jump breadcrumb the same way Capacitor's verse-grid button
-    // handlers call clearXrefHistory() right before loadChapter().
-    //
     // focusVerse controls the temporary "spotlight this verse, blur the
     // rest" effect (see focusedVerseNumber / ReaderScreen's xrefFocusActive).
     // That's the right effect for "jump straight to verse X" entry points
@@ -455,7 +472,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // a chapter to review it — pass focusVerse = false there so the whole
     // chapter reads normally instead of blurring around one cell.
     fun jumpToVerse(book: String, chapter: Int, verse: Int, focusVerse: Boolean = true) {
-        clearXrefHistory()
         _focusedVerseNumber.value = verse
         _focusedVerseBlurEnabled.value = focusVerse
         loadChapter(book, chapter)
@@ -472,9 +488,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _isLoading.value = true
             _selectedVerse.value = null
-            _selectedCrossReferences.value = null
-            _crossReferenceSourceVerse.value = null
-            
+
             val bookName = _currentBook.value
             val chap = _currentChapter.value
             val result = repository.getChapterVerses(bookName, chap, includeTelugu = _showTeluguInline.value)
@@ -624,45 +638,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         repository.saveEnglishFont(fontName)
     }
 
+    // Tapping a reference in CrossReferenceScreen: same pattern as
+    // openSearchResult — this is a fresh reader position, so it flags the
+    // "return to cross references" banner (rather than dismissing/clearing
+    // the list, which now stays intact for that return trip) and jumps.
     fun navigateToCrossReference(targetBook: String, targetChapter: Int, targetVerse: Int) {
-        val sourceVerse = _crossReferenceSourceVerse.value
-        val currentPos = Position(
-            book = sourceVerse?.book ?: _currentBook.value,
-            chapter = sourceVerse?.chapter ?: _currentChapter.value,
-            verse = sourceVerse?.number ?: _selectedVerse.value?.number ?: 1
-        )
-        _xrefHistory.value = _xrefHistory.value + currentPos
+        _crossReferenceReturnAvailable.value = true
         _focusedVerseNumber.value = targetVerse
         _focusedVerseBlurEnabled.value = true
         // Blur mode (privacy blur, the pill toggle) would defeat the whole
         // point of following a cross-reference — you followed it to read
         // the target verse, not stare at an obscured one.
         _isBlurModeEnabled.value = false
-        dismissCrossReferences()
+        selectTab(NavTab.READER)
         loadChapter(targetBook, targetChapter)
     }
 
-    fun goBackCrossReference() {
-        val history = _xrefHistory.value
-        if (history.isNotEmpty()) {
-            val last = history.last()
-            _xrefHistory.value = history.dropLast(1)
-            _focusedVerseNumber.value = last.verse
-            _focusedVerseBlurEnabled.value = true
-            _isBlurModeEnabled.value = false
-            loadChapter(last.book, last.chapter)
-        }
-    }
-
-    fun clearXrefHistory() {
-        _xrefHistory.value = emptyList()
-        _focusedVerseNumber.value = null
-    }
-
-    // Clears just the "spotlight this verse, blur the rest" target, without
-    // touching xref breadcrumb history. Called when entering any pick mode
-    // (Study or Note), since pick mode is a distinct interaction that
-    // should always show the chapter normally — never inheriting a stale
+    // Clears just the "spotlight this verse, blur the rest" target. Called
+    // when entering any pick mode (Study or Note), since pick mode is a
+    // distinct interaction that should always show the chapter normally —
+    // never inheriting a stale
     // focus/blur left over from an earlier cross-reference jump, search
     // result, or highlighted-verse tap that happened to land on the same
     // chapter. Also called by ReaderScreen once the user scrolls away from
@@ -728,22 +723,51 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // Opens CrossReferenceScreen for this verse — same shape as a search:
+    // fetch the list, land on the page. Remember the verse the xrefs were
+    // opened *from*, independent of _selectedVerse — the dagger marker
+    // (onCrossReferenceMarkerClick) opens xrefs without ever selecting the
+    // verse.
     fun openCrossReferences(verse: Verse) {
-        // Remember the verse the xrefs were opened *from*, independent of
-        // _selectedVerse — the dagger marker (onCrossReferenceMarkerClick)
-        // opens xrefs without ever selecting the verse, so relying on
-        // _selectedVerse here caused navigateToCrossReference() to fall back
-        // to verse 1 for the "return to" breadcrumb.
         _crossReferenceSourceVerse.value = verse
+        // Reset to "loading" (null) rather than leaving a previous verse's
+        // list on screen — otherwise re-opening for a different verse
+        // could briefly show the old list under the new source-verse
+        // header until the fetch below resolves.
+        _crossReferenceList.value = null
+        _crossReferenceScrollIndex.value = 0
+        _crossReferenceScrollOffset.value = 0
         viewModelScope.launch {
-            val xrefs = repository.getCrossReferences(verse.book, verse.chapter, verse.number)
-            _selectedCrossReferences.value = xrefs
+            _crossReferenceList.value = repository.getCrossReferences(verse.book, verse.chapter, verse.number)
         }
+        selectTab(NavTab.CROSS_REFERENCES)
     }
 
-    fun dismissCrossReferences() {
-        _selectedCrossReferences.value = null
+    // Hops back to CrossReferenceScreen from the Reader's "Return to cross
+    // references" banner — same scroll position, same list. Mirrors
+    // returnToSearchResults().
+    fun returnToCrossReferences() {
+        _crossReferenceReturnAvailable.value = false
+        selectTab(NavTab.CROSS_REFERENCES)
+    }
+
+    // "Cancel" on the banner — end the session (mirrors
+    // dismissSearchReturnBanner()/endSearchSession()) rather than just
+    // hiding the banner and leaving a stale list around for next time.
+    fun dismissCrossReferenceReturnBanner() {
+        _crossReferenceReturnAvailable.value = false
+        endCrossReferenceSession()
+    }
+
+    // Ends the whole cross-reference session: list, source verse, scroll
+    // position, everything reset. Called when the user explicitly leaves
+    // CrossReferenceScreen via its own back button, or dismisses the
+    // "Return to cross references" banner.
+    fun endCrossReferenceSession() {
+        _crossReferenceList.value = null
         _crossReferenceSourceVerse.value = null
+        _crossReferenceScrollIndex.value = 0
+        _crossReferenceScrollOffset.value = 0
     }
 
     fun toggleCompletedVerse(book: String, chapter: Int, verse: Int) {
