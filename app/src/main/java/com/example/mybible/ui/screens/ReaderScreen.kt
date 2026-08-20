@@ -200,20 +200,29 @@ fun ReaderScreen(
     }
 
     // Watches for the user actually moving away from the landed verse and
-    // turns the temporary focus blur off. The first emission from
-    // snapshotFlow is the position we just landed on (matches the target,
-    // so the condition below is false and nothing clears); any further
-    // emission means the list position changed after that — which can only
-    // happen from here on by the user scrolling, since nothing else
-    // programmatically scrolls after the initial jump. A few pixels of
-    // slack on the offset absorbs float/measurement rounding rather than
-    // requiring an exact match.
-    LaunchedEffect(xrefFocusActive, xrefFocusLandedIndex, xrefFocusLandedOffset) {
-        if (!xrefFocusActive) return@LaunchedEffect
+    // clears the temporary jump-target state — both the local blur flag
+    // and the ViewModel's focusedVerseNumber itself. The first emission
+    // from snapshotFlow is the position we just landed on (matches the
+    // target, so the condition below is false and nothing clears); any
+    // further emission means the list position changed after that — which
+    // can only happen from here on by the user scrolling, since nothing
+    // else programmatically scrolls after the initial jump. A few pixels
+    // of slack on the offset absorbs float/measurement rounding rather
+    // than requiring an exact match.
+    //
+    // Keyed on focusedVerseNumber (not just xrefFocusActive): a plain
+    // non-blurred jump (focusVerse = false — e.g. the Studied tab's browse
+    // entry point) lands with xrefFocusActive already false, so gating on
+    // that alone meant this effect never ran for that case and
+    // focusedVerseNumber stayed set forever. See clearVerseFocus()'s doc
+    // for what that broke.
+    LaunchedEffect(focusedVerseNumber, xrefFocusLandedIndex, xrefFocusLandedOffset) {
+        if (focusedVerseNumber == null) return@LaunchedEffect
         snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
             .collect { (idx, offset) ->
                 if (idx != xrefFocusLandedIndex || kotlin.math.abs(offset - xrefFocusLandedOffset) > 4) {
                     xrefFocusActive = false
+                    viewModel.clearVerseFocus()
                 }
             }
     }

@@ -665,8 +665,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // should always show the chapter normally — never inheriting a stale
     // focus/blur left over from an earlier cross-reference jump, search
     // result, or highlighted-verse tap that happened to land on the same
-    // chapter.
-    private fun clearVerseFocus() {
+    // chapter. Also called by ReaderScreen once the user scrolls away from
+    // wherever a jump landed (see its "watches for the user actually
+    // moving away" effect) — without that, focusedVerseNumber stayed set
+    // indefinitely, and since ReaderScreen's isFocused gives it priority
+    // over isBlurModeEnabled, manually turning on Blur Mode afterward got
+    // stuck spotlighting that stale jump target instead of tracking scroll
+    // position, no matter how far you scrolled.
+    fun clearVerseFocus() {
         _focusedVerseNumber.value = null
     }
 
