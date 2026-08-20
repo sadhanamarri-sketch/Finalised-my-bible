@@ -224,10 +224,11 @@ class MainActivity : ComponentActivity() {
             }
 
             // While Reader shows a "Return to X" banner (followed a cross-
-            // reference, search result, or lexicon citation into the
-            // Reader), system back should act instead of falling through to
-            // the default Activity back behavior (backgrounding/exiting the
-            // app) — activeTab == READER disables the blanket handler above.
+            // reference, search result, lexicon citation, or note's verse
+            // mention into the Reader), system back should act instead of
+            // falling through to the default Activity back behavior
+            // (backgrounding/exiting the app) — activeTab == READER
+            // disables the blanket handler above.
             //
             // What it does depends on whether the detour has a meaningful
             // "verse reading started from" to undo back to:
@@ -243,17 +244,24 @@ class MainActivity : ComponentActivity() {
             //    its own destination from anywhere, not from a specific
             //    verse — so its results list genuinely is the most useful
             //    thing to go back to, same as tapping Return.
+            //  - A note's verse mention is the opposite of cross-
+            //    reference/lexicon: there's no "origin verse" at all (you
+            //    were reading the note's text, not a Bible verse), so the
+            //    note itself is the right target for both Return and
+            //    system back — no distinction needed.
             val crossReferenceReturnAvailable by viewModel.crossReferenceReturnAvailable.collectAsState()
             val searchReturnAvailable by viewModel.searchReturnAvailable.collectAsState()
             val lexiconReturnTab by viewModel.lexiconReturnTab.collectAsState()
+            val noteReturnItem by viewModel.noteReturnItem.collectAsState()
             BackHandler(
                 enabled = activeTab == NavTab.READER &&
-                    (crossReferenceReturnAvailable || searchReturnAvailable || lexiconReturnTab != null)
+                    (crossReferenceReturnAvailable || searchReturnAvailable || lexiconReturnTab != null || noteReturnItem != null)
             ) {
                 when {
                     crossReferenceReturnAvailable -> viewModel.backToCrossReferenceSourceVerse()
                     searchReturnAvailable -> viewModel.returnToSearchResults()
-                    else -> viewModel.backToLexiconOriginVerse()
+                    lexiconReturnTab != null -> viewModel.backToLexiconOriginVerse()
+                    else -> viewModel.returnToNote()
                 }
             }
 
@@ -434,10 +442,12 @@ class MainActivity : ComponentActivity() {
                             verseText = preview.text,
                             onOpenInReader = {
                                 val lexiconOriginTab = preview.lexiconOriginTab
+                                val mentionNoteReturnItem = preview.noteReturnItem
                                 viewModel.closeVerseMentionPreview()
                                 if (lexiconOriginTab != null) {
                                     viewModel.setLexiconReturnTab(lexiconOriginTab)
                                 } else {
+                                    if (mentionNoteReturnItem != null) viewModel.setNoteReturnItem(mentionNoteReturnItem)
                                     viewModel.closeNoteReader()
                                     viewModel.closeNoteEditor()
                                 }
@@ -492,7 +502,7 @@ class MainActivity : ComponentActivity() {
                                     viewModel.openNoteEditor(note)
                                 },
                                 onOpenVerseMention = { book, chapter, verse ->
-                                    viewModel.openVerseMentionPreview(book, chapter, verse)
+                                    viewModel.openVerseMentionPreview(book, chapter, verse, noteReturnItem = note)
                                 }
                             )
                         }

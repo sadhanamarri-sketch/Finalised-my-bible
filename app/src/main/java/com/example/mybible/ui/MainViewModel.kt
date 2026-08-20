@@ -299,22 +299,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     //
     // lexiconOriginTab is non-null only for the lexicon-reference case — it
     // records which of NavTab.GREEK_WORD/HEBREW_WORD to return to (see
-    // _lexiconReturnTab below) once "Open in Reader" is tapped. Null keeps
-    // the existing Notes-origin behavior untouched (closes note screens,
-    // no return banner).
+    // _lexiconReturnTab below) once "Open in Reader" is tapped.
+    //
+    // noteReturnItem is non-null only when the mention was tapped inside
+    // NoteReaderScreen (see _noteReturnItem below) — the note to reopen
+    // once "Open in Reader" is tapped. Null for the note-editor origin too
+    // (a mention tapped mid-edit): reopening the editor there would reseed
+    // its local draft state from the saved note, discarding any unsaved
+    // edits, so that case keeps the old behavior (closes the editor, no
+    // return banner) until that's handled properly.
     data class VerseMentionPreview(
         val book: String,
         val chapter: Int,
         val verse: Int,
         val text: String?,
-        val lexiconOriginTab: NavTab? = null
+        val lexiconOriginTab: NavTab? = null,
+        val noteReturnItem: NoteItem? = null
     )
 
     private val _verseMentionPreview = MutableStateFlow<VerseMentionPreview?>(null)
     val verseMentionPreview: StateFlow<VerseMentionPreview?> = _verseMentionPreview.asStateFlow()
 
-    fun openVerseMentionPreview(book: String, chapter: Int, verse: Int, lexiconOriginTab: NavTab? = null) {
-        _verseMentionPreview.value = VerseMentionPreview(book, chapter, verse, null, lexiconOriginTab)
+    fun openVerseMentionPreview(
+        book: String,
+        chapter: Int,
+        verse: Int,
+        lexiconOriginTab: NavTab? = null,
+        noteReturnItem: NoteItem? = null
+    ) {
+        _verseMentionPreview.value = VerseMentionPreview(book, chapter, verse, null, lexiconOriginTab, noteReturnItem)
         viewModelScope.launch {
             val text = repository.getVerseText(book, chapter, verse)
             // bail if the sheet moved on to a different reference while
@@ -354,6 +367,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun dismissLexiconReturnBanner() {
         _lexiconReturnTab.value = null
+    }
+
+    // Which note (if any) a "return to note" banner in the Reader should
+    // reopen — set when a verse mention tapped inside NoteReaderScreen is
+    // opened in the Reader. Same pattern as _lexiconReturnTab, but unlike
+    // cross-references/lexicon there's no "verse reading started from" to
+    // distinguish a system-back destination from a button destination —
+    // you were reading a note, not a Bible verse, so both the banner's
+    // Return button and system back do the same thing here: reopen that
+    // note (see MainActivity's back-handling comment).
+    private val _noteReturnItem = MutableStateFlow<NoteItem?>(null)
+    val noteReturnItem: StateFlow<NoteItem?> = _noteReturnItem.asStateFlow()
+
+    fun setNoteReturnItem(note: NoteItem) {
+        _noteReturnItem.value = note
+    }
+
+    fun returnToNote() {
+        val note = _noteReturnItem.value ?: return
+        _noteReturnItem.value = null
+        openNoteReader(note)
+        selectTab(NavTab.NOTES)
+    }
+
+    fun dismissNoteReturnBanner() {
+        _noteReturnItem.value = null
     }
 
     private val _showBookPicker = MutableStateFlow(false)
