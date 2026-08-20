@@ -305,7 +305,7 @@ fun NotesScreen(
                             ) {
                                 Text(
                                     text = note.title.ifBlank { "Untitled note" }.uppercase(),
-                                    fontSize = 17.sp,
+                                    fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
                                     fontFamily = FontFamily.SansSerif,
                                     color = MaterialTheme.colorScheme.tertiary,
@@ -373,8 +373,8 @@ fun NotesScreen(
                             Text(
                                 text = note.text,
                                 fontFamily = FontFamily.Serif,
-                                fontSize = 17.5.sp,
-                                lineHeight = 25.sp,
+                                fontSize = 14.sp,
+                                lineHeight = 20.sp,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 3,
                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
