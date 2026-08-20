@@ -32,7 +32,6 @@ import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.components.BackTopBar
 import com.example.mybible.ui.components.DsSwitch
-import com.example.mybible.ui.components.resolveEnglishFontStyle
 
 @Composable
 fun SearchScreen(
@@ -46,7 +45,6 @@ fun SearchScreen(
     val savedScrollIndex by viewModel.searchScrollIndex.collectAsState()
     val savedScrollOffset by viewModel.searchScrollOffset.collectAsState()
     val searchHistory by viewModel.searchHistory.collectAsState()
-    val englishFontFamilyName by viewModel.englishFontFamilyName.collectAsState()
 
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = savedScrollIndex,
@@ -286,7 +284,6 @@ fun SearchScreen(
             // place in this pass keeping Material's card-with-shadow look
             // rather than the flat-bordered treatment used elsewhere
             // (Cross References/Highlighted Verses), by request.
-            val englishFontStyle = resolveEnglishFontStyle(englishFontFamilyName)
             LazyColumn(
                 state = listState,
                 verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -323,10 +320,7 @@ fun SearchScreen(
                             Text(
                                 text = verse.text,
                                 fontSize = 15.sp,
-                                fontFamily = englishFontStyle.family,
-                                fontWeight = englishFontStyle.weight,
-                                fontStyle = englishFontStyle.style,
-                                letterSpacing = englishFontStyle.letterSpacing,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
                                 lineHeight = 21.sp,
                                 color = MaterialTheme.colorScheme.onSurface
                             )

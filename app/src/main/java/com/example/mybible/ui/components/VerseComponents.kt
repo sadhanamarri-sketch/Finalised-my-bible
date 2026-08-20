@@ -61,14 +61,14 @@ private const val FIXED_LINE_HEIGHT_RATIO = 1.85f
  * collapsing onto the single built-in FontFamily.Serif, which previously
  * made picking a different "font" look like it did nothing.
  */
-internal data class EnglishFontStyle(
+private data class EnglishFontStyle(
     val family: FontFamily,
     val weight: FontWeight = FontWeight.Normal,
     val style: FontStyle = FontStyle.Normal,
     val letterSpacing: androidx.compose.ui.unit.TextUnit = 0.sp
 )
 
-internal fun resolveEnglishFontStyle(englishFontFamilyName: String): EnglishFontStyle =
+private fun resolveEnglishFontStyle(englishFontFamilyName: String): EnglishFontStyle =
     when (englishFontFamilyName.lowercase()) {
         "sans", "sans-serif", "system" -> EnglishFontStyle(FontFamily.SansSerif)
         "monospace", "mono" -> EnglishFontStyle(FontFamily.Monospace)
