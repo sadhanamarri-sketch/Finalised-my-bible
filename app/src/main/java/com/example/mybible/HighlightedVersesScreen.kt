@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -152,12 +153,14 @@ private fun HighlightedVerseRow(
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(bottom = 4.dp)
             )
-            // Reference — small caps, letter-spaced, gold (tertiary).
+            // Reference — matches DsSectionLabel's gold heading style
+            // exactly (Settings/Search): 12.5sp, 1.5sp letter-spacing,
+            // SansSerif, tertiary, not bold.
             Text(
                 text = "${item.book} ${item.chapter}:${item.verse}".uppercase(),
                 fontSize = 12.5.sp,
                 letterSpacing = 1.5.sp,
-                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.SansSerif,
                 color = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.padding(bottom = 6.dp)
             )
