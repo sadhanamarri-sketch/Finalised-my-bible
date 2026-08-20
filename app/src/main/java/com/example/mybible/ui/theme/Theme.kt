@@ -38,6 +38,14 @@ private val PaperColorScheme = lightColorScheme(
     surfaceContainerHigh = Color(0xFFE5E0D5),
     surfaceVariant = Color(0xFFE8E3D8),
     onSurfaceVariant = Color(0xFF6B625B),
+    // outline/outlineVariant were unset here too (same story as secondary/
+    // secondaryContainer above), silently falling back to Material's
+    // baseline purple-gray for every hairline border/divider in the app.
+    // Reusing onSurfaceVariant/surfaceContainerHigh keeps borders in the
+    // same warm ink family as everything else instead of an off-palette
+    // purple tint.
+    outline = Color(0xFF6B625B),
+    outlineVariant = Color(0xFFE5E0D5),
     tertiary = Color(0xFFA9852F),   // --gold (light)
     error = Color(0xFFB7362A)       // --redletter (light)
 )
@@ -58,6 +66,8 @@ private val SepiaColorScheme = lightColorScheme(
     surfaceContainerHigh = Color(0xFFDECDB9),
     surfaceVariant = Color(0xFFDFD1C0),
     onSurfaceVariant = Color(0xFF6E6056),
+    outline = Color(0xFF6E6056),
+    outlineVariant = Color(0xFFDECDB9),
     tertiary = Color(0xFFA9852F),
     error = Color(0xFFA8402C)
 )
@@ -78,6 +88,8 @@ private val LightColorScheme = lightColorScheme(
     surfaceContainerHigh = Color(0xFFEAEAEA),
     surfaceVariant = Color(0xFFE0E0E0),
     onSurfaceVariant = Color(0xFF616161),
+    outline = Color(0xFF616161),
+    outlineVariant = Color(0xFFEAEAEA),
     tertiary = Color(0xFF9A7B2E),
     error = Color(0xFFB7362A)
 )
@@ -98,6 +110,8 @@ private val DarkColorScheme = darkColorScheme(
     surfaceContainerHigh = Color(0xFF332F2A),
     surfaceVariant = Color(0xFF302C28),
     onSurfaceVariant = Color(0xFFAAA298),
+    outline = Color(0xFFAAA298),
+    outlineVariant = Color(0xFF332F2A),
     tertiary = Color(0xFFD2A94F),
     error = Color(0xFFE2694F)
 )
@@ -121,6 +135,8 @@ private val ClassicDarkColorScheme = darkColorScheme(
     surfaceContainerHigh = Color(0xFF3A3631), // --line
     surfaceVariant = Color(0xFF262320),    // --paper-dim
     onSurfaceVariant = Color(0xFFA29C8E),  // --ink-soft
+    outline = Color(0xFFA29C8E),           // --ink-soft
+    outlineVariant = Color(0xFF3A3631),    // --line
     tertiary = Color(0xFFD2A94F),          // --gold
     error = Color(0xFFE2694F)              // --redletter (words-of-Christ red-letter color)
 )
