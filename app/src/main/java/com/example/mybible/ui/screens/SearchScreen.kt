@@ -283,52 +283,56 @@ fun SearchScreen(
                 )
             }
         } else {
-            // Flat rows separated by a hairline, not individually bordered
-            // cards — matches Cross References/Highlighted Verses.
+            // Elevated Cards, not flat/hairline-divided rows — the one
+            // place in this pass keeping Material's card-with-shadow look
+            // rather than the flat-bordered treatment used elsewhere
+            // (Cross References/Highlighted Verses), by request.
             val englishFontStyle = resolveEnglishFontStyle(englishFontFamilyName)
             LazyColumn(
                 state = listState,
+                verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(searchResults) { verse ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { viewModel.openSearchResult(verse) }
-                            .padding(vertical = 12.dp)
+                    Card(
+                        onClick = { viewModel.openSearchResult(verse) },
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "${verse.book} ${verse.chapter}:${verse.number}".uppercase(),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.sp,
+                                    color = MaterialTheme.colorScheme.tertiary
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.ArrowForward,
+                                    contentDescription = "Navigate",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "${verse.book} ${verse.chapter}:${verse.number}".uppercase(),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp,
-                                color = MaterialTheme.colorScheme.tertiary
-                            )
-                            Icon(
-                                imageVector = Icons.Default.ArrowForward,
-                                contentDescription = "Navigate",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(16.dp)
+                                text = verse.text,
+                                fontSize = 15.sp,
+                                fontFamily = englishFontStyle.family,
+                                fontWeight = englishFontStyle.weight,
+                                fontStyle = englishFontStyle.style,
+                                letterSpacing = englishFontStyle.letterSpacing,
+                                lineHeight = 21.sp,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = verse.text,
-                            fontSize = 15.sp,
-                            fontFamily = englishFontStyle.family,
-                            fontWeight = englishFontStyle.weight,
-                            fontStyle = englishFontStyle.style,
-                            letterSpacing = englishFontStyle.letterSpacing,
-                            lineHeight = 21.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceContainerHigh)
                 }
             }
         }
