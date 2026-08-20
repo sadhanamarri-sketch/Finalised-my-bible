@@ -22,6 +22,7 @@ import com.example.mybible.model.*
 import com.example.mybible.ui.components.BIBLE_BOOKS
 import com.example.mybible.ui.components.BOOK_CHAPTER_COUNTS
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -549,8 +550,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // chapters." updateAll() asks Glance to re-run provideGlance()
     // immediately; fire-and-forget on viewModelScope since it's a suspend
     // call and loadChapter isn't.
+    //
+    // Dispatchers.Default (not the viewModelScope default of Main.immediate):
+    // loadChapter also kicks off loadCurrentChapter()'s heavier verse/xref
+    // load on the same scope, and backgrounding the app right after
+    // switching chapters piles on window-teardown work of its own — all of
+    // that queues ahead of this on the Main thread, so the widget lagged
+    // behind exactly when the user jumped straight to the home screen to
+    // check it. updateAll() itself doesn't touch any UI, so it doesn't need
+    // Main at all; running it on Default lets it fire as soon as the prefs
+    // write lands instead of waiting for Main to clear out.
     private fun refreshContinueReadingWidget() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.Default) {
             try {
                 com.example.mybible.widget.VerseOfDayWidget().updateAll(appContext)
                 com.example.mybible.widget.ContinueReadingWidget().updateAll(appContext)
