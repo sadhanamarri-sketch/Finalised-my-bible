@@ -276,17 +276,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val crossReferenceReturnAvailable: StateFlow<Boolean> = _crossReferenceReturnAvailable.asStateFlow()
 
     // Verse-mention preview sheet — opened by tapping a linkified reference
-    // inside note text (see data/VerseMentionLinkifier.kt). Matches
-    // Capacitor's openVerseTextSheet/closeVerseTextSheet: shows the
-    // reference + verse text without leaving the note; "Open in Reader" is
-    // an explicit separate action.
-    data class VerseMentionPreview(val book: String, val chapter: Int, val verse: Int, val text: String?)
+    // inside note text (see data/VerseMentionLinkifier.kt) or a clickable
+    // Scripture citation inside a Greek/Hebrew lexicon definition (see
+    // ui/components/LexiconDefinitionView.kt). Matches Capacitor's
+    // openVerseTextSheet/closeVerseTextSheet: shows the reference + verse
+    // text without leaving the note/lexicon page; "Open in Reader" is an
+    // explicit separate action.
+    //
+    // lexiconOriginTab is non-null only for the lexicon-reference case — it
+    // records which of NavTab.GREEK_WORD/HEBREW_WORD to return to (see
+    // _lexiconReturnTab below) once "Open in Reader" is tapped. Null keeps
+    // the existing Notes-origin behavior untouched (closes note screens,
+    // no return banner).
+    data class VerseMentionPreview(
+        val book: String,
+        val chapter: Int,
+        val verse: Int,
+        val text: String?,
+        val lexiconOriginTab: NavTab? = null
+    )
 
     private val _verseMentionPreview = MutableStateFlow<VerseMentionPreview?>(null)
     val verseMentionPreview: StateFlow<VerseMentionPreview?> = _verseMentionPreview.asStateFlow()
 
-    fun openVerseMentionPreview(book: String, chapter: Int, verse: Int) {
-        _verseMentionPreview.value = VerseMentionPreview(book, chapter, verse, null)
+    fun openVerseMentionPreview(book: String, chapter: Int, verse: Int, lexiconOriginTab: NavTab? = null) {
+        _verseMentionPreview.value = VerseMentionPreview(book, chapter, verse, null, lexiconOriginTab)
         viewModelScope.launch {
             val text = repository.getVerseText(book, chapter, verse)
             // bail if the sheet moved on to a different reference while
@@ -302,6 +316,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun closeVerseMentionPreview() {
         _verseMentionPreview.value = null
+    }
+
+    // Which lexicon tab (if any) a "return to lexicon" banner in the
+    // Reader should jump back to — set when a reference tapped inside a
+    // Greek/Hebrew lexicon definition is opened in the Reader. Mirrors
+    // _crossReferenceReturnAvailable's pattern, but needs to remember
+    // *which* of the two lexicon tabs to return to (GREEK_WORD vs
+    // HEBREW_WORD), unlike cross-references which only ever return to one
+    // place.
+    private val _lexiconReturnTab = MutableStateFlow<NavTab?>(null)
+    val lexiconReturnTab: StateFlow<NavTab?> = _lexiconReturnTab.asStateFlow()
+
+    fun setLexiconReturnTab(tab: NavTab) {
+        _lexiconReturnTab.value = tab
+    }
+
+    fun returnToLexicon() {
+        val tab = _lexiconReturnTab.value ?: return
+        _lexiconReturnTab.value = null
+        selectTab(tab)
+    }
+
+    fun dismissLexiconReturnBanner() {
+        _lexiconReturnTab.value = null
     }
 
     private val _showBookPicker = MutableStateFlow(false)

@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.sp
 import com.example.mybible.data.LexiconLookupResult
 import com.example.mybible.data.MorphologyParser
 import com.example.mybible.ui.MainViewModel
+import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.components.BackTopBar
 import com.example.mybible.ui.components.LexiconDefinitionText
 
@@ -71,6 +72,9 @@ fun GreekWordScreen(
             lexiconResult = lexiconResult,
             isLoading = isLoading,
             scrollState = scrollState,
+            onReferenceClick = { book, chapter, verse ->
+                viewModel.openVerseMentionPreview(book, chapter, verse, NavTab.GREEK_WORD)
+            },
             modifier = Modifier.padding(padding)
         )
     }
@@ -124,6 +128,9 @@ fun HebrewWordScreen(
             lexiconResult = lexiconResult,
             isLoading = isLoading,
             scrollState = scrollState,
+            onReferenceClick = { book, chapter, verse ->
+                viewModel.openVerseMentionPreview(book, chapter, verse, NavTab.HEBREW_WORD)
+            },
             modifier = Modifier.padding(padding)
         )
     }
@@ -144,6 +151,7 @@ private fun LexiconWordPageContent(
     lexiconResult: LexiconLookupResult?,
     isLoading: Boolean,
     scrollState: ScrollState,
+    onReferenceClick: (book: String, chapter: Int, verse: Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val foundEntry = (lexiconResult as? LexiconLookupResult.Found)?.entry
@@ -260,7 +268,7 @@ private fun LexiconWordPageContent(
             foundEntry != null -> {
                 val body = foundEntry.definition.ifBlank { foundEntry.gloss }
                 if (body.isNotBlank()) {
-                    LexiconDefinitionText(definition = body)
+                    LexiconDefinitionText(definition = body, onReferenceClick = onReferenceClick)
                 }
             }
         }

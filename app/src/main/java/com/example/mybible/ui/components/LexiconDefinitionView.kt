@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,13 +19,17 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mybible.data.LexiconDefinitionFormatter
+import com.example.mybible.data.ScriptureRefResolver
 
-/** Highlights Scripture-reference tokens (e.g. "Rom.6:19") within [text] in [refColor]. */
-private fun highlightRefs(text: String, refColor: Color): AnnotatedString = buildAnnotatedString {
+private const val REF_ANNOTATION_TAG = "lexiconVerseRef"
+
+/** Highlights bare Scripture-reference tokens (e.g. "Rom.6:19") in [refColor] — used for any text outside a "⟦key|display⟧" marker. */
+private fun AnnotatedString.Builder.appendHighlighted(text: String, refColor: Color) {
     var last = 0
     for (match in LexiconDefinitionFormatter.SCRIPTURE_REF_RE.findAll(text)) {
         if (match.range.first > last) append(text.substring(last, match.range.first))
@@ -36,9 +41,66 @@ private fun highlightRefs(text: String, refColor: Color): AnnotatedString = buil
     if (last < text.length) append(text.substring(last))
 }
 
+// Matches the "⟦key|display⟧" markers TbesgImporter/TbeshImporter wrap
+// Scripture citations in (see TbesgImporter's REF_TAG_RE doc) — U+27E6/
+// U+27E7 brackets, verified absent from the source lexicon text itself.
+private val REF_MARKER_RE = Regex("⟦([^|⟧]*)\\|([^⟧]*)⟧")
+
+/**
+ * Builds an [AnnotatedString] where "⟦key|display⟧" markers become their
+ * display text, underlined and carrying a [REF_ANNOTATION_TAG] annotation
+ * when [ScriptureRefResolver] can resolve the key to a navigable verse
+ * (most citations — see its doc for the residue that can't be, like
+ * Apocryphal references this KJV-only app has no text for), and any bare
+ * reference-shaped text outside markers is still just highlighted, not
+ * clickable, exactly as before.
+ */
+private fun buildRefAnnotatedString(text: String, refColor: Color): AnnotatedString = buildAnnotatedString {
+    var last = 0
+    for (match in REF_MARKER_RE.findAll(text)) {
+        if (match.range.first > last) appendHighlighted(text.substring(last, match.range.first), refColor)
+        val key = match.groupValues[1]
+        val display = match.groupValues[2]
+        val resolved = ScriptureRefResolver.resolve(key)
+        val start = length
+        withStyle(
+            SpanStyle(
+                color = refColor,
+                fontWeight = FontWeight.Medium,
+                textDecoration = if (resolved != null) TextDecoration.Underline else null
+            )
+        ) {
+            append(display)
+        }
+        if (resolved != null) {
+            addStringAnnotation(REF_ANNOTATION_TAG, "${resolved.book}|${resolved.chapter}|${resolved.verse}", start, length)
+        }
+        last = match.range.last + 1
+    }
+    if (last < text.length) appendHighlighted(text.substring(last), refColor)
+}
+
 @Composable
-private fun RefText(text: String, style: TextStyle, refColor: Color, modifier: Modifier = Modifier) {
-    Text(text = highlightRefs(text, refColor), style = style, modifier = modifier)
+private fun RefText(
+    text: String,
+    style: TextStyle,
+    refColor: Color,
+    modifier: Modifier = Modifier,
+    onReferenceClick: (book: String, chapter: Int, verse: Int) -> Unit = { _, _, _ -> }
+) {
+    val annotated = remember(text, refColor) { buildRefAnnotatedString(text, refColor) }
+    ClickableText(
+        text = annotated,
+        style = style,
+        modifier = modifier,
+        onClick = { offset ->
+            val annotation = annotated.getStringAnnotations(REF_ANNOTATION_TAG, offset, offset).firstOrNull() ?: return@ClickableText
+            val parts = annotation.item.split("|")
+            val chapter = parts.getOrNull(1)?.toIntOrNull()
+            val verse = parts.getOrNull(2)?.toIntOrNull()
+            if (chapter != null && verse != null) onReferenceClick(parts[0], chapter, verse)
+        }
+    )
 }
 
 /**
@@ -50,7 +112,11 @@ private fun RefText(text: String, style: TextStyle, refColor: Color, modifier: M
  * references are picked out in the accent color throughout.
  */
 @Composable
-fun LexiconDefinitionText(definition: String, modifier: Modifier = Modifier) {
+fun LexiconDefinitionText(
+    definition: String,
+    modifier: Modifier = Modifier,
+    onReferenceClick: (book: String, chapter: Int, verse: Int) -> Unit = { _, _, _ -> }
+) {
     val lines = remember(definition) { LexiconDefinitionFormatter.parse(definition) }
     val bodyColor = MaterialTheme.colorScheme.onSurfaceVariant
     val refColor = MaterialTheme.colorScheme.primary
@@ -79,7 +145,8 @@ fun LexiconDefinitionText(definition: String, modifier: Modifier = Modifier) {
                             lineHeight = 21.sp,
                             color = bodyColor.copy(alpha = 0.85f)
                         ),
-                        refColor = refColor
+                        refColor = refColor,
+                        onReferenceClick = onReferenceClick
                     )
                     Spacer(Modifier.height(12.dp))
                 }
@@ -96,7 +163,8 @@ fun LexiconDefinitionText(definition: String, modifier: Modifier = Modifier) {
                         RefText(
                             text = line.body,
                             style = TextStyle(fontSize = 16.sp, lineHeight = 23.sp, color = bodyColor),
-                            refColor = refColor
+                            refColor = refColor,
+                            onReferenceClick = onReferenceClick
                         )
                     }
                 }
@@ -113,7 +181,8 @@ fun LexiconDefinitionText(definition: String, modifier: Modifier = Modifier) {
                         RefText(
                             text = line.body,
                             style = TextStyle(fontSize = 15.sp, lineHeight = 22.sp, color = bodyColor),
-                            refColor = refColor
+                            refColor = refColor,
+                            onReferenceClick = onReferenceClick
                         )
                     }
                 }
@@ -131,7 +200,8 @@ fun LexiconDefinitionText(definition: String, modifier: Modifier = Modifier) {
                         RefText(
                             text = line.body,
                             style = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, color = bodyColor.copy(alpha = 0.85f)),
-                            refColor = refColor
+                            refColor = refColor,
+                            onReferenceClick = onReferenceClick
                         )
                     }
                 }
@@ -141,7 +211,8 @@ fun LexiconDefinitionText(definition: String, modifier: Modifier = Modifier) {
                     RefText(
                         text = line.text,
                         style = TextStyle(fontSize = 16.sp, lineHeight = 23.sp, color = bodyColor),
-                        refColor = refColor
+                        refColor = refColor,
+                        onReferenceClick = onReferenceClick
                     )
                 }
             }

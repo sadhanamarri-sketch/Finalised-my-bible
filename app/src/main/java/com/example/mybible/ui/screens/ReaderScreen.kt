@@ -93,6 +93,7 @@ fun ReaderScreen(
     val focusedVerseNumber by viewModel.focusedVerseNumber.collectAsState()
     val focusedVerseBlurEnabled by viewModel.focusedVerseBlurEnabled.collectAsState()
     val searchReturnAvailable by viewModel.searchReturnAvailable.collectAsState()
+    val lexiconReturnTab by viewModel.lexiconReturnTab.collectAsState()
 
     val completedVerses by viewModel.completedVerses.collectAsState(initial = emptyList())
     val highlights by viewModel.highlights.collectAsState(initial = emptyList())
@@ -305,7 +306,7 @@ fun ReaderScreen(
     // a cross-reference back-bar is showing, a sheet/menu is open, or a
     // verse is selected (selection already swaps the pill for the action
     // toolbar, but this also covers the moment the toolbar is dismissing).
-    val canHideBars = !crossReferenceReturnAvailable && !searchReturnAvailable && !showReaderMenu && selectedVerse == null &&
+    val canHideBars = !crossReferenceReturnAvailable && !searchReturnAvailable && lexiconReturnTab == null && !showReaderMenu && selectedVerse == null &&
         readerPickMode == ReaderPickMode.NONE &&
         readerPickMode == ReaderPickMode.NONE
 
@@ -564,6 +565,71 @@ fun ReaderScreen(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Dismiss",
                                 tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // "Return to lexicon" banner — shown after tapping a Scripture
+            // reference inside a Greek/Hebrew lexicon definition, so the
+            // user can hop straight back to that word's page instead of
+            // re-searching for it, or dismiss it to just keep reading.
+            // Mutually exclusive with the cross-reference/search banners
+            // above, same fixed top slot.
+            if (readerPickMode == ReaderPickMode.NONE && !crossReferenceReturnAvailable && !searchReturnAvailable && lexiconReturnTab != null) {
+                Surface(
+                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "Lexicon",
+                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (lexiconReturnTab == NavTab.HEBREW_WORD) "Return to Hebrew word" else "Return to Greek word",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Button(
+                                onClick = { viewModel.returnToLexicon() },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.tertiary,
+                                    contentColor = MaterialTheme.colorScheme.onTertiary
+                                ),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                modifier = Modifier.height(30.dp)
+                            ) {
+                                Text("Return", fontSize = 12.sp)
+                            }
+                        }
+                        IconButton(
+                            onClick = { viewModel.dismissLexiconReturnBanner() },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Dismiss",
+                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
                                 modifier = Modifier.size(16.dp)
                             )
                         }

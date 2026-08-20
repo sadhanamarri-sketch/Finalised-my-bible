@@ -387,9 +387,14 @@ class MainActivity : ComponentActivity() {
                             verse = preview.verse,
                             verseText = preview.text,
                             onOpenInReader = {
+                                val lexiconOriginTab = preview.lexiconOriginTab
                                 viewModel.closeVerseMentionPreview()
-                                viewModel.closeNoteReader()
-                                viewModel.closeNoteEditor()
+                                if (lexiconOriginTab != null) {
+                                    viewModel.setLexiconReturnTab(lexiconOriginTab)
+                                } else {
+                                    viewModel.closeNoteReader()
+                                    viewModel.closeNoteEditor()
+                                }
                                 viewModel.disableBlurModeForNavigation()
                                 viewModel.jumpToVerse(preview.book, preview.chapter, preview.verse)
                                 viewModel.selectTab(NavTab.READER)

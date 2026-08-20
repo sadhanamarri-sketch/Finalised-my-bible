@@ -38,17 +38,15 @@ object LexiconDefinitionFormatter {
     private val SYN_RE = Regex("""^SYN\.?:?\s*(.*)$""", RegexOption.IGNORE_CASE)
     private val GREEK_RE = Regex("\\p{InGreek}")
 
-    // TbesgImporter/TbeshImporter now preserve Scripture citations as
+    // TbesgImporter/TbeshImporter preserve Scripture citations as
     // "⟦book.chapter.verse|display text⟧" markers instead of discarding
-    // them (see TbesgImporter's REF_TAG_RE doc) — unwrapped back to plain
-    // display text here for now, so the reader's output is unchanged until
-    // a later pass renders these as tappable spans instead of stripping
-    // them.
-    private val REF_MARKER_RE = Regex("⟦[^|⟧]*\\|([^⟧]*)⟧")
+    // them (see TbesgImporter's REF_TAG_RE doc). Left intact through
+    // classification here — LexiconDefinitionView renders them as tappable
+    // spans (via ScriptureRefResolver) rather than plain text, so the
+    // marker's key half needs to survive into the rendering layer.
 
     fun parse(definition: String): List<Line> {
         val rawLines = definition
-            .replace(REF_MARKER_RE) { it.groupValues[1] }
             .split("\n").map { it.trim() }.filter { it.isNotEmpty() }
         return rawLines.mapIndexed { index, line ->
             val synMatch = SYN_RE.find(line)
