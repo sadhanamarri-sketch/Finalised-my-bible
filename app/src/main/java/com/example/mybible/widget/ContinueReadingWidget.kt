@@ -79,9 +79,13 @@ private fun ContinueReadingContent(
     lastChapter: Int
 ) {
     val context = LocalContext.current
-    // Default footprint is ~40dp tall (1 row); 4x2 and up is ~110dp+ (see
-    // continue_reading_widget_info.xml), so 80dp cleanly separates the two.
-    val isExpanded = LocalSize.current.height >= 80.dp
+    // TEMP DEBUG (see debugSize Text below): the 80dp guess for "default
+    // 4x1 vs. resized-taller" turned out wrong on the test device — its
+    // default 4x1 placement already measures >= 80dp tall. Reading the
+    // actual LocalSize numbers off-device is the only way to pick a
+    // correct threshold instead of guessing again.
+    val currentSize = LocalSize.current
+    val isExpanded = currentSize.height >= 80.dp
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
@@ -89,6 +93,11 @@ private fun ContinueReadingContent(
             .cornerRadius(24.dp)
             .padding(10.dp)
     ) {
+        Text(
+            text = "${currentSize.width.value.toInt()}x${currentSize.height.value.toInt()}dp",
+            style = TextStyle(fontSize = 9.sp, color = palette.accent)
+        )
+
         // Outer box paints the border color; a 1dp inset reveals it as a
         // ring around the inner pill (Glance has no Modifier.border()) —
         // same trick used by the Continue Reading row on VerseOfDayWidget.
