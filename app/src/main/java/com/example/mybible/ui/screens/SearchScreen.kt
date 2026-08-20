@@ -1,6 +1,5 @@
 package com.example.mybible.ui.screens
 
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,7 +18,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
@@ -152,14 +150,14 @@ fun SearchScreen(
                     focusManager.clearFocus()
                 }
             ),
-            // Gold focus ring instead of Material's default primary blue —
+            // Coral focus ring instead of Material's default primary blue —
             // matches the flat/line-bordered look the rest of the app's
             // inputs use (see NeTextField) rather than the stock Material
             // outlined-field treatment.
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.tertiary,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
                 unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                focusedLabelColor = MaterialTheme.colorScheme.tertiary,
+                focusedLabelColor = MaterialTheme.colorScheme.primary,
                 cursorColor = MaterialTheme.colorScheme.primary
             ),
             modifier = Modifier
@@ -285,23 +283,19 @@ fun SearchScreen(
                 )
             }
         } else {
-            // Coral-bordered cards, each with a trailing arrow — matches
-            // Cross References' row shape, with its own outline instead of
-            // a shared hairline between rows.
+            // Flat rows separated by a hairline, not individually bordered
+            // cards — matches Cross References/Highlighted Verses.
             val englishFontStyle = resolveEnglishFontStyle(englishFontFamilyName)
             LazyColumn(
                 state = listState,
-                verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(searchResults) { verse ->
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
                             .clickable { viewModel.openSearchResult(verse) }
-                            .padding(12.dp)
+                            .padding(vertical = 12.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -334,6 +328,7 @@ fun SearchScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceContainerHigh)
                 }
             }
         }
