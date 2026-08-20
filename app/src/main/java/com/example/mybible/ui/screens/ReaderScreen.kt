@@ -92,6 +92,7 @@ fun ReaderScreen(
     val crossReferenceReturnAvailable by viewModel.crossReferenceReturnAvailable.collectAsState()
     val focusedVerseNumber by viewModel.focusedVerseNumber.collectAsState()
     val focusedVerseBlurEnabled by viewModel.focusedVerseBlurEnabled.collectAsState()
+    val focusedVersePinToTop by viewModel.focusedVersePinToTop.collectAsState()
     val searchReturnAvailable by viewModel.searchReturnAvailable.collectAsState()
     val lexiconReturnTab by viewModel.lexiconReturnTab.collectAsState()
 
@@ -159,7 +160,7 @@ fun ReaderScreen(
     // currentBook/currentChapter (loadChapter is called with the same
     // values, which a MutableStateFlow drops as a no-op), so without this
     // key a same-chapter xref tap wouldn't re-scroll or re-focus at all.
-    LaunchedEffect(currentBook, currentChapter, verses, focusedVerseNumber, focusedVerseBlurEnabled) {
+    LaunchedEffect(currentBook, currentChapter, verses, focusedVerseNumber, focusedVerseBlurEnabled, focusedVersePinToTop) {
         if (verses.isEmpty()) return@LaunchedEffect
         // A different chapter means a different set of row heights at the
         // same indices (e.g. leaving Psalm 119 for a 3-verse chapter) — old
@@ -171,20 +172,26 @@ fun ReaderScreen(
             if (idx >= 0) {
                 val targetIndex = idx + 1
                 // First bring the target item into the laid-out set so its
-                // actual measured height is available, then re-scroll with
-                // a computed offset so the verse lands centered in the
-                // viewport instead of pinned to the very top.
+                // actual measured height is available, then (unless
+                // pinToTop) re-scroll with a computed offset so the verse
+                // lands centered in the viewport instead of flush with the
+                // top — pinToTop skips that: it means this is a scroll-
+                // position *restore* (Telugu/interlinear toggle), where the
+                // point is to leave the anchor verse exactly where it
+                // already was on screen, not spotlight a new one.
                 listState.scrollToItem(targetIndex)
-                val layoutInfo = listState.layoutInfo
-                val itemInfo = layoutInfo.visibleItemsInfo.find { it.index == targetIndex }
-                if (itemInfo != null) {
-                    val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
-                    val extraSpace = (viewportHeight - itemInfo.size).coerceAtLeast(0)
-                    if (extraSpace > 0) {
-                        // Negative scrollOffset pushes the item down from
-                        // the top of the viewport by half the leftover
-                        // space, centering it.
-                        listState.scrollToItem(targetIndex, -(extraSpace / 2))
+                if (!focusedVersePinToTop) {
+                    val layoutInfo = listState.layoutInfo
+                    val itemInfo = layoutInfo.visibleItemsInfo.find { it.index == targetIndex }
+                    if (itemInfo != null) {
+                        val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
+                        val extraSpace = (viewportHeight - itemInfo.size).coerceAtLeast(0)
+                        if (extraSpace > 0) {
+                            // Negative scrollOffset pushes the item down from
+                            // the top of the viewport by half the leftover
+                            // space, centering it.
+                            listState.scrollToItem(targetIndex, -(extraSpace / 2))
+                        }
                     }
                 }
                 xrefFocusLandedIndex = listState.firstVisibleItemIndex
@@ -838,10 +845,10 @@ fun ReaderScreen(
                                 }
                             },
                             onGreekWordClick = { gWord ->
-                                runUnlessBlurred { viewModel.selectGreekWord(gWord) }
+                                runUnlessBlurred { viewModel.selectGreekWord(gWord, verse.number) }
                             },
                             onHebrewWordClick = { hWord ->
-                                runUnlessBlurred { viewModel.selectHebrewWord(hWord) }
+                                runUnlessBlurred { viewModel.selectHebrewWord(hWord, verse.number) }
                             },
                             onCrossReferenceMarkerClick = {
                                 // Bypasses the verse action sheet entirely —
@@ -904,7 +911,15 @@ fun ReaderScreen(
                     viewModel.openCrossReferences(verse)
                 },
                 onToggleInterlinear = {
-                    viewModel.toggleInterlinear()
+                    // Anchor on whatever verse is at the top of the
+                    // viewport, same as the pill toggle below — not on
+                    // `verse` itself, which is just whichever verse this
+                    // selection toolbar happens to be attached to (often
+                    // off-screen or near the bottom, since the toolbar is
+                    // bottom-aligned) and would jump the view to it instead
+                    // of preserving where the user was reading.
+                    val anchorVerse = verses.getOrNull(listState.firstVisibleItemIndex - 1)?.number
+                    viewModel.toggleInterlinear(anchorVerse)
                 },
                 onDismiss = {
                     viewModel.setSelectedVerse(null)
@@ -998,7 +1013,12 @@ fun ReaderScreen(
                         glyph = if (isOldTestamentBook) "\u05D0" else "\u03B1",
                         active = showInterlinear,
                         contentDescription = if (isOldTestamentBook) "Hebrew interlinear" else "Greek interlinear",
-                        onClick = { viewModel.toggleInterlinear() },
+                        onClick = {
+                            // See toggleTeluguInline's/toggleInterlinear's
+                            // doc for why this anchor is needed.
+                            val anchorVerse = verses.getOrNull(listState.firstVisibleItemIndex - 1)?.number
+                            viewModel.toggleInterlinear(anchorVerse)
+                        },
                         modifier = Modifier.testTag("pill_greek_toggle"),
                         offsetY = (-1).dp
                     )

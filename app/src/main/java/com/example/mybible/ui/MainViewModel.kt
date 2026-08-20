@@ -143,6 +143,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _focusedVerseBlurEnabled = MutableStateFlow(true)
     val focusedVerseBlurEnabled: StateFlow<Boolean> = _focusedVerseBlurEnabled.asStateFlow()
 
+    // Whether landing on focusedVerseNumber should pin it flush to the exact
+    // top of the viewport (offset 0) instead of the default centered "jump
+    // to this verse" landing. True only for the Telugu/interlinear inline-
+    // toggle case (toggleTeluguInline/toggleInterlinear below) — its whole
+    // point is to keep whatever verse was already at the top of the screen
+    // there, not to spotlight a new one, so centering it instead reads as a
+    // scroll jump (the verse that was pinned at the top drifts toward the
+    // middle of the screen, and drifts again on the next toggle since the
+    // next anchor capture reads the now-wrong top verse). Every real "jump
+    // to verse X" entry point (jumpToVerse, navigateToCrossReference, the
+    // lexicon-page return below) explicitly resets this to false.
+    private val _focusedVersePinToTop = MutableStateFlow(false)
+    val focusedVersePinToTop: StateFlow<Boolean> = _focusedVersePinToTop.asStateFlow()
+
     // English Dictionary Lookup state
     private val _selectedEnglishWord = MutableStateFlow<String?>(null)
     val selectedEnglishWord: StateFlow<String?> = _selectedEnglishWord.asStateFlow()
@@ -532,6 +546,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun jumpToVerse(book: String, chapter: Int, verse: Int, focusVerse: Boolean = true) {
         _focusedVerseNumber.value = verse
         _focusedVerseBlurEnabled.value = focusVerse
+        _focusedVersePinToTop.value = false
         loadChapter(book, chapter)
     }
 
@@ -609,18 +624,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // very top of the chapter, which reads as "toggling Telugu jumped me
     // back to verse 1." Setting it here (unblurred — this is a position
     // restore, not a real "jump to this verse") makes that effect land back
-    // where the user already was instead.
+    // where the user already was instead. pinToTop=true is the other half
+    // of that: without it, the effect *centers* the anchor verse instead of
+    // leaving it flush with the top of the screen, which reads as its own
+    // kind of scroll jump (the verse that was pinned at the top drifts
+    // toward the middle) and compounds on every subsequent toggle, since
+    // each one re-anchors off the now-wrong top verse.
     fun toggleTeluguInline(anchorVerse: Int? = null) {
         _showTeluguInline.value = !_showTeluguInline.value
         if (anchorVerse != null) {
             _focusedVerseNumber.value = anchorVerse
             _focusedVerseBlurEnabled.value = false
+            _focusedVersePinToTop.value = true
         }
         loadCurrentChapter()
     }
 
-    fun toggleInterlinear() {
+    // Same anchor-preservation need as toggleTeluguInline above, and the
+    // same fix — but no loadCurrentChapter() call: showInterlinear only
+    // gates whether VerseComponents renders the Greek/Hebrew interlinear
+    // words that are already present on every loaded Verse, so there's no
+    // new data to re-fetch, just a height change per verse to restore
+    // position across (setting focusedVerseNumber still re-triggers
+    // ReaderScreen's scroll-restore effect on its own).
+    fun toggleInterlinear(anchorVerse: Int? = null) {
         _showInterlinear.value = !_showInterlinear.value
+        if (anchorVerse != null) {
+            _focusedVerseNumber.value = anchorVerse
+            _focusedVerseBlurEnabled.value = false
+            _focusedVersePinToTop.value = true
+        }
     }
 
     fun toggleBlurMode() {
@@ -704,6 +737,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _crossReferenceReturnAvailable.value = true
         _focusedVerseNumber.value = targetVerse
         _focusedVerseBlurEnabled.value = true
+        _focusedVersePinToTop.value = false
         // Blur mode (privacy blur, the pill toggle) would defeat the whole
         // point of following a cross-reference — you followed it to read
         // the target verse, not stare at an obscured one.
@@ -727,6 +761,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // position, no matter how far you scrolled.
     fun clearVerseFocus() {
         _focusedVerseNumber.value = null
+        _focusedVersePinToTop.value = false
     }
 
     fun openEnglishWordLookup(word: String) {
@@ -751,18 +786,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _selectedVerse.value = verse
     }
 
+    // The verse a Greek/Hebrew word lookup was opened from — set by
+    // selectGreekWord/selectHebrewWord whenever a word is tapped, read back
+    // by closeGreekWordPage/closeHebrewWordPage (including via system back —
+    // see MainActivity) to land back on that exact verse instead of the top
+    // of the chapter. Reader's own LazyListState is fully disposed while
+    // GreekWordScreen/HebrewWordScreen is showing (AnimatedContent tears
+    // down the inactive tab's composable), so without this, switching back
+    // to the Reader tab has nothing to restore its scroll position from.
+    private val _lexiconBaseVerse = MutableStateFlow<Int?>(null)
+
     // Opens GreekWordScreen for this word — same "land on a full page,
     // fetch lazily" shape as CrossReferenceScreen/openCrossReferences.
     // Passing null instead clears the selection without switching tabs
     // (used internally by closeGreekWordPage(), and safe to leave as a
     // dedicated no-op path for any future non-navigating "just clear it"
-    // caller).
-    fun selectGreekWord(greekWord: GreekWord?) {
+    // caller); baseVerse is only meaningful on that real-selection path.
+    fun selectGreekWord(greekWord: GreekWord?, baseVerse: Int? = null) {
         _selectedGreekWord.value = greekWord
         lexiconLookupJob?.cancel()
         _lexiconResult.value = null
         _isLoadingLexicon.value = false
         if (greekWord == null) return
+        if (baseVerse != null) _lexiconBaseVerse.value = baseVerse
 
         _greekWordScrollPosition.value = 0
         _isLoadingLexicon.value = true
@@ -775,18 +821,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // GreekWordScreen's own back button — mirrors endCrossReferenceSession()
-    // + selectTab(READER).
+    // + selectTab(READER), plus focusing the base verse (see
+    // focusLexiconBaseVerseAndReturn).
     fun closeGreekWordPage() {
         selectGreekWord(null)
-        selectTab(NavTab.READER)
+        focusLexiconBaseVerseAndReturn()
     }
 
-    fun selectHebrewWord(hebrewWord: HebrewWord?) {
+    fun selectHebrewWord(hebrewWord: HebrewWord?, baseVerse: Int? = null) {
         _selectedHebrewWord.value = hebrewWord
         hebrewLexiconLookupJob?.cancel()
         _hebrewLexiconResult.value = null
         _isLoadingHebrewLexicon.value = false
         if (hebrewWord == null) return
+        if (baseVerse != null) _lexiconBaseVerse.value = baseVerse
 
         _hebrewWordScrollPosition.value = 0
         _isLoadingHebrewLexicon.value = true
@@ -800,6 +848,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun closeHebrewWordPage() {
         selectHebrewWord(null)
+        focusLexiconBaseVerseAndReturn()
+    }
+
+    // Shared by closeGreekWordPage/closeHebrewWordPage: spotlight-jump back
+    // to the verse the lookup was opened from (same "focus" treatment as a
+    // cross-reference/search jump — see jumpToVerse's doc), then return to
+    // Reader. Falls back to a plain tab switch if somehow no base verse was
+    // recorded, rather than forcing a jump to nothing.
+    private fun focusLexiconBaseVerseAndReturn() {
+        val base = _lexiconBaseVerse.value
+        _lexiconBaseVerse.value = null
+        if (base != null) {
+            _focusedVerseNumber.value = base
+            _focusedVerseBlurEnabled.value = true
+            _focusedVersePinToTop.value = false
+        }
         selectTab(NavTab.READER)
     }
 

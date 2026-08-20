@@ -204,11 +204,44 @@ class MainActivity : ComponentActivity() {
 
             var manualShowTour by remember { mutableStateOf(false) }
 
-            // Hardware/gesture back returns to Reader from any destination
-            // screen, instead of backgrounding the app — Reader is "home"
+            // Hardware/gesture back returns to Reader from most destination
+            // screens, instead of backgrounding the app — Reader is "home"
             // now that there's no persistent tab bar to tap back with.
-            BackHandler(enabled = activeTab != NavTab.READER) {
+            // Greek/Hebrew word lookup pages are excluded here and get
+            // their own handlers below: they need to land back on the verse
+            // the lookup was opened from (closeGreekWordPage/
+            // closeHebrewWordPage), not just switch tabs and leave Reader
+            // scrolled to the top of the chapter — its list state was fully
+            // disposed while the lookup page was showing.
+            BackHandler(enabled = activeTab != NavTab.READER && activeTab != NavTab.GREEK_WORD && activeTab != NavTab.HEBREW_WORD) {
                 viewModel.selectTab(NavTab.READER)
+            }
+            BackHandler(enabled = activeTab == NavTab.GREEK_WORD) {
+                viewModel.closeGreekWordPage()
+            }
+            BackHandler(enabled = activeTab == NavTab.HEBREW_WORD) {
+                viewModel.closeHebrewWordPage()
+            }
+
+            // While Reader shows a "Return to X" banner (followed a cross-
+            // reference, search result, or lexicon citation into the
+            // Reader), system back should do exactly what tapping the
+            // banner's Return button does — hop back to that list/page —
+            // instead of falling through to the default Activity back
+            // behavior (backgrounding/exiting the app), since activeTab ==
+            // READER disables the blanket handler above.
+            val crossReferenceReturnAvailable by viewModel.crossReferenceReturnAvailable.collectAsState()
+            val searchReturnAvailable by viewModel.searchReturnAvailable.collectAsState()
+            val lexiconReturnTab by viewModel.lexiconReturnTab.collectAsState()
+            BackHandler(
+                enabled = activeTab == NavTab.READER &&
+                    (crossReferenceReturnAvailable || searchReturnAvailable || lexiconReturnTab != null)
+            ) {
+                when {
+                    crossReferenceReturnAvailable -> viewModel.returnToCrossReferences()
+                    searchReturnAvailable -> viewModel.returnToSearchResults()
+                    else -> viewModel.returnToLexicon()
+                }
             }
 
             // Note editor/reader are now full pages pushed over the Notes
