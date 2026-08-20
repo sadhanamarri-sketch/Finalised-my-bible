@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -43,7 +42,6 @@ import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.components.BackTopBar
 import com.example.mybible.ui.components.DateField
-import com.example.mybible.ui.components.LinkifiedNoteText
 import com.example.mybible.ui.components.NeSectionLabel
 
 // Formats an ISO "yyyy-MM-dd" note date as "22nd Aug 2026" — matches the
@@ -278,8 +276,10 @@ fun NotesScreen(
                     )
                 }
             } else {
-                val dividerColor = MaterialTheme.colorScheme.outlineVariant
+                // Elevated Cards, not flat/hairline-divided rows — same
+                // treatment as Search's result list.
                 LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
                     items(filteredNotes, key = { it.id }) { note ->
@@ -287,20 +287,16 @@ fun NotesScreen(
                         // a note at a glance: title, text, "Read more" —
                         // refs/date/tags used to make each row noisy and
                         // are already visible inside the note itself.
+                        Card(
+                            onClick = { viewModel.openNoteReader(note) },
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { viewModel.openNoteReader(note) }
-                                .drawBehind {
-                                    val strokeWidth = 1.dp.toPx()
-                                    drawLine(
-                                        color = dividerColor,
-                                        start = androidx.compose.ui.geometry.Offset(0f, size.height - strokeWidth / 2),
-                                        end = androidx.compose.ui.geometry.Offset(size.width, size.height - strokeWidth / 2),
-                                        strokeWidth = strokeWidth
-                                    )
-                                }
-                                .padding(vertical = 14.dp, horizontal = 2.dp)
+                                .padding(14.dp)
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -308,9 +304,10 @@ fun NotesScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = note.title.ifBlank { "Untitled note" },
-                                    fontSize = 17.sp,
+                                    text = note.title.ifBlank { "Untitled note" }.uppercase(),
+                                    fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.SansSerif,
                                     color = MaterialTheme.colorScheme.tertiary,
                                     modifier = Modifier.weight(1f)
                                 )
@@ -364,34 +361,37 @@ fun NotesScreen(
 
                             // Note body preview — clipped to a few lines;
                             // "Read more" (below) opens the full note
-                            // reader rather than expanding inline.
-                            LinkifiedNoteText(
+                            // reader rather than expanding inline. Plain
+                            // Text, not LinkifiedNoteText: the whole card is
+                            // already tap-to-open-reader (see the Card's own
+                            // onClick above), and a verse mention being
+                            // separately clickable here stole that tap
+                            // instead of opening the reader. Verse mentions
+                            // are only meant to be tappable once you're
+                            // actually inside the reader — see
+                            // NoteReaderScreen's use of LinkifiedNoteText.
+                            Text(
                                 text = note.text,
-                                onMentionClick = { b, c, v -> viewModel.openVerseMentionPreview(b, c, v) },
-                                style = androidx.compose.ui.text.TextStyle(
-                                    fontFamily = com.example.mybible.ui.theme.GelasioFontFamily,
-                                    fontSize = 17.5.sp,
-                                    lineHeight = 25.sp,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                ),
+                                fontFamily = FontFamily.Serif,
+                                fontSize = 14.sp,
+                                lineHeight = 20.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 3,
                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                                 modifier = Modifier.padding(top = 6.dp)
                             )
 
-                            // "Read more" — right-aligned, terracotta
-                            // (the theme's redletter/error tone, the
-                            // closest match to "terracotta" in the
-                            // palette). Only shown when the 3-line preview
-                            // above is actually likely to have clipped
-                            // something.
+                            // "Read more" — right-aligned, coral (the
+                            // theme's primary/accent tone). Only shown when
+                            // the 3-line preview above is actually likely
+                            // to have clipped something.
                             if (note.text.length > 140) {
                                 Box(modifier = Modifier.fillMaxWidth()) {
                                     Text(
                                         text = "Read more",
                                         fontSize = 13.5.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.error,
+                                        color = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier
                                             .align(Alignment.CenterEnd)
                                             .padding(top = 4.dp)
@@ -399,6 +399,7 @@ fun NotesScreen(
                                     )
                                 }
                             }
+                        }
                         }
                     }
                 }

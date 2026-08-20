@@ -11,6 +11,10 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -18,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -31,12 +36,15 @@ import com.example.mybible.ui.components.LinkifiedNoteText
  * Material TopAppBar look the rest of this app's full-page screens use.
  *
  * Layout, top to bottom:
- *  - Header: plain-text "← Back" (left) / the note's own title, centered,
- *    falling back to "Note" when untitled (right) / plain-text "Edit"
- *    (right), thin bottom border. Capacitor's header title is always the
- *    literal word "Note" instead — this is a deliberate deviation so it's
- *    clear which note is open at a glance, same reasoning as the
- *    full-screen note-text writer's header.
+ *  - Header: back-arrow icon (left) / the note's own title, centered,
+ *    uppercase and styled to match the Notes-list card title (bold
+ *    sans-serif, gold/tertiary), falling back to "Untitled note" when
+ *    untitled / pen (edit) icon (right), thin bottom border. Both icons
+ *    use onBackground (not a literal white) so they stay visible in the
+ *    light-toned themes too, not just the dark ones.
+ *    Capacitor's header title is always the literal word "Note" instead —
+ *    this is a deliberate deviation so it's clear which note is open at a
+ *    glance, same reasoning as the full-screen note-text writer's header.
  *  - Ref line: gold outlined pill per reference (matches the same
  *    ref-chip style used in the Notes list and editor), or the note's
  *    date if it has no references, or "Note" if it has neither — matching
@@ -47,10 +55,10 @@ import com.example.mybible.ui.components.LinkifiedNoteText
  *    tapping a verse mention in the body text below. A deliberate
  *    deviation kept from the pre-Capacitor version rather than a
  *    straight port.
- *  - Title: only shown if the note has one.
- *  - Body text: verse mentions inside it (e.g. "See John 3:16") are still
- *    tappable via LinkifiedNoteText, opening the small verse-preview sheet
- *    — matches Capacitor's linkifyXrefs applied to #noteReaderText.
+ *  - Body text: no separate title block — the title only appears once, in
+ *    the header. Verse mentions inside the body (e.g. "See John 3:16") are
+ *    still tappable via LinkifiedNoteText, opening the small verse-preview
+ *    sheet — matches Capacitor's linkifyXrefs applied to #noteReaderText.
  *
  * Capacitor's note reader doesn't show tags at all, so this doesn't
  * either — they're still visible on the note's row in the list and in
@@ -94,18 +102,18 @@ fun NoteReaderScreen(
                     .padding(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "← Back",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary,
+                Icon(
+                    imageVector = Icons.Default.ArrowBack,
+                    contentDescription = "Back",
+                    tint = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.clickable(onClick = onBack)
                 )
                 Text(
-                    text = noteItem.title.ifBlank { "Note" },
-                    fontSize = 16.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    text = noteItem.title.ifBlank { "Untitled note" }.uppercase(),
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.SansSerif,
+                    color = MaterialTheme.colorScheme.tertiary,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -114,18 +122,17 @@ fun NoteReaderScreen(
                         .padding(horizontal = 8.dp)
                 )
                 if (onEdit != null) {
-                    Text(
-                        text = "Edit",
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary,
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Edit",
+                        tint = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.clickable(onClick = onEdit)
                     )
                 } else {
-                    // Keeps "Note" centered even without an Edit action —
-                    // matches the left button's width so the Row's
-                    // weight(1f) title stays balanced.
-                    Spacer(Modifier.width(46.dp))
+                    // Keeps the title centered even without an Edit action —
+                    // matches the left icon's width so the Row's weight(1f)
+                    // title stays balanced.
+                    Spacer(Modifier.width(24.dp))
                 }
             }
             HorizontalDividerLine()
@@ -180,22 +187,11 @@ fun NoteReaderScreen(
                     )
                 }
 
-                if (noteItem.title.isNotBlank()) {
-                    Text(
-                        text = noteItem.title,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        fontFamily = com.example.mybible.ui.theme.GelasioFontFamily,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(bottom = 10.dp)
-                    )
-                }
-
                 LinkifiedNoteText(
                     text = noteItem.text,
                     onMentionClick = { b, c, v -> onOpenVerseMention?.invoke(b, c, v) },
                     style = androidx.compose.ui.text.TextStyle(
-                        fontFamily = com.example.mybible.ui.theme.GelasioFontFamily,
+                        fontFamily = FontFamily.Serif,
                         fontSize = 18.sp,
                         lineHeight = 29.sp,
                         color = MaterialTheme.colorScheme.onSurface

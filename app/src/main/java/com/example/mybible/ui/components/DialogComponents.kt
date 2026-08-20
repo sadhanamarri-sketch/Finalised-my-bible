@@ -32,12 +32,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import com.example.mybible.data.LexiconLookupResult
-import com.example.mybible.data.MorphologyParser
-import com.example.mybible.model.CrossReferenceItem
 import com.example.mybible.model.EnglishDictionaryEntry
-import com.example.mybible.model.GreekWord
-import com.example.mybible.model.HebrewWord
 import com.example.mybible.model.HighlightColorDef
 
 // A YYYY-MM-DD text field with a calendar icon that opens a native
@@ -110,382 +105,6 @@ fun DateField(
     }
 }
 
-// Tapping a Greek word opens this the same way the Capacitor app's
-// #greekWordSheet does: the word's own inline gloss (from TAGNT, already on
-// [greekWord]) shows immediately, then the fuller TBESG lexicon entry fills
-// in underneath once it loads — Strong's ref, headword, transliteration,
-// bold gloss, a "Lexical form" line (the dictionary's citation form, which
-// can differ from the inflected form tapped in the verse), then the full
-// definition. [lexiconResult]/[isLoading] drive that second, slower part;
-// see BibleRepository.getLexiconEntry for how the three "nothing to show"
-// cases below map to Capacitor's three distinct sheet messages.
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun GreekWordSheet(
-    greekWord: GreekWord,
-    lexiconResult: LexiconLookupResult?,
-    isLoading: Boolean,
-    onDismiss: () -> Unit
-) {
-    val foundEntry = (lexiconResult as? LexiconLookupResult.Found)?.entry
-    // Capacitor only overwrites the inline gloss with the lexicon's gloss
-    // when the tapped word didn't already carry one of its own.
-    val displayedGloss = greekWord.englishGloss.ifBlank { foundEntry?.gloss.orEmpty() }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp)
-        ) {
-            Text(
-                text = if (greekWord.strongs.isNullOrBlank()) "GREEK WORD" else "STRONG'S ${greekWord.strongs.uppercase()}",
-                fontSize = 11.sp,
-                letterSpacing = 1.5.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = greekWord.greek,
-                fontSize = 28.sp,
-                fontFamily = FontFamily.Serif,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            if (greekWord.transliteration.isNotBlank()) {
-                Text(
-                    text = greekWord.transliteration,
-                    fontSize = 15.5.sp,
-                    fontStyle = FontStyle.Italic,
-                    color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
-            }
-            val parsedMorphology = MorphologyParser.describe(greekWord.morphology)
-            if (parsedMorphology.isNotBlank()) {
-                Text(
-                    text = parsedMorphology,
-                    fontSize = 12.5.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
-            if (displayedGloss.isNotBlank()) {
-                Text(
-                    text = displayedGloss,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(top = 10.dp)
-                )
-            }
-
-            if (!foundEntry?.lemma.isNullOrBlank()) {
-                Column(modifier = Modifier.padding(top = 12.dp)) {
-                    Text(
-                        text = "Lexical form: ${foundEntry!!.lemma}",
-                        fontSize = 12.5.sp,
-                        letterSpacing = 1.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    if (foundEntry!!.transliteration.isNotBlank()) {
-                        Text(
-                            text = foundEntry!!.transliteration,
-                            fontSize = 13.sp,
-                            fontStyle = FontStyle.Italic,
-                            color = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.padding(top = 2.dp)
-                        )
-                    }
-                    if (foundEntry!!.morphology.isNotBlank()) {
-                        Text(
-                            text = "Lexicon morphology: ${MorphologyParser.describe(foundEntry!!.morphology)}",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 3.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(14.dp))
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            when {
-                isLoading -> {
-                    Text(
-                        text = "Loading definition\u2026",
-                        fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                lexiconResult is LexiconLookupResult.NoStrongsNumber -> {
-                    Text(
-                        text = "No Strong\u2019s number is tagged for this word.",
-                        fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                lexiconResult is LexiconLookupResult.NetworkError -> {
-                    Text(
-                        text = "Couldn\u2019t load the definition \u2014 check your connection and try again.",
-                        fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                lexiconResult is LexiconLookupResult.NotFound -> {
-                    Text(
-                        text = "Full definition not available for this word.",
-                        fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                foundEntry != null -> {
-                    val body = foundEntry.definition.ifBlank { foundEntry.gloss }
-                    if (body.isNotBlank()) {
-                        LexiconDefinitionText(definition = body)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-    }
-}
-
-// Hebrew counterpart to GreekWordSheet above — same structure and the same
-// three "nothing to show" messages, just backed by TAHOT's inline
-// gloss/grammar instead of TAGNT's, and by getHebrewLexiconEntry (H-prefixed
-// Strong's numbers) instead of getLexiconEntry. No Hebrew morphology parser
-// exists yet (MorphologyParser.describe is Robinson/Greek-specific), so the
-// ETCBC grammar code TAHOT provides is shown as-is rather than expanded into
-// prose — still more useful than nothing, and it's what a study-Bible reader
-// would recognize from other interlinear tools anyway.
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun HebrewWordSheet(
-    hebrewWord: HebrewWord,
-    lexiconResult: LexiconLookupResult?,
-    isLoading: Boolean,
-    onDismiss: () -> Unit
-) {
-    val foundEntry = (lexiconResult as? LexiconLookupResult.Found)?.entry
-    val displayedGloss = hebrewWord.englishGloss.ifBlank { foundEntry?.gloss.orEmpty() }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp)
-        ) {
-            Text(
-                text = if (hebrewWord.strongs.isNullOrBlank()) "HEBREW WORD" else "STRONG'S ${hebrewWord.strongs.uppercase()}",
-                fontSize = 11.sp,
-                letterSpacing = 1.5.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = hebrewWord.hebrew,
-                fontSize = 28.sp,
-                fontFamily = FontFamily.Serif,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            if (hebrewWord.transliteration.isNotBlank()) {
-                Text(
-                    text = hebrewWord.transliteration,
-                    fontSize = 15.5.sp,
-                    fontStyle = FontStyle.Italic,
-                    color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
-            }
-            if (hebrewWord.morphology.isNotBlank()) {
-                Text(
-                    text = "Grammar: ${hebrewWord.morphology}",
-                    fontSize = 12.5.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
-            if (displayedGloss.isNotBlank()) {
-                Text(
-                    text = displayedGloss,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(top = 10.dp)
-                )
-            }
-
-            if (!foundEntry?.lemma.isNullOrBlank()) {
-                Column(modifier = Modifier.padding(top = 12.dp)) {
-                    Text(
-                        text = "Lexical form: ${foundEntry!!.lemma}",
-                        fontSize = 12.5.sp,
-                        letterSpacing = 1.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    if (foundEntry!!.transliteration.isNotBlank()) {
-                        Text(
-                            text = foundEntry!!.transliteration,
-                            fontSize = 13.sp,
-                            fontStyle = FontStyle.Italic,
-                            color = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.padding(top = 2.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(14.dp))
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            when {
-                isLoading -> {
-                    Text(
-                        text = "Loading definition\u2026",
-                        fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                lexiconResult is LexiconLookupResult.NoStrongsNumber -> {
-                    Text(
-                        text = "No Strong\u2019s number is tagged for this word.",
-                        fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                lexiconResult is LexiconLookupResult.NetworkError -> {
-                    Text(
-                        text = "Couldn\u2019t load the definition \u2014 check your connection and try again.",
-                        fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                lexiconResult is LexiconLookupResult.NotFound -> {
-                    Text(
-                        text = "Full definition not available for this word.",
-                        fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                foundEntry != null -> {
-                    val body = foundEntry.definition.ifBlank { foundEntry.gloss }
-                    if (body.isNotBlank()) {
-                        LexiconDefinitionText(definition = body)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun CrossReferenceSheet(
-    crossReferences: List<CrossReferenceItem>,
-    onSelectReference: (String, Int, Int) -> Unit,
-    onDismiss: () -> Unit
-) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.background
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Cross References (Treasury)",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = "Tap to Navigate",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.secondary,
-                    fontStyle = FontStyle.Italic
-                )
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.heightIn(max = 340.dp)
-            ) {
-                items(crossReferences) { item ->
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                onSelectReference(item.targetBook, item.targetChapter, item.targetVerse)
-                            }
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "${item.targetBook} ${item.targetChapter}:${item.targetVerse}",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Icon(
-                                    imageVector = Icons.Default.ArrowForward,
-                                    contentDescription = "Navigate",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = item.previewText,
-                                fontSize = 14.sp,
-                                fontFamily = FontFamily.Serif,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            OutlinedButton(
-                onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Close")
-            }
-        }
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EnglishDictionarySheet(
@@ -524,7 +143,20 @@ fun EnglishDictionarySheet(
                     text = entry!!.phonetic!!,
                     fontSize = 14.sp,
                     fontStyle = FontStyle.Italic,
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
+                )
+            } else if (entry?.resolvedFrom != null) {
+                // Webster's 1828 doesn't have "tribulations" as its own
+                // headword, only "tribulation" — see
+                // BibleRepository.lookupWebsterStem. Make clear the
+                // definition below belongs to that base form, not a
+                // literal entry for the word tapped.
+                Text(
+                    text = "Showing definition for \"${entry.resolvedFrom}\"",
+                    fontSize = 13.sp,
+                    fontStyle = FontStyle.Italic,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
                 )
             } else {
@@ -549,38 +181,47 @@ fun EnglishDictionarySheet(
                 )
             } else {
                 LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.heightIn(max = 300.dp)
                 ) {
                     items(entry.meanings) { meaning ->
-                        Column {
-                            if (meaning.partOfSpeech.isNotBlank()) {
-                                Text(
-                                    text = meaning.partOfSpeech.uppercase(),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 1.2.sp,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                            }
-                            meaning.definitions.forEachIndexed { idx, def ->
-                                Row(
-                                    modifier = Modifier.padding(vertical = 2.dp),
-                                    verticalAlignment = Alignment.Top
-                                ) {
+                        // Elevated Card per part-of-speech group — matches
+                        // the same list-row treatment used by Search,
+                        // Notes, Highlighted Verses and Cross References.
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                if (meaning.partOfSpeech.isNotBlank()) {
                                     Text(
-                                        text = "${idx + 1}. ",
-                                        fontSize = 14.sp,
+                                        text = meaning.partOfSpeech.uppercase(),
+                                        fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.secondary
+                                        letterSpacing = 1.2.sp,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(bottom = 4.dp)
                                     )
-                                    Text(
-                                        text = def,
-                                        fontSize = 14.sp,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        lineHeight = 20.sp
-                                    )
+                                }
+                                meaning.definitions.forEachIndexed { idx, def ->
+                                    Row(
+                                        modifier = Modifier.padding(vertical = 2.dp),
+                                        verticalAlignment = Alignment.Top
+                                    ) {
+                                        Text(
+                                            text = "${idx + 1}. ",
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            text = def,
+                                            fontSize = 14.sp,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            lineHeight = 20.sp
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -723,7 +364,7 @@ fun VerseMentionPreviewSheet(
                 text = "$book $chapter:$verse",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.tertiary
             )
             Spacer(modifier = Modifier.height(10.dp))
             Text(
@@ -878,7 +519,7 @@ fun ManageHighlightColorsSheet(
                         }
                     }
 
-                    Switch(
+                    DsSwitch(
                         checked = def.enabled,
                         onCheckedChange = { checked ->
                             if (!(isOnlyEnabledLeft && !checked)) onSetEnabled(def.colorHex, checked)

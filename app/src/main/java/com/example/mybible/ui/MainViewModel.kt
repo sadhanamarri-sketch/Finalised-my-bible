@@ -22,6 +22,7 @@ import com.example.mybible.model.*
 import com.example.mybible.ui.components.BIBLE_BOOKS
 import com.example.mybible.ui.components.BOOK_CHAPTER_COUNTS
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,7 +38,7 @@ import java.util.Date
 import java.util.Locale
 
 enum class NavTab {
-    READER, STUDIED, NOTES, SEARCH, SETTINGS, HIGHLIGHTS
+    READER, STUDIED, NOTES, SEARCH, SETTINGS, HIGHLIGHTS, CROSS_REFERENCES, GREEK_WORD, HEBREW_WORD
 }
 
 // Mirrors Capacitor's pickingMode (notes) and selectMode (studied) — a
@@ -131,10 +132,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isBlurModeEnabled = MutableStateFlow(false)
     val isBlurModeEnabled: StateFlow<Boolean> = _isBlurModeEnabled.asStateFlow()
 
-    // Cross Reference Navigation & Focused Verse
-    private val _xrefHistory = MutableStateFlow<List<Position>>(emptyList())
-    val xrefHistory: StateFlow<List<Position>> = _xrefHistory.asStateFlow()
-
+    // Focused Verse
     private val _focusedVerseNumber = MutableStateFlow<Int?>(null)
     val focusedVerseNumber: StateFlow<Int?> = _focusedVerseNumber.asStateFlow()
 
@@ -145,6 +143,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // points; false for browse-style entry points (see jumpToVerse).
     private val _focusedVerseBlurEnabled = MutableStateFlow(true)
     val focusedVerseBlurEnabled: StateFlow<Boolean> = _focusedVerseBlurEnabled.asStateFlow()
+
+    // Whether landing on focusedVerseNumber should pin it flush to the exact
+    // top of the viewport (offset 0) instead of the default centered "jump
+    // to this verse" landing. True only for the Telugu/interlinear inline-
+    // toggle case (toggleTeluguInline/toggleInterlinear below) — its whole
+    // point is to keep whatever verse was already at the top of the screen
+    // there, not to spotlight a new one, so centering it instead reads as a
+    // scroll jump (the verse that was pinned at the top drifts toward the
+    // middle of the screen, and drifts again on the next toggle since the
+    // next anchor capture reads the now-wrong top verse). Every real "jump
+    // to verse X" entry point (jumpToVerse, navigateToCrossReference, the
+    // lexicon-page return below) explicitly resets this to false.
+    private val _focusedVersePinToTop = MutableStateFlow(false)
+    val focusedVersePinToTop: StateFlow<Boolean> = _focusedVersePinToTop.asStateFlow()
 
     // English Dictionary Lookup state
     private val _selectedEnglishWord = MutableStateFlow<String?>(null)
@@ -201,9 +213,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _selectedHebrewWord = MutableStateFlow<HebrewWord?>(null)
     val selectedHebrewWord: StateFlow<HebrewWord?> = _selectedHebrewWord.asStateFlow()
 
-    // Greek Lexicon (TBESG) Lookup state — the sheet's inline gloss comes
-    // straight off selectedGreekWord above; this is the fuller entry fetched
-    // lazily once the sheet opens, mirroring Capacitor's openGreekWordSheet().
+    // Greek Lexicon (TBESG) Lookup state — GreekWordScreen's inline gloss
+    // comes straight off selectedGreekWord above; this is the fuller entry
+    // fetched lazily once the page opens, mirroring Capacitor's
+    // openGreekWordSheet() (the page here, its bottom sheet there).
     private val _lexiconResult = MutableStateFlow<LexiconLookupResult?>(null)
     val lexiconResult: StateFlow<LexiconLookupResult?> = _lexiconResult.asStateFlow()
 
@@ -224,27 +237,98 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private var hebrewLexiconLookupJob: Job? = null
 
-    private val _selectedCrossReferences = MutableStateFlow<List<CrossReferenceItem>?>(null)
-    val selectedCrossReferences: StateFlow<List<CrossReferenceItem>?> = _selectedCrossReferences.asStateFlow()
+    // Scroll position within GreekWordScreen/HebrewWordScreen's definition
+    // text, saved/restored across the trip to Reader and back the same way
+    // Search/CrossReferenceScreen do (see _searchScrollIndex etc. below) —
+    // a single Int since the page is one continuously-scrolling Column, not
+    // a LazyColumn of discrete items.
+    private val _greekWordScrollPosition = MutableStateFlow(0)
+    val greekWordScrollPosition: StateFlow<Int> = _greekWordScrollPosition.asStateFlow()
 
-    // The verse whose cross-references are currently open — the source verse
-    // for the "return to" breadcrumb in navigateToCrossReference(). Tracked
-    // separately from _selectedVerse since opening xrefs via the dagger
-    // marker never selects the verse.
+    private val _hebrewWordScrollPosition = MutableStateFlow(0)
+    val hebrewWordScrollPosition: StateFlow<Int> = _hebrewWordScrollPosition.asStateFlow()
+
+    fun saveGreekWordScrollPosition(position: Int) {
+        _greekWordScrollPosition.value = position
+    }
+
+    fun saveHebrewWordScrollPosition(position: Int) {
+        _hebrewWordScrollPosition.value = position
+    }
+
+    // Cross References page (see CrossReferenceScreen) — same
+    // persisted-list-and-scroll-position pattern as Search (see
+    // _searchResults / _searchScrollIndex below): the list and source verse
+    // survive navigating to the Reader to follow a reference, so "return to
+    // cross references" lands back on the same list instead of a fresh
+    // lookup.
+    private val _crossReferenceList = MutableStateFlow<List<CrossReferenceItem>?>(null)
+    val crossReferenceList: StateFlow<List<CrossReferenceItem>?> = _crossReferenceList.asStateFlow()
+
+    // The verse the currently-open cross-reference list was opened *from*.
+    // Tracked separately from _selectedVerse since opening xrefs via the
+    // dagger marker never selects the verse. Shown as the "base verse" at
+    // the top of CrossReferenceScreen.
     private val _crossReferenceSourceVerse = MutableStateFlow<Verse?>(null)
+    val crossReferenceSourceVerse: StateFlow<Verse?> = _crossReferenceSourceVerse.asStateFlow()
+
+    private val _crossReferenceScrollIndex = MutableStateFlow(0)
+    val crossReferenceScrollIndex: StateFlow<Int> = _crossReferenceScrollIndex.asStateFlow()
+
+    private val _crossReferenceScrollOffset = MutableStateFlow(0)
+    val crossReferenceScrollOffset: StateFlow<Int> = _crossReferenceScrollOffset.asStateFlow()
+
+    fun saveCrossReferenceScrollPosition(index: Int, offset: Int) {
+        _crossReferenceScrollIndex.value = index
+        _crossReferenceScrollOffset.value = offset
+    }
+
+    // Whether a "return to cross references" banner should be showing in
+    // the Reader — set when a cross-reference result is tapped, cleared
+    // when the user either returns via the banner or dismisses it. Same
+    // pattern as _searchReturnAvailable below.
+    private val _crossReferenceReturnAvailable = MutableStateFlow(false)
+    val crossReferenceReturnAvailable: StateFlow<Boolean> = _crossReferenceReturnAvailable.asStateFlow()
 
     // Verse-mention preview sheet — opened by tapping a linkified reference
-    // inside note text (see data/VerseMentionLinkifier.kt). Matches
-    // Capacitor's openVerseTextSheet/closeVerseTextSheet: shows the
-    // reference + verse text without leaving the note; "Open in Reader" is
-    // an explicit separate action.
-    data class VerseMentionPreview(val book: String, val chapter: Int, val verse: Int, val text: String?)
+    // inside note text (see data/VerseMentionLinkifier.kt) or a clickable
+    // Scripture citation inside a Greek/Hebrew lexicon definition (see
+    // ui/components/LexiconDefinitionView.kt). Matches Capacitor's
+    // openVerseTextSheet/closeVerseTextSheet: shows the reference + verse
+    // text without leaving the note/lexicon page; "Open in Reader" is an
+    // explicit separate action.
+    //
+    // lexiconOriginTab is non-null only for the lexicon-reference case — it
+    // records which of NavTab.GREEK_WORD/HEBREW_WORD to return to (see
+    // _lexiconReturnTab below) once "Open in Reader" is tapped.
+    //
+    // noteReturnItem is non-null only when the mention was tapped inside
+    // NoteReaderScreen (see _noteReturnItem below) — the note to reopen
+    // once "Open in Reader" is tapped. Null for the note-editor origin too
+    // (a mention tapped mid-edit): reopening the editor there would reseed
+    // its local draft state from the saved note, discarding any unsaved
+    // edits, so that case keeps the old behavior (closes the editor, no
+    // return banner) until that's handled properly.
+    data class VerseMentionPreview(
+        val book: String,
+        val chapter: Int,
+        val verse: Int,
+        val text: String?,
+        val lexiconOriginTab: NavTab? = null,
+        val noteReturnItem: NoteItem? = null
+    )
 
     private val _verseMentionPreview = MutableStateFlow<VerseMentionPreview?>(null)
     val verseMentionPreview: StateFlow<VerseMentionPreview?> = _verseMentionPreview.asStateFlow()
 
-    fun openVerseMentionPreview(book: String, chapter: Int, verse: Int) {
-        _verseMentionPreview.value = VerseMentionPreview(book, chapter, verse, null)
+    fun openVerseMentionPreview(
+        book: String,
+        chapter: Int,
+        verse: Int,
+        lexiconOriginTab: NavTab? = null,
+        noteReturnItem: NoteItem? = null
+    ) {
+        _verseMentionPreview.value = VerseMentionPreview(book, chapter, verse, null, lexiconOriginTab, noteReturnItem)
         viewModelScope.launch {
             val text = repository.getVerseText(book, chapter, verse)
             // bail if the sheet moved on to a different reference while
@@ -260,6 +344,56 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun closeVerseMentionPreview() {
         _verseMentionPreview.value = null
+    }
+
+    // Which lexicon tab (if any) a "return to lexicon" banner in the
+    // Reader should jump back to — set when a reference tapped inside a
+    // Greek/Hebrew lexicon definition is opened in the Reader. Mirrors
+    // _crossReferenceReturnAvailable's pattern, but needs to remember
+    // *which* of the two lexicon tabs to return to (GREEK_WORD vs
+    // HEBREW_WORD), unlike cross-references which only ever return to one
+    // place.
+    private val _lexiconReturnTab = MutableStateFlow<NavTab?>(null)
+    val lexiconReturnTab: StateFlow<NavTab?> = _lexiconReturnTab.asStateFlow()
+
+    fun setLexiconReturnTab(tab: NavTab) {
+        _lexiconReturnTab.value = tab
+    }
+
+    fun returnToLexicon() {
+        val tab = _lexiconReturnTab.value ?: return
+        _lexiconReturnTab.value = null
+        selectTab(tab)
+    }
+
+    fun dismissLexiconReturnBanner() {
+        _lexiconReturnTab.value = null
+    }
+
+    // Which note (if any) a "return to note" banner in the Reader should
+    // reopen — set when a verse mention tapped inside NoteReaderScreen is
+    // opened in the Reader. Same pattern as _lexiconReturnTab, but unlike
+    // cross-references/lexicon there's no "verse reading started from" to
+    // distinguish a system-back destination from a button destination —
+    // you were reading a note, not a Bible verse, so both the banner's
+    // Return button and system back do the same thing here: reopen that
+    // note (see MainActivity's back-handling comment).
+    private val _noteReturnItem = MutableStateFlow<NoteItem?>(null)
+    val noteReturnItem: StateFlow<NoteItem?> = _noteReturnItem.asStateFlow()
+
+    fun setNoteReturnItem(note: NoteItem) {
+        _noteReturnItem.value = note
+    }
+
+    fun returnToNote() {
+        val note = _noteReturnItem.value ?: return
+        _noteReturnItem.value = null
+        openNoteReader(note)
+        selectTab(NavTab.NOTES)
+    }
+
+    fun dismissNoteReturnBanner() {
+        _noteReturnItem.value = null
     }
 
     private val _showBookPicker = MutableStateFlow(false)
@@ -416,8 +550,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // chapters." updateAll() asks Glance to re-run provideGlance()
     // immediately; fire-and-forget on viewModelScope since it's a suspend
     // call and loadChapter isn't.
+    //
+    // Dispatchers.Default (not the viewModelScope default of Main.immediate):
+    // loadChapter also kicks off loadCurrentChapter()'s heavier verse/xref
+    // load on the same scope, and backgrounding the app right after
+    // switching chapters piles on window-teardown work of its own — all of
+    // that queues ahead of this on the Main thread, so the widget lagged
+    // behind exactly when the user jumped straight to the home screen to
+    // check it. updateAll() itself doesn't touch any UI, so it doesn't need
+    // Main at all; running it on Default lets it fire as soon as the prefs
+    // write lands instead of waiting for Main to clear out.
     private fun refreshContinueReadingWidget() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.Default) {
             try {
                 com.example.mybible.widget.VerseOfDayWidget().updateAll(appContext)
                 com.example.mybible.widget.ContinueReadingWidget().updateAll(appContext)
@@ -440,11 +584,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Used by the picker's verse grid: jumping straight to a verse (rather
-    // than a cross-reference jump) is fresh navigation, so it clears any
-    // prior xref-jump breadcrumb the same way Capacitor's verse-grid button
-    // handlers call clearXrefHistory() right before loadChapter().
-    //
     // focusVerse controls the temporary "spotlight this verse, blur the
     // rest" effect (see focusedVerseNumber / ReaderScreen's xrefFocusActive).
     // That's the right effect for "jump straight to verse X" entry points
@@ -455,9 +594,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // a chapter to review it — pass focusVerse = false there so the whole
     // chapter reads normally instead of blurring around one cell.
     fun jumpToVerse(book: String, chapter: Int, verse: Int, focusVerse: Boolean = true) {
-        clearXrefHistory()
         _focusedVerseNumber.value = verse
         _focusedVerseBlurEnabled.value = focusVerse
+        _focusedVersePinToTop.value = false
         loadChapter(book, chapter)
     }
 
@@ -472,9 +611,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _isLoading.value = true
             _selectedVerse.value = null
-            _selectedCrossReferences.value = null
-            _crossReferenceSourceVerse.value = null
-            
+
             val bookName = _currentBook.value
             val chap = _currentChapter.value
             val result = repository.getChapterVerses(bookName, chap, includeTelugu = _showTeluguInline.value)
@@ -529,13 +666,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         repository.setRedLetterEnabled(enabled)
     }
 
-    fun toggleTeluguInline() {
+    // anchorVerse: the verse currently at/near the top of the reader's
+    // viewport, if known. loadCurrentChapter() below re-fetches _verses
+    // with a new list identity (same chapter, just with/without Telugu
+    // text), and ReaderScreen's scroll effect is keyed on that list — with
+    // no focusedVerseNumber to land on, it falls back to scrolling to the
+    // very top of the chapter, which reads as "toggling Telugu jumped me
+    // back to verse 1." Setting it here (unblurred — this is a position
+    // restore, not a real "jump to this verse") makes that effect land back
+    // where the user already was instead. pinToTop=true is the other half
+    // of that: without it, the effect *centers* the anchor verse instead of
+    // leaving it flush with the top of the screen, which reads as its own
+    // kind of scroll jump (the verse that was pinned at the top drifts
+    // toward the middle) and compounds on every subsequent toggle, since
+    // each one re-anchors off the now-wrong top verse.
+    fun toggleTeluguInline(anchorVerse: Int? = null) {
         _showTeluguInline.value = !_showTeluguInline.value
+        if (anchorVerse != null) {
+            _focusedVerseNumber.value = anchorVerse
+            _focusedVerseBlurEnabled.value = false
+            _focusedVersePinToTop.value = true
+        }
         loadCurrentChapter()
     }
 
-    fun toggleInterlinear() {
+    // Same anchor-preservation need as toggleTeluguInline above, and the
+    // same fix — but no loadCurrentChapter() call: showInterlinear only
+    // gates whether VerseComponents renders the Greek/Hebrew interlinear
+    // words that are already present on every loaded Verse, so there's no
+    // new data to re-fetch, just a height change per verse to restore
+    // position across (setting focusedVerseNumber still re-triggers
+    // ReaderScreen's scroll-restore effect on its own).
+    fun toggleInterlinear(anchorVerse: Int? = null) {
         _showInterlinear.value = !_showInterlinear.value
+        if (anchorVerse != null) {
+            _focusedVerseNumber.value = anchorVerse
+            _focusedVerseBlurEnabled.value = false
+            _focusedVersePinToTop.value = true
+        }
     }
 
     fun toggleBlurMode() {
@@ -611,50 +779,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         repository.saveEnglishFont(fontName)
     }
 
+    // Tapping a reference in CrossReferenceScreen: same pattern as
+    // openSearchResult — this is a fresh reader position, so it flags the
+    // "return to cross references" banner (rather than dismissing/clearing
+    // the list, which now stays intact for that return trip) and jumps.
     fun navigateToCrossReference(targetBook: String, targetChapter: Int, targetVerse: Int) {
-        val sourceVerse = _crossReferenceSourceVerse.value
-        val currentPos = Position(
-            book = sourceVerse?.book ?: _currentBook.value,
-            chapter = sourceVerse?.chapter ?: _currentChapter.value,
-            verse = sourceVerse?.number ?: _selectedVerse.value?.number ?: 1
-        )
-        _xrefHistory.value = _xrefHistory.value + currentPos
+        _crossReferenceReturnAvailable.value = true
         _focusedVerseNumber.value = targetVerse
         _focusedVerseBlurEnabled.value = true
+        _focusedVersePinToTop.value = false
         // Blur mode (privacy blur, the pill toggle) would defeat the whole
         // point of following a cross-reference — you followed it to read
         // the target verse, not stare at an obscured one.
         _isBlurModeEnabled.value = false
-        dismissCrossReferences()
+        selectTab(NavTab.READER)
         loadChapter(targetBook, targetChapter)
     }
 
-    fun goBackCrossReference() {
-        val history = _xrefHistory.value
-        if (history.isNotEmpty()) {
-            val last = history.last()
-            _xrefHistory.value = history.dropLast(1)
-            _focusedVerseNumber.value = last.verse
-            _focusedVerseBlurEnabled.value = true
-            _isBlurModeEnabled.value = false
-            loadChapter(last.book, last.chapter)
-        }
-    }
-
-    fun clearXrefHistory() {
-        _xrefHistory.value = emptyList()
-        _focusedVerseNumber.value = null
-    }
-
-    // Clears just the "spotlight this verse, blur the rest" target, without
-    // touching xref breadcrumb history. Called when entering any pick mode
-    // (Study or Note), since pick mode is a distinct interaction that
-    // should always show the chapter normally — never inheriting a stale
+    // Clears just the "spotlight this verse, blur the rest" target. Called
+    // when entering any pick mode (Study or Note), since pick mode is a
+    // distinct interaction that should always show the chapter normally —
+    // never inheriting a stale
     // focus/blur left over from an earlier cross-reference jump, search
     // result, or highlighted-verse tap that happened to land on the same
-    // chapter.
-    private fun clearVerseFocus() {
+    // chapter. Also called by ReaderScreen once the user scrolls away from
+    // wherever a jump landed (see its "watches for the user actually
+    // moving away" effect) — without that, focusedVerseNumber stayed set
+    // indefinitely, and since ReaderScreen's isFocused gives it priority
+    // over isBlurModeEnabled, manually turning on Blur Mode afterward got
+    // stuck spotlighting that stale jump target instead of tracking scroll
+    // position, no matter how far you scrolled.
+    fun clearVerseFocus() {
         _focusedVerseNumber.value = null
+        _focusedVersePinToTop.value = false
     }
 
     fun openEnglishWordLookup(word: String) {
@@ -679,52 +836,183 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _selectedVerse.value = verse
     }
 
-    fun selectGreekWord(greekWord: GreekWord?) {
+    // The verse a Greek/Hebrew word lookup was opened from — set by
+    // selectGreekWord/selectHebrewWord whenever a word is tapped, read back
+    // by closeGreekWordPage/closeHebrewWordPage (including via system back —
+    // see MainActivity) to land back on that exact verse instead of the top
+    // of the chapter. Reader's own LazyListState is fully disposed while
+    // GreekWordScreen/HebrewWordScreen is showing (AnimatedContent tears
+    // down the inactive tab's composable), so without this, switching back
+    // to the Reader tab has nothing to restore its scroll position from.
+    //
+    // Stored as a full Verse (not just a verse number): a citation tapped
+    // inside the definition can jump the Reader to a different book/
+    // chapter entirely (see openVerseMentionPreview's "Open in Reader"),
+    // so by the time either closeGreekWordPage/closeHebrewWordPage or
+    // backToLexiconOriginVerse runs, currentBook/currentChapter no longer
+    // necessarily match the chapter this word was originally tapped in —
+    // a bare verse number would silently resolve against the wrong
+    // chapter's verse list.
+    private val _lexiconBaseVerse = MutableStateFlow<Verse?>(null)
+
+    // Opens GreekWordScreen for this word — same "land on a full page,
+    // fetch lazily" shape as CrossReferenceScreen/openCrossReferences.
+    // Passing null instead clears the selection without switching tabs
+    // (used internally by closeGreekWordPage(), and safe to leave as a
+    // dedicated no-op path for any future non-navigating "just clear it"
+    // caller); baseVerse is only meaningful on that real-selection path.
+    fun selectGreekWord(greekWord: GreekWord?, baseVerse: Verse? = null) {
         _selectedGreekWord.value = greekWord
         lexiconLookupJob?.cancel()
         _lexiconResult.value = null
         _isLoadingLexicon.value = false
         if (greekWord == null) return
+        if (baseVerse != null) _lexiconBaseVerse.value = baseVerse
 
+        _greekWordScrollPosition.value = 0
         _isLoadingLexicon.value = true
         lexiconLookupJob = viewModelScope.launch {
             val result = repository.getLexiconEntry(greekWord.strongs)
             _lexiconResult.value = result
             _isLoadingLexicon.value = false
         }
+        selectTab(NavTab.GREEK_WORD)
     }
 
-    fun selectHebrewWord(hebrewWord: HebrewWord?) {
+    // GreekWordScreen's own back button — mirrors endCrossReferenceSession()
+    // + selectTab(READER), plus focusing the base verse (see
+    // jumpToLexiconBaseVerse).
+    fun closeGreekWordPage() {
+        selectGreekWord(null)
+        jumpToLexiconBaseVerse()
+        selectTab(NavTab.READER)
+    }
+
+    fun selectHebrewWord(hebrewWord: HebrewWord?, baseVerse: Verse? = null) {
         _selectedHebrewWord.value = hebrewWord
         hebrewLexiconLookupJob?.cancel()
         _hebrewLexiconResult.value = null
         _isLoadingHebrewLexicon.value = false
         if (hebrewWord == null) return
+        if (baseVerse != null) _lexiconBaseVerse.value = baseVerse
 
+        _hebrewWordScrollPosition.value = 0
         _isLoadingHebrewLexicon.value = true
         hebrewLexiconLookupJob = viewModelScope.launch {
             val result = repository.getHebrewLexiconEntry(hebrewWord.strongs)
             _hebrewLexiconResult.value = result
             _isLoadingHebrewLexicon.value = false
         }
+        selectTab(NavTab.HEBREW_WORD)
     }
 
-    fun openCrossReferences(verse: Verse) {
-        // Remember the verse the xrefs were opened *from*, independent of
-        // _selectedVerse — the dagger marker (onCrossReferenceMarkerClick)
-        // opens xrefs without ever selecting the verse, so relying on
-        // _selectedVerse here caused navigateToCrossReference() to fall back
-        // to verse 1 for the "return to" breadcrumb.
-        _crossReferenceSourceVerse.value = verse
-        viewModelScope.launch {
-            val xrefs = repository.getCrossReferences(verse.book, verse.chapter, verse.number)
-            _selectedCrossReferences.value = xrefs
+    fun closeHebrewWordPage() {
+        selectHebrewWord(null)
+        jumpToLexiconBaseVerse()
+        selectTab(NavTab.READER)
+    }
+
+    // Shared by closeGreekWordPage/closeHebrewWordPage and
+    // backToLexiconOriginVerse below: spotlight-jump back to the verse the
+    // lookup was opened from — across book/chapter if a followed citation
+    // moved the Reader elsewhere (see _lexiconBaseVerse's doc) — via the
+    // same real "jump to verse X" path used by cross-reference/search
+    // jumps (see jumpToVerse's doc), rather than just poking
+    // focusedVerseNumber. A no-op if somehow no base verse was recorded,
+    // rather than forcing a jump to nothing.
+    private fun jumpToLexiconBaseVerse() {
+        val base = _lexiconBaseVerse.value
+        _lexiconBaseVerse.value = null
+        if (base != null) {
+            jumpToVerse(base.book, base.chapter, base.number)
+            _isBlurModeEnabled.value = false
         }
     }
 
-    fun dismissCrossReferences() {
-        _selectedCrossReferences.value = null
+    // System back while Reader shows the "Return to Greek/Hebrew word"
+    // banner — undoes the whole lexicon detour and lands back on the verse
+    // the word lookup was originally opened from, rather than the lexicon
+    // definition page (which is what the banner's own Return button does —
+    // see returnToLexicon()). That's system back's conventional meaning
+    // ("take me back to where I was"), distinct from the button's
+    // deliberate "let me pick another reference from here" — see
+    // MainActivity's back-handling comment for the parallel
+    // cross-reference case. Also clears whichever word was selected so a
+    // stray later tab switch into Greek/Hebrew word doesn't resurrect a
+    // stale definition.
+    fun backToLexiconOriginVerse() {
+        _lexiconReturnTab.value = null
+        selectGreekWord(null)
+        selectHebrewWord(null)
+        jumpToLexiconBaseVerse()
+    }
+
+    // Opens CrossReferenceScreen for this verse — same shape as a search:
+    // fetch the list, land on the page. Remember the verse the xrefs were
+    // opened *from*, independent of _selectedVerse — the dagger marker
+    // (onCrossReferenceMarkerClick) opens xrefs without ever selecting the
+    // verse.
+    fun openCrossReferences(verse: Verse) {
+        _crossReferenceSourceVerse.value = verse
+        // Reset to "loading" (null) rather than leaving a previous verse's
+        // list on screen — otherwise re-opening for a different verse
+        // could briefly show the old list under the new source-verse
+        // header until the fetch below resolves.
+        _crossReferenceList.value = null
+        _crossReferenceScrollIndex.value = 0
+        _crossReferenceScrollOffset.value = 0
+        viewModelScope.launch {
+            _crossReferenceList.value = repository.getCrossReferences(verse.book, verse.chapter, verse.number)
+        }
+        selectTab(NavTab.CROSS_REFERENCES)
+    }
+
+    // Hops back to CrossReferenceScreen from the Reader's "Return to cross
+    // references" banner — same scroll position, same list. Mirrors
+    // returnToSearchResults(). This is the banner's own Return button;
+    // system back does something different — see
+    // backToCrossReferenceSourceVerse below.
+    fun returnToCrossReferences() {
+        _crossReferenceReturnAvailable.value = false
+        selectTab(NavTab.CROSS_REFERENCES)
+    }
+
+    // System back while Reader shows the "Return to cross references"
+    // banner — undoes the whole cross-reference detour and lands back on
+    // the verse reading started from (e.g. Romans 2:3), rather than the
+    // cross-reference list (Romans 11:2's references), which is what the
+    // banner's own Return button goes to. That's system back's
+    // conventional meaning ("take me back to where I was"), distinct from
+    // the button's deliberate "let me pick another reference from here."
+    // Ends the session too, same as dismissCrossReferenceReturnBanner():
+    // there's no list left to come back to once you've backed out past it.
+    fun backToCrossReferenceSourceVerse() {
+        val source = _crossReferenceSourceVerse.value
+        _crossReferenceReturnAvailable.value = false
+        endCrossReferenceSession()
+        if (source != null) {
+            jumpToVerse(source.book, source.chapter, source.number)
+            _isBlurModeEnabled.value = false
+        }
+    }
+
+    // "Cancel" on the banner — end the session (mirrors
+    // dismissSearchReturnBanner()/endSearchSession()) rather than just
+    // hiding the banner and leaving a stale list around for next time.
+    fun dismissCrossReferenceReturnBanner() {
+        _crossReferenceReturnAvailable.value = false
+        endCrossReferenceSession()
+    }
+
+    // Ends the whole cross-reference session: list, source verse, scroll
+    // position, everything reset. Called when the user explicitly leaves
+    // CrossReferenceScreen via its own back button, or dismisses the
+    // "Return to cross references" banner.
+    fun endCrossReferenceSession() {
+        _crossReferenceList.value = null
         _crossReferenceSourceVerse.value = null
+        _crossReferenceScrollIndex.value = 0
+        _crossReferenceScrollOffset.value = 0
     }
 
     fun toggleCompletedVerse(book: String, chapter: Int, verse: Int) {

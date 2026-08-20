@@ -57,6 +57,14 @@ interface BibleDao {
     @Query("SELECT COUNT(*) FROM greek_words")
     suspend fun countGreekWords(): Int
 
+    // TAGNT downloads in 2 file-parts (gospels, Acts-Revelation — see
+    // GreekImporter); each part is all-or-nothing (a failed fetch inserts
+    // zero words for every book in that part; see BibleDataInitializer's
+    // maybeImportGreek doc for why aggregate countGreekWords() alone can't
+    // detect a missing part). Distinct book count catches that precisely.
+    @Query("SELECT COUNT(DISTINCT book) FROM greek_words")
+    suspend fun countDistinctGreekBooks(): Int
+
     // ---- Hebrew interlinear (TAHOT) ----
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -67,6 +75,12 @@ interface BibleDao {
 
     @Query("SELECT COUNT(*) FROM hebrew_words")
     suspend fun countHebrewWords(): Int
+
+    // TAHOT downloads in 4 file-parts (Gen-Deu, Jos-Est, Job-Sng, Isa-Mal —
+    // see HebrewImporter); see countDistinctGreekBooks() above for why this
+    // is needed alongside the aggregate count.
+    @Query("SELECT COUNT(DISTINCT book) FROM hebrew_words")
+    suspend fun countDistinctHebrewBooks(): Int
 
     // ---- Cross references (Treasury of Scripture Knowledge) ----
 
@@ -95,8 +109,19 @@ interface BibleDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertLexiconEntries(entries: List<LexiconEntity>)
 
-    @Query("SELECT * FROM lexicon_entries WHERE strongs = :key LIMIT 1")
-    suspend fun getLexiconEntry(key: String): LexiconEntity?
+    // Exact match on the disambiguated Strong's form (dStrong#, e.g.
+    // G4613H) — the precise per-occurrence key TAGNT/TAHOT tag words with.
+    // See LexiconEntity's class doc for why this must be tried before the
+    // bare-number fallback below.
+    @Query("SELECT * FROM lexicon_entries WHERE strongsDisambiguated = :key LIMIT 1")
+    suspend fun getLexiconEntryByDisambiguated(key: String): LexiconEntity?
+
+    // Fallback when no row has that exact disambiguated key: any row for
+    // the bare eStrong, preferring the earliest-lettered one (TBESG's own
+    // "primary/general meaning" convention — its disambiguation suffixes
+    // consistently start at "G", so ascending order picks it first).
+    @Query("SELECT * FROM lexicon_entries WHERE strongs = :key ORDER BY strongsDisambiguated ASC LIMIT 1")
+    suspend fun getLexiconEntryByBareStrongs(key: String): LexiconEntity?
 
     @Query("SELECT COUNT(*) FROM lexicon_entries")
     suspend fun countLexiconEntries(): Int

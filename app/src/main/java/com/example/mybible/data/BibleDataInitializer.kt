@@ -13,9 +13,28 @@ private const val FULL_BIBLE_VERSE_THRESHOLD = 30_000
 /** TAGNT covers ~138k Greek NT words once fully imported. */
 private const val GREEK_WORD_THRESHOLD = 100_000
 
+/** GreekImporter downloads TAGNT in 2 file-parts (gospels, Acts-Revelation),
+ *  each all-or-nothing — a failed fetch (e.g. network drop, app killed
+ *  mid-download) inserts zero words for every book in that part, but the
+ *  other part's ~27-89k+ words can still clear GREEK_WORD_THRESHOLD on
+ *  their own, so the aggregate count alone can silently mark an import
+ *  "complete" while a whole part (e.g. all of Acts-Revelation) has no
+ *  interlinear data and never gets retried. Requiring every one of the 27
+ *  NT books to have at least one word closes that gap. */
+private const val GREEK_BOOK_COUNT = 27
+
 /** TAHOT covers ~283k Hebrew OT words once fully imported (verified against
  *  the 4 source files: ~76k+102k+30k+75k across Gen-Deu/Jos-Est/Job-Sng/Isa-Mal). */
 private const val HEBREW_WORD_THRESHOLD = 200_000
+
+/** Same reasoning as GREEK_BOOK_COUNT above, for TAHOT's 4 file-parts.
+ *  Concretely: any 3-of-4 parts already total well over
+ *  HEBREW_WORD_THRESHOLD (e.g. missing only Isa-Mal's ~75k still leaves
+ *  ~208k), so a single part failing partway through a download (this is
+ *  the bug a locked/backgrounded phone killing the app mid-download hits)
+ *  can leave 10 OT books with zero Hebrew forever, undetected by the
+ *  aggregate count. */
+private const val HEBREW_BOOK_COUNT = 39
 
 /** The full Treasury of Scripture Knowledge dataset has on the order of
  *  300k+ rows; this is a conservative "did this actually finish" floor. */
@@ -147,7 +166,9 @@ class BibleDataInitializer(
     }
 
     private suspend fun maybeImportGreek() {
-        if (dao.countGreekWords() >= GREEK_WORD_THRESHOLD) return
+        if (dao.countGreekWords() >= GREEK_WORD_THRESHOLD &&
+            dao.countDistinctGreekBooks() >= GREEK_BOOK_COUNT
+        ) return
         if (greekAttemptedThisSession) return
         greekAttemptedThisSession = true
 
@@ -164,7 +185,9 @@ class BibleDataInitializer(
     }
 
     private suspend fun maybeImportHebrew() {
-        if (dao.countHebrewWords() >= HEBREW_WORD_THRESHOLD) return
+        if (dao.countHebrewWords() >= HEBREW_WORD_THRESHOLD &&
+            dao.countDistinctHebrewBooks() >= HEBREW_BOOK_COUNT
+        ) return
         if (hebrewAttemptedThisSession) return
         hebrewAttemptedThisSession = true
 

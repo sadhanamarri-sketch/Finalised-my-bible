@@ -18,7 +18,14 @@ import androidx.room.PrimaryKey
  */
 @Entity(
     tableName = "hebrew_words",
-    indices = [Index(value = ["book", "chapter", "verse"])]
+    // unique on (book, chapter, verse, orderIndex) — without this,
+    // @Insert(onConflict = REPLACE) in insertHebrewWords() has no
+    // constraint to match against, so re-running HebrewImporter (e.g. the
+    // self-healing retry BibleDataInitializer does when a previous
+    // download was interrupted partway through) would silently insert a
+    // second full set of duplicate rows for every book that already
+    // imported successfully, instead of overwriting them.
+    indices = [Index(value = ["book", "chapter", "verse", "orderIndex"], unique = true)]
 )
 data class HebrewWordEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,

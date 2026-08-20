@@ -81,7 +81,18 @@ object HebrewImporter {
         return TAHOT_ABBR.getOrNull(idx)
     }
 
-    private val REF_REGEX = Regex("^[0-9A-Za-z]+\\.(\\d+)\\.(\\d+)#(\\d+)=(\\S*)$")
+    // The trailing (?:\(...\))? tolerates TAHOT's Hebrew/English versification
+    // offset annotation, e.g. "Ecc.5.1(4.17)#01=L" for Ecclesiastes 5 (whose
+    // English verse 1 is Hebrew 4:17 — the whole chapter is shifted by one
+    // verse) or "Psa.3.1(3.0)#01=L" for a psalm superscription. Every word
+    // in an affected verse carries this suffix, and without tolerating it
+    // here the row silently failed to match at all — parseTahotChapter's
+    // `REF_REGEX.find(cols[0]) ?: continue` skipped every single word,
+    // leaving the whole verse (and for Ecc.5, the whole chapter, since
+    // every verse in it is offset) with no interlinear data at all. Applies
+    // to ~120 book/chapter combinations just in the Job-Sng file alone
+    // (mostly Psalms superscriptions, plus Ecc.5 and Job.41).
+    private val REF_REGEX = Regex("^[0-9A-Za-z]+\\.(\\d+)\\.(\\d+)(?:\\([^)]*\\))?#(\\d+)=(\\S*)$")
     private val HEADER_REGEX = Regex("\\n# ([0-9A-Za-z]+)\\.(\\d+)\\.")
     private val strongsRootRegex = Regex("\\{([^}]+)\\}")
 

@@ -189,13 +189,6 @@ class MainActivity : ComponentActivity() {
 
             val showBookPicker by viewModel.showBookPicker.collectAsState()
             val currentBook by viewModel.currentBook.collectAsState()
-            val selectedGreekWord by viewModel.selectedGreekWord.collectAsState()
-            val lexiconResult by viewModel.lexiconResult.collectAsState()
-            val isLoadingLexicon by viewModel.isLoadingLexicon.collectAsState()
-            val selectedHebrewWord by viewModel.selectedHebrewWord.collectAsState()
-            val hebrewLexiconResult by viewModel.hebrewLexiconResult.collectAsState()
-            val isLoadingHebrewLexicon by viewModel.isLoadingHebrewLexicon.collectAsState()
-            val selectedCrossReferences by viewModel.selectedCrossReferences.collectAsState()
             val selectedEnglishWord by viewModel.selectedEnglishWord.collectAsState()
             val dictionaryEntry by viewModel.dictionaryEntry.collectAsState()
             val isLoadingDictionary by viewModel.isLoadingDictionary.collectAsState()
@@ -211,11 +204,65 @@ class MainActivity : ComponentActivity() {
 
             var manualShowTour by remember { mutableStateOf(false) }
 
-            // Hardware/gesture back returns to Reader from any destination
-            // screen, instead of backgrounding the app — Reader is "home"
+            // Hardware/gesture back returns to Reader from most destination
+            // screens, instead of backgrounding the app — Reader is "home"
             // now that there's no persistent tab bar to tap back with.
-            BackHandler(enabled = activeTab != NavTab.READER) {
+            // Greek/Hebrew word lookup pages are excluded here and get
+            // their own handlers below: they need to land back on the verse
+            // the lookup was opened from (closeGreekWordPage/
+            // closeHebrewWordPage), not just switch tabs and leave Reader
+            // scrolled to the top of the chapter — its list state was fully
+            // disposed while the lookup page was showing.
+            BackHandler(enabled = activeTab != NavTab.READER && activeTab != NavTab.GREEK_WORD && activeTab != NavTab.HEBREW_WORD) {
                 viewModel.selectTab(NavTab.READER)
+            }
+            BackHandler(enabled = activeTab == NavTab.GREEK_WORD) {
+                viewModel.closeGreekWordPage()
+            }
+            BackHandler(enabled = activeTab == NavTab.HEBREW_WORD) {
+                viewModel.closeHebrewWordPage()
+            }
+
+            // While Reader shows a "Return to X" banner (followed a cross-
+            // reference, search result, lexicon citation, or note's verse
+            // mention into the Reader), system back should act instead of
+            // falling through to the default Activity back behavior
+            // (backgrounding/exiting the app) — activeTab == READER
+            // disables the blanket handler above.
+            //
+            // What it does depends on whether the detour has a meaningful
+            // "verse reading started from" to undo back to:
+            //  - Cross-reference and lexicon citation detours both started
+            //    from a specific verse while reading (e.g. Romans 2:3,
+            //    before following a reference to Romans 11:2) — system
+            //    back's conventional meaning is "take me back to where I
+            //    was", i.e. that source verse, NOT the list/definition page
+            //    the banner's own Return button goes to (that's a
+            //    deliberate separate "let me pick another reference from
+            //    here" action, left as-is on the button).
+            //  - Search has no equivalent "origin verse" — it's opened as
+            //    its own destination from anywhere, not from a specific
+            //    verse — so its results list genuinely is the most useful
+            //    thing to go back to, same as tapping Return.
+            //  - A note's verse mention is the opposite of cross-
+            //    reference/lexicon: there's no "origin verse" at all (you
+            //    were reading the note's text, not a Bible verse), so the
+            //    note itself is the right target for both Return and
+            //    system back — no distinction needed.
+            val crossReferenceReturnAvailable by viewModel.crossReferenceReturnAvailable.collectAsState()
+            val searchReturnAvailable by viewModel.searchReturnAvailable.collectAsState()
+            val lexiconReturnTab by viewModel.lexiconReturnTab.collectAsState()
+            val noteReturnItem by viewModel.noteReturnItem.collectAsState()
+            BackHandler(
+                enabled = activeTab == NavTab.READER &&
+                    (crossReferenceReturnAvailable || searchReturnAvailable || lexiconReturnTab != null || noteReturnItem != null)
+            ) {
+                when {
+                    crossReferenceReturnAvailable -> viewModel.backToCrossReferenceSourceVerse()
+                    searchReturnAvailable -> viewModel.returnToSearchResults()
+                    lexiconReturnTab != null -> viewModel.backToLexiconOriginVerse()
+                    else -> viewModel.returnToNote()
+                }
             }
 
             // Note editor/reader are now full pages pushed over the Notes
@@ -269,10 +316,14 @@ class MainActivity : ComponentActivity() {
                             NavTab.STUDIED -> StudiedScreen(viewModel = viewModel)
                             NavTab.NOTES -> NotesScreen(viewModel = viewModel)
                             NavTab.SEARCH -> SearchScreen(viewModel = viewModel)
+                            NavTab.CROSS_REFERENCES -> CrossReferenceScreen(viewModel = viewModel)
+                            NavTab.GREEK_WORD -> GreekWordScreen(viewModel = viewModel)
+                            NavTab.HEBREW_WORD -> HebrewWordScreen(viewModel = viewModel)
                             NavTab.HIGHLIGHTS -> {
                                 val highlightedItems by viewModel.highlightedVerseItems.collectAsState()
                                 HighlightedVersesScreen(
                                     highlights = highlightedItems,
+                                    themeMode = themeMode,
                                     onOpenVerse = { viewModel.openHighlightedVerse(it) },
                                     onClose = { viewModel.selectTab(NavTab.READER) }
                                 )
@@ -330,7 +381,12 @@ class MainActivity : ComponentActivity() {
                             currentBook = currentBook,
                             onDismiss = { viewModel.setShowBookPicker(false) },
                             onSelectBookAndChapter = { book, chap ->
-                                viewModel.clearXrefHistory()
+                                // Clears any stale "spotlight this verse"
+                                // target from an earlier jump so a plain
+                                // book/chapter browse (no specific verse)
+                                // doesn't inherit it — see clearVerseFocus()'s
+                                // doc for what that broke previously.
+                                viewModel.clearVerseFocus()
                                 viewModel.disableBlurModeForNavigation()
                                 viewModel.loadChapter(book, chap)
                                 viewModel.setShowBookPicker(false)
@@ -341,37 +397,6 @@ class MainActivity : ComponentActivity() {
                                 viewModel.setShowBookPicker(false)
                             },
                             getVerseCount = { book, chap -> viewModel.getVerseCount(book, chap) }
-                        )
-                    }
-
-                    // Greek Word Lexicon Sheet (TBESG)
-                    if (selectedGreekWord != null) {
-                        GreekWordSheet(
-                            greekWord = selectedGreekWord!!,
-                            lexiconResult = lexiconResult,
-                            isLoading = isLoadingLexicon,
-                            onDismiss = { viewModel.selectGreekWord(null) }
-                        )
-                    }
-
-                    // Hebrew Word Sheet (TAHOT)
-                    if (selectedHebrewWord != null) {
-                        HebrewWordSheet(
-                            hebrewWord = selectedHebrewWord!!,
-                            lexiconResult = hebrewLexiconResult,
-                            isLoading = isLoadingHebrewLexicon,
-                            onDismiss = { viewModel.selectHebrewWord(null) }
-                        )
-                    }
-
-                    // Cross Reference Bottom Sheet
-                    if (selectedCrossReferences != null) {
-                        CrossReferenceSheet(
-                            crossReferences = selectedCrossReferences!!,
-                            onSelectReference = { targetBook, targetChapter, targetVerse ->
-                                viewModel.navigateToCrossReference(targetBook, targetChapter, targetVerse)
-                            },
-                            onDismiss = { viewModel.dismissCrossReferences() }
                         )
                     }
 
@@ -417,9 +442,16 @@ class MainActivity : ComponentActivity() {
                             verse = preview.verse,
                             verseText = preview.text,
                             onOpenInReader = {
+                                val lexiconOriginTab = preview.lexiconOriginTab
+                                val mentionNoteReturnItem = preview.noteReturnItem
                                 viewModel.closeVerseMentionPreview()
-                                viewModel.closeNoteReader()
-                                viewModel.closeNoteEditor()
+                                if (lexiconOriginTab != null) {
+                                    viewModel.setLexiconReturnTab(lexiconOriginTab)
+                                } else {
+                                    if (mentionNoteReturnItem != null) viewModel.setNoteReturnItem(mentionNoteReturnItem)
+                                    viewModel.closeNoteReader()
+                                    viewModel.closeNoteEditor()
+                                }
                                 viewModel.disableBlurModeForNavigation()
                                 viewModel.jumpToVerse(preview.book, preview.chapter, preview.verse)
                                 viewModel.selectTab(NavTab.READER)
@@ -471,7 +503,7 @@ class MainActivity : ComponentActivity() {
                                     viewModel.openNoteEditor(note)
                                 },
                                 onOpenVerseMention = { book, chapter, verse ->
-                                    viewModel.openVerseMentionPreview(book, chapter, verse)
+                                    viewModel.openVerseMentionPreview(book, chapter, verse, noteReturnItem = note)
                                 }
                             )
                         }

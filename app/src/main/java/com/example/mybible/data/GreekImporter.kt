@@ -38,7 +38,10 @@ object GreekImporter {
     )
     private const val OT_COUNT = 39
 
-    private val REF_REGEX = Regex("^[0-9A-Za-z]+\\.(\\d+)\\.(\\d+)#(\\d+)=(\\S*)$")
+    // See HebrewImporter's identical REF_REGEX comment — same TAGNT
+    // versification-offset annotation (confirmed present, e.g. Mrk.12) that
+    // silently dropped every word in an affected verse without this.
+    private val REF_REGEX = Regex("^[0-9A-Za-z]+\\.(\\d+)\\.(\\d+)(?:\\([^)]*\\))?#(\\d+)=(\\S*)$")
     private val GREEK_REGEX = Regex("^(\\S+)\\s*\\(([^)]+)\\)")
     private val HEADER_REGEX = Regex("\\n# ([0-9A-Za-z]+)\\.(\\d+)\\.")
     private val JESUS_WORD_TYPE = Regex("[NnKk]")

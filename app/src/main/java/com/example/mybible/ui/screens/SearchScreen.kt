@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
@@ -23,7 +24,6 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.components.BackTopBar
+import com.example.mybible.ui.components.DsSwitch
 
 @Composable
 fun SearchScreen(
@@ -136,7 +137,7 @@ fun SearchScreen(
                     }
                 }
             },
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(8.dp),
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(
@@ -145,6 +146,16 @@ fun SearchScreen(
                     keyboardController?.hide()
                     focusManager.clearFocus()
                 }
+            ),
+            // Coral focus ring instead of Material's default primary blue —
+            // matches the flat/line-bordered look the rest of the app's
+            // inputs use (see NeTextField) rather than the stock Material
+            // outlined-field treatment.
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                cursorColor = MaterialTheme.colorScheme.primary
             ),
             modifier = Modifier
                 .fillMaxWidth()
@@ -178,6 +189,10 @@ fun SearchScreen(
             Spacer(modifier = Modifier.height(6.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(searchHistory) { term ->
+                    // Bordered pill instead of Material's default filled
+                    // AssistChip — matches the neutral chip look used for
+                    // note references (see NoteEditorScreen's ref-chip)
+                    // rather than a solid Material surface-tint fill.
                     AssistChip(
                         onClick = { viewModel.searchFromHistory(term) },
                         label = { Text(term, fontSize = 13.sp) },
@@ -196,7 +211,17 @@ fun SearchScreen(
                                     .size(14.dp)
                                     .clickable { viewModel.removeSearchHistoryItem(term) }
                             )
-                        }
+                        },
+                        colors = AssistChipDefaults.assistChipColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            labelColor = MaterialTheme.colorScheme.onSurface,
+                            leadingIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            trailingIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        border = AssistChipDefaults.assistChipBorder(
+                            enabled = true,
+                            borderColor = MaterialTheme.colorScheme.outlineVariant
+                        )
                     )
                 }
             }
@@ -226,7 +251,7 @@ fun SearchScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.width(6.dp))
-                Switch(
+                DsSwitch(
                     checked = caseSensitive,
                     onCheckedChange = { viewModel.setSearchCaseSensitive(it) },
                     modifier = Modifier.testTag("search_case_sensitive_toggle")
@@ -255,9 +280,13 @@ fun SearchScreen(
                 )
             }
         } else {
+            // Elevated Cards, not flat/hairline-divided rows — the one
+            // place in this pass keeping Material's card-with-shadow look
+            // rather than the flat-bordered treatment used elsewhere
+            // (Cross References/Highlighted Verses), by request.
             LazyColumn(
                 state = listState,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(searchResults) { verse ->
@@ -268,16 +297,31 @@ fun SearchScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
-                            Text(
-                                text = "${verse.book} ${verse.chapter}:${verse.number}",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "${verse.book} ${verse.chapter}:${verse.number}".uppercase(),
+                                    fontSize = 12.5.sp,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
+                                    letterSpacing = 1.5.sp,
+                                    color = MaterialTheme.colorScheme.tertiary
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.ArrowForward,
+                                    contentDescription = "Navigate",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = verse.text,
-                                fontSize = 13.sp,
+                                fontSize = 15.sp,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+                                lineHeight = 21.sp,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                         }

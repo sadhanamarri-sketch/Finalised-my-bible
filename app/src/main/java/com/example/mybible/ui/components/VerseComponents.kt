@@ -340,14 +340,14 @@ fun VerseCard(
                                         text = gWord.greek,
                                         fontSize = greekFontSizeSp.sp,
                                         fontWeight = FontWeight.Normal,
-                                        color = Color.White,
+                                        color = MaterialTheme.colorScheme.onSurface,
                                         fontFamily = FontFamily.Serif
                                     )
                                     Text(
                                         text = gWord.transliteration,
                                         fontSize = (greekFontSizeSp - 1).sp,
                                         fontStyle = FontStyle.Italic,
-                                        color = Color.White
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
                                         text = gWord.englishGloss,
@@ -394,14 +394,14 @@ fun VerseCard(
                                             text = hWord.hebrew,
                                             fontSize = hebrewFontSizeSp.sp,
                                             fontWeight = FontWeight.Normal,
-                                            color = Color.White,
+                                            color = MaterialTheme.colorScheme.onSurface,
                                             fontFamily = FontFamily.Serif
                                         )
                                         Text(
                                             text = hWord.transliteration,
                                             fontSize = (hebrewFontSizeSp - 1).sp,
                                             fontStyle = FontStyle.Italic,
-                                            color = Color.White
+                                            color = MaterialTheme.colorScheme.onSurface
                                         )
                                         Text(
                                             text = hWord.englishGloss,
@@ -464,11 +464,20 @@ fun VerseActionToolbar(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Gold outlined pill — matches the reference-chip style
+                // already established in the Notes list/editor/reader
+                // (see NoteReaderScreen's ref line) rather than plain bold
+                // text, so a Scripture reference reads the same way
+                // everywhere it appears in the app.
                 Text(
                     text = "${verse.book} ${verse.chapter}:${verse.number}",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurface
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .border(1.dp, MaterialTheme.colorScheme.tertiary, RoundedCornerShape(10.dp))
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
                 )
                 IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
                     Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -569,15 +578,21 @@ fun VerseActionToolbar(
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
+            // All four actions share one accent tint (the theme's primary —
+            // the same coral/accent role Settings' outline buttons use)
+            // instead of "Studied" alone carrying an unrelated `secondary`
+            // tint and the rest defaulting to plain onSurface: a row of
+            // equally-weighted actions should read as one family, not one
+            // singled-out control among plain ones.
+            val actionTint = MaterialTheme.colorScheme.primary
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
-                TextButton(onClick = onToggleCompleted) {
+                TextButton(onClick = onToggleCompleted, colors = ButtonDefaults.textButtonColors(contentColor = actionTint)) {
                     Icon(
                         imageVector = if (isCompleted) Icons.Default.CheckCircle else Icons.Default.CheckCircleOutline,
                         contentDescription = "Studied",
-                        tint = MaterialTheme.colorScheme.secondary,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
@@ -587,19 +602,19 @@ fun VerseActionToolbar(
                 // Label switches to "Add another" once a note already
                 // exists on this verse, matching Capacitor's addBtn.textContent
                 // toggling between "Add note" / "Add another note".
-                TextButton(onClick = onAddNote) {
+                TextButton(onClick = onAddNote, colors = ButtonDefaults.textButtonColors(contentColor = actionTint)) {
                     Icon(Icons.Default.EditNote, contentDescription = "Add Note", modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(if (existingNotes.isEmpty()) "Note" else "Add another", fontSize = 12.sp)
                 }
 
-                TextButton(onClick = onCrossRefClick) {
+                TextButton(onClick = onCrossRefClick, colors = ButtonDefaults.textButtonColors(contentColor = actionTint)) {
                     Icon(Icons.Default.FormatQuote, contentDescription = "Cross Ref", modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Cross Ref", fontSize = 12.sp)
                 }
 
-                TextButton(onClick = onToggleInterlinear) {
+                TextButton(onClick = onToggleInterlinear, colors = ButtonDefaults.textButtonColors(contentColor = actionTint)) {
                     Icon(Icons.Default.Translate, contentDescription = "Greek", modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Greek", fontSize = 12.sp)

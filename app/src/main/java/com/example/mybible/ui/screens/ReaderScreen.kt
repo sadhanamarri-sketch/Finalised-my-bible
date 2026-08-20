@@ -89,10 +89,13 @@ fun ReaderScreen(
     val englishFontFamilyName by viewModel.englishFontFamilyName.collectAsState()
 
     val isBlurModeEnabled by viewModel.isBlurModeEnabled.collectAsState()
-    val xrefHistory by viewModel.xrefHistory.collectAsState()
+    val crossReferenceReturnAvailable by viewModel.crossReferenceReturnAvailable.collectAsState()
     val focusedVerseNumber by viewModel.focusedVerseNumber.collectAsState()
     val focusedVerseBlurEnabled by viewModel.focusedVerseBlurEnabled.collectAsState()
+    val focusedVersePinToTop by viewModel.focusedVersePinToTop.collectAsState()
     val searchReturnAvailable by viewModel.searchReturnAvailable.collectAsState()
+    val lexiconReturnTab by viewModel.lexiconReturnTab.collectAsState()
+    val noteReturnItem by viewModel.noteReturnItem.collectAsState()
 
     val completedVerses by viewModel.completedVerses.collectAsState(initial = emptyList())
     val highlights by viewModel.highlights.collectAsState(initial = emptyList())
@@ -142,6 +145,13 @@ fun ReaderScreen(
     var xrefFocusActive by remember { mutableStateOf(false) }
     var xrefFocusLandedIndex by remember { mutableStateOf(-1) }
     var xrefFocusLandedOffset by remember { mutableStateOf(0) }
+    // Tracks which chapter the effect below last ran for, so it can tell a
+    // genuine chapter change (which should reset scroll to the top when
+    // there's no focus target) apart from focusedVerseNumber simply being
+    // cleared within the *same* chapter — e.g. tapping a blurred verse to
+    // dismiss focus, or scrolling away from the landed verse — neither of
+    // which should snap the reader back to the top of the chapter.
+    var lastFocusEffectChapterKey by remember { mutableStateOf<Pair<String, Int>?>(null) }
 
     // Scroll to top (or the focused cross-reference/search verse) when the
     // chapter changes. Keyed on `verses` too, not just currentBook/
@@ -158,32 +168,44 @@ fun ReaderScreen(
     // currentBook/currentChapter (loadChapter is called with the same
     // values, which a MutableStateFlow drops as a no-op), so without this
     // key a same-chapter xref tap wouldn't re-scroll or re-focus at all.
-    LaunchedEffect(currentBook, currentChapter, verses, focusedVerseNumber, focusedVerseBlurEnabled) {
+    LaunchedEffect(currentBook, currentChapter, verses, focusedVerseNumber, focusedVerseBlurEnabled, focusedVersePinToTop) {
         if (verses.isEmpty()) return@LaunchedEffect
-        // A different chapter means a different set of row heights at the
-        // same indices (e.g. leaving Psalm 119 for a 3-verse chapter) — old
-        // cached heights would skew centerItemIndex's ramp math until
-        // re-measured, so start clean each time the chapter actually changes.
-        itemHeights.clear()
+        val chapterKey = currentBook to currentChapter
+        val isNewChapter = chapterKey != lastFocusEffectChapterKey
+        lastFocusEffectChapterKey = chapterKey
+        if (isNewChapter) {
+            // A different chapter means a different set of row heights at
+            // the same indices (e.g. leaving Psalm 119 for a 3-verse
+            // chapter) — old cached heights would skew centerItemIndex's
+            // ramp math until re-measured, so start clean each time the
+            // chapter actually changes.
+            itemHeights.clear()
+        }
         if (focusedVerseNumber != null) {
             val idx = verses.indexOfFirst { it.number == focusedVerseNumber }
             if (idx >= 0) {
                 val targetIndex = idx + 1
                 // First bring the target item into the laid-out set so its
-                // actual measured height is available, then re-scroll with
-                // a computed offset so the verse lands centered in the
-                // viewport instead of pinned to the very top.
+                // actual measured height is available, then (unless
+                // pinToTop) re-scroll with a computed offset so the verse
+                // lands centered in the viewport instead of flush with the
+                // top — pinToTop skips that: it means this is a scroll-
+                // position *restore* (Telugu/interlinear toggle), where the
+                // point is to leave the anchor verse exactly where it
+                // already was on screen, not spotlight a new one.
                 listState.scrollToItem(targetIndex)
-                val layoutInfo = listState.layoutInfo
-                val itemInfo = layoutInfo.visibleItemsInfo.find { it.index == targetIndex }
-                if (itemInfo != null) {
-                    val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
-                    val extraSpace = (viewportHeight - itemInfo.size).coerceAtLeast(0)
-                    if (extraSpace > 0) {
-                        // Negative scrollOffset pushes the item down from
-                        // the top of the viewport by half the leftover
-                        // space, centering it.
-                        listState.scrollToItem(targetIndex, -(extraSpace / 2))
+                if (!focusedVersePinToTop) {
+                    val layoutInfo = listState.layoutInfo
+                    val itemInfo = layoutInfo.visibleItemsInfo.find { it.index == targetIndex }
+                    if (itemInfo != null) {
+                        val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
+                        val extraSpace = (viewportHeight - itemInfo.size).coerceAtLeast(0)
+                        if (extraSpace > 0) {
+                            // Negative scrollOffset pushes the item down from
+                            // the top of the viewport by half the leftover
+                            // space, centering it.
+                            listState.scrollToItem(targetIndex, -(extraSpace / 2))
+                        }
                     }
                 }
                 xrefFocusLandedIndex = listState.firstVisibleItemIndex
@@ -193,27 +215,42 @@ fun ReaderScreen(
                 listState.scrollToItem(0)
                 xrefFocusActive = false
             }
-        } else {
+        } else if (isNewChapter) {
             listState.scrollToItem(0)
+            xrefFocusActive = false
+        } else {
+            // Same chapter, no focus target — this is focus being cleared
+            // (blur dismissed by tap, or the user scrolled away from the
+            // landed verse), not a fresh chapter open, so leave the scroll
+            // position exactly where the reader already is.
             xrefFocusActive = false
         }
     }
 
     // Watches for the user actually moving away from the landed verse and
-    // turns the temporary focus blur off. The first emission from
-    // snapshotFlow is the position we just landed on (matches the target,
-    // so the condition below is false and nothing clears); any further
-    // emission means the list position changed after that — which can only
-    // happen from here on by the user scrolling, since nothing else
-    // programmatically scrolls after the initial jump. A few pixels of
-    // slack on the offset absorbs float/measurement rounding rather than
-    // requiring an exact match.
-    LaunchedEffect(xrefFocusActive, xrefFocusLandedIndex, xrefFocusLandedOffset) {
-        if (!xrefFocusActive) return@LaunchedEffect
+    // clears the temporary jump-target state — both the local blur flag
+    // and the ViewModel's focusedVerseNumber itself. The first emission
+    // from snapshotFlow is the position we just landed on (matches the
+    // target, so the condition below is false and nothing clears); any
+    // further emission means the list position changed after that — which
+    // can only happen from here on by the user scrolling, since nothing
+    // else programmatically scrolls after the initial jump. A few pixels
+    // of slack on the offset absorbs float/measurement rounding rather
+    // than requiring an exact match.
+    //
+    // Keyed on focusedVerseNumber (not just xrefFocusActive): a plain
+    // non-blurred jump (focusVerse = false — e.g. the Studied tab's browse
+    // entry point) lands with xrefFocusActive already false, so gating on
+    // that alone meant this effect never ran for that case and
+    // focusedVerseNumber stayed set forever. See clearVerseFocus()'s doc
+    // for what that broke.
+    LaunchedEffect(focusedVerseNumber, xrefFocusLandedIndex, xrefFocusLandedOffset) {
+        if (focusedVerseNumber == null) return@LaunchedEffect
         snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
             .collect { (idx, offset) ->
                 if (idx != xrefFocusLandedIndex || kotlin.math.abs(offset - xrefFocusLandedOffset) > 4) {
                     xrefFocusActive = false
+                    viewModel.clearVerseFocus()
                 }
             }
     }
@@ -296,7 +333,7 @@ fun ReaderScreen(
     // a cross-reference back-bar is showing, a sheet/menu is open, or a
     // verse is selected (selection already swaps the pill for the action
     // toolbar, but this also covers the moment the toolbar is dismissing).
-    val canHideBars = xrefHistory.isEmpty() && !searchReturnAvailable && !showReaderMenu && selectedVerse == null &&
+    val canHideBars = !crossReferenceReturnAvailable && !searchReturnAvailable && lexiconReturnTab == null && noteReturnItem == null && !showReaderMenu && selectedVerse == null &&
         readerPickMode == ReaderPickMode.NONE &&
         readerPickMode == ReaderPickMode.NONE
 
@@ -433,9 +470,13 @@ fun ReaderScreen(
                     onDone = { viewModel.finishPicking() }
                 )
             }
-            // Cross Reference Navigation Back Bar
-            if (readerPickMode == ReaderPickMode.NONE && xrefHistory.isNotEmpty()) {
-                val lastPos = xrefHistory.last()
+            // "Return to cross references" banner — shown after tapping a
+            // cross-reference result, so the user can hop straight back to
+            // the same list/scroll position instead of re-opening it, or
+            // dismiss it to just keep reading. Mirrors the "return to
+            // search results" banner below; mutually exclusive with it,
+            // same fixed top slot.
+            if (readerPickMode == ReaderPickMode.NONE && crossReferenceReturnAvailable) {
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer,
                     modifier = Modifier.fillMaxWidth()
@@ -455,20 +496,20 @@ fun ReaderScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.ArrowBack,
-                                contentDescription = "Back",
+                                contentDescription = "Cross references",
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Back to ${lastPos.book} ${lastPos.chapter}:${lastPos.verse}",
+                                text = "Return to cross references",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.weight(1f)
                             )
                             Button(
-                                onClick = { viewModel.goBackCrossReference() },
+                                onClick = { viewModel.returnToCrossReferences() },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MaterialTheme.colorScheme.primary,
                                     contentColor = MaterialTheme.colorScheme.onPrimary
@@ -476,16 +517,16 @@ fun ReaderScreen(
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                                 modifier = Modifier.height(30.dp)
                             ) {
-                                Text("Jump Back", fontSize = 12.sp)
+                                Text("Return", fontSize = 12.sp)
                             }
                         }
                         IconButton(
-                            onClick = { viewModel.clearXrefHistory() },
+                            onClick = { viewModel.dismissCrossReferenceReturnBanner() },
                             modifier = Modifier.size(24.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = "Clear History",
+                                contentDescription = "Dismiss",
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.size(16.dp)
                             )
@@ -498,8 +539,8 @@ fun ReaderScreen(
             // search result, so the user can hop straight back to the same
             // results/scroll position instead of re-searching, or dismiss
             // it to just keep reading. Mutually exclusive with the
-            // cross-reference bar, same fixed top slot.
-            if (readerPickMode == ReaderPickMode.NONE && xrefHistory.isEmpty() && searchReturnAvailable) {
+            // cross-reference banner above, same fixed top slot.
+            if (readerPickMode == ReaderPickMode.NONE && !crossReferenceReturnAvailable && searchReturnAvailable) {
                 Surface(
                     color = MaterialTheme.colorScheme.secondaryContainer,
                     modifier = Modifier.fillMaxWidth()
@@ -551,6 +592,135 @@ fun ReaderScreen(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Dismiss",
                                 tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // "Return to lexicon" banner — shown after tapping a Scripture
+            // reference inside a Greek/Hebrew lexicon definition, so the
+            // user can hop straight back to that word's page instead of
+            // re-searching for it, or dismiss it to just keep reading.
+            // Mutually exclusive with the cross-reference/search banners
+            // above, same fixed top slot.
+            if (readerPickMode == ReaderPickMode.NONE && !crossReferenceReturnAvailable && !searchReturnAvailable && lexiconReturnTab != null) {
+                Surface(
+                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "Lexicon",
+                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (lexiconReturnTab == NavTab.HEBREW_WORD) "Return to Hebrew word" else "Return to Greek word",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Button(
+                                onClick = { viewModel.returnToLexicon() },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.tertiary,
+                                    contentColor = MaterialTheme.colorScheme.onTertiary
+                                ),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                modifier = Modifier.height(30.dp)
+                            ) {
+                                Text("Return", fontSize = 12.sp)
+                            }
+                        }
+                        IconButton(
+                            onClick = { viewModel.dismissLexiconReturnBanner() },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Dismiss",
+                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // "Return to note" banner — shown after tapping a verse mention
+            // inside a note being read, so the user can hop straight back
+            // to it instead of finding it again in the list, or dismiss it
+            // to just keep reading. Mutually exclusive with the cross-
+            // reference/search/lexicon banners above, same fixed top slot.
+            if (readerPickMode == ReaderPickMode.NONE && !crossReferenceReturnAvailable && !searchReturnAvailable && lexiconReturnTab == null && noteReturnItem != null) {
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.EditNote,
+                                contentDescription = "Note",
+                                tint = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Return to note",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Button(
+                                onClick = { viewModel.returnToNote() },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.error,
+                                    contentColor = MaterialTheme.colorScheme.onError
+                                ),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                modifier = Modifier.height(30.dp)
+                            ) {
+                                Text("Return", fontSize = 12.sp)
+                            }
+                        }
+                        IconButton(
+                            onClick = { viewModel.dismissNoteReturnBanner() },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Dismiss",
+                                tint = MaterialTheme.colorScheme.onErrorContainer,
                                 modifier = Modifier.size(16.dp)
                             )
                         }
@@ -672,6 +842,28 @@ fun ReaderScreen(
                         // (see xrefFocusActive above).
                         val effectiveBlurEnabled = isBlurModeEnabled || xrefFocusActive
 
+                        // Every tap-driven callback below (whole-verse tap,
+                        // and the word-level Greek/Hebrew/English/xref-marker
+                        // taps, which are separate click targets inside
+                        // VerseCard that don't go through onVerseClick at
+                        // all) routes through here first: tapping anything on
+                        // a blurred, non-focused verse dismisses blur/focus
+                        // instead of acting on it. Previously only
+                        // onVerseClick had any blur awareness, so a word tap
+                        // could still open a lookup for a verse you couldn't
+                        // even read.
+                        fun runUnlessBlurred(action: () -> Unit) {
+                            if (effectiveBlurEnabled && !isFocused) {
+                                if (isBlurModeEnabled) viewModel.toggleBlurMode()
+                                if (xrefFocusActive) {
+                                    xrefFocusActive = false
+                                    viewModel.clearVerseFocus()
+                                }
+                            } else {
+                                action()
+                            }
+                        }
+
                         // While a pick mode is active, tapping a verse means
                         // "add/toggle this verse" instead of opening the
                         // normal selection toolbar — mirrors Capacitor's
@@ -711,12 +903,14 @@ fun ReaderScreen(
                             greekFontSizeSp = greekFontSizeSp,
                             hebrewFontSizeSp = hebrewFontSizeSp,
                             onVerseClick = {
-                                if (readerPickMode != ReaderPickMode.NONE) {
-                                    viewModel.onPickModeVerseTap(verse)
-                                } else if (selectedVerse?.number == verse.number) {
-                                    viewModel.setSelectedVerse(null)
-                                } else {
-                                    viewModel.setSelectedVerse(verse)
+                                runUnlessBlurred {
+                                    if (readerPickMode != ReaderPickMode.NONE) {
+                                        viewModel.onPickModeVerseTap(verse)
+                                    } else if (selectedVerse?.number == verse.number) {
+                                        viewModel.setSelectedVerse(null)
+                                    } else {
+                                        viewModel.setSelectedVerse(verse)
+                                    }
                                 }
                             },
                             onVerseLongClick = {
@@ -735,20 +929,20 @@ fun ReaderScreen(
                                 }
                             },
                             onGreekWordClick = { gWord ->
-                                viewModel.selectGreekWord(gWord)
+                                runUnlessBlurred { viewModel.selectGreekWord(gWord, verse) }
                             },
                             onHebrewWordClick = { hWord ->
-                                viewModel.selectHebrewWord(hWord)
+                                runUnlessBlurred { viewModel.selectHebrewWord(hWord, verse) }
                             },
                             onCrossReferenceMarkerClick = {
                                 // Bypasses the verse action sheet entirely —
                                 // tapping the dagger jumps straight to cross
                                 // references, reusing the same sheet/history
                                 // stack a manual "Cross References" tap would.
-                                viewModel.openCrossReferences(verse)
+                                runUnlessBlurred { viewModel.openCrossReferences(verse) }
                             },
                             onEnglishWordClick = { word ->
-                                viewModel.openEnglishWordLookup(word)
+                                runUnlessBlurred { viewModel.openEnglishWordLookup(word) }
                             }
                         )
                     }
@@ -801,7 +995,15 @@ fun ReaderScreen(
                     viewModel.openCrossReferences(verse)
                 },
                 onToggleInterlinear = {
-                    viewModel.toggleInterlinear()
+                    // Anchor on whatever verse is at the top of the
+                    // viewport, same as the pill toggle below — not on
+                    // `verse` itself, which is just whichever verse this
+                    // selection toolbar happens to be attached to (often
+                    // off-screen or near the bottom, since the toolbar is
+                    // bottom-aligned) and would jump the view to it instead
+                    // of preserving where the user was reading.
+                    val anchorVerse = verses.getOrNull(listState.firstVisibleItemIndex - 1)?.number
+                    viewModel.toggleInterlinear(anchorVerse)
                 },
                 onDismiss = {
                     viewModel.setSelectedVerse(null)
@@ -872,7 +1074,15 @@ fun ReaderScreen(
                         glyph = "\u0C05",
                         active = showTeluguInline,
                         contentDescription = "Telugu inline translation",
-                        onClick = { viewModel.toggleTeluguInline() },
+                        onClick = {
+                            // Item 0 in the LazyColumn is the "$currentBook
+                            // $currentChapter" header (see itemsIndexed(verses)
+                            // below), so verse array index = list index - 1.
+                            // See toggleTeluguInline's doc for why this is
+                            // needed at all.
+                            val anchorVerse = verses.getOrNull(listState.firstVisibleItemIndex - 1)?.number
+                            viewModel.toggleTeluguInline(anchorVerse)
+                        },
                         modifier = Modifier.testTag("pill_telugu_toggle"),
                         offsetY = 1.dp
                     )
@@ -887,7 +1097,12 @@ fun ReaderScreen(
                         glyph = if (isOldTestamentBook) "\u05D0" else "\u03B1",
                         active = showInterlinear,
                         contentDescription = if (isOldTestamentBook) "Hebrew interlinear" else "Greek interlinear",
-                        onClick = { viewModel.toggleInterlinear() },
+                        onClick = {
+                            // See toggleTeluguInline's/toggleInterlinear's
+                            // doc for why this anchor is needed.
+                            val anchorVerse = verses.getOrNull(listState.firstVisibleItemIndex - 1)?.number
+                            viewModel.toggleInterlinear(anchorVerse)
+                        },
                         modifier = Modifier.testTag("pill_greek_toggle"),
                         offsetY = (-1).dp
                     )

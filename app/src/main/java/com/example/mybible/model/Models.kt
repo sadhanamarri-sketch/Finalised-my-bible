@@ -3,13 +3,6 @@ package com.example.mybible.model
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class Position(
-    val book: String,
-    val chapter: Int,
-    val verse: Int
-)
-
-@Serializable
 data class DictionaryMeaning(
     val partOfSpeech: String,
     val definitions: List<String>
@@ -19,7 +12,13 @@ data class DictionaryMeaning(
 data class EnglishDictionaryEntry(
     val word: String,
     val phonetic: String? = null,
-    val meanings: List<DictionaryMeaning> = emptyList()
+    val meanings: List<DictionaryMeaning> = emptyList(),
+    // Set when the lookup word itself isn't a Webster 1828 headword but a
+    // suffix-stripped base form is (e.g. "tribulations" -> "tribulation",
+    // "loveth" -> "love") — see BibleRepository.lookupEnglishWord. Null for
+    // a direct headword match. Lets the UI note which word the shown
+    // definition actually belongs to.
+    val resolvedFrom: String? = null
 )
 
 @Serializable
