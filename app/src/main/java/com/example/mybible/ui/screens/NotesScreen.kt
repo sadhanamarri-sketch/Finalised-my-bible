@@ -307,6 +307,7 @@ fun NotesScreen(
                                     text = note.title.ifBlank { "Untitled note" }.uppercase(),
                                     fontSize = 17.sp,
                                     fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.SansSerif,
                                     color = MaterialTheme.colorScheme.tertiary,
                                     modifier = Modifier.weight(1f)
                                 )
@@ -371,7 +372,7 @@ fun NotesScreen(
                             // NoteReaderScreen's use of LinkifiedNoteText.
                             Text(
                                 text = note.text,
-                                fontFamily = com.example.mybible.ui.theme.GelasioFontFamily,
+                                fontFamily = FontFamily.Serif,
                                 fontSize = 17.5.sp,
                                 lineHeight = 25.sp,
                                 color = MaterialTheme.colorScheme.onSurface,
