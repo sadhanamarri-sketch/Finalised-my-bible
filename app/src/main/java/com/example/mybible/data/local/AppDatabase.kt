@@ -17,9 +17,12 @@ import androidx.room.RoomDatabase
     // v7: added unique indices on greek_words/hebrew_words(book, chapter,
     // verse, orderIndex) so REPLACE-on-conflict retries of Greek/Hebrew
     // interlinear imports overwrite instead of duplicating rows — see
-    // those entities' indices comments. Destructive migration (below) just
-    // wipes and re-downloads, same as every prior version bump.
-    version = 7,
+    // those entities' indices comments.
+    // v8: lexicon_entries' primary key changed from strongs (bare eStrong)
+    // to strongsDisambiguated (dStrong) — see LexiconEntity's class doc.
+    // Destructive migration (below) just wipes and re-downloads, same as
+    // every prior version bump.
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

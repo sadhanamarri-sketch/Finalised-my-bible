@@ -1054,16 +1054,18 @@ class BibleRepository(private val context: Context) {
     }
 
     // Strong's numbers as tagged on a word (dStrong) can carry a trailing
-    // disambiguation letter (e.g. "G3588A"); TBESG's own primary keys are
-    // normalized down to the bare number for lookup — same behavior as
-    // Capacitor's normalizeStrongsKey(), including its tradeoff: if TBESG
-    // only has lettered-variant entries for a number and no bare-number
-    // entry, the lookup below won't find it.
+    // disambiguation letter (e.g. "G3588A"). Unlike the old behavior, that
+    // letter is looked up exactly first (see LexiconEntity's class doc for
+    // why — two entirely unrelated words can share a bare number, e.g.
+    // G0001G "Α" vs G0001H "ἔα"), falling back to the bare number only if
+    // no row has that exact disambiguated key.
     private fun normalizeLexiconKey(dStrong: String?): String? {
         if (dStrong.isNullOrBlank()) return null
-        val match = Regex("^G\\d+").find(dStrong.uppercase()) ?: return null
-        return match.value
+        return dStrong.trim().uppercase().takeIf { Regex("^G\\d+").containsMatchIn(it) }
     }
+
+    private fun bareLexiconKey(fullKey: String): String? =
+        Regex("^G\\d+").find(fullKey)?.value
 
     /**
      * Looks up a Greek word's full lexicon entry by its Strong's number.
@@ -1073,9 +1075,11 @@ class BibleRepository(private val context: Context) {
      * a first-time download that failed (no connection).
      */
     suspend fun getLexiconEntry(dStrong: String?): LexiconLookupResult = withContext(Dispatchers.IO) {
-        val key = normalizeLexiconKey(dStrong) ?: return@withContext LexiconLookupResult.NoStrongsNumber
+        val fullKey = normalizeLexiconKey(dStrong) ?: return@withContext LexiconLookupResult.NoStrongsNumber
+        val bareKey = bareLexiconKey(fullKey) ?: return@withContext LexiconLookupResult.NoStrongsNumber
         if (!ensureLexiconImported()) return@withContext LexiconLookupResult.NetworkError
-        val entity = bibleDao.getLexiconEntry(key)
+        val entity = bibleDao.getLexiconEntryByDisambiguated(fullKey)
+            ?: bibleDao.getLexiconEntryByBareStrongs(bareKey)
         if (entity == null || (entity.definition.isBlank() && entity.gloss.isBlank())) {
             LexiconLookupResult.NotFound
         } else {
@@ -1112,14 +1116,18 @@ class BibleRepository(private val context: Context) {
 
     private fun normalizeHebrewLexiconKey(dStrong: String?): String? {
         if (dStrong.isNullOrBlank()) return null
-        val match = Regex("^H\\d+").find(dStrong.uppercase()) ?: return null
-        return match.value
+        return dStrong.trim().uppercase().takeIf { Regex("^H\\d+").containsMatchIn(it) }
     }
 
+    private fun bareHebrewLexiconKey(fullKey: String): String? =
+        Regex("^H\\d+").find(fullKey)?.value
+
     suspend fun getHebrewLexiconEntry(dStrong: String?): LexiconLookupResult = withContext(Dispatchers.IO) {
-        val key = normalizeHebrewLexiconKey(dStrong) ?: return@withContext LexiconLookupResult.NoStrongsNumber
+        val fullKey = normalizeHebrewLexiconKey(dStrong) ?: return@withContext LexiconLookupResult.NoStrongsNumber
+        val bareKey = bareHebrewLexiconKey(fullKey) ?: return@withContext LexiconLookupResult.NoStrongsNumber
         if (!ensureHebrewLexiconImported()) return@withContext LexiconLookupResult.NetworkError
-        val entity = bibleDao.getLexiconEntry(key)
+        val entity = bibleDao.getLexiconEntryByDisambiguated(fullKey)
+            ?: bibleDao.getLexiconEntryByBareStrongs(bareKey)
         if (entity == null || (entity.definition.isBlank() && entity.gloss.isBlank())) {
             LexiconLookupResult.NotFound
         } else {
