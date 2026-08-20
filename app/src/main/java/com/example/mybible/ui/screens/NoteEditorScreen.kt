@@ -381,18 +381,14 @@ fun NoteEditorScreen(
                     commitTag(fuzzyMatch ?: tagInput)
                 },
                 trailingContent = {
-                    // Explicit Save button — the field previously only
-                    // committed a typed tag via Enter or a small unlabeled
-                    // "+" icon, neither of which read as "how you save a
-                    // tag," so this spells it out.
-                    TextButton(
-                        onClick = { commitTag(tagInput) },
-                        enabled = tagInput.isNotBlank(),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                        modifier = Modifier.height(30.dp)
-                    ) {
-                        Text("Save", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    }
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = "Add Tag",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clickable { commitTag(tagInput) }
+                    )
                 },
                 modifier = Modifier
                     .fillMaxWidth()

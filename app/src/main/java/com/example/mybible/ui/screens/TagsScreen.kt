@@ -6,6 +6,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -256,6 +258,7 @@ private fun TagEditorSheet(
                 .fillMaxWidth()
                 .navigationBarsPadding()
                 .imePadding()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 12.dp)
         ) {
@@ -286,11 +289,17 @@ private fun TagEditorSheet(
             NeSectionLabel("Description", optionalNote = "(optional)")
             // Multi-line, so this doesn't reuse NeTextField (which forces
             // singleLine) — same flat-bordered container look, just taller
-            // and left-aligned to the top for multi-line text.
+            // and left-aligned to the top for multi-line text. Capped at
+            // 160dp (not just heightIn(min=88dp) with an unbounded
+            // fillMaxSize() field): inside this sheet's fully-expanded
+            // ModalBottomSheet, an unbounded box grew to fill the whole
+            // available height, pushing the Save/Cancel row below the
+            // screen entirely. The field itself scrolls internally if the
+            // typed description outgrows the capped box.
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 88.dp)
+                    .heightIn(min = 88.dp, max = 160.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(MaterialTheme.colorScheme.surface)
                     .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
@@ -305,7 +314,9 @@ private fun TagEditorSheet(
                     ),
                     cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
                 )
                 if (description.isEmpty()) {
                     Text(
