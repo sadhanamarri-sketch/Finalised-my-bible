@@ -24,7 +24,6 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
@@ -308,9 +307,9 @@ fun SearchScreen(
                             ) {
                                 Text(
                                     text = "${verse.book} ${verse.chapter}:${verse.number}".uppercase(),
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 1.sp,
+                                    fontSize = 12.5.sp,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
+                                    letterSpacing = 1.5.sp,
                                     color = MaterialTheme.colorScheme.tertiary
                                 )
                                 Icon(
