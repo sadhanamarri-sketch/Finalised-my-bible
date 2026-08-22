@@ -113,7 +113,25 @@ fun ReaderScreen(
     val pickedNoteRefs by viewModel.pickedNoteRefs.collectAsState()
     val noteToEdit by viewModel.noteToEdit.collectAsState()
 
-    val listState = rememberLazyListState()
+    // Seeds the list's first rendered frame near the target verse instead
+    // of always starting at index 0 (the chapter header) — the real
+    // scroll-to-focus effect below only runs *after* the first frame is
+    // composed and drawn (LaunchedEffect bodies run post-composition), so
+    // without this, even a mount where verses/focusedVerseNumber are
+    // already fully resolved (e.g. after MainActivity's cold-start gate)
+    // would still visibly flash the top of the chapter for that one frame
+    // before snapping to the target. This is a *different* problem from
+    // the one that gate fixed (verses being empty/target not yet landed
+    // when the "did the user scroll away" watcher starts observing) —
+    // removing this as "redundant" once the gate landed was wrong; the two
+    // don't overlap. Approximates "verse N sits at LazyColumn index N"
+    // (index 0 is the chapter header, see itemsIndexed(verses) below)
+    // since chapters are verse-numbered 1..count without gaps in the vast
+    // majority of cases; any off-by-a-little from a rare gap is just a
+    // small correction once scrollToItem runs, not a full jump from the
+    // top. Only read once (remember has no keys) — later focus changes go
+    // through scrollToItem instead.
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = focusedVerseNumber ?: 0)
 
     // Snapshots the top-visible verse into MainViewModel right before
     // ReaderScreen is torn down (visiting another tab) — see
