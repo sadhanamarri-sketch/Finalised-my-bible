@@ -191,21 +191,28 @@ class BibleRepository(private val context: Context) {
     // Exact verse-level resume position — separate from saveLastPosition
     // above (called on every chapter navigation) because it's written far
     // less often: only when the app actually backgrounds (see
-    // MainViewModel's ProcessLifecycleOwner observer), capturing whatever
-    // verse was sitting at the top of the Reader viewport at that moment.
-    // Always writes book/chapter/verse together in one call so the three
-    // stay consistent — reading last_verse back against a *different*
-    // last_book/last_chapter (e.g. saved mid-navigation) would resume at
-    // the wrong verse in the right chapter.
+    // MainActivity.onStop -> MainViewModel.persistCurrentReadingPosition),
+    // capturing whatever verse was sitting at the top of the Reader
+    // viewport at that moment. Always writes book/chapter/verse together in
+    // one call so the three stay consistent — reading last_verse back
+    // against a *different* last_book/last_chapter (e.g. saved mid-
+    // navigation) would resume at the wrong verse in the right chapter.
     fun getLastReadVerse(): Int? {
         val v = prefs.getInt("last_verse", -1)
         return if (v > 0) v else null
     }
 
+    // commit(), not apply() — this is written from Activity.onStop, the
+    // last guaranteed moment before Android may kill the process (e.g.
+    // swiping the app away in the recent-apps switcher, which can kill it
+    // fast enough to beat apply()'s queued background write). commit()
+    // blocks until the write actually lands, which is fine here: onStop is
+    // already synchronous, and one small SharedPreferences write is a
+    // negligible delay against the alternative of silently losing it.
     fun saveLastReadPosition(book: String, chapter: Int, verse: Int?) {
         val editor = prefs.edit().putString("last_book", book).putInt("last_chapter", chapter)
         if (verse != null) editor.putInt("last_verse", verse) else editor.remove("last_verse")
-        editor.apply()
+        editor.commit()
     }
 
     fun isFirstLaunch(): Boolean {
