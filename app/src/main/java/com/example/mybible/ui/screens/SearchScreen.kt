@@ -132,7 +132,7 @@ fun SearchScreen(
             BackTopBar(
                 title = "Search",
                 onBack = {
-                    viewModel.endSearchSession()
+                    viewModel.backToSearchSourceVerse()
                     viewModel.selectTab(NavTab.READER)
                 }
             )

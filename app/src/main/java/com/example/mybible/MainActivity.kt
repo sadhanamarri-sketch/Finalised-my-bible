@@ -279,7 +279,16 @@ class MainActivity : ComponentActivity() {
                 // the old query/results behind. Search history already
                 // preserves past searches separately, so there's nothing to
                 // lose by keeping this consistent with the arrow.
-                if (activeTab == NavTab.SEARCH) viewModel.endSearchSession()
+                //
+                // backToSearchSourceVerse() (not plain endSearchSession())
+                // so backing all the way out of a search detour — banner's
+                // Return to the results list, then back again from there —
+                // lands on the verse Reader was actually showing before the
+                // search started (e.g. Romans 4), not wherever the last-
+                // viewed result happened to leave currentBook/currentChapter
+                // (e.g. Genesis 22). Mirrors cross-reference/lexicon's
+                // "system back means take me back to where I was."
+                if (activeTab == NavTab.SEARCH) viewModel.backToSearchSourceVerse()
                 viewModel.selectTab(NavTab.READER)
             }
             BackHandler(enabled = activeTab == NavTab.GREEK_WORD) {

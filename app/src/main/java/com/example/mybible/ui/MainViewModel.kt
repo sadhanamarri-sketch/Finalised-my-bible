@@ -614,6 +614,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _searchReturnAvailable = MutableStateFlow(false)
     val searchReturnAvailable: StateFlow<Boolean> = _searchReturnAvailable.asStateFlow()
 
+    // Where the user was actually reading before this search detour started
+    // — Reader's own position, kept separate from wherever a search result
+    // jump has since taken it. Mirrors _crossReferenceSourceVerse's role for
+    // cross-references: the banner's own Return button (returnToSearchResults)
+    // goes to the search results list, but system back means "take me back
+    // to where I was," same as it does for cross-references/lexicon — see
+    // backToSearchSourceVerse. Captured once per search "session" (only if
+    // not already set) so tapping a second result after already returning
+    // to the list once doesn't overwrite the *original* reading position
+    // with the first result's; cleared in endSearchSession, same lifetime
+    // as the rest of the search-detour state.
+    private val _searchSourceVerse = MutableStateFlow<ReaderScrollAnchor?>(null)
+
     // "book:chapter:verse" key of the last search result tapped — lets
     // SearchScreen mark that card with an accent bar on return, so the
     // user can spot which result they already visited without having to
@@ -1977,6 +1990,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _searchResults.value = emptyList()
         _isSearching.value = false
         _searchLastTappedKey.value = null
+        _searchSourceVerse.value = null
     }
 
     // Tapping a recent-search suggestion re-runs that exact search and
@@ -1995,6 +2009,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // their results — same scroll position, same query — or dismiss it to
     // just keep reading.
     fun openSearchResult(verse: Verse) {
+        if (_searchSourceVerse.value == null) {
+            // readerAnchor (saved by ReaderScreen's own teardown effect when
+            // leaving for the Search tab) has the exact verse if it's still
+            // fresh for this book/chapter; falling back to the chapter's
+            // top verse is fine here — the point is restoring the right
+            // chapter, not necessarily the exact scroll pixel.
+            val anchor = _readerAnchor.value
+            val sourceVerseNumber = anchor?.takeIf {
+                it.book == _currentBook.value && it.chapter == _currentChapter.value
+            }?.verse ?: 1
+            _searchSourceVerse.value = ReaderScrollAnchor(_currentBook.value, _currentChapter.value, sourceVerseNumber)
+        }
         _searchReturnAvailable.value = true
         _searchLastTappedKey.value = "${verse.book}:${verse.chapter}:${verse.number}"
         _isBlurModeEnabled.value = false
@@ -2019,6 +2045,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _searchReturnAvailable.value = false
         _suppressNextSearchAutofocus.value = true
         selectTab(NavTab.SEARCH)
+    }
+
+    // System back while Reader shows the "Return to search results" banner
+    // — undoes the whole search detour and lands back on the verse reading
+    // started from (e.g. Romans 4), rather than the search results list,
+    // which is what the banner's own Return button goes to. Mirrors
+    // backToCrossReferenceSourceVerse's distinction between the button and
+    // system back. Ends the session too, same reasoning as
+    // dismissSearchReturnBanner(): there's no list left to come back to
+    // once you've backed out past it.
+    fun backToSearchSourceVerse() {
+        val source = _searchSourceVerse.value
+        _searchReturnAvailable.value = false
+        endSearchSession()
+        if (source != null) {
+            jumpToVerse(source.book, source.chapter, source.verse)
+            _isBlurModeEnabled.value = false
+        }
     }
 
     // "Cancel" on the banner — the user is choosing NOT to resume that
