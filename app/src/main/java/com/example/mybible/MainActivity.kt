@@ -73,18 +73,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        // On a singleTask relaunch from a fully-killed process (e.g. the
-        // widget's Continue Reading button after the app was swiped away),
-        // Android can show a cached screenshot of this window's last-known
-        // frame as a transition preview before the freshly-composed UI
-        // takes over — a brief flash of wherever the Reader happened to be
-        // showing right before the process died, independent of (and not
-        // fixable by) ReaderScreen's own alpha-gating of its first frame.
-        // Telling the system not to generate/reuse that preview for this
-        // window removes that one remaining source of the flash.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            window.setDisablePreviewScreenshots(true)
-        }
         currentIntent = intent
 
         setContent {
