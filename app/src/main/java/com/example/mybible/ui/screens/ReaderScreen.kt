@@ -283,6 +283,23 @@ fun ReaderScreen(
             } else {
                 listState.scrollToItem(0)
                 xrefFocusActive = false
+                // The chapter loads twice on a cold start — once
+                // immediately (possibly a live-fetch fallback), again once
+                // the one-time Bible import finishes with authoritative
+                // Room data (see MainViewModel's loadCurrentChapter doc).
+                // If the cold-start restore's target verse isn't in *this*
+                // pass's verses, don't reveal yet — the second pass a
+                // moment later should have it, and revealing now would
+                // show the top of the chapter for that gap instead of
+                // staying hidden until the real position is known. Bounded
+                // to isNewChapter (the first time this effect runs for
+                // this book/chapter): lastFocusEffectChapterKey is already
+                // updated above, so the *next* run — whether it finds the
+                // verse or not — always reveals, so a genuinely-missing
+                // verse can't hide the reader forever.
+                if (isNewChapter && targetVerseNumber == initialScrollHint) {
+                    return@LaunchedEffect
+                }
             }
         } else if (isNewChapter) {
             // No explicit jump target — this is either the very first
