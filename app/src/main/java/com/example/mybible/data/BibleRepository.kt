@@ -231,6 +231,20 @@ class BibleRepository(private val context: Context) {
         if (durable) editor.commit() else editor.apply()
     }
 
+    // Temporary diagnostics for the widget exact-resume bug — see
+    // saveLastReadPosition's own trace above. This side records what the
+    // *restore* half saw: what MainViewModel's init{} read back on cold
+    // start, and whether ReaderScreen's scroll-to-focus effect actually
+    // found that verse in the loaded chapter. Remove both alongside the
+    // widget's debug lines once resolved.
+    fun setDebugRestoreTrace(trace: String) {
+        prefs.edit().putString("debug_restore_trace", trace).apply()
+    }
+
+    fun setDebugScrollTrace(trace: String) {
+        prefs.edit().putString("debug_scroll_trace", trace).apply()
+    }
+
     fun getDebugSaveTrace(): String? = prefs.getString("debug_save_trace", null)
 
     fun isFirstLaunch(): Boolean {

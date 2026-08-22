@@ -223,6 +223,7 @@ fun ReaderScreen(
         }
         if (focusedVerseNumber != null) {
             val idx = verses.indexOfFirst { it.number == focusedVerseNumber }
+            viewModel.debugLogScrollAttempt(focusedVerseNumber, idx, verses.size)
             if (idx >= 0) {
                 val targetIndex = idx + 1
                 // First bring the target item into the laid-out set so its

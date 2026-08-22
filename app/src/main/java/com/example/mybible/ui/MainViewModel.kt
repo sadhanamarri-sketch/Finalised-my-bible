@@ -665,7 +665,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // observer below), not just the top of the saved chapter. Unblurred/
         // pinned-to-top — same as toggleTeluguInline's anchor restore — since
         // this is a silent position restore, not a "look at this verse" jump.
-        repository.getLastReadVerse()?.let { verse ->
+        val restoredVerse = repository.getLastReadVerse()
+        repository.setDebugRestoreTrace(
+            "book=$savedBook chap=$savedChap verse=$restoredVerse at=${System.currentTimeMillis()}"
+        )
+        restoredVerse?.let { verse ->
             _focusedVerseNumber.value = verse
             _focusedVerseBlurEnabled.value = false
             _focusedVersePinToTop.value = true
@@ -853,6 +857,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun savePositionToDisk(durable: Boolean) {
         repository.saveLastReadPosition(_currentBook.value, _currentChapter.value, liveTopVerse, durable = durable)
+    }
+
+    // Temporary diagnostic for the widget exact-resume bug — called from
+    // ReaderScreen's scroll-to-focus effect (see its own doc) right after it
+    // looks up focusedVerseNumber in the freshly loaded verses list, so it's
+    // visible (via the widget label) whether a cold-start restore actually
+    // found its target verse or silently fell back to the top of the
+    // chapter. Remove alongside the widget's debug lines once resolved.
+    fun debugLogScrollAttempt(targetVerse: Int, foundIndex: Int, versesSize: Int) {
+        repository.setDebugScrollTrace(
+            "target=$targetVerse foundIdx=$foundIndex versesSize=$versesSize at=${System.currentTimeMillis()}"
+        )
     }
 
     fun loadChapter(book: String, chapter: Int) {

@@ -27,7 +27,34 @@ fun formatDebugSaveTrace(raw: String?): String? {
     val durable = raw.substringAfter("durable=").substringBefore(" at=")
     val at = raw.substringAfter("at=").toLongOrNull() ?: return null
     val agoSec = (System.currentTimeMillis() - at) / 1000
-    return "v=$verse d=$durable ${agoSec}s ago"
+    return "save: v=$verse d=$durable ${agoSec}s ago"
+}
+
+// Companion to formatDebugSaveTrace above, decoding
+// MainViewModel's init{}-time "what did cold start read back" trace
+// (BibleRepository.setDebugRestoreTrace).
+fun formatDebugRestoreTrace(raw: String?): String? {
+    if (raw == null) return null
+    val book = raw.substringAfter("book=").substringBefore(" chap=")
+    val chap = raw.substringAfter("chap=").substringBefore(" verse=")
+    val verse = raw.substringAfter("verse=").substringBefore(" at=")
+    val at = raw.substringAfter("at=").toLongOrNull() ?: return null
+    val agoSec = (System.currentTimeMillis() - at) / 1000
+    return "init: $book $chap v=$verse ${agoSec}s ago"
+}
+
+// Companion to formatDebugSaveTrace above, decoding ReaderScreen's
+// scroll-to-focus attempt trace (BibleRepository.setDebugScrollTrace) —
+// foundIdx=-1 means the target verse was NOT in the loaded chapter, which
+// is exactly what falls back to scrolling to the top instead.
+fun formatDebugScrollTrace(raw: String?): String? {
+    if (raw == null) return null
+    val target = raw.substringAfter("target=").substringBefore(" foundIdx=")
+    val foundIdx = raw.substringAfter("foundIdx=").substringBefore(" versesSize=")
+    val versesSize = raw.substringAfter("versesSize=").substringBefore(" at=")
+    val at = raw.substringAfter("at=").toLongOrNull() ?: return null
+    val agoSec = (System.currentTimeMillis() - at) / 1000
+    return "scroll: t=$target idx=$foundIdx n=$versesSize ${agoSec}s ago"
 }
 
 data class WidgetPalette(

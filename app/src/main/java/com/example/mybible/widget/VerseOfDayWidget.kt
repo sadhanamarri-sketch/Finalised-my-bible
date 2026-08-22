@@ -58,7 +58,11 @@ class VerseOfDayWidget : GlanceAppWidget() {
         val lastBook = prefs.getString("last_book", "Genesis") ?: "Genesis"
         val lastChapter = prefs.getInt("last_chapter", 1)
         val lastVerse = prefs.getInt("last_verse", -1)
-        val debugTrace = formatDebugSaveTrace(prefs.getString("debug_save_trace", null))
+        val debugLines = listOfNotNull(
+            formatDebugSaveTrace(prefs.getString("debug_save_trace", null)),
+            formatDebugRestoreTrace(prefs.getString("debug_restore_trace", null)),
+            formatDebugScrollTrace(prefs.getString("debug_scroll_trace", null))
+        )
         val todayVerse = VerseOfDayRepository.verseForToday()
 
         provideContent {
@@ -67,7 +71,7 @@ class VerseOfDayWidget : GlanceAppWidget() {
                 lastBook = lastBook,
                 lastChapter = lastChapter,
                 lastVerse = lastVerse,
-                debugTrace = debugTrace,
+                debugLines = debugLines,
                 verse = todayVerse
             )
         }
@@ -80,7 +84,7 @@ private fun WidgetContent(
     lastBook: String,
     lastChapter: Int,
     lastVerse: Int,
-    debugTrace: String?,
+    debugLines: List<String>,
     verse: VerseOfDay
 ) {
     val context = LocalContext.current
@@ -228,9 +232,9 @@ private fun WidgetContent(
         }
         }
 
-        if (debugTrace != null) {
+        debugLines.forEach { line ->
             Text(
-                text = debugTrace,
+                text = line,
                 style = TextStyle(fontSize = 9.sp, color = palette.accent),
                 maxLines = 1
             )
