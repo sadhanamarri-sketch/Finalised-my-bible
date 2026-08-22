@@ -621,3 +621,69 @@ fun ManageHighlightColorsSheet(
         }
     }
 }
+
+/** "6:00 AM" / "9:00 PM" style label for an hour-of-day (0-23), no minutes
+ *  — reminders only ever fire on the hour, so a full HH:MM time picker
+ *  would be showing a control the user can't actually use meaningfully. */
+fun formatHourLabel(hour: Int): String {
+    val period = if (hour < 12) "AM" else "PM"
+    val display = when {
+        hour == 0 -> 12
+        hour > 12 -> hour - 12
+        else -> hour
+    }
+    return "$display:00 $period"
+}
+
+/**
+ * Purpose-built hour-of-day picker (see [formatHourLabel]) — Settings'
+ * "Active hours" reminder window uses two of these (start/end) instead of
+ * Material3's full TimePicker, which includes a minute wheel that would
+ * just be dead weight here. Tapping a row selects it and dismisses
+ * immediately, matching how a single-value picker list is expected to work.
+ */
+@Composable
+fun HourPickerDialog(
+    title: String,
+    selectedHour: Int,
+    onDismiss: () -> Unit,
+    onSelect: (Int) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            LazyColumn(modifier = Modifier.heightIn(max = 340.dp)) {
+                items(24) { hour ->
+                    val isSelected = hour == selectedHour
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                else Color.Transparent
+                            )
+                            .clickable {
+                                onSelect(hour)
+                                onDismiss()
+                            }
+                            .padding(vertical = 12.dp, horizontal = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = formatHourLabel(hour),
+                            fontSize = 16.sp,
+                            fontFamily = FontFamily.SansSerif,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        }
+    )
+}

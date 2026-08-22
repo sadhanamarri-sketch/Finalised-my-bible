@@ -17,6 +17,9 @@ import com.example.mybible.data.BibleDataImportWorker
 import com.example.mybible.data.BibleRepository
 import com.example.mybible.data.DriveBackupManager
 import com.example.mybible.data.DriveSyncWorker
+import com.example.mybible.reminders.ReminderFrequency
+import com.example.mybible.reminders.ReminderScheduler
+import com.example.mybible.reminders.ReminderTheme
 import com.example.mybible.data.resolveBookName
 import com.example.mybible.data.LexiconLookupResult
 import com.example.mybible.model.*
@@ -921,14 +924,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // an Activity — that's requested by MainActivity, which calls this only
     // once permission is granted (or immediately, on older Android where no
     // such permission exists).
-    private val _remindersEnabled = MutableStateFlow(
-        com.example.mybible.reminders.ReminderScheduler.isEnabled(appContext)
-    )
+    private val _remindersEnabled = MutableStateFlow(ReminderScheduler.isEnabled(appContext))
     val remindersEnabled: StateFlow<Boolean> = _remindersEnabled.asStateFlow()
 
     fun setRemindersEnabled(enabled: Boolean) {
-        com.example.mybible.reminders.ReminderScheduler.setEnabled(appContext, enabled)
+        ReminderScheduler.setEnabled(appContext, enabled)
         _remindersEnabled.value = enabled
+    }
+
+    // Frequency, active-hours window, and which message themes rotate —
+    // all previously hardcoded (every 3 hours, 6am-9pm, all 6 themes).
+    // ReminderScheduler/ReminderMessages own the actual persistence and
+    // alarm-rescheduling; these StateFlows just mirror that for Settings'
+    // UI, same pattern as remindersEnabled above.
+    private val _reminderFrequency = MutableStateFlow(ReminderScheduler.getFrequency(appContext))
+    val reminderFrequency: StateFlow<ReminderFrequency> = _reminderFrequency.asStateFlow()
+
+    fun setReminderFrequency(frequency: ReminderFrequency) {
+        ReminderScheduler.setFrequency(appContext, frequency)
+        _reminderFrequency.value = frequency
+    }
+
+    private val _reminderActiveHours = MutableStateFlow(ReminderScheduler.getActiveHours(appContext))
+    val reminderActiveHours: StateFlow<Pair<Int, Int>> = _reminderActiveHours.asStateFlow()
+
+    fun setReminderActiveHours(startHour: Int, endHour: Int) {
+        ReminderScheduler.setActiveHours(appContext, startHour, endHour)
+        _reminderActiveHours.value = startHour to endHour
+    }
+
+    private val _reminderEnabledThemes = MutableStateFlow(ReminderScheduler.getEnabledThemes(appContext))
+    val reminderEnabledThemes: StateFlow<Set<ReminderTheme>> = _reminderEnabledThemes.asStateFlow()
+
+    fun setReminderThemeEnabled(theme: ReminderTheme, enabled: Boolean) {
+        ReminderScheduler.setThemeEnabled(appContext, theme, enabled)
+        _reminderEnabledThemes.value = ReminderScheduler.getEnabledThemes(appContext)
     }
 
     fun adjustFontSize(deltaSp: Int) {

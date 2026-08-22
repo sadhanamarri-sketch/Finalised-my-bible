@@ -20,19 +20,25 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mybible.model.ThemeMode
+import com.example.mybible.reminders.ReminderFrequency
+import com.example.mybible.reminders.ReminderTheme
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.components.BackTopBar
 import com.example.mybible.ui.components.DsOutlineAccentButton
 import com.example.mybible.ui.components.DsSectionLabel
 import com.example.mybible.ui.components.DsSizeAdjustRow
+import com.example.mybible.ui.components.DsSwitch
 import com.example.mybible.ui.components.DsToggleRow
+import com.example.mybible.ui.components.HourPickerDialog
+import com.example.mybible.ui.components.formatHourLabel
 import com.example.mybible.ui.theme.EbGaramondFontFamily
 import com.example.mybible.ui.theme.GelasioFontFamily
 import com.example.mybible.ui.theme.LoraFontFamily
@@ -98,6 +104,12 @@ fun SettingsScreen(
     val showInterlinear by viewModel.showInterlinear.collectAsState()
     val isBlurModeEnabled by viewModel.isBlurModeEnabled.collectAsState()
     val remindersEnabled by viewModel.remindersEnabled.collectAsState()
+    val reminderFrequency by viewModel.reminderFrequency.collectAsState()
+    val reminderActiveHours by viewModel.reminderActiveHours.collectAsState()
+    val (reminderStartHour, reminderEndHour) = reminderActiveHours
+    val reminderEnabledThemes by viewModel.reminderEnabledThemes.collectAsState()
+    var showStartHourPicker by remember { mutableStateOf(false) }
+    var showEndHourPicker by remember { mutableStateOf(false) }
 
     val driveAccount by viewModel.driveAccount.collectAsState()
     val isDriveSyncing by viewModel.isDriveSyncing.collectAsState()
@@ -359,12 +371,147 @@ fun SettingsScreen(
 
         // ---- Reminders ----
         DsSectionLabel("Reminders")
+        val notificationsPerDay = if (reminderStartHour > reminderEndHour) {
+            1
+        } else {
+            ((reminderEndHour - reminderStartHour) / reminderFrequency.stepHours) + 1
+        }
         DsToggleRow(
             label = "Reading reminders",
-            subLabel = "6 gentle nudges a day, every 3 hours from 6am\u20139pm, pointing back to where you left off",
+            subLabel = "$notificationsPerDay ${if (notificationsPerDay == 1) "nudge" else "nudges"} a day, " +
+                "every ${reminderFrequency.stepHours}h from ${formatHourLabel(reminderStartHour)}\u2013" +
+                "${formatHourLabel(reminderEndHour)}, pointing back to where you left off",
             checked = remindersEnabled,
             onCheckedChange = onToggleReminders
         )
+
+        if (remindersEnabled) {
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Frequency",
+                fontSize = 13.sp,
+                fontFamily = FontFamily.SansSerif,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 6.dp)
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                ReminderFrequency.entries.forEach { freq ->
+                    val selected = freq == reminderFrequency
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                            .clickable { viewModel.setReminderFrequency(freq) }
+                            .padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = freq.label,
+                            fontSize = 13.5.sp,
+                            fontFamily = FontFamily.SansSerif,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (selected) MaterialTheme.colorScheme.onPrimary
+                                else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Active hours",
+                fontSize = 13.sp,
+                fontFamily = FontFamily.SansSerif,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 6.dp)
+            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = formatHourLabel(reminderStartHour),
+                    fontSize = 14.5.sp,
+                    fontFamily = FontFamily.SansSerif,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(10.dp))
+                        .clickable { showStartHourPicker = true }
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                )
+                Text(
+                    text = "to",
+                    fontSize = 13.sp,
+                    fontFamily = FontFamily.SansSerif,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = formatHourLabel(reminderEndHour),
+                    fontSize = 14.5.sp,
+                    fontFamily = FontFamily.SansSerif,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(10.dp))
+                        .clickable { showEndHourPicker = true }
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Message themes",
+                fontSize = 13.sp,
+                fontFamily = FontFamily.SansSerif,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
+            ReminderTheme.entries.forEach { theme ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = theme.label,
+                        fontSize = 14.5.sp,
+                        fontFamily = FontFamily.SansSerif,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f).padding(end = 14.dp)
+                    )
+                    DsSwitch(
+                        checked = theme in reminderEnabledThemes,
+                        onCheckedChange = { viewModel.setReminderThemeEnabled(theme, it) }
+                    )
+                }
+            }
+        }
+
+        if (showStartHourPicker) {
+            HourPickerDialog(
+                title = "Start time",
+                selectedHour = reminderStartHour,
+                onDismiss = { showStartHourPicker = false },
+                onSelect = { viewModel.setReminderActiveHours(it, reminderEndHour) }
+            )
+        }
+        if (showEndHourPicker) {
+            HourPickerDialog(
+                title = "End time",
+                selectedHour = reminderEndHour,
+                onDismiss = { showEndHourPicker = false },
+                onSelect = { viewModel.setReminderActiveHours(reminderStartHour, it) }
+            )
+        }
 
         HorizontalDivider(modifier = Modifier.padding(top = 18.dp), color = MaterialTheme.colorScheme.surfaceVariant)
 

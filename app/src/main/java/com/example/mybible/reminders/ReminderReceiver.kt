@@ -10,8 +10,9 @@ private const val PREFS_NAME = "my_bible_prefs"
  * Fires one reading reminder. Reads the current reading position straight
  * from the same SharedPreferences BibleRepository writes to (so no DB/repo
  * dependency is needed here), picks a rotating message the same way the
- * Capacitor app does (day-of-epoch + hour-slot index into the 36-message
- * list), shows the notification, then reschedules itself 24h out.
+ * Capacitor app does (day-of-epoch + hour-slot index into the enabled-
+ * themes message pool — see ReminderMessages.forThemes), shows the
+ * notification, then reschedules itself 24h out.
  */
 class ReminderReceiver : BroadcastReceiver() {
 
@@ -19,10 +20,12 @@ class ReminderReceiver : BroadcastReceiver() {
         val hour = intent.getIntExtra("hour", -1)
         if (hour == -1) return
 
-        // This hour is no longer part of the active schedule (e.g. the app updated
-        // from the old hourly cadence to the current one) — don't notify, and don't
-        // re-arm it, so it stops firing for good instead of self-perpetuating forever.
-        if (hour !in ReminderScheduler.HOURS) return
+        // This hour is no longer part of the active schedule (e.g. the user
+        // changed the frequency or active-hours window since this alarm was
+        // set) — don't notify, and don't re-arm it, so it stops firing for
+        // good instead of self-perpetuating forever.
+        val activeHours = ReminderScheduler.hours(context)
+        if (hour !in activeHours) return
 
         // A stale alarm could still fire right after the user disables
         // reminders (there's an unavoidable race between cancel() and an
@@ -34,10 +37,10 @@ class ReminderReceiver : BroadcastReceiver() {
         val chapter = prefs.getInt("last_chapter", 1)
         val ref = "$book $chapter"
 
-        val slotIndex = ReminderScheduler.HOURS.indexOf(hour).coerceAtLeast(0)
+        val slotIndex = activeHours.indexOf(hour).coerceAtLeast(0)
         val dayIndex = (System.currentTimeMillis() / 86_400_000L).toInt()
-        val messages = ReminderMessages.ALL
-        val msgIndex = ((dayIndex * ReminderScheduler.HOURS.size + slotIndex) % messages.size + messages.size) % messages.size
+        val messages = ReminderMessages.forThemes(ReminderScheduler.getEnabledThemes(context))
+        val msgIndex = ((dayIndex * activeHours.size + slotIndex) % messages.size + messages.size) % messages.size
         val body = messages[msgIndex].replace("{ref}", ref)
 
         NotificationHelper.show(context, notificationId = hour, body = body)
