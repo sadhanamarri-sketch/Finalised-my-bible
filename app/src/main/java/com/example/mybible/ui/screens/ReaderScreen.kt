@@ -20,7 +20,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -114,34 +113,7 @@ fun ReaderScreen(
     val pickedNoteRefs by viewModel.pickedNoteRefs.collectAsState()
     val noteToEdit by viewModel.noteToEdit.collectAsState()
 
-    // Best-effort initial position to avoid a visible top-of-chapter flash
-    // on a cold start (e.g. via the widget), before the real scroll-to-
-    // focus effect below corrects it once verses/focusedVerseNumber are
-    // actually ready — see MainViewModel.consumeInitialScrollHint's own
-    // doc for why this is a separate, one-shot, plain value rather than
-    // reading focusedVerseNumber directly here (that ordering is load-
-    // bearing for the scroll-away watcher elsewhere in this file).
-    // Captured into `remember` (not passed inline) so the one-shot
-    // consumption happens exactly once, on this composable's first
-    // composition, rather than once per recomposition. Approximates
-    // "verse N sits at LazyColumn index N" (index 0 is the chapter
-    // header) since chapters are verse-numbered 1..count without gaps in
-    // the vast majority of cases; any off-by-a-little from a rare gap is
-    // just a small correction once the real verse list loads, not a full
-    // top-of-chapter jump.
-    val initialScrollHint = remember { viewModel.consumeInitialScrollHint() }
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialScrollHint ?: 0)
-    // The seeded index above only takes effect once the LazyColumn actually
-    // has an item there — verses is still empty for a frame or more after a
-    // cold start (see the scroll-to-focus effect's own `verses.isEmpty()`
-    // guard below), so before that the list has nothing to scroll to but
-    // its single header item, and clamps to showing that regardless of the
-    // seed — a real, if brief, top-of-chapter flash before the effect can
-    // even run. Only relevant when there's a hint to honor (a genuine
-    // cold-start restore); every other mount has nothing to hide and stays
-    // visible immediately. Flipped true at the end of that same effect,
-    // once it has actually run for this composition.
-    var readyToRender by remember { mutableStateOf(initialScrollHint == null) }
+    val listState = rememberLazyListState()
 
     // Snapshots the top-visible verse into MainViewModel right before
     // ReaderScreen is torn down (visiting another tab) — see
@@ -283,23 +255,6 @@ fun ReaderScreen(
             } else {
                 listState.scrollToItem(0)
                 xrefFocusActive = false
-                // The chapter loads twice on a cold start — once
-                // immediately (possibly a live-fetch fallback), again once
-                // the one-time Bible import finishes with authoritative
-                // Room data (see MainViewModel's loadCurrentChapter doc).
-                // If the cold-start restore's target verse isn't in *this*
-                // pass's verses, don't reveal yet — the second pass a
-                // moment later should have it, and revealing now would
-                // show the top of the chapter for that gap instead of
-                // staying hidden until the real position is known. Bounded
-                // to isNewChapter (the first time this effect runs for
-                // this book/chapter): lastFocusEffectChapterKey is already
-                // updated above, so the *next* run — whether it finds the
-                // verse or not — always reveals, so a genuinely-missing
-                // verse can't hide the reader forever.
-                if (isNewChapter && targetVerseNumber == initialScrollHint) {
-                    return@LaunchedEffect
-                }
             }
         } else if (isNewChapter) {
             // No explicit jump target — this is either the very first
@@ -330,7 +285,6 @@ fun ReaderScreen(
             // position exactly where the reader already is.
             xrefFocusActive = false
         }
-        if (!readyToRender) readyToRender = true
     }
 
     // Watches for the user actually moving away from the landed verse and
@@ -1051,7 +1005,6 @@ fun ReaderScreen(
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = bottomOverlayPaddingDp),
                     modifier = Modifier
                         .fillMaxSize()
-                        .alpha(if (readyToRender) 1f else 0f)
                         .testTag("reader_verses_list")
                 ) {
                     item {
