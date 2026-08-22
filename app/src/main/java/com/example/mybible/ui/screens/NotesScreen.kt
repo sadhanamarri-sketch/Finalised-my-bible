@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.draw.clip
@@ -69,6 +70,20 @@ fun NotesScreen(
 ) {
     val notes by viewModel.notes.collectAsState(initial = emptyList())
     val tagDefinitions by viewModel.tagDefinitions.collectAsState(initial = emptyList())
+    val savedScrollIndex by viewModel.notesScrollIndex.collectAsState()
+    val savedScrollOffset by viewModel.notesScrollOffset.collectAsState()
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = savedScrollIndex,
+        initialFirstVisibleItemScrollOffset = savedScrollOffset
+    )
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.saveNotesScrollPosition(
+                listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset
+            )
+        }
+    }
     // Advanced filters (tags + date) live in a bottom sheet now, opened via
     // the compact search bar's Filter chip — search text itself is always
     // visible and never needs the sheet.
@@ -279,6 +294,7 @@ fun NotesScreen(
                 // Elevated Cards, not flat/hairline-divided rows — same
                 // treatment as Search's result list.
                 LazyColumn(
+                    state = listState,
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {

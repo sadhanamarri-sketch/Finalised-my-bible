@@ -187,6 +187,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val highlights = repository.allHighlights
     val highlightColorDefs = repository.allHighlightColorDefs
 
+    // NotesScreen is fully disposed (not just hidden) when the user
+    // switches tabs, same as Search/CrossReferenceScreen — without this,
+    // the list silently reset to the top every time you left the Notes
+    // tab and came back, even though nothing else about it had changed.
+    private val _notesScrollIndex = MutableStateFlow(0)
+    val notesScrollIndex: StateFlow<Int> = _notesScrollIndex.asStateFlow()
+
+    private val _notesScrollOffset = MutableStateFlow(0)
+    val notesScrollOffset: StateFlow<Int> = _notesScrollOffset.asStateFlow()
+
+    fun saveNotesScrollPosition(index: Int, offset: Int) {
+        _notesScrollIndex.value = index
+        _notesScrollOffset.value = offset
+    }
+
     // Feeds HighlightedVersesScreen (the "Highlighted Verses" browser tab):
     // joins the two flows above against each verse's text. Recomputes
     // whenever either the highlight set or the color labels change; verse
