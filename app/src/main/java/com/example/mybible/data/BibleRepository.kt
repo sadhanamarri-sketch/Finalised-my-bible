@@ -183,6 +183,26 @@ class BibleRepository(private val context: Context) {
         // function isn't — the caller owns the coroutine scope.
     }
 
+    // Exact verse-level resume position — separate from saveLastPosition
+    // above (called on every chapter navigation) because it's written far
+    // less often: only when the app actually backgrounds (see
+    // MainViewModel's ProcessLifecycleOwner observer), capturing whatever
+    // verse was sitting at the top of the Reader viewport at that moment.
+    // Always writes book/chapter/verse together in one call so the three
+    // stay consistent — reading last_verse back against a *different*
+    // last_book/last_chapter (e.g. saved mid-navigation) would resume at
+    // the wrong verse in the right chapter.
+    fun getLastReadVerse(): Int? {
+        val v = prefs.getInt("last_verse", -1)
+        return if (v > 0) v else null
+    }
+
+    fun saveLastReadPosition(book: String, chapter: Int, verse: Int?) {
+        val editor = prefs.edit().putString("last_book", book).putInt("last_chapter", chapter)
+        if (verse != null) editor.putInt("last_verse", verse) else editor.remove("last_verse")
+        editor.apply()
+    }
+
     fun isFirstLaunch(): Boolean {
         return prefs.getBoolean("is_first_launch", true)
     }

@@ -577,6 +577,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val (savedBook, savedChap) = repository.getLastPosition()
         _currentBook.value = savedBook
         _currentChapter.value = savedChap
+        // Resume at the exact verse the app was showing when it last went
+        // to background (see saveLastReadPosition/the ProcessLifecycleOwner
+        // observer below), not just the top of the saved chapter. Unblurred/
+        // pinned-to-top — same as toggleTeluguInline's anchor restore — since
+        // this is a silent position restore, not a "look at this verse" jump.
+        repository.getLastReadVerse()?.let { verse ->
+            _focusedVerseNumber.value = verse
+            _focusedVerseBlurEnabled.value = false
+            _focusedVersePinToTop.value = true
+        }
         loadCurrentChapter()
 
         // Study time should only accrue while the app is actually in the
@@ -587,7 +597,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // lifecycle callbacks through the ViewModel.
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) = startStudyTimer()
-            override fun onStop(owner: LifecycleOwner) = stopStudyTimer()
+            override fun onStop(owner: LifecycleOwner) {
+                stopStudyTimer()
+                // Persists an exact resume position, not just book/chapter
+                // (saveLastPosition already covers that on every chapter
+                // navigation) — liveTopVerse is kept live by ReaderScreen's
+                // own scroll-reporting effect (see reportLiveTopVerse) the
+                // whole time the app is in the foreground, so whatever it
+                // holds here is genuinely "where the user was looking" the
+                // moment they backgrounded the app, not stale.
+                repository.saveLastReadPosition(_currentBook.value, _currentChapter.value, liveTopVerse)
+            }
         })
 
         viewModelScope.launch {
@@ -654,6 +674,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // stale anchor from a much earlier visit.
     fun consumeReaderAnchor() {
         _readerAnchor.value = null
+    }
+
+    // Continuously-updated "what verse is at the top of the Reader viewport
+    // right now" — read once, synchronously, when the app actually
+    // backgrounds (see the ProcessLifecycleOwner observer in init) to
+    // persist an exact resume position to disk (saveLastReadPosition).
+    // Deliberately separate from readerAnchor above: that one is only
+    // snapshotted at tab-switch-away time and gets consumed/cleared on use,
+    // which is exactly wrong here — backgrounding the app while still on
+    // the Reader tab never triggers a tab switch, so readerAnchor would
+    // often be stale or null at the moment it's needed. A plain field (not
+    // a StateFlow) is enough since nothing needs to observe this reactively.
+    private var liveTopVerse: Int? = null
+
+    fun reportLiveTopVerse(book: String, chapter: Int, verse: Int?) {
+        if (book == _currentBook.value && chapter == _currentChapter.value) {
+            liveTopVerse = verse
+        }
     }
 
     fun loadChapter(book: String, chapter: Int) {

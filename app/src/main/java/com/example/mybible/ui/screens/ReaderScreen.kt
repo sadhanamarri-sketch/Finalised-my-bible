@@ -134,6 +134,20 @@ fun ReaderScreen(
         }
     }
 
+    // Keeps MainViewModel's liveTopVerse current for as long as Reader
+    // stays on screen — unlike the anchor above (only snapshotted at
+    // tab-switch-away), this needs to reflect the actual top-visible verse
+    // at any moment, since backgrounding the app with the home button
+    // while still on the Reader tab never disposes this composable at all.
+    // See MainViewModel.reportLiveTopVerse's doc.
+    LaunchedEffect(listState, currentBook, currentChapter, verses) {
+        snapshotFlow { listState.firstVisibleItemIndex }
+            .collect { idx ->
+                val topVerseNumber = verses.getOrNull(idx - 1)?.number
+                viewModel.reportLiveTopVerse(currentBook, currentChapter, topVerseNumber)
+            }
+    }
+
     // Per-item measured heights (px), keyed by LazyColumn item index —
     // needed to reconstruct an absolute "scrollTop"/"scrollHeight" the way
     // Capacitor's DOM scrollEl.scrollTop/scrollHeight naturally have them,
