@@ -20,6 +20,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -130,6 +131,17 @@ fun ReaderScreen(
     // top-of-chapter jump.
     val initialScrollHint = remember { viewModel.consumeInitialScrollHint() }
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialScrollHint ?: 0)
+    // The seeded index above only takes effect once the LazyColumn actually
+    // has an item there — verses is still empty for a frame or more after a
+    // cold start (see the scroll-to-focus effect's own `verses.isEmpty()`
+    // guard below), so before that the list has nothing to scroll to but
+    // its single header item, and clamps to showing that regardless of the
+    // seed — a real, if brief, top-of-chapter flash before the effect can
+    // even run. Only relevant when there's a hint to honor (a genuine
+    // cold-start restore); every other mount has nothing to hide and stays
+    // visible immediately. Flipped true at the end of that same effect,
+    // once it has actually run for this composition.
+    var readyToRender by remember { mutableStateOf(initialScrollHint == null) }
 
     // Snapshots the top-visible verse into MainViewModel right before
     // ReaderScreen is torn down (visiting another tab) — see
@@ -301,6 +313,7 @@ fun ReaderScreen(
             // position exactly where the reader already is.
             xrefFocusActive = false
         }
+        if (!readyToRender) readyToRender = true
     }
 
     // Watches for the user actually moving away from the landed verse and
@@ -1021,6 +1034,7 @@ fun ReaderScreen(
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = bottomOverlayPaddingDp),
                     modifier = Modifier
                         .fillMaxSize()
+                        .alpha(if (readyToRender) 1f else 0f)
                         .testTag("reader_verses_list")
                 ) {
                     item {
