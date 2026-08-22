@@ -225,6 +225,51 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _highlightsReturnAvailable = MutableStateFlow(false)
     val highlightsReturnAvailable: StateFlow<Boolean> = _highlightsReturnAvailable.asStateFlow()
 
+    // Same pattern, for StudiedScreen's two jump-to-Reader entry points
+    // ("Recently Studied" card, verse grid selection) — neither of those
+    // used to set any return flag at all, so system back after either one
+    // fell through with nothing to catch it and exited/backgrounded the
+    // app instead of doing anything sensible.
+    private val _studiedReturnAvailable = MutableStateFlow(false)
+    val studiedReturnAvailable: StateFlow<Boolean> = _studiedReturnAvailable.asStateFlow()
+
+    fun markStudiedNavigation() {
+        _studiedReturnAvailable.value = true
+    }
+
+    fun returnToStudied() {
+        _studiedReturnAvailable.value = false
+        selectTab(NavTab.STUDIED)
+    }
+
+    fun dismissStudiedReturnBanner() {
+        _studiedReturnAvailable.value = false
+    }
+
+    // StudiedScreen's own book/chapter drill-down + book-list scroll
+    // position — same reasoning as notesScrollIndex/Offset: the screen is
+    // fully disposed on a tab switch, so without this, leaving mid-browse
+    // and coming back always reset to the top-level dashboard instead of
+    // wherever you'd drilled into.
+    private val _studiedSelectedBook = MutableStateFlow<String?>(null)
+    val studiedSelectedBook: StateFlow<String?> = _studiedSelectedBook.asStateFlow()
+
+    private val _studiedSelectedChapter = MutableStateFlow<Int?>(null)
+    val studiedSelectedChapter: StateFlow<Int?> = _studiedSelectedChapter.asStateFlow()
+
+    private val _studiedBookListScrollIndex = MutableStateFlow(0)
+    val studiedBookListScrollIndex: StateFlow<Int> = _studiedBookListScrollIndex.asStateFlow()
+
+    private val _studiedBookListScrollOffset = MutableStateFlow(0)
+    val studiedBookListScrollOffset: StateFlow<Int> = _studiedBookListScrollOffset.asStateFlow()
+
+    fun saveStudiedScreenState(book: String?, chapter: Int?, scrollIndex: Int, scrollOffset: Int) {
+        _studiedSelectedBook.value = book
+        _studiedSelectedChapter.value = chapter
+        _studiedBookListScrollIndex.value = scrollIndex
+        _studiedBookListScrollOffset.value = scrollOffset
+    }
+
     // Used by HighlightedVersesScreen when the user taps a result: jump the
     // Reader to that verse and switch back to it, same as tapping a Studied
     // or Search result does.

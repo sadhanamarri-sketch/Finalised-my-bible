@@ -97,6 +97,7 @@ fun ReaderScreen(
     val lexiconReturnTab by viewModel.lexiconReturnTab.collectAsState()
     val noteReturnItem by viewModel.noteReturnItem.collectAsState()
     val highlightsReturnAvailable by viewModel.highlightsReturnAvailable.collectAsState()
+    val studiedReturnAvailable by viewModel.studiedReturnAvailable.collectAsState()
     val readerAnchor by viewModel.readerAnchor.collectAsState()
 
     val completedVerses by viewModel.completedVerses.collectAsState(initial = emptyList())
@@ -375,7 +376,7 @@ fun ReaderScreen(
     // a cross-reference back-bar is showing, a sheet/menu is open, or a
     // verse is selected (selection already swaps the pill for the action
     // toolbar, but this also covers the moment the toolbar is dismissing).
-    val canHideBars = !crossReferenceReturnAvailable && !searchReturnAvailable && lexiconReturnTab == null && noteReturnItem == null && !highlightsReturnAvailable && !showReaderMenu && selectedVerse == null &&
+    val canHideBars = !crossReferenceReturnAvailable && !searchReturnAvailable && lexiconReturnTab == null && noteReturnItem == null && !highlightsReturnAvailable && !studiedReturnAvailable && !showReaderMenu && selectedVerse == null &&
         readerPickMode == ReaderPickMode.NONE &&
         readerPickMode == ReaderPickMode.NONE
 
@@ -828,6 +829,73 @@ fun ReaderScreen(
                         }
                         IconButton(
                             onClick = { viewModel.dismissHighlightsReturnBanner() },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Dismiss",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // "Return to Studied" banner — shown after jumping in from
+            // StudiedScreen's "Recently Studied" card or its verse grid,
+            // same reasoning as the highlighted-verses banner above
+            // (Studied is its own destination too, no "origin verse" to
+            // undo back to). Mutually exclusive with all 5 banners above,
+            // same fixed top slot. Same neutral surfaceContainerHigh
+            // treatment as the highlights banner — the two are never shown
+            // at once, so sharing that look isn't confusing in practice.
+            if (readerPickMode == ReaderPickMode.NONE && !crossReferenceReturnAvailable && !searchReturnAvailable && lexiconReturnTab == null && noteReturnItem == null && !highlightsReturnAvailable && studiedReturnAvailable) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = "Studied",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Return to Studied",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Button(
+                                onClick = { viewModel.returnToStudied() },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                ),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                modifier = Modifier.height(30.dp)
+                            ) {
+                                Text("Return", fontSize = 12.sp)
+                            }
+                        }
+                        IconButton(
+                            onClick = { viewModel.dismissStudiedReturnBanner() },
                             modifier = Modifier.size(24.dp)
                         ) {
                             Icon(

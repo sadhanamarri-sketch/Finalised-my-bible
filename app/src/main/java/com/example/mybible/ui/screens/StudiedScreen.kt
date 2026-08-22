@@ -1,5 +1,6 @@
 package com.example.mybible.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -85,9 +86,47 @@ fun StudiedScreen(
     val otTotalVerses by viewModel.otTotalVerses.collectAsState()
     val ntTotalVerses by viewModel.ntTotalVerses.collectAsState()
 
-    var selectedBook by remember { mutableStateOf<String?>(null) }
-    var selectedChapter by remember { mutableStateOf<Int?>(null) }
-    val listState = rememberLazyListState()
+    // Remembered across a tab visit — StudiedScreen is fully disposed (not
+    // just hidden) on a tab switch, so without this, leaving mid-browse and
+    // coming back always reset to the top-level dashboard instead of
+    // wherever you'd drilled into. Same reasoning/pattern as
+    // notesScrollIndex/Offset.
+    val savedSelectedBook by viewModel.studiedSelectedBook.collectAsState()
+    val savedSelectedChapter by viewModel.studiedSelectedChapter.collectAsState()
+    val savedScrollIndex by viewModel.studiedBookListScrollIndex.collectAsState()
+    val savedScrollOffset by viewModel.studiedBookListScrollOffset.collectAsState()
+
+    var selectedBook by remember { mutableStateOf(savedSelectedBook) }
+    var selectedChapter by remember { mutableStateOf(savedSelectedChapter) }
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = savedScrollIndex,
+        initialFirstVisibleItemScrollOffset = savedScrollOffset
+    )
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.saveStudiedScreenState(
+                selectedBook,
+                selectedChapter,
+                listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset
+            )
+        }
+    }
+
+    // System back used to always exit straight to Reader regardless of how
+    // deep the book/chapter/verse drill-down was, since the only back
+    // handling that existed lived in MainActivity with no visibility into
+    // this screen's own local state — a jarring mismatch with the visible
+    // back-arrow above, which steps out one level at a time. Enabled only
+    // while at least one level deep; at the top level this falls through
+    // to MainActivity's blanket handler (-> Reader), matching the arrow's
+    // own top-level behavior.
+    BackHandler(enabled = selectedChapter != null || selectedBook != null) {
+        when {
+            selectedChapter != null -> selectedChapter = null
+            selectedBook != null -> selectedBook = null
+        }
+    }
 
     val otCount = remember { BIBLE_BOOKS.indexOf("Matthew") }
 
@@ -185,6 +224,7 @@ fun StudiedScreen(
                         dayLabel = recentDayLabel,
                         groups = recentGroups,
                         onGroupClick = { group ->
+                            viewModel.markStudiedNavigation()
                             viewModel.disableBlurModeForNavigation()
                             viewModel.jumpToVerse(group.book, group.chapter, group.verses.min())
                             viewModel.selectTab(NavTab.READER)
@@ -246,6 +286,7 @@ fun StudiedScreen(
                         onVerseSelected = { verse ->
                             // Browsing into a chapter here, not spotlighting
                             // one verse — no focus-blur (see jumpToVerse).
+                            viewModel.markStudiedNavigation()
                             viewModel.disableBlurModeForNavigation()
                             viewModel.jumpToVerse(selectedBook!!, selectedChapter!!, verse, focusVerse = false)
                             selectedBook = null
