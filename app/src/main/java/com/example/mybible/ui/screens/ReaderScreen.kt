@@ -303,13 +303,28 @@ fun ReaderScreen(
     // that alone meant this effect never ran for that case and
     // focusedVerseNumber stayed set forever. See clearVerseFocus()'s doc
     // for what that broke.
+    //
+    // Also clears whichever "return to X" banner flag brought us here
+    // (clearStaleReaderDetours, not just clearVerseFocus) — every jump that
+    // sets focusedVerseNumber (openHighlightedVerse, markStudiedNavigation,
+    // openSearchResult, navigateToCrossReference, the lexicon/note "Open in
+    // Reader" actions) also flips one of the six detour flags, and until
+    // now *only* the banner's own Return/dismiss button cleared it. Scroll
+    // away without ever touching that banner (extremely easy to do — just
+    // keep reading) and the flag stayed stuck true indefinitely, which
+    // silently disables every position save gated on isDetourActive() —
+    // including the exact-verse resume the widget's Continue Reading
+    // depends on — for the rest of the session. Scrolling away is exactly
+    // the "settled here" signal isDetourActive's own doc calls for, so
+    // this is the same rule the explicit dismiss already applies, just
+    // triggered automatically instead of requiring a tap nothing prompts.
     LaunchedEffect(focusedVerseNumber, xrefFocusLandedIndex, xrefFocusLandedOffset) {
         if (focusedVerseNumber == null) return@LaunchedEffect
         snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
             .collect { (idx, offset) ->
                 if (idx != xrefFocusLandedIndex || kotlin.math.abs(offset - xrefFocusLandedOffset) > 4) {
                     xrefFocusActive = false
-                    viewModel.clearVerseFocus()
+                    viewModel.clearStaleReaderDetours()
                 }
             }
     }

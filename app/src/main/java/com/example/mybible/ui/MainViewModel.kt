@@ -1141,9 +1141,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Clears every "return to X" detour flag (cross-reference/search/
-    // lexicon/note/highlights/studied) plus any leftover verse focus —
-    // used by entry points that arrive at Reader from *outside* the app
-    // (the home screen widget), as opposed to in-app navigation.
+    // lexicon/note/highlights/studied) plus any leftover verse focus. Two
+    // callers: entry points that arrive at Reader from *outside* the app
+    // (the home screen widget), and ReaderScreen's own "scrolled away from
+    // the landed verse" watcher — the latter is what makes this the
+    // *general* answer to "the user has settled here," not just a widget-
+    // specific cleanup: without it, a detour flag set by jumping in from
+    // Highlighted Verses/Studied/Search/Cross-Ref/Lexicon/Notes stayed
+    // stuck true for the rest of the session unless the user happened to
+    // tap that banner's own Return/dismiss button, silently blocking every
+    // isDetourActive()-gated position save (including the widget's exact-
+    // verse resume) from then on.
     //
     // Without this: these flags are plain in-memory state, so backgrounding
     // the app mid-detour (e.g. having followed a cross-reference, then
