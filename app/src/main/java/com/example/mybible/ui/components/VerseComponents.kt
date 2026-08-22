@@ -198,14 +198,6 @@ fun VerseCard(
         // real to fill and silently collapses to zero instead of matching
         // the verse text's height.
         Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-            if (highlightColor != null) {
-                Box(
-                    modifier = Modifier
-                        .width(3.dp)
-                        .fillMaxHeight()
-                        .background(highlightColor)
-                )
-            }
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -445,6 +437,14 @@ fun VerseCard(
                 // the toolbar's toggle state when the verse is selected, and
                 // stamping every studied verse with a checkmark just added
                 // visual noise to a chapter you already know you've read.
+            }
+            if (highlightColor != null) {
+                Box(
+                    modifier = Modifier
+                        .width(3.dp)
+                        .fillMaxHeight()
+                        .background(highlightColor)
+                )
             }
             }
         }
