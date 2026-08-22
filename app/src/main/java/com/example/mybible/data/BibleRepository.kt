@@ -78,8 +78,12 @@ class BibleRepository(private val context: Context) {
 
     private val bibleDao: BibleDao = AppDatabase.getInstance(context).bibleDao()
 
-    /** Runs the one-time KJV download + Telugu asset import; see [BibleDataInitializer]. */
-    val dataInitializer = BibleDataInitializer(context, bibleDao)
+    /** Runs the one-time KJV download + Telugu asset import; see [BibleDataInitializer].
+     *  A process-wide singleton (BibleDataInitializer.getInstance), not a fresh
+     *  instance per BibleRepository — MainViewModel and BibleDataImportWorker
+     *  each construct their own BibleRepository but must share the same
+     *  underlying progress/errorMessage state. */
+    val dataInitializer = BibleDataInitializer.getInstance(context, bibleDao)
 
     // Memory cache for fetched English chapter verses
     private val kjvCache = mutableMapOf<String, List<Verse>>()

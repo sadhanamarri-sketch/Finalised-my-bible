@@ -5,6 +5,14 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- BibleDataImportWorker (see data/BibleDataImportWorker.kt) runs the
+         one-time KJV/Greek/Hebrew/cross-reference download as WorkManager
+         foreground work so it survives the app being backgrounded — both
+         permissions are required for a foreground service of type
+         "dataSync" on Android 14+ (API 34). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"

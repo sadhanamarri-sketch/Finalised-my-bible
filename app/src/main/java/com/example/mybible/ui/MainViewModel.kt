@@ -13,6 +13,7 @@ import com.example.mybible.HighlightedVerseItem
 import com.example.mybible.StudyStats
 import com.example.mybible.StudySummary
 import com.example.mybible.buildHighlightedVerseItems
+import com.example.mybible.data.BibleDataImportWorker
 import com.example.mybible.data.BibleRepository
 import com.example.mybible.data.DriveBackupManager
 import com.example.mybible.data.DriveSyncWorker
@@ -632,8 +633,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         })
 
+        // Runs as WorkManager foreground work (see BibleDataImportWorker)
+        // instead of a plain coroutine here, so the one-time download
+        // actually survives the app being backgrounded. enqueue() is safe
+        // to call on every launch (KEEP policy — a finished or in-progress
+        // run is left alone); awaitCompletion() below just waits for
+        // whatever that run is to reach a terminal state, then does the
+        // same on-screen refresh the old direct ensureImported() call did.
+        BibleDataImportWorker.enqueue(appContext)
         viewModelScope.launch {
-            repository.dataInitializer.ensureImported()
+            BibleDataImportWorker.awaitCompletion(appContext)
             // Once the import finishes, refresh whatever chapter is on screen
             // so it picks up Room data (Telugu text, etc.) instead of
             // whatever the live-fetch fallback returned while it was running.
@@ -647,8 +656,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun retryBibleDataImport() {
+        BibleDataImportWorker.enqueueRetry(appContext)
         viewModelScope.launch {
-            repository.dataInitializer.retry()
+            BibleDataImportWorker.awaitCompletion(appContext)
             loadCurrentChapter()
         }
     }

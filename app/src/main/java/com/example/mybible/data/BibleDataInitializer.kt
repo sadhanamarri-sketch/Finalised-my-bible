@@ -87,7 +87,7 @@ data class ImportProgress(
  * experience (same philosophy as the Capacitor app), so they fail quietly
  * and are simply retried on the next launch.
  */
-class BibleDataInitializer(
+class BibleDataInitializer private constructor(
     private val context: Context,
     private val dao: BibleDao
 ) {
@@ -225,5 +225,20 @@ class BibleDataInitializer(
             e.printStackTrace()
             // Quiet failure — falls back to the old hardcoded cross-references.
         }
+    }
+
+    companion object {
+        @Volatile private var instance: BibleDataInitializer? = null
+
+        // A single process-wide instance — its progress/errorMessage
+        // StateFlows and "attempted this session" bookkeeping need to be
+        // shared by every caller, not reset/duplicated each time a new
+        // BibleRepository is constructed (MainViewModel and
+        // BibleDataImportWorker each build their own BibleRepository, but
+        // must observe/drive the exact same import state).
+        fun getInstance(context: Context, dao: BibleDao): BibleDataInitializer =
+            instance ?: synchronized(this) {
+                instance ?: BibleDataInitializer(context.applicationContext, dao).also { instance = it }
+            }
     }
 }
