@@ -485,7 +485,11 @@ fun VerseActionToolbar(
     // note (added before this verse was ever highlighted), and that must
     // not hide the quick-note row for a highlight that has no note of its
     // own yet.
-    highlightHasLinkedNote: Boolean = false
+    highlightHasLinkedNote: Boolean = false,
+    // Long-press a swatch to rename it — see RenameHighlightColorDialog.
+    // Null hides nothing (there's no separate affordance to hide), it just
+    // makes long-press a no-op.
+    onRenameColor: ((HighlightColorDef) -> Unit)? = null
 ) {
     Surface(
         modifier = modifier
@@ -612,7 +616,11 @@ fun VerseActionToolbar(
             // no add/manage flow. Horizontally scrollable since 12 swatches
             // plus Clear doesn't comfortably fit most screens at once.
             Column(modifier = Modifier.fillMaxWidth()) {
-                Text("Highlight:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    text = if (onRenameColor != null) "Highlight: (long-press a color to rename)" else "Highlight:",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier
@@ -643,7 +651,8 @@ fun VerseActionToolbar(
                             label = def.label,
                             swatchColor = parseHexColorOrNull(def.colorHex) ?: Color.Gray,
                             isActive = isActive,
-                            onClick = { onSetHighlight(if (isActive) "" else def.colorHex) }
+                            onClick = { onSetHighlight(if (isActive) "" else def.colorHex) },
+                            onLongClick = onRenameColor?.let { rename -> { rename(def) } }
                         )
                     }
                 }
@@ -707,6 +716,7 @@ private fun notePreviewLine(note: NoteItem, maxChars: Int = 90): String {
 /** One labeled swatch in the highlight-color row: circle + short label
  *  underneath, checkmark overlay when active — matches Capacitor's
  *  `.hl-swatch-item` (dot + `.hl-label`, `.active` shows a check). */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun HighlightSwatchItem(
     label: String,
@@ -715,13 +725,16 @@ private fun HighlightSwatchItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     outlineOnly: Boolean = false,
-    content: (@Composable () -> Unit)? = null
+    content: (@Composable () -> Unit)? = null,
+    // Long-press to rename — see RenameHighlightColorDialog. Null on the
+    // Clear swatch, which isn't a real color and has nothing to rename.
+    onLongClick: (() -> Unit)? = null
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
             .width(48.dp)
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
     ) {
         Box(
             modifier = Modifier

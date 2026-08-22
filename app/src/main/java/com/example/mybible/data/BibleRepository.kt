@@ -11,7 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -336,9 +336,17 @@ class BibleRepository(private val context: Context) {
     private val _highlightsFlow = MutableStateFlow<List<HighlightItem>>(loadHighlightsFromPrefs())
     val allHighlights: Flow<List<HighlightItem>> = _highlightsFlow.asStateFlow()
 
-    // Fixed set now (see model/HighlightColors.kt) — no per-user add/rename/
-    // disable, so this is a constant flow rather than prefs-backed state.
-    val allHighlightColorDefs: Flow<List<HighlightColorDef>> = flowOf(HIGHLIGHT_COLOR_DEFS)
+    // Fixed set of colors now (see model/HighlightColors.kt) — no add/
+    // delete/enable-disable — but a label can still be renamed, so this
+    // stays a real flow: the base palette with any saved label overrides
+    // applied on top.
+    private val _highlightColorLabelOverridesFlow =
+        MutableStateFlow<Map<String, String>>(loadHighlightColorLabelOverridesFromPrefs())
+    val allHighlightColorDefs: Flow<List<HighlightColorDef>> =
+        _highlightColorLabelOverridesFlow.map { overrides -> resolvedHighlightColorDefs(overrides) }
+
+    private fun resolvedHighlightColorDefs(overrides: Map<String, String>): List<HighlightColorDef> =
+        HIGHLIGHT_COLOR_DEFS.map { def -> overrides[def.colorHex]?.let { def.copy(label = it) } ?: def }
 
     private fun loadNotesFromPrefs(): List<NoteItem> {
         val str = prefs.getString("saved_notes_json", null) ?: return emptyList()
@@ -406,6 +414,25 @@ class BibleRepository(private val context: Context) {
     private fun saveHighlightsToPrefs(list: List<HighlightItem>) {
         _highlightsFlow.value = list
         prefs.edit().putString("saved_highlights_json", json.encodeToString(list)).apply()
+    }
+
+    // Keyed by colorHex (a color's fixed identity — see model/HighlightColors.kt),
+    // not by the whole HighlightColorDef, since the hex/swatch itself can't
+    // change anymore — only the label.
+    private fun loadHighlightColorLabelOverridesFromPrefs(): Map<String, String> {
+        val str = prefs.getString("highlight_color_label_overrides_json", null) ?: return emptyMap()
+        return try { json.decodeFromString(str) } catch (e: Exception) { emptyMap() }
+    }
+
+    private fun saveHighlightColorLabelOverridesToPrefs(map: Map<String, String>) {
+        _highlightColorLabelOverridesFlow.value = map
+        prefs.edit().putString("highlight_color_label_overrides_json", json.encodeToString(map)).apply()
+    }
+
+    suspend fun renameHighlightColor(colorHex: String, newLabel: String) {
+        val current = _highlightColorLabelOverridesFlow.value.toMutableMap()
+        current[colorHex] = newLabel
+        saveHighlightColorLabelOverridesToPrefs(current)
     }
 
     // Load Telugu translation from assets
@@ -1190,9 +1217,7 @@ class BibleRepository(private val context: Context) {
             tagDefs = _tagDefinitionsFlow.value,
             completed = _completedVersesFlow.value,
             highlights = _highlightsFlow.value,
-            // Fixed now (see model/HighlightColors.kt) — included only so
-            // older builds reading this backup still find the key present.
-            highlightColorDefs = HIGHLIGHT_COLOR_DEFS,
+            highlightColorDefs = resolvedHighlightColorDefs(_highlightColorLabelOverridesFlow.value),
             tombstones = SyncTombstones(_tombstonesFlow.value)
         )
         json.encodeToString(data)
@@ -1206,7 +1231,8 @@ class BibleRepository(private val context: Context) {
         val notesUpdated: Int,
         val tagsAdded: Int,
         val completedAdded: Int,
-        val highlightsAdded: Int
+        val highlightsAdded: Int,
+        val colorsRelabeled: Int
     )
 
     /** Restores from a backup produced by [exportBackupJson] (this device,
@@ -1364,15 +1390,31 @@ class BibleRepository(private val context: Context) {
         saveHighlightsToPrefs(mergedHighlights)
 
         // Highlight colors are fixed now (see model/HighlightColors.kt) —
-        // `data.highlightColorDefs` is read by older builds only, nothing
-        // to merge on this one.
+        // only a label can still differ from the default, so this merges
+        // label overrides by colorHex rather than whole defs. A hex the
+        // fixed palette no longer has is dropped rather than resurrected;
+        // a matching hex with a non-default label applies as an override,
+        // same "restoring is deliberate, backup wins" rule labels used
+        // before this feature was briefly removed and re-added.
+        val knownHexes = HIGHLIGHT_COLOR_DEFS.associateBy { it.colorHex }
+        val mergedOverrides = _highlightColorLabelOverridesFlow.value.toMutableMap()
+        var colorsRelabeled = 0
+        for (incoming in data.highlightColorDefs) {
+            val default = knownHexes[incoming.colorHex] ?: continue
+            if (incoming.label != default.label && mergedOverrides[incoming.colorHex] != incoming.label) {
+                mergedOverrides[incoming.colorHex] = incoming.label
+                colorsRelabeled++
+            }
+        }
+        saveHighlightColorLabelOverridesToPrefs(mergedOverrides)
 
         ImportResult(
             notesAdded = notesAdded,
             notesUpdated = notesUpdated,
             tagsAdded = tagsAdded,
             completedAdded = completedAdded,
-            highlightsAdded = highlightsAdded
+            highlightsAdded = highlightsAdded,
+            colorsRelabeled = colorsRelabeled
         )
     }
 

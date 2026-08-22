@@ -42,8 +42,10 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import kotlinx.coroutines.delay
 import com.example.mybible.model.CompletedVerseItem
+import com.example.mybible.model.HighlightColorDef
 import com.example.mybible.model.HighlightItem
 import com.example.mybible.model.NoteItem
+import com.example.mybible.ui.components.RenameHighlightColorDialog
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.ReaderPickMode
@@ -1146,6 +1148,23 @@ fun ReaderScreen(
             }
         }
 
+        // Which color's rename dialog is open, if any — rendered as its
+        // own AlertDialog (a separate window), so its position in this Box
+        // doesn't matter — declared once here rather than nested inside the
+        // toolbar branch below so it isn't torn down if the toolbar itself
+        // closes while the rename dialog is still open.
+        var colorToRename by remember { mutableStateOf<HighlightColorDef?>(null) }
+        colorToRename?.let { def ->
+            RenameHighlightColorDialog(
+                colorDef = def,
+                onDismiss = { colorToRename = null },
+                onRename = { newLabel ->
+                    viewModel.renameHighlightColor(def.colorHex, newLabel)
+                    colorToRename = null
+                }
+            )
+        }
+
         // Floating Action Toolbar for selected verse
         if (selectedVerse != null) {
             val verse = selectedVerse!!
@@ -1203,6 +1222,7 @@ fun ReaderScreen(
                 onDismiss = {
                     viewModel.setSelectedVerse(null)
                 },
+                onRenameColor = { def -> colorToRename = def },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 12.dp)

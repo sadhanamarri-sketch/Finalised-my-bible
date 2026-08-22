@@ -33,6 +33,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import com.example.mybible.model.EnglishDictionaryEntry
+import com.example.mybible.model.HighlightColorDef
 
 // A YYYY-MM-DD text field with a calendar icon that opens a native
 // DatePickerDialog. Typing is still allowed (e.g. for quick edits or
@@ -304,6 +305,47 @@ fun VerseMentionPreviewSheet(
     }
 }
 
+/** Renames one fixed highlight color's label — the one piece of the old
+ *  "Manage Highlight Colors" sheet kept after the rest (add/delete/
+ *  enable-disable) was dropped for the fixed 12-color palette; see
+ *  model/HighlightColors.kt. Triggered by long-pressing a swatch in
+ *  VerseActionToolbar's highlight row (VerseComponents.kt). */
+@Composable
+fun RenameHighlightColorDialog(
+    colorDef: HighlightColorDef,
+    onDismiss: () -> Unit,
+    onRename: (newLabel: String) -> Unit
+) {
+    var label by remember(colorDef.colorHex) { mutableStateOf(colorDef.label) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rename Color") },
+        text = {
+            OutlinedTextField(
+                value = label,
+                onValueChange = { label = it },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val trimmed = label.trim()
+                    if (trimmed.isNotEmpty()) onRename(trimmed)
+                },
+                enabled = label.trim().isNotEmpty()
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
 
 /** "6:00 AM" / "9:00 PM" style label for an hour-of-day (0-23), no minutes
  *  — reminders only ever fire on the hour, so a full HH:MM time picker

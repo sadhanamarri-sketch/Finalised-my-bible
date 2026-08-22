@@ -1426,6 +1426,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // Rename a highlight color's label — the one piece of the old "Manage
+    // Highlight Colors" flow kept after the rest (add/delete/enable-disable)
+    // was removed in favor of the fixed palette; see model/HighlightColors.kt.
+    fun renameHighlightColor(colorHex: String, newLabel: String) {
+        viewModelScope.launch { repository.renameHighlightColor(colorHex, newLabel) }
+    }
+
     // Which tab NoteReaderScreen was opened from — the Notes tab (tapping a
     // note card there) or straight from Reader (the verse action toolbar's
     // "View notes", when a verse has exactly one existing note and there's
@@ -2023,7 +2030,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val result = repository.importFromBackup(jsonText)
                 _backupStatusMessage.value = "Restored: ${result.notesAdded} new notes, " +
                     "${result.notesUpdated} updated, ${result.highlightsAdded} new highlights, " +
-                    "${result.completedAdded} new completed verses, ${result.tagsAdded} new tags"
+                    "${result.completedAdded} new completed verses, ${result.tagsAdded} new tags, " +
+                    "${result.colorsRelabeled} colors relabeled"
             } catch (e: Exception) {
                 _backupStatusMessage.value = "Couldn't read that backup file"
             }
@@ -2111,7 +2119,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         repository.setLastDriveRestoreAt(now)
                         _lastDriveRestoreAt.value = now
                         _backupStatusMessage.value = "Restored from Drive: ${importResult.notesAdded} new notes, " +
-                            "${importResult.notesUpdated} updated, ${importResult.highlightsAdded} new highlights"
+                            "${importResult.notesUpdated} updated, ${importResult.highlightsAdded} new highlights, " +
+                            "${importResult.colorsRelabeled} colors relabeled"
                     } catch (e: Exception) {
                         _backupStatusMessage.value = "Couldn't read the Drive backup"
                     }
