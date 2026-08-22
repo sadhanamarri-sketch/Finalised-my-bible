@@ -288,7 +288,16 @@ class MainActivity : ComponentActivity() {
                 // viewed result happened to leave currentBook/currentChapter
                 // (e.g. Genesis 22). Mirrors cross-reference/lexicon's
                 // "system back means take me back to where I was."
-                if (activeTab == NavTab.SEARCH) viewModel.backToSearchSourceVerse()
+                // Same reasoning for Highlights/Studied/Notes: exiting one
+                // of those tabs entirely restores wherever Reader actually
+                // was before, rather than wherever the last jump left it.
+                when (activeTab) {
+                    NavTab.SEARCH -> viewModel.backToSearchSourceVerse()
+                    NavTab.HIGHLIGHTS -> viewModel.backToHighlightsSourceVerse()
+                    NavTab.STUDIED -> viewModel.backToStudiedSourceVerse()
+                    NavTab.NOTES -> viewModel.backToNotesSourceVerse()
+                    else -> {}
+                }
                 viewModel.selectTab(NavTab.READER)
             }
             BackHandler(enabled = activeTab == NavTab.GREEK_WORD) {
@@ -414,7 +423,10 @@ class MainActivity : ComponentActivity() {
                                     highlights = highlightedItems,
                                     themeMode = themeMode,
                                     onOpenVerse = { viewModel.openHighlightedVerse(it) },
-                                    onClose = { viewModel.selectTab(NavTab.READER) }
+                                    onClose = {
+                                        viewModel.backToHighlightsSourceVerse()
+                                        viewModel.selectTab(NavTab.READER)
+                                    }
                                 )
                             }
                             NavTab.SETTINGS -> SettingsScreen(

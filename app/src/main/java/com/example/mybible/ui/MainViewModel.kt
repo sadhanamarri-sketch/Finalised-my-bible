@@ -242,14 +242,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // Whether a "return to highlighted verses" banner should be showing in
     // the Reader — set when a highlighted-verse result is tapped, cleared
-    // when the user either returns via the banner or dismisses it. Same
-    // pattern as _searchReturnAvailable: Highlighted Verses has no "origin
-    // verse" to undo back to either (you opened it as its own destination,
-    // not from a specific verse while reading), so both the banner's Return
-    // button and system back should land you back on that list, not some
-    // verse you were reading before.
+    // when the user either returns via the banner or dismisses it. The
+    // banner's own Return button still goes to that list (same as
+    // returnToSearchResults for search) — but fully exiting Highlights back
+    // to Reader (its own close button, or system back from that tab) now
+    // restores wherever Reader actually was before, via
+    // _highlightsSourceVerse below, same as search/cross-reference/lexicon.
     private val _highlightsReturnAvailable = MutableStateFlow(false)
     val highlightsReturnAvailable: StateFlow<Boolean> = _highlightsReturnAvailable.asStateFlow()
+
+    // Mirrors _searchSourceVerse: Reader's actual position before this
+    // detour started, captured once (openHighlightedVerse guards on
+    // already-set) and restored by backToHighlightsSourceVerse when the
+    // Highlights tab is exited entirely.
+    private val _highlightsSourceVerse = MutableStateFlow<ReaderScrollAnchor?>(null)
 
     // Same pattern, for StudiedScreen's two jump-to-Reader entry points
     // ("Recently Studied" card, verse grid selection) — neither of those
@@ -259,7 +265,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _studiedReturnAvailable = MutableStateFlow(false)
     val studiedReturnAvailable: StateFlow<Boolean> = _studiedReturnAvailable.asStateFlow()
 
+    // Mirrors _highlightsSourceVerse above, for Studied.
+    private val _studiedSourceVerse = MutableStateFlow<ReaderScrollAnchor?>(null)
+
+    private fun captureReaderSourceVerseIfNeeded(existing: MutableStateFlow<ReaderScrollAnchor?>) {
+        if (existing.value != null) return
+        val anchor = _readerAnchor.value
+        val sourceVerseNumber = anchor?.takeIf {
+            it.book == _currentBook.value && it.chapter == _currentChapter.value
+        }?.verse ?: 1
+        existing.value = ReaderScrollAnchor(_currentBook.value, _currentChapter.value, sourceVerseNumber)
+    }
+
     fun markStudiedNavigation() {
+        captureReaderSourceVerseIfNeeded(_studiedSourceVerse)
         _studiedReturnAvailable.value = true
     }
 
@@ -270,6 +289,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun dismissStudiedReturnBanner() {
         _studiedReturnAvailable.value = false
+    }
+
+    // System back / Studied's own back arrow when fully exiting the tab
+    // (not the banner's Return button, which still goes to Studied — see
+    // returnToStudied) — restores wherever Reader actually was before this
+    // detour, same as backToSearchSourceVerse/backToHighlightsSourceVerse.
+    fun backToStudiedSourceVerse() {
+        val source = _studiedSourceVerse.value
+        _studiedSourceVerse.value = null
+        _studiedReturnAvailable.value = false
+        if (source != null) {
+            jumpToVerse(source.book, source.chapter, source.verse)
+            _isBlurModeEnabled.value = false
+        }
     }
 
     // StudiedScreen's own book/chapter drill-down + book-list scroll
@@ -300,12 +333,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Reader to that verse and switch back to it, same as tapping a Studied
     // or Search result does.
     fun openHighlightedVerse(item: HighlightedVerseItem) {
+        captureReaderSourceVerseIfNeeded(_highlightsSourceVerse)
         _highlightsReturnAvailable.value = true
         jumpToVerse(item.book, item.chapter, item.verse)
         // Same reasoning as navigateToCrossReference — you tapped this to
         // read the verse, blur mode would hide the very thing you came for.
         _isBlurModeEnabled.value = false
         selectTab(NavTab.READER)
+    }
+
+    // System back / HighlightedVersesScreen's own close button when fully
+    // exiting the tab (not the banner's Return button, which still goes to
+    // Highlights — see returnToHighlightedVerses) — restores wherever
+    // Reader actually was before this detour, same as
+    // backToSearchSourceVerse/backToStudiedSourceVerse.
+    fun backToHighlightsSourceVerse() {
+        val source = _highlightsSourceVerse.value
+        _highlightsSourceVerse.value = null
+        _highlightsReturnAvailable.value = false
+        if (source != null) {
+            jumpToVerse(source.book, source.chapter, source.verse)
+            _isBlurModeEnabled.value = false
+        }
     }
 
     fun returnToHighlightedVerses() {
@@ -505,8 +554,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _noteReturnItem = MutableStateFlow<NoteItem?>(null)
     val noteReturnItem: StateFlow<NoteItem?> = _noteReturnItem.asStateFlow()
 
+    // Where Reader actually was before the user ever went to the Notes tab
+    // — separate from _noteReturnItem above, which only tracks "which note
+    // to reopen" one step at a time. A verse-mention jump can nest several
+    // notes deep (note A's mention -> Reader -> back to note A -> back to
+    // notes list), and each of those steps disposes/remounts Reader — which
+    // would clobber a shared anchor like readerAnchor — so this is captured
+    // once (guarded, see captureReaderSourceVerseIfNeeded) the first time a
+    // note-mention jump happens, and only consumed when the Notes tab is
+    // exited entirely (see backToNotesSourceVerse), not by the individual
+    // note-mention "return to note" steps in between.
+    private val _notesSourceVerse = MutableStateFlow<ReaderScrollAnchor?>(null)
+
     fun setNoteReturnItem(note: NoteItem) {
+        captureReaderSourceVerseIfNeeded(_notesSourceVerse)
         _noteReturnItem.value = note
+    }
+
+    // Called when the Notes tab is exited entirely — its own back arrow, or
+    // system back from the Notes list (not from within a note or its
+    // "return to note" banner, which keep working as before). Restores
+    // wherever Reader actually was before the user ever opened Notes.
+    fun backToNotesSourceVerse() {
+        val source = _notesSourceVerse.value
+        _notesSourceVerse.value = null
+        if (source != null) {
+            jumpToVerse(source.book, source.chapter, source.verse)
+            _isBlurModeEnabled.value = false
+        }
     }
 
     fun returnToNote() {
@@ -1263,6 +1338,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _noteReturnItem.value = null
         _highlightsReturnAvailable.value = false
         _studiedReturnAvailable.value = false
+        // Also clear the source-verse-to-restore-on-exit tracking for
+        // search/highlights/studied/notes — otherwise a stale one left over
+        // from before backgrounding (see this function's own doc) would
+        // never get overwritten (openSearchResult/openHighlightedVerse/
+        // markStudiedNavigation/setNoteReturnItem only capture a *new* one
+        // when the existing slot is empty), silently restoring the wrong
+        // chapter the next time that tab's detour is fully exited.
+        _searchSourceVerse.value = null
+        _highlightsSourceVerse.value = null
+        _studiedSourceVerse.value = null
+        _notesSourceVerse.value = null
         if (clearFocus) clearVerseFocus()
     }
 

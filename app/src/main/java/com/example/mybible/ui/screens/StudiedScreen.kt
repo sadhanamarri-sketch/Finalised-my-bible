@@ -193,7 +193,10 @@ fun StudiedScreen(
                     when {
                         selectedChapter != null -> selectedChapter = null
                         selectedBook != null -> selectedBook = null
-                        else -> viewModel.selectTab(NavTab.READER)
+                        else -> {
+                            viewModel.backToStudiedSourceVerse()
+                            viewModel.selectTab(NavTab.READER)
+                        }
                     }
                 },
                 actions = {

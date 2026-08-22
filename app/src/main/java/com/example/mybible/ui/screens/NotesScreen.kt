@@ -112,7 +112,10 @@ fun NotesScreen(
         topBar = {
             BackTopBar(
                 title = "Notes",
-                onBack = { viewModel.selectTab(NavTab.READER) },
+                onBack = {
+                    viewModel.backToNotesSourceVerse()
+                    viewModel.selectTab(NavTab.READER)
+                },
                 actions = {
                     IconButton(onClick = { viewModel.openTagsScreen() }) {
                         Icon(Icons.Default.Label, contentDescription = "Manage tags")
