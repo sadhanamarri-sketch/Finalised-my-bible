@@ -247,96 +247,10 @@ fun EnglishDictionarySheet(
 // MainActivity so "Add note" and tapping a note each open their own screen
 // instead of a sheet layered over the notes list.
 
-@Composable
-fun OnboardingTourDialog(
-    onDismiss: () -> Unit
-) {
-    var slide by remember { mutableStateOf(0) }
-
-    val slides = listOf(
-        Pair("Welcome to My Bible", "A minimalist, offline King James Version and Telugu Bible reader designed for focused Scripture study."),
-        Pair("Bilingual & Interlinear", "Read KJV with optional inline Telugu translation and interlinear Greek NT / Hebrew OT word breakdowns."),
-        Pair("Notes & Highlights", "Highlight verses in custom colors, take tagged personal study notes, and track your daily study progress."),
-        Pair("Offline Ready", "All 66 Telugu books and KJV Bible text are stored right on your device for seamless offline reading.")
-    )
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = slides[slide].first,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-        },
-        text = {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(
-                    imageVector = when (slide) {
-                        0 -> Icons.Default.MenuBook
-                        1 -> Icons.Default.Translate
-                        2 -> Icons.Default.EditNote
-                        else -> Icons.Default.CloudDone
-                    },
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(48.dp)
-                )
-
-                Text(
-                    text = slides[slide].second,
-                    fontSize = 15.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Row(
-                    horizontalArrangement = Arrangement.Center,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    slides.indices.forEach { idx ->
-                        Box(
-                            modifier = Modifier
-                                .padding(horizontal = 4.dp)
-                                .size(if (idx == slide) 10.dp else 6.dp)
-                                .clip(RoundedCornerShape(5.dp))
-                                .background(if (idx == slide) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline)
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (slide < slides.lastIndex) {
-                        slide++
-                    } else {
-                        onDismiss()
-                    }
-                }
-            ) {
-                Text(if (slide < slides.lastIndex) "Next" else "Get Started")
-            }
-        },
-        dismissButton = {
-            if (slide > 0) {
-                TextButton(onClick = { slide-- }) {
-                    Text("Back")
-                }
-            } else {
-                TextButton(onClick = onDismiss) {
-                    Text("Skip")
-                }
-            }
-        }
-    )
-}
+// OnboardingTourDialog (a static 4-slide AlertDialog) has been replaced by
+// the real guided tour — see ui/components/GuidedTourComponents.kt
+// (TourChoiceDialog/GuidedTourOverlay/TourCuratedEndDialog) and
+// MainViewModel's TourMode state machine.
 
 /**
  * Small preview sheet shown when a verse mention inside note text (e.g.

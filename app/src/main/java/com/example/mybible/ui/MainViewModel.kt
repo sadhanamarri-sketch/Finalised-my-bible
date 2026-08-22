@@ -52,6 +52,11 @@ enum class ReaderPickMode {
     NONE, NOTE_PICK, STUDY_PICK
 }
 
+// Guided app tour state — see MainViewModel.tourMode's doc. CHOOSING is
+// the upfront "curated or everything" prompt; CURATED/FULL are the tour
+// itself actually running.
+enum class TourMode { NONE, CHOOSING, CURATED, FULL }
+
 // In-memory-only "last scroll position in Reader" marker — see
 // MainViewModel.saveReaderAnchor's doc. Deliberately not @Serializable/
 // persisted: it only needs to survive a live tab switch, not an app
@@ -521,8 +526,53 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _noteToRead = MutableStateFlow<NoteItem?>(null)
     val noteToRead: StateFlow<NoteItem?> = _noteToRead.asStateFlow()
 
-    private val _showOnboarding = MutableStateFlow(repository.isFirstLaunch())
-    val showOnboarding: StateFlow<Boolean> = _showOnboarding.asStateFlow()
+    // Guided app tour — replaces the old static 4-slide AlertDialog with a
+    // real walkthrough that switches through the actual tabs (see
+    // ui/components/GuidedTourComponents.kt for the step content and
+    // overlay UI). CHOOSING is the upfront "curated or everything" prompt;
+    // starts there automatically on first launch, same trigger the old
+    // showOnboarding used.
+    private val _tourMode = MutableStateFlow(if (repository.isFirstLaunch()) TourMode.CHOOSING else TourMode.NONE)
+    val tourMode: StateFlow<TourMode> = _tourMode.asStateFlow()
+
+    private val _tourStepIndex = MutableStateFlow(0)
+    val tourStepIndex: StateFlow<Int> = _tourStepIndex.asStateFlow()
+
+    // Shown once, right after a CURATED tour ends, noting the full
+    // walkthrough is still available later — not shown after FULL, and not
+    // shown at all if the user skips out of the tour entirely (skipping
+    // isn't "I want the short version," it's "not now").
+    private val _tourJustFinishedCurated = MutableStateFlow(false)
+    val tourJustFinishedCurated: StateFlow<Boolean> = _tourJustFinishedCurated.asStateFlow()
+
+    /** Opens the upfront curated/everything choice — used by Settings'
+     *  "Show app tour" button to relaunch the tour on demand. */
+    fun startTour() {
+        _tourMode.value = TourMode.CHOOSING
+        _tourStepIndex.value = 0
+    }
+
+    fun chooseTourVariant(mode: TourMode) {
+        _tourMode.value = mode
+        _tourStepIndex.value = 0
+    }
+
+    fun setTourStepIndex(index: Int) {
+        _tourStepIndex.value = index
+    }
+
+    /** Ends the tour, whatever mode it was in — used for both "finished
+     *  the last step" and "tapped Skip"/dismissed the choice prompt. */
+    fun finishTour() {
+        val wasCurated = _tourMode.value == TourMode.CURATED
+        _tourMode.value = TourMode.NONE
+        repository.setFirstLaunchCompleted()
+        if (wasCurated) _tourJustFinishedCurated.value = true
+    }
+
+    fun dismissTourCuratedEndNote() {
+        _tourJustFinishedCurated.value = false
+    }
 
     // Search state
     private val _searchQuery = MutableStateFlow("")
@@ -1723,11 +1773,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setShowBookPicker(show: Boolean) {
         _showBookPicker.value = show
-    }
-
-    fun dismissOnboarding() {
-        _showOnboarding.value = false
-        repository.setFirstLaunchCompleted()
     }
 
     private var searchJob: Job? = null

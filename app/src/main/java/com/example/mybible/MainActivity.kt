@@ -24,6 +24,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.ReaderPickMode
+import com.example.mybible.ui.TourMode
 import com.example.mybible.ui.components.*
 import com.example.mybible.ui.screens.*
 import com.example.mybible.ui.theme.MyBibleTheme
@@ -210,11 +211,11 @@ class MainActivity : ComponentActivity() {
             val noteToRead by viewModel.noteToRead.collectAsState()
             val readerPickMode by viewModel.readerPickMode.collectAsState()
             val tagDefinitions by viewModel.tagDefinitions.collectAsState(initial = emptyList())
-            val showOnboarding by viewModel.showOnboarding.collectAsState()
+            val tourMode by viewModel.tourMode.collectAsState()
+            val tourStepIndex by viewModel.tourStepIndex.collectAsState()
+            val tourJustFinishedCurated by viewModel.tourJustFinishedCurated.collectAsState()
             val importProgress by viewModel.importProgress.collectAsState()
             val importError by viewModel.importError.collectAsState()
-
-            var manualShowTour by remember { mutableStateOf(false) }
 
             // Hardware/gesture back returns to Reader from most destination
             // screens, instead of backgrounding the app — Reader is "home"
@@ -353,7 +354,7 @@ class MainActivity : ComponentActivity() {
                             }
                             NavTab.SETTINGS -> SettingsScreen(
                                 viewModel = viewModel,
-                                onShowTour = { manualShowTour = true },
+                                onShowTour = { viewModel.startTour() },
                                 onToggleReminders = onToggleReminders,
                                 onExportLocal = {
                                     val stamp = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
@@ -608,14 +609,40 @@ class MainActivity : ComponentActivity() {
                         TagsScreen(viewModel = viewModel)
                     }
 
-                    // Onboarding Tour Dialog
-                    if (showOnboarding || manualShowTour) {
-                        OnboardingTourDialog(
-                            onDismiss = {
-                                viewModel.dismissOnboarding()
-                                manualShowTour = false
-                            }
+                    // Guided app tour — see MainViewModel's TourMode doc and
+                    // ui/components/GuidedTourComponents.kt for the step
+                    // content/overlay UI. Switches the real active tab to
+                    // match the current step (see the LaunchedEffect below)
+                    // so the tour walks the user to each feature's actual
+                    // location instead of just describing it.
+                    when (tourMode) {
+                        TourMode.CHOOSING -> TourChoiceDialog(
+                            onChooseCurated = { viewModel.chooseTourVariant(TourMode.CURATED) },
+                            onChooseEverything = { viewModel.chooseTourVariant(TourMode.FULL) },
+                            onDismiss = { viewModel.finishTour() }
                         )
+                        TourMode.CURATED, TourMode.FULL -> {
+                            val steps = if (tourMode == TourMode.FULL) FULL_TOUR_STEPS else CURATED_TOUR_STEPS
+                            val clampedIndex = tourStepIndex.coerceIn(0, steps.lastIndex)
+                            LaunchedEffect(clampedIndex, tourMode) {
+                                viewModel.selectTab(steps[clampedIndex].tab)
+                            }
+                            GuidedTourOverlay(
+                                steps = steps,
+                                stepIndex = clampedIndex,
+                                onBack = { viewModel.setTourStepIndex((clampedIndex - 1).coerceAtLeast(0)) },
+                                onNext = {
+                                    if (clampedIndex == steps.lastIndex) viewModel.finishTour()
+                                    else viewModel.setTourStepIndex(clampedIndex + 1)
+                                },
+                                onSkip = { viewModel.finishTour() }
+                            )
+                        }
+                        TourMode.NONE -> {}
+                    }
+
+                    if (tourJustFinishedCurated) {
+                        TourCuratedEndDialog(onDismiss = { viewModel.dismissTourCuratedEndNote() })
                     }
                 }
             }
