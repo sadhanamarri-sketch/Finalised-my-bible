@@ -157,6 +157,18 @@ class MainActivity : ComponentActivity() {
             // first frame renders the correct tab directly. None of the
             // calls here are suspend functions, so no coroutine is needed.
             remember(intent) {
+                // Every widget entry point arrives at the app from outside
+                // it — any cross-reference/search/lexicon/note/highlights/
+                // studied "return" flag left dangling from before the app
+                // was backgrounded (these are plain in-memory state, so
+                // pressing Home mid-detour instead of formally closing it
+                // leaves them set indefinitely) needs clearing here, or the
+                // very first system back press after one of these taps
+                // gets silently hijacked by that stale detour instead of
+                // acting on the widget tap's own destination. See
+                // MainViewModel.clearStaleReaderDetours's doc.
+                viewModel.clearStaleReaderDetours()
+
                 // VerseOfDayWidget (Glance) extras — see widget/WidgetActionKeys.kt.
                 val verseBook = intent.getStringExtra(WidgetActionKeys.EXTRA_VERSE_BOOK)
                 val verseChapter = intent.getIntExtra(WidgetActionKeys.EXTRA_VERSE_CHAPTER, -1)

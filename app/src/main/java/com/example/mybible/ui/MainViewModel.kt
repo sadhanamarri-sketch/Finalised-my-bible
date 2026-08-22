@@ -938,6 +938,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _focusedVersePinToTop.value = false
     }
 
+    // Clears every "return to X" detour flag (cross-reference/search/
+    // lexicon/note/highlights/studied) plus any leftover verse focus —
+    // used by entry points that arrive at Reader from *outside* the app
+    // (the home screen widget), as opposed to in-app navigation.
+    //
+    // Without this: these flags are plain in-memory state, so backgrounding
+    // the app mid-detour (e.g. having followed a cross-reference, then
+    // pressing Home instead of formally closing the banner) leaves them
+    // set indefinitely — the process is still alive, nothing clears them.
+    // Reopening later via a widget tap (which jumps straight to a chapter,
+    // or just re-selects the Reader tab, neither of which touched these
+    // flags before) then hit a surprising bug: the very first system back
+    // press was silently hijacked by that stale detour — e.g. a leftover
+    // crossReferenceReturnAvailable spotlight-jumping back to whatever
+    // verse the old cross-reference session started from, which could
+    // easily be a different verse in the very same chapter the widget had
+    // just opened, reading as "back just replayed the same chapter" —
+    // before a second back press finally exited normally.
+    fun clearStaleReaderDetours() {
+        _crossReferenceReturnAvailable.value = false
+        _searchReturnAvailable.value = false
+        _lexiconReturnTab.value = null
+        _noteReturnItem.value = null
+        _highlightsReturnAvailable.value = false
+        _studiedReturnAvailable.value = false
+        clearVerseFocus()
+    }
+
     fun openEnglishWordLookup(word: String) {
         val cleanWord = word.lowercase().replace(Regex("[^a-z]"), "")
         if (cleanWord.isEmpty()) return
