@@ -61,12 +61,14 @@ class ContinueReadingWidget : GlanceAppWidget() {
         val prefs = context.getSharedPreferences(WIDGET_PREFS_NAME, Context.MODE_PRIVATE)
         val lastBook = prefs.getString("last_book", "Genesis") ?: "Genesis"
         val lastChapter = prefs.getInt("last_chapter", 1)
+        val lastVerse = prefs.getInt("last_verse", -1)
 
         provideContent {
             ContinueReadingContent(
                 palette = palette,
                 lastBook = lastBook,
-                lastChapter = lastChapter
+                lastChapter = lastChapter,
+                lastVerse = lastVerse
             )
         }
     }
@@ -76,7 +78,8 @@ class ContinueReadingWidget : GlanceAppWidget() {
 private fun ContinueReadingContent(
     palette: WidgetPalette,
     lastBook: String,
-    lastChapter: Int
+    lastChapter: Int,
+    lastVerse: Int
 ) {
     val context = LocalContext.current
     // Measured on-device (see commit history): default 4x1 placement is
@@ -134,7 +137,11 @@ private fun ContinueReadingContent(
                 )
                 Spacer(modifier = GlanceModifier.width(6.dp))
                 Text(
-                    text = "$lastBook $lastChapter",
+                    // Verse suffix is temporary diagnostics for the widget
+                    // exact-resume bug — lets it be checked on-device
+                    // (whether the saved verse itself is right) without
+                    // needing adb/logcat access. Remove once resolved.
+                    text = if (lastVerse > 0) "$lastBook $lastChapter:$lastVerse" else "$lastBook $lastChapter",
                     style = TextStyle(
                         fontWeight = FontWeight.Bold,
                         fontSize = 17.sp,
