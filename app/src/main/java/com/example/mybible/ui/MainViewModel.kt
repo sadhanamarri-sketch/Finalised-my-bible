@@ -197,6 +197,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _notesScrollOffset = MutableStateFlow(0)
     val notesScrollOffset: StateFlow<Int> = _notesScrollOffset.asStateFlow()
 
+    // Same reasoning, for SettingsScreen — a plain verticalScroll(ScrollState)
+    // page rather than a LazyColumn, so it's a single pixel offset instead
+    // of an index/offset pair.
+    private val _settingsScrollPosition = MutableStateFlow(0)
+    val settingsScrollPosition: StateFlow<Int> = _settingsScrollPosition.asStateFlow()
+
+    fun saveSettingsScrollPosition(value: Int) {
+        _settingsScrollPosition.value = value
+    }
+
     fun saveNotesScrollPosition(index: Int, offset: Int) {
         _notesScrollIndex.value = index
         _notesScrollOffset.value = offset

@@ -106,7 +106,16 @@ fun SettingsScreen(
     val autoBackupEnabled by viewModel.autoBackupEnabled.collectAsState()
     val backupStatusMessage by viewModel.backupStatusMessage.collectAsState()
 
-    val scrollState = rememberScrollState()
+    // SettingsScreen is fully disposed (not just hidden) on a tab switch,
+    // same as Notes/Studied/Search — save scroll position on the way out so
+    // leaving and coming back doesn't reset to the top of the page.
+    val savedScrollPosition by viewModel.settingsScrollPosition.collectAsState()
+    val scrollState = rememberScrollState(initial = savedScrollPosition)
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.saveSettingsScrollPosition(scrollState.value)
+        }
+    }
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(backupStatusMessage) {
