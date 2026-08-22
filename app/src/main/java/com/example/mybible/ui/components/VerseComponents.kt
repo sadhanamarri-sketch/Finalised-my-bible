@@ -469,20 +469,20 @@ fun VerseCard(
                         .fillMaxHeight()
                 ) {
                     Column(modifier = Modifier.fillMaxSize()) {
-                        // Top offset stays proportional (5% of the verse's
+                        // Top offset stays proportional (10% of the verse's
                         // own height) so the bar still starts near the
                         // English text regardless of how tall the verse
-                        // is — but the bar itself is now a fixed 20dp
-                        // rather than scaling with verse height, so the
-                        // remaining space just absorbs whatever's left.
-                        Spacer(modifier = Modifier.weight(0.05f))
+                        // is — but the bar itself is a fixed 20dp rather
+                        // than scaling with verse height, so the remaining
+                        // space just absorbs whatever's left.
+                        Spacer(modifier = Modifier.weight(0.10f))
                         Box(
                             modifier = Modifier
                                 .height(20.dp)
                                 .fillMaxWidth()
                                 .background(highlightColor)
                         )
-                        Spacer(modifier = Modifier.weight(0.95f))
+                        Spacer(modifier = Modifier.weight(0.90f))
                     }
                 }
             }
