@@ -444,15 +444,41 @@ fun VerseCard(
             }
             // Sibling of the weighted content Column above (not nested
             // inside it) — so this renders as a bar on the *right edge* of
-            // the whole card, spanning its full height, rather than a
-            // sliver stacked underneath the verse text.
+            // the whole card, not a sliver stacked underneath the verse
+            // text.
+            //
+            // Proportional and top-anchored rather than full-height: spans
+            // 5%-30% of the verse's own measured height (English text plus
+            // Telugu/Greek-Hebrew interlinear when those are on), so a
+            // one-line verse gets a short mark and a verse with every
+            // script enabled gets a taller one, but neither ever reads as a
+            // full-height stripe running the whole card. Anchored near the
+            // top (a small 5% gap, not flush) rather than centered on the
+            // midpoint since the English text — what's actually being
+            // read — always starts at the top; the midpoint drifts further
+            // down the longer the optional scripts underneath it get.
+            // The three weights (0.05/0.25/0.70) carve exact proportional
+            // segments out of whatever height the outer Box resolves to
+            // (fillMaxHeight() against the Row's IntrinsicSize.Min), same
+            // technique as any weighted Column, just used for spacing
+            // rather than visible content.
             if (highlightColor != null) {
                 Box(
                     modifier = Modifier
-                        .width(3.dp)
+                        .width(1.dp)
                         .fillMaxHeight()
-                        .background(highlightColor)
-                )
+                ) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        Spacer(modifier = Modifier.weight(0.05f))
+                        Box(
+                            modifier = Modifier
+                                .weight(0.25f)
+                                .fillMaxWidth()
+                                .background(highlightColor)
+                        )
+                        Spacer(modifier = Modifier.weight(0.70f))
+                    }
+                }
             }
         }
     }
