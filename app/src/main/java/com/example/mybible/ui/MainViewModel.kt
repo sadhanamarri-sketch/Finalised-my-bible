@@ -671,28 +671,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // than time spent reading. ProcessLifecycleOwner gives us one
         // app-wide foreground/background signal without wiring per-Activity
         // lifecycle callbacks through the ViewModel.
+        // Deliberately NOT where the exact reading position gets persisted
+        // (see persistCurrentReadingPosition below and MainActivity's own
+        // onStop override) — ProcessLifecycleOwner debounces this callback
+        // by roughly 700ms to avoid false "backgrounded" signals from brief
+        // activity transitions, which is exactly right for study-time
+        // tracking but means backgrounding the app and reopening it (e.g.
+        // via the widget) within that window would race the save and could
+        // still find yesterday's — or no — saved verse.
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) = startStudyTimer()
-            override fun onStop(owner: LifecycleOwner) {
-                stopStudyTimer()
-                // Persists an exact resume position, not just book/chapter
-                // (saveLastPosition already covers that on every chapter
-                // navigation) — liveTopVerse is kept live by ReaderScreen's
-                // own scroll-reporting effect (see reportLiveTopVerse) the
-                // whole time the app is in the foreground, so whatever it
-                // holds here is genuinely "where the user was looking" the
-                // moment they backgrounded the app, not stale.
-                //
-                // Skipped entirely while a detour banner is showing (see
-                // isDetourActive's doc) — backgrounding mid-detour, before
-                // the user has decided to stay or go back, must leave
-                // whatever was already saved untouched rather than silently
-                // overwriting it with a position the user hasn't settled on.
-                if (!isDetourActive()) {
-                    repository.saveLastReadPosition(_currentBook.value, _currentChapter.value, liveTopVerse)
-                    refreshContinueReadingWidget()
-                }
-            }
+            override fun onStop(owner: LifecycleOwner) = stopStudyTimer()
         })
 
         // Runs as WorkManager foreground work (see BibleDataImportWorker)
@@ -772,8 +761,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // Continuously-updated "what verse is at the top of the Reader viewport
     // right now" — read once, synchronously, when the app actually
-    // backgrounds (see the ProcessLifecycleOwner observer in init) to
-    // persist an exact resume position to disk (saveLastReadPosition).
+    // backgrounds (see persistCurrentReadingPosition/MainActivity's onStop)
+    // to persist an exact resume position to disk (saveLastReadPosition).
     // Deliberately separate from readerAnchor above: that one is only
     // snapshotted at tab-switch-away time and gets consumed/cleared on use,
     // which is exactly wrong here — backgrounding the app while still on
@@ -805,6 +794,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _noteReturnItem.value != null ||
             _highlightsReturnAvailable.value ||
             _studiedReturnAvailable.value
+
+    // Persists an exact resume position, not just book/chapter
+    // (saveLastPosition already covers that on every chapter navigation) —
+    // liveTopVerse is kept live by ReaderScreen's own scroll-reporting
+    // effect (see reportLiveTopVerse) the whole time the app is in the
+    // foreground, so whatever it holds here is genuinely "where the user
+    // was looking" the moment this is called, not stale.
+    //
+    // Called from MainActivity's own Activity-level onStop, not the
+    // ProcessLifecycleOwner observer above — that one is debounced by
+    // ~700ms (correct for study-time tracking, wrong here), so backgrounding
+    // the app and immediately reopening it via the widget could otherwise
+    // race the save and land back on whatever was saved before (or nothing,
+    // on a first run), overwriting the exact verse with the top of the
+    // chapter. Activity.onStop fires synchronously the moment this Activity
+    // loses the foreground, closing that window.
+    //
+    // Skipped entirely while a detour banner is showing (see
+    // isDetourActive's doc) — backgrounding mid-detour, before the user has
+    // decided to stay or go back, must leave whatever was already saved
+    // untouched rather than silently overwriting it with a position the
+    // user hasn't settled on.
+    fun persistCurrentReadingPosition() {
+        if (!isDetourActive()) {
+            repository.saveLastReadPosition(_currentBook.value, _currentChapter.value, liveTopVerse)
+            refreshContinueReadingWidget()
+        }
+    }
 
     fun loadChapter(book: String, chapter: Int) {
         _currentBook.value = book

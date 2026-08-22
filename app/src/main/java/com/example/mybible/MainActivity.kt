@@ -9,6 +9,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
@@ -36,14 +37,43 @@ import java.util.Locale
 
 class MainActivity : ComponentActivity() {
 
+    // Same instance the composable `viewModel()` call inside setContent
+    // resolves to (both go through this Activity's ViewModelStore) — held
+    // here too so onStop below can reach it without being inside Compose.
+    private val viewModel: MainViewModel by viewModels()
+
+    // MainActivity is singleTask (see the manifest), so a second widget tap
+    // while the app is already running arrives here instead of creating a
+    // fresh Activity — and Compose has no way to know that happened unless
+    // something it actually reads changes. Plain `setIntent()` alone
+    // wouldn't trigger a recomposition, silently leaving the widget-launch
+    // handling below (`remember(currentIntent)`) stuck on the *previous*
+    // intent's extras. Backed by a Compose-observable field instead so
+    // each new intent is genuinely picked up.
+    private var currentIntent by mutableStateOf<android.content.Intent?>(null)
+
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        currentIntent = intent
+    }
+
+    // Fires synchronously the moment this Activity loses the foreground —
+    // unlike MainViewModel's ProcessLifecycleOwner observer (used for
+    // study-time tracking), which debounces by ~700ms to ignore brief
+    // transitions. Persisting the exact reading position here instead
+    // closes the race where backgrounding the app and immediately
+    // reopening it via the widget could otherwise land back on a stale (or
+    // absent) saved verse. See MainViewModel.persistCurrentReadingPosition.
+    override fun onStop() {
+        super.onStop()
+        viewModel.persistCurrentReadingPosition()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        currentIntent = intent
 
         setContent {
             val viewModel: MainViewModel = viewModel()
@@ -146,18 +176,25 @@ class MainActivity : ComponentActivity() {
 
             // Resolves widget-launch extras into initial nav state.
             //
-            // This is deliberately `remember(intent) { ... }`, not
-            // `LaunchedEffect(intent)`. LaunchedEffect runs *after* the first
-            // composition commits, so on a cold launch from the widget the
-            // very first frame rendered whatever activeTab's ViewModel
-            // default was (Reader) before the effect fired and switched
-            // tabs — a visible flash of Reader before the requested tab.
-            // `remember` runs synchronously as part of composition, so by
-            // the time `viewModel.activeTab.collectAsState()` below reads
-            // the StateFlow, selectTab() has already mutated it and the
-            // first frame renders the correct tab directly. None of the
-            // calls here are suspend functions, so no coroutine is needed.
-            remember(intent) {
+            // This is deliberately `remember(currentIntent) { ... }`, not
+            // `LaunchedEffect(currentIntent)`. LaunchedEffect runs *after*
+            // the first composition commits, so on a cold launch from the
+            // widget the very first frame rendered whatever activeTab's
+            // ViewModel default was (Reader) before the effect fired and
+            // switched tabs — a visible flash of Reader before the
+            // requested tab. `remember` runs synchronously as part of
+            // composition, so by the time `viewModel.activeTab.collectAsState()`
+            // below reads the StateFlow, selectTab() has already mutated it
+            // and the first frame renders the correct tab directly. None of
+            // the calls here are suspend functions, so no coroutine is
+            // needed. Keyed on `currentIntent` (the Compose-observable field
+            // above), not the Activity's raw `intent` property directly —
+            // MainActivity is singleTask, so a second widget tap while
+            // already running updates that property via onNewIntent without
+            // Compose otherwise having any reason to know it changed.
+            val intent = currentIntent
+            remember(currentIntent) {
+                if (intent == null) return@remember Unit
                 // Continue Reading is checked first and handled on its own:
                 // it still needs the other five detour flags cleared (same
                 // "stale banner hijacks the first back press" reasoning as
