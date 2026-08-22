@@ -1,5 +1,9 @@
 package com.example.mybible.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -180,7 +184,18 @@ fun CrossReferenceScreen(
                                 // have anything bounded to fill, since this
                                 // Row sits in a wrap-content Card.
                                 Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-                                    if (isLastTapped) {
+                                    // Fades out slowly rather than an instant
+                                    // on/off — appears immediately on landing
+                                    // (enter = None) but eases out over a full
+                                    // second once cleared (see
+                                    // clearCrossReferenceLastTapped's caller),
+                                    // giving the eye time to register which
+                                    // card it was before it's gone.
+                                    AnimatedVisibility(
+                                        visible = isLastTapped,
+                                        enter = EnterTransition.None,
+                                        exit = fadeOut(animationSpec = tween(durationMillis = 1000))
+                                    ) {
                                         Box(
                                             modifier = Modifier
                                                 .width(3.dp)
