@@ -48,6 +48,13 @@ enum class ReaderPickMode {
     NONE, NOTE_PICK, STUDY_PICK
 }
 
+// In-memory-only "last scroll position in Reader" marker — see
+// MainViewModel.saveReaderAnchor's doc. Deliberately not @Serializable/
+// persisted: it only needs to survive a live tab switch, not an app
+// restart (repository.saveLastPosition already covers that, at
+// book/chapter granularity).
+data class ReaderScrollAnchor(val book: String, val chapter: Int, val verse: Int)
+
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = BibleRepository(application)
@@ -192,15 +199,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // Whether a "return to highlighted verses" banner should be showing in
+    // the Reader — set when a highlighted-verse result is tapped, cleared
+    // when the user either returns via the banner or dismisses it. Same
+    // pattern as _searchReturnAvailable: Highlighted Verses has no "origin
+    // verse" to undo back to either (you opened it as its own destination,
+    // not from a specific verse while reading), so both the banner's Return
+    // button and system back should land you back on that list, not some
+    // verse you were reading before.
+    private val _highlightsReturnAvailable = MutableStateFlow(false)
+    val highlightsReturnAvailable: StateFlow<Boolean> = _highlightsReturnAvailable.asStateFlow()
+
     // Used by HighlightedVersesScreen when the user taps a result: jump the
     // Reader to that verse and switch back to it, same as tapping a Studied
     // or Search result does.
     fun openHighlightedVerse(item: HighlightedVerseItem) {
+        _highlightsReturnAvailable.value = true
         jumpToVerse(item.book, item.chapter, item.verse)
         // Same reasoning as navigateToCrossReference — you tapped this to
         // read the verse, blur mode would hide the very thing you came for.
         _isBlurModeEnabled.value = false
         selectTab(NavTab.READER)
+    }
+
+    fun returnToHighlightedVerses() {
+        _highlightsReturnAvailable.value = false
+        selectTab(NavTab.HIGHLIGHTS)
+    }
+
+    fun dismissHighlightsReturnBanner() {
+        _highlightsReturnAvailable.value = false
     }
 
     // Interactive UI overlays & actions
@@ -530,6 +558,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun selectTab(tab: NavTab) {
         _activeTab.value = tab
+    }
+
+    // In-memory-only "where was I reading" anchor — separate from
+    // repository.saveLastPosition (book/chapter, persisted to disk for
+    // cold app launch): this is verse-level and only needs to survive
+    // ReaderScreen being disposed and remounted within the same live app
+    // session, e.g. visiting Highlighted Verses/Notes/Search/etc. and
+    // pressing back without having tapped anything there. ReaderScreen
+    // saves it (see its own DisposableEffect) with the top-visible verse
+    // right before it's torn down, and consults it once on a fresh mount
+    // when there's no explicit focusedVerseNumber jump target — otherwise
+    // that mount had nothing to go on but "scroll to the top of the
+    // chapter," which is the exact behavior this fixes.
+    private val _readerAnchor = MutableStateFlow<ReaderScrollAnchor?>(null)
+    val readerAnchor: StateFlow<ReaderScrollAnchor?> = _readerAnchor.asStateFlow()
+
+    fun saveReaderAnchor(book: String, chapter: Int, verse: Int?) {
+        _readerAnchor.value = if (verse != null) ReaderScrollAnchor(book, chapter, verse) else null
+    }
+
+    // Consumed (cleared) once used so a coincidental later revisit to the
+    // same chapter within the same session doesn't keep re-applying a
+    // stale anchor from a much earlier visit.
+    fun consumeReaderAnchor() {
+        _readerAnchor.value = null
     }
 
     fun loadChapter(book: String, chapter: Int) {

@@ -253,15 +253,17 @@ class MainActivity : ComponentActivity() {
             val searchReturnAvailable by viewModel.searchReturnAvailable.collectAsState()
             val lexiconReturnTab by viewModel.lexiconReturnTab.collectAsState()
             val noteReturnItem by viewModel.noteReturnItem.collectAsState()
+            val highlightsReturnAvailable by viewModel.highlightsReturnAvailable.collectAsState()
             BackHandler(
                 enabled = activeTab == NavTab.READER &&
-                    (crossReferenceReturnAvailable || searchReturnAvailable || lexiconReturnTab != null || noteReturnItem != null)
+                    (crossReferenceReturnAvailable || searchReturnAvailable || lexiconReturnTab != null || noteReturnItem != null || highlightsReturnAvailable)
             ) {
                 when {
                     crossReferenceReturnAvailable -> viewModel.backToCrossReferenceSourceVerse()
                     searchReturnAvailable -> viewModel.returnToSearchResults()
                     lexiconReturnTab != null -> viewModel.backToLexiconOriginVerse()
-                    else -> viewModel.returnToNote()
+                    noteReturnItem != null -> viewModel.returnToNote()
+                    else -> viewModel.returnToHighlightedVerses()
                 }
             }
 

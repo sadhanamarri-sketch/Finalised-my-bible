@@ -96,6 +96,8 @@ fun ReaderScreen(
     val searchReturnAvailable by viewModel.searchReturnAvailable.collectAsState()
     val lexiconReturnTab by viewModel.lexiconReturnTab.collectAsState()
     val noteReturnItem by viewModel.noteReturnItem.collectAsState()
+    val highlightsReturnAvailable by viewModel.highlightsReturnAvailable.collectAsState()
+    val readerAnchor by viewModel.readerAnchor.collectAsState()
 
     val completedVerses by viewModel.completedVerses.collectAsState(initial = emptyList())
     val highlights by viewModel.highlights.collectAsState(initial = emptyList())
@@ -109,6 +111,27 @@ fun ReaderScreen(
     val noteToEdit by viewModel.noteToEdit.collectAsState()
 
     val listState = rememberLazyListState()
+
+    // Snapshots the top-visible verse into MainViewModel right before
+    // ReaderScreen is torn down (visiting another tab) — see
+    // MainViewModel.saveReaderAnchor's doc for why this exists and how
+    // it's consumed on the next mount. rememberUpdatedState is required
+    // here, not a plain closure over `verses`/`currentBook`/`currentChapter`:
+    // DisposableEffect(Unit)'s block (and everything it captures) only
+    // actually runs once, at first composition, but onDispose needs
+    // whatever the *latest* values were at the moment of teardown, which
+    // can be many recompositions later.
+    val latestVerses = rememberUpdatedState(verses)
+    val latestBook = rememberUpdatedState(currentBook)
+    val latestChapter = rememberUpdatedState(currentChapter)
+    DisposableEffect(Unit) {
+        onDispose {
+            val topVerseNumber = latestVerses.value
+                .getOrNull(listState.firstVisibleItemIndex - 1)
+                ?.number
+            viewModel.saveReaderAnchor(latestBook.value, latestChapter.value, topVerseNumber)
+        }
+    }
 
     // Per-item measured heights (px), keyed by LazyColumn item index —
     // needed to reconstruct an absolute "scrollTop"/"scrollHeight" the way
@@ -168,7 +191,7 @@ fun ReaderScreen(
     // currentBook/currentChapter (loadChapter is called with the same
     // values, which a MutableStateFlow drops as a no-op), so without this
     // key a same-chapter xref tap wouldn't re-scroll or re-focus at all.
-    LaunchedEffect(currentBook, currentChapter, verses, focusedVerseNumber, focusedVerseBlurEnabled, focusedVersePinToTop) {
+    LaunchedEffect(currentBook, currentChapter, verses, focusedVerseNumber, focusedVerseBlurEnabled, focusedVersePinToTop, readerAnchor) {
         if (verses.isEmpty()) return@LaunchedEffect
         val chapterKey = currentBook to currentChapter
         val isNewChapter = chapterKey != lastFocusEffectChapterKey
@@ -216,7 +239,26 @@ fun ReaderScreen(
                 xrefFocusActive = false
             }
         } else if (isNewChapter) {
-            listState.scrollToItem(0)
+            // No explicit jump target — this is either the very first
+            // load, or ReaderScreen was just remounted after a visit to
+            // another tab. In the remount case, restore to wherever the
+            // reader last was in *this exact* book/chapter (see
+            // MainViewModel.saveReaderAnchor's doc) rather than always
+            // dropping to the top — a genuine chapter change (swiping
+            // forward/back) naturally won't match the anchor's stale
+            // book/chapter, so it still falls through to scrolling to 0.
+            val anchor = readerAnchor
+            val anchorIdx = if (anchor != null && anchor.book == currentBook && anchor.chapter == currentChapter) {
+                verses.indexOfFirst { it.number == anchor.verse }
+            } else {
+                -1
+            }
+            if (anchorIdx >= 0) {
+                listState.scrollToItem(anchorIdx + 1)
+                viewModel.consumeReaderAnchor()
+            } else {
+                listState.scrollToItem(0)
+            }
             xrefFocusActive = false
         } else {
             // Same chapter, no focus target — this is focus being cleared
@@ -333,7 +375,7 @@ fun ReaderScreen(
     // a cross-reference back-bar is showing, a sheet/menu is open, or a
     // verse is selected (selection already swaps the pill for the action
     // toolbar, but this also covers the moment the toolbar is dismissing).
-    val canHideBars = !crossReferenceReturnAvailable && !searchReturnAvailable && lexiconReturnTab == null && noteReturnItem == null && !showReaderMenu && selectedVerse == null &&
+    val canHideBars = !crossReferenceReturnAvailable && !searchReturnAvailable && lexiconReturnTab == null && noteReturnItem == null && !highlightsReturnAvailable && !showReaderMenu && selectedVerse == null &&
         readerPickMode == ReaderPickMode.NONE &&
         readerPickMode == ReaderPickMode.NONE
 
@@ -721,6 +763,77 @@ fun ReaderScreen(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Dismiss",
                                 tint = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // "Return to highlighted verses" banner — shown after tapping a
+            // highlighted-verse result, same reasoning as "Return to search
+            // results": Highlighted Verses has no "origin verse" to undo
+            // back to, it's opened as its own destination, so both this
+            // banner and system back land back on that list. Mutually
+            // exclusive with the cross-reference/search/lexicon/note
+            // banners above, same fixed top slot. All 4 accent container
+            // roles (primary/secondary/tertiary/error) are already taken by
+            // those, so this uses the neutral surfaceContainerHigh instead,
+            // with the coral "Return" button matching the rest of the app's
+            // convention for the one interactive accent in an otherwise
+            // neutral row.
+            if (readerPickMode == ReaderPickMode.NONE && !crossReferenceReturnAvailable && !searchReturnAvailable && lexiconReturnTab == null && noteReturnItem == null && highlightsReturnAvailable) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Highlight,
+                                contentDescription = "Highlighted verses",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Return to highlighted verses",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Button(
+                                onClick = { viewModel.returnToHighlightedVerses() },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                ),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                modifier = Modifier.height(30.dp)
+                            ) {
+                                Text("Return", fontSize = 12.sp)
+                            }
+                        }
+                        IconButton(
+                            onClick = { viewModel.dismissHighlightsReturnBanner() },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Dismiss",
+                                tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(16.dp)
                             )
                         }
