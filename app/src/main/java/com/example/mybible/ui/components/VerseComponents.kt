@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -469,7 +470,11 @@ fun VerseActionToolbar(
     // verseSheetNotePreview/vsViewNote. Empty by default so existing call
     // sites (if any aren't updated yet) keep compiling.
     existingNotes: List<com.example.mybible.model.NoteItem> = emptyList(),
-    onViewNotes: (() -> Unit)? = null
+    onViewNotes: (() -> Unit)? = null,
+    // Inline "why did I mark this" comment offered right after a highlight
+    // is applied — see MainViewModel.addHighlightQuickNote. Null when the
+    // caller doesn't wire this up, so the row simply doesn't show.
+    onAddQuickNote: ((String) -> Unit)? = null
 ) {
     Surface(
         modifier = modifier
@@ -561,6 +566,51 @@ fun VerseActionToolbar(
                         isActive = false,
                         onClick = onManageHighlightColors
                     )
+                }
+            }
+
+            // Optional inline "quick note" — offered right after a
+            // highlight is applied, so a one-line "why did I mark this"
+            // (doubt / prayer / learning) can be jotted down without
+            // leaving the toolbar for the full Note Editor. Only shown
+            // once a color is active and the verse has no notes yet — once
+            // a note exists, "Add another" in the action row below covers
+            // it, same as the full editor flow.
+            if (onAddQuickNote != null && !currentHighlightColorHex.isNullOrEmpty() && existingNotes.isEmpty()) {
+                var quickNoteText by remember(verse.book, verse.chapter, verse.number, currentHighlightColorHex) {
+                    mutableStateOf("")
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = quickNoteText,
+                        onValueChange = { quickNoteText = it },
+                        modifier = Modifier.weight(1f),
+                        placeholder = { Text("Add a quick note… (e.g. doubt, prayer)", fontSize = 12.sp) },
+                        textStyle = TextStyle(fontSize = 13.sp),
+                        singleLine = true
+                    )
+                    IconButton(
+                        onClick = {
+                            val trimmed = quickNoteText.trim()
+                            if (trimmed.isNotEmpty()) {
+                                onAddQuickNote(trimmed)
+                                quickNoteText = ""
+                            }
+                        },
+                        enabled = quickNoteText.isNotBlank()
+                    ) {
+                        Icon(
+                            Icons.Default.Send,
+                            contentDescription = "Save quick note",
+                            tint = if (quickNoteText.isNotBlank()) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                        )
+                    }
                 }
             }
 

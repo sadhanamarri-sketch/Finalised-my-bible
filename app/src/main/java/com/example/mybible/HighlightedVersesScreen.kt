@@ -35,7 +35,10 @@ data class HighlightedVerseItem(
     val chapter: Int,
     val verse: Int,
     val text: String,
-    val colorName: String = "Default"
+    val colorName: String = "Default",
+    // Text of the linked quick-note (see HighlightItem.noteId), when one
+    // exists — shown as a truncated italic preview under the verse.
+    val noteText: String? = null
 )
 
 /**
@@ -187,6 +190,15 @@ private fun HighlightedVerseRow(
                 lineHeight = 21.sp,
                 color = MaterialTheme.colorScheme.onSurface
             )
+            if (!item.noteText.isNullOrBlank()) {
+                Text(
+                    text = item.noteText.let { if (it.length > 90) it.take(89) + "…" else it },
+                    fontSize = 13.sp,
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
         }
     }
 }

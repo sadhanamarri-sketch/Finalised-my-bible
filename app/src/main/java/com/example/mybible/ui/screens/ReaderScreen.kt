@@ -1154,6 +1154,23 @@ fun ReaderScreen(
                 onSetHighlight = { hex ->
                     viewModel.setHighlightColor(verse.book, verse.chapter, verse.number, hex)
                 },
+                onAddQuickNote = { noteText ->
+                    val currentHex = highlights.find {
+                        it.book == verse.book && it.chapter == verse.chapter && it.verse == verse.number
+                    }?.colorHex
+                    if (currentHex != null) {
+                        val colorLabel = highlightColorDefs.find { it.colorHex == currentHex }?.label ?: "Highlight"
+                        viewModel.addHighlightQuickNote(
+                            book = verse.book,
+                            chapter = verse.chapter,
+                            verse = verse.number,
+                            verseText = verse.text,
+                            colorHex = currentHex,
+                            colorLabel = colorLabel,
+                            noteText = noteText
+                        )
+                    }
+                },
                 onManageHighlightColors = {
                     viewModel.setShowManageHighlightColors(true)
                 },

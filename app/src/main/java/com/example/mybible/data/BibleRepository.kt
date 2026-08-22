@@ -660,10 +660,10 @@ class BibleRepository(private val context: Context) {
         recordTombstone(completedTombstoneKey(book, chapter, verse))
     }
 
-    suspend fun setHighlight(book: String, chapter: Int, verse: Int, colorHex: String) {
+    suspend fun setHighlight(book: String, chapter: Int, verse: Int, colorHex: String, noteId: Long? = null) {
         val current = _highlightsFlow.value.toMutableList()
         current.removeAll { it.book == book && it.chapter == chapter && it.verse == verse }
-        current.add(HighlightItem(book, chapter, verse, colorHex))
+        current.add(HighlightItem(book, chapter, verse, colorHex, noteId = noteId))
         saveHighlightsToPrefs(current)
     }
 

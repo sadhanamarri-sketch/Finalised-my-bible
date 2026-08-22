@@ -218,8 +218,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // text lookups are cheap single-row Room queries, not worth caching
     // separately given highlight counts are small relative to the full text.
     val highlightedVerseItems: StateFlow<List<HighlightedVerseItem>> =
-        combine(repository.allHighlights, repository.allHighlightColorDefs) { highlightList, colorDefs ->
-            buildHighlightedVerseItems(highlightList, colorDefs) { book, chapter, verse ->
+        combine(repository.allHighlights, repository.allHighlightColorDefs, repository.allNotes) { highlightList, colorDefs, notes ->
+            buildHighlightedVerseItems(highlightList, colorDefs, notes = notes) { book, chapter, verse ->
                 repository.getVerseText(book, chapter, verse)
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -1186,10 +1186,51 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             if (colorHex.isEmpty()) {
                 repository.removeHighlight(book, chapter, verse)
+                _selectedVerse.value = null
             } else {
                 repository.setHighlight(book, chapter, verse, colorHex)
+                // Toolbar deliberately stays open here (unlike Clear above)
+                // — a fresh highlight can optionally be followed by a quick
+                // note (see addHighlightQuickNote) right in the same
+                // toolbar, without a separate detour into the full Note
+                // Editor. Dismisses the same way any other verse-selection
+                // state already does: the toolbar's own Close button, or
+                // tapping the verse again.
             }
-            _selectedVerse.value = null
+        }
+    }
+
+    // "Add a quick note" row on the verse action toolbar, shown once a
+    // highlight is active and the verse has no notes yet — creates a real
+    // NoteItem (tagged with the highlight color's own label, linked to this
+    // verse) rather than a separate, duplicate content store, and links it
+    // back via HighlightItem.noteId so the Highlighted Verses browser can
+    // show a preview of it. Kept out of the full Note Editor screen
+    // deliberately: this is meant to stay a one-line "why did I mark this"
+    // comment, not a detour into title/tags/full editor for what's usually
+    // a single sentence.
+    fun addHighlightQuickNote(
+        book: String,
+        chapter: Int,
+        verse: Int,
+        verseText: String,
+        colorHex: String,
+        colorLabel: String,
+        noteText: String
+    ) {
+        val trimmed = noteText.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            val noteId = System.currentTimeMillis()
+            repository.saveNote(
+                id = noteId,
+                title = "",
+                text = trimmed,
+                noteDate = "",
+                refs = listOf(NoteReference(book, chapter, verse, verseText)),
+                tags = listOf(colorLabel)
+            )
+            repository.setHighlight(book, chapter, verse, colorHex, noteId = noteId)
         }
     }
 

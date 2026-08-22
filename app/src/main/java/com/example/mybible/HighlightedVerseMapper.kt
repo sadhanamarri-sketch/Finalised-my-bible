@@ -2,6 +2,7 @@ package com.example.mybible
 
 import com.example.mybible.model.HighlightColorDef
 import com.example.mybible.model.HighlightItem
+import com.example.mybible.model.NoteItem
 import com.example.mybible.ui.components.BIBLE_BOOKS
 
 /**
@@ -19,9 +20,11 @@ import com.example.mybible.ui.components.BIBLE_BOOKS
 suspend fun buildHighlightedVerseItems(
     highlights: List<HighlightItem>,
     colorDefs: List<HighlightColorDef>,
+    notes: List<NoteItem> = emptyList(),
     getVerseText: suspend (book: String, chapter: Int, verse: Int) -> String?
 ): List<HighlightedVerseItem> {
     val labelsByHex = colorDefs.associate { it.colorHex.lowercase() to it.label }
+    val notesById = notes.associateBy { it.id }
 
     return highlights.map { highlight ->
         val text = getVerseText(highlight.book, highlight.chapter, highlight.verse).orEmpty()
@@ -31,7 +34,8 @@ suspend fun buildHighlightedVerseItems(
             chapter = highlight.chapter,
             verse = highlight.verse,
             text = text,
-            colorName = labelsByHex[highlight.colorHex.lowercase()] ?: "Uncategorized"
+            colorName = labelsByHex[highlight.colorHex.lowercase()] ?: "Uncategorized",
+            noteText = highlight.noteId?.let { notesById[it]?.text }
         )
     }.sortedWith(compareBy({ BIBLE_BOOKS.indexOf(it.book) }, { it.chapter }, { it.verse }))
 }

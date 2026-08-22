@@ -136,7 +136,13 @@ data class HighlightItem(
     // undelete, not get silently blocked forever just because a tombstone
     // exists. Defaults to "now" for any HighlightItem built before this
     // field existed (both in code and in already-saved/backed-up JSON).
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    // Links this highlight to the optional "quick note" comment created
+    // alongside it (e.g. "doubt", "prayer point") — a real NoteItem, found
+    // by id in the same notes list, not a duplicate content store. Null for
+    // every highlight created before this existed, and for any highlight
+    // the user chose not to comment on.
+    val noteId: Long? = null
 )
 
 @Serializable
