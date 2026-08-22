@@ -214,6 +214,13 @@ class MainActivity : ComponentActivity() {
             // scrolled to the top of the chapter — its list state was fully
             // disposed while the lookup page was showing.
             BackHandler(enabled = activeTab != NavTab.READER && activeTab != NavTab.GREEK_WORD && activeTab != NavTab.HEBREW_WORD) {
+                // Search's own back-arrow ends the session (clears the typed
+                // query/results) before returning to Reader — system back
+                // used to skip that and just switch tabs, silently leaving
+                // the old query/results behind. Search history already
+                // preserves past searches separately, so there's nothing to
+                // lose by keeping this consistent with the arrow.
+                if (activeTab == NavTab.SEARCH) viewModel.endSearchSession()
                 viewModel.selectTab(NavTab.READER)
             }
             BackHandler(enabled = activeTab == NavTab.GREEK_WORD) {
