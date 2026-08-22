@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Overrides only windowBackground from the stock Material Light theme
+         — everything else (status bar icon color, etc.) stays whatever
+         Compose's own MyBibleTheme sets up at runtime. This exists purely
+         to fix the white "starting window" flash Android paints the
+         instant the launcher icon or a widget button is tapped, before
+         Compose has drawn its first frame: the stock theme's white
+         windowBackground was jarring against the app's default Classic
+         Dark look (see BibleRepository's "theme_mode" default and
+         MyBibleTheme's own default parameter, both ThemeMode.CLASSIC_DARK).
+         Matches ClassicDarkColorScheme.background in ui/theme/Theme.kt
+         (#1C1A17, Capacitor's "paper" color) — a fixed guess rather than reading
+         the user's actual saved theme, since that preference can't be read
+         before this native window is inflated; still far less jarring than
+         white for every theme, and exact for the app's own default. -->
+    <style name="AppTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#1C1A17</item>
+    </style>
+</resources>
