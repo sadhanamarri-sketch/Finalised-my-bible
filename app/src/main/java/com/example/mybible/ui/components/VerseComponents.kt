@@ -441,6 +441,11 @@ fun VerseCard(
                 // stamping every studied verse with a checkmark just added
                 // visual noise to a chapter you already know you've read.
             }
+            }
+            // Sibling of the weighted content Column above (not nested
+            // inside it) — so this renders as a bar on the *right edge* of
+            // the whole card, spanning its full height, rather than a
+            // sliver stacked underneath the verse text.
             if (highlightColor != null) {
                 Box(
                     modifier = Modifier
@@ -448,7 +453,6 @@ fun VerseCard(
                         .fillMaxHeight()
                         .background(highlightColor)
                 )
-            }
             }
         }
     }
