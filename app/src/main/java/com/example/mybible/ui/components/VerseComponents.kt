@@ -557,19 +557,23 @@ fun VerseActionToolbar(
                 }
             }
 
-            // Existing-note preview — one tinted row per note (not a
+            // Existing-note preview — one plain row per note (not a
             // collapsed "N notes" summary), each showing that note's own
             // first line and opening straight into it in the note reader.
+            // Rows are separated by a hairline divider rather than a tinted
+            // card background, so the list reads as one continuous strip
+            // instead of a stack of separate colored chips.
             if (existingNotes.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    existingNotes.forEach { note ->
+                Column {
+                    existingNotes.forEachIndexed { index, note ->
+                        if (index > 0) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                        }
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.35f))
                                 .then(if (onOpenNote != null) Modifier.clickable { onOpenNote(note) } else Modifier)
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                                .padding(horizontal = 4.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
