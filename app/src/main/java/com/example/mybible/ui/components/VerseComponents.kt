@@ -122,14 +122,15 @@ fun VerseCard(
     // than pattern-matching a hardcoded set — a pattern-match would silently
     // stop rendering any color added or recolored since the original 5.
     //
-    // Rendered as a slim left-edge accent bar + a tinted verse number,
-    // rather than a translucent full-row fill — a full-row wash across
-    // every highlighted verse in a chapter made the page read as "so much
-    // color" with no easy way to tell which color was which without
-    // staring at it. The bar+number combo keeps the reading text itself on
-    // the plain background (fully legible in every theme) while still
-    // being unmistakable at a glance, and it's a full-opacity color rather
-    // than translucent since it's a thin accent, not a wash over text.
+    // Rendered as a slim left-edge accent bar rather than a translucent
+    // full-row fill — a full-row wash across every highlighted verse in a
+    // chapter made the page read as "so much color" with no easy way to
+    // tell which color was which without staring at it. The bar keeps the
+    // reading text itself on the plain background (fully legible in every
+    // theme) while still being unmistakable at a glance, and it's a
+    // full-opacity color rather than translucent since it's a thin accent,
+    // not a wash over text. (Also tinting the verse number was tried and
+    // dropped as redundant once the bar was in place.)
     val highlightColor = highlightColorHex?.let { parseHexColorOrNull(it) }
 
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
@@ -224,8 +225,7 @@ fun VerseCard(
                         text = "${verse.number}",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = highlightColor
-                            ?: if (isFocusedVerse) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                        color = if (isFocusedVerse) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
                     )
                     // Cross-reference marker (Capacitor's `.verse.has-xref
                     // .vnum::after` dagger, '\u2020', gold, superscript-ish).
