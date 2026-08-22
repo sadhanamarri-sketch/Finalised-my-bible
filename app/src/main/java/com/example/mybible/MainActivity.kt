@@ -158,16 +158,32 @@ class MainActivity : ComponentActivity() {
             // first frame renders the correct tab directly. None of the
             // calls here are suspend functions, so no coroutine is needed.
             remember(intent) {
-                // Every widget entry point arrives at the app from outside
-                // it — any cross-reference/search/lexicon/note/highlights/
-                // studied "return" flag left dangling from before the app
-                // was backgrounded (these are plain in-memory state, so
-                // pressing Home mid-detour instead of formally closing it
-                // leaves them set indefinitely) needs clearing here, or the
-                // very first system back press after one of these taps
-                // gets silently hijacked by that stale detour instead of
-                // acting on the widget tap's own destination. See
-                // MainViewModel.clearStaleReaderDetours's doc.
+                // Continue Reading is checked first and handled on its own:
+                // it still needs the other five detour flags cleared (same
+                // "stale banner hijacks the first back press" reasoning as
+                // every other widget entry point below), but NOT verse
+                // focus — init already seeded focusedVerseNumber/pinToTop
+                // this same cold start from the persisted exact resume
+                // verse (see MainViewModel.saveLastReadPosition), and the
+                // blanket clearStaleReaderDetours() below would silently
+                // wipe that seed right back out, landing on the top of the
+                // chapter instead of the saved verse.
+                if (intent.getBooleanExtra(WidgetActionKeys.EXTRA_CONTINUE_READING, false)) {
+                    viewModel.clearStaleReaderDetours(clearFocus = false)
+                    viewModel.selectTab(NavTab.READER)
+                    return@remember Unit
+                }
+
+                // Every other widget entry point arrives at the app from
+                // outside it — any cross-reference/search/lexicon/note/
+                // highlights/studied "return" flag left dangling from
+                // before the app was backgrounded (these are plain in-
+                // memory state, so pressing Home mid-detour instead of
+                // formally closing it leaves them set indefinitely) needs
+                // clearing here, or the very first system back press after
+                // one of these taps gets silently hijacked by that stale
+                // detour instead of acting on the widget tap's own
+                // destination. See MainViewModel.clearStaleReaderDetours's doc.
                 viewModel.clearStaleReaderDetours()
 
                 // VerseOfDayWidget (Glance) extras — see widget/WidgetActionKeys.kt.
@@ -175,14 +191,6 @@ class MainActivity : ComponentActivity() {
                 val verseChapter = intent.getIntExtra(WidgetActionKeys.EXTRA_VERSE_CHAPTER, -1)
                 if (!verseBook.isNullOrEmpty() && verseChapter != -1) {
                     viewModel.loadChapter(verseBook, verseChapter)
-                    viewModel.selectTab(NavTab.READER)
-                    return@remember Unit
-                }
-
-                if (intent.getBooleanExtra(WidgetActionKeys.EXTRA_CONTINUE_READING, false)) {
-                    // App already resumes the last read position on normal
-                    // launch, so no explicit action is needed here beyond
-                    // making sure Reader is the visible tab.
                     viewModel.selectTab(NavTab.READER)
                     return@remember Unit
                 }

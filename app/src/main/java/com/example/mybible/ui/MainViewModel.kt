@@ -682,7 +682,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // whole time the app is in the foreground, so whatever it
                 // holds here is genuinely "where the user was looking" the
                 // moment they backgrounded the app, not stale.
-                repository.saveLastReadPosition(_currentBook.value, _currentChapter.value, liveTopVerse)
+                //
+                // Skipped entirely while a detour banner is showing (see
+                // isDetourActive's doc) — backgrounding mid-detour, before
+                // the user has decided to stay or go back, must leave
+                // whatever was already saved untouched rather than silently
+                // overwriting it with a position the user hasn't settled on.
+                if (!isDetourActive()) {
+                    repository.saveLastReadPosition(_currentBook.value, _currentChapter.value, liveTopVerse)
+                    refreshContinueReadingWidget()
+                }
             }
         })
 
@@ -779,12 +788,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // True while a "return to X" banner is showing (cross-reference/search/
+    // lexicon/note/highlights/studied) — the user has jumped away from
+    // where they were reading but hasn't decided yet whether to stay here
+    // or go back. See loadChapter/the ProcessLifecycleOwner onStop
+    // observer's docs for why this gates what counts as the "genuine"
+    // reading position for resume/widget purposes: a search/cross-
+    // reference/etc. detour a few taps deep shouldn't silently become
+    // "where you were reading" just because you looked at it, only once
+    // you've actually settled there (dismissed the banner via its own
+    // close button rather than tapping Return) or backed all the way out.
+    private fun isDetourActive(): Boolean =
+        _crossReferenceReturnAvailable.value ||
+            _searchReturnAvailable.value ||
+            _lexiconReturnTab.value != null ||
+            _noteReturnItem.value != null ||
+            _highlightsReturnAvailable.value ||
+            _studiedReturnAvailable.value
+
     fun loadChapter(book: String, chapter: Int) {
         _currentBook.value = book
         _currentChapter.value = chapter
-        repository.saveLastPosition(book, chapter)
+        // Only persist/refresh the widget for a genuine reading position —
+        // swiping chapters or picking one from the Book/Chapter picker
+        // (neither sets a detour flag) still does immediately, same as
+        // before; a search/cross-reference/etc. jump (which does) skips
+        // this until the user settles there — see isDetourActive's doc.
+        if (!isDetourActive()) {
+            repository.saveLastPosition(book, chapter)
+            refreshContinueReadingWidget()
+        }
         loadCurrentChapter()
-        refreshContinueReadingWidget()
     }
 
     // The home screen widget's "Continue reading" row reads last_book/
@@ -1107,14 +1141,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // easily be a different verse in the very same chapter the widget had
     // just opened, reading as "back just replayed the same chapter" —
     // before a second back press finally exited normally.
-    fun clearStaleReaderDetours() {
+    // clearFocus = false is used only by the widget's "Continue Reading"
+    // entry point: init already seeded focusedVerseNumber/pinToTop this
+    // same cold start from the persisted exact resume verse (see
+    // saveLastReadPosition), and clearing it right back out here would
+    // silently drop that seed, landing on the top of the chapter instead
+    // of the saved verse — the exact bug this parameter exists to avoid.
+    fun clearStaleReaderDetours(clearFocus: Boolean = true) {
         _crossReferenceReturnAvailable.value = false
         _searchReturnAvailable.value = false
         _lexiconReturnTab.value = null
         _noteReturnItem.value = null
         _highlightsReturnAvailable.value = false
         _studiedReturnAvailable.value = false
-        clearVerseFocus()
+        if (clearFocus) clearVerseFocus()
     }
 
     fun openEnglishWordLookup(word: String) {
