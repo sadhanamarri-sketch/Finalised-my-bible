@@ -1,5 +1,6 @@
 package com.example.mybible.ui.components
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -186,6 +187,26 @@ fun BookChapterPickerSheet(
     var selectedBookName by remember { mutableStateOf<String?>(null) }
     var selectedChapter by remember { mutableStateOf<Int?>(null) }
     val listState = rememberLazyListState()
+
+    // This sheet is a plain boolean-flag overlay on top of Reader (see
+    // MainActivity's showBookPicker), not a NavTab — so unlike a tab
+    // switch, nothing else in the app catches system back while it's
+    // open. Without this handler, back fell through to the OS default
+    // and exited/backgrounded the app entirely, mid-picker, instead of
+    // closing it or stepping back a level — this screen is one of the
+    // most frequently opened in the app, so that was an easy bug to hit.
+    // Steps out one level at a time (verse -> chapter -> book list),
+    // matching the "‹ All books"/"‹ bookName" links each step already
+    // has, and only calls onDismiss (closing the whole sheet) once
+    // already at the top level.
+    BackHandler {
+        when {
+            selectedChapter != null -> selectedChapter = null
+            selectedBookName != null -> selectedBookName = null
+            else -> onDismiss()
+        }
+    }
+
     // Genesis..Malachi are the 39 Old Testament books; Matthew is the first
     // New Testament book — same OT_COUNT boundary Capacitor uses.
     val otCount = remember { BIBLE_BOOKS.indexOf("Matthew") }
