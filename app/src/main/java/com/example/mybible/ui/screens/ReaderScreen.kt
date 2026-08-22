@@ -1149,9 +1149,6 @@ fun ReaderScreen(
         // Floating Action Toolbar for selected verse
         if (selectedVerse != null) {
             val verse = selectedVerse!!
-            val isCompleted = completedVerses.any {
-                it.book == verse.book && it.chapter == verse.chapter && it.verse == verse.number
-            }
             val notesOnVerse = notes.filter { it.matchesVerse(verse.book, verse.chapter, verse.number) }
             val currentHighlight = highlights.find {
                 it.book == verse.book && it.chapter == verse.chapter && it.verse == verse.number
@@ -1159,14 +1156,10 @@ fun ReaderScreen(
 
             VerseActionToolbar(
                 verse = verse,
-                isCompleted = isCompleted,
                 highlightColorDefs = highlightColorDefs,
                 currentHighlightColorHex = currentHighlight?.colorHex,
                 highlightHasLinkedNote = currentHighlight?.noteId != null,
                 existingNotes = notesOnVerse,
-                onToggleCompleted = {
-                    viewModel.toggleCompletedVerse(verse.book, verse.chapter, verse.number)
-                },
                 onSetHighlight = { hex ->
                     viewModel.setHighlightColor(verse.book, verse.chapter, verse.number, hex)
                 },
@@ -1185,26 +1178,16 @@ fun ReaderScreen(
                         )
                     }
                 },
-                onManageHighlightColors = {
-                    viewModel.setShowManageHighlightColors(true)
-                },
                 onAddNote = {
                     viewModel.openNoteEditor(defaultVerse = verse)
                 },
-                onViewNotes = {
+                onOpenNote = { note ->
                     // Matches the note-marker dot: opens straight into a
                     // read-only view of the note, not the editor — editing
                     // is a separate explicit action (the note's own overflow
                     // menu), not something a plain tap should land you in.
                     viewModel.setSelectedVerse(null)
-                    if (notesOnVerse.size == 1) {
-                        viewModel.openNoteReader(notesOnVerse.first(), originTab = NavTab.READER)
-                    } else {
-                        viewModel.selectTab(NavTab.NOTES)
-                    }
-                },
-                onCrossRefClick = {
-                    viewModel.openCrossReferences(verse)
+                    viewModel.openNoteReader(note, originTab = NavTab.READER)
                 },
                 onToggleInterlinear = {
                     // Anchor on whatever verse is at the top of the

@@ -1426,36 +1426,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // ---- Highlight color management (labeled colors, "option b" preset
-    // palette instead of a free-form picker — see model/HighlightColors.kt) ----
-
-    private val _showManageHighlightColors = MutableStateFlow(false)
-    val showManageHighlightColors: StateFlow<Boolean> = _showManageHighlightColors.asStateFlow()
-
-    fun setShowManageHighlightColors(show: Boolean) {
-        _showManageHighlightColors.value = show
-    }
-
-    fun addHighlightColor(label: String, colorHex: String) {
-        viewModelScope.launch { repository.addHighlightColor(label, colorHex) }
-    }
-
-    fun renameHighlightColor(colorHex: String, newLabel: String) {
-        viewModelScope.launch { repository.renameHighlightColor(colorHex, newLabel) }
-    }
-
-    fun setHighlightColorEnabled(colorHex: String, enabled: Boolean) {
-        viewModelScope.launch { repository.setHighlightColorEnabled(colorHex, enabled) }
-    }
-
-    fun recolorHighlightColor(oldHex: String, newHex: String) {
-        viewModelScope.launch { repository.recolorHighlightColor(oldHex, newHex) }
-    }
-
-    fun deleteHighlightColor(colorHex: String) {
-        viewModelScope.launch { repository.deleteHighlightColor(colorHex) }
-    }
-
     // Which tab NoteReaderScreen was opened from — the Notes tab (tapping a
     // note card there) or straight from Reader (the verse action toolbar's
     // "View notes", when a verse has exactly one existing note and there's
@@ -2053,8 +2023,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val result = repository.importFromBackup(jsonText)
                 _backupStatusMessage.value = "Restored: ${result.notesAdded} new notes, " +
                     "${result.notesUpdated} updated, ${result.highlightsAdded} new highlights, " +
-                    "${result.completedAdded} new completed verses, ${result.tagsAdded} new tags, " +
-                    "${result.colorsAdded} new colors"
+                    "${result.completedAdded} new completed verses, ${result.tagsAdded} new tags"
             } catch (e: Exception) {
                 _backupStatusMessage.value = "Couldn't read that backup file"
             }
@@ -2142,8 +2111,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         repository.setLastDriveRestoreAt(now)
                         _lastDriveRestoreAt.value = now
                         _backupStatusMessage.value = "Restored from Drive: ${importResult.notesAdded} new notes, " +
-                            "${importResult.notesUpdated} updated, ${importResult.highlightsAdded} new highlights, " +
-                            "${importResult.colorsAdded} new colors"
+                            "${importResult.notesUpdated} updated, ${importResult.highlightsAdded} new highlights"
                     } catch (e: Exception) {
                         _backupStatusMessage.value = "Couldn't read the Drive backup"
                     }

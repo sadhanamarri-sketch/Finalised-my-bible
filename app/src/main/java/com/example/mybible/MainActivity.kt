@@ -432,21 +432,6 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    // Manage Highlight Colors Sheet — opened from the verse
-                    // action toolbar's "Manage" swatch.
-                    val showManageHighlightColors by viewModel.showManageHighlightColors.collectAsState()
-                    val highlightColorDefsForManage by viewModel.highlightColorDefs.collectAsState(initial = emptyList())
-                    if (showManageHighlightColors) {
-                        ManageHighlightColorsSheet(
-                            colorDefs = highlightColorDefsForManage,
-                            onRename = { colorHex, newLabel -> viewModel.renameHighlightColor(colorHex, newLabel) },
-                            onSetEnabled = { colorHex, enabled -> viewModel.setHighlightColorEnabled(colorHex, enabled) },
-                            onDelete = { colorHex -> viewModel.deleteHighlightColor(colorHex) },
-                            onAdd = { label, colorHex -> viewModel.addHighlightColor(label, colorHex) },
-                            onDismiss = { viewModel.setShowManageHighlightColors(false) }
-                        )
-                    }
-
                     // English Dictionary Sheet
                     if (selectedEnglishWord != null) {
                         EnglishDictionarySheet(

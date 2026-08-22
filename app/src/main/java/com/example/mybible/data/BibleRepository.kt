@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -327,7 +328,6 @@ class BibleRepository(private val context: Context) {
     private fun noteTombstoneKey(id: Long) = "note:$id"
     private fun highlightTombstoneKey(book: String, chapter: Int, verse: Int) = "highlight:$book:$chapter:$verse"
     private fun completedTombstoneKey(book: String, chapter: Int, verse: Int) = "completed:$book:$chapter:$verse"
-    private fun colorTombstoneKey(colorHex: String) = "color:${colorHex.lowercase(Locale.US)}"
     private fun tagTombstoneKey(name: String) = "tag:${name.lowercase(Locale.US)}"
 
     private val _completedVersesFlow = MutableStateFlow<List<CompletedVerseItem>>(loadCompletedFromPrefs())
@@ -336,8 +336,9 @@ class BibleRepository(private val context: Context) {
     private val _highlightsFlow = MutableStateFlow<List<HighlightItem>>(loadHighlightsFromPrefs())
     val allHighlights: Flow<List<HighlightItem>> = _highlightsFlow.asStateFlow()
 
-    private val _highlightColorDefsFlow = MutableStateFlow<List<HighlightColorDef>>(loadHighlightColorDefsFromPrefs())
-    val allHighlightColorDefs: Flow<List<HighlightColorDef>> = _highlightColorDefsFlow.asStateFlow()
+    // Fixed set now (see model/HighlightColors.kt) — no per-user add/rename/
+    // disable, so this is a constant flow rather than prefs-backed state.
+    val allHighlightColorDefs: Flow<List<HighlightColorDef>> = flowOf(HIGHLIGHT_COLOR_DEFS)
 
     private fun loadNotesFromPrefs(): List<NoteItem> {
         val str = prefs.getString("saved_notes_json", null) ?: return emptyList()
@@ -384,7 +385,20 @@ class BibleRepository(private val context: Context) {
         prefs.edit().putString("saved_completed_json", json.encodeToString(list)).apply()
     }
 
+    // One-time wipe when upgrading into the fixed 12-color palette: old
+    // highlights may reference colors (custom or the old default set) that
+    // no longer exist, and there's no "Manage" flow anymore to reconcile
+    // them — so rather than carrying orphaned/unlabeled highlights forward,
+    // this discards everything highlighted under the old system once, the
+    // first time this version runs.
     private fun loadHighlightsFromPrefs(): List<HighlightItem> {
+        if (!prefs.getBoolean("highlight_palette_v2_migrated", false)) {
+            prefs.edit()
+                .remove("saved_highlights_json")
+                .putBoolean("highlight_palette_v2_migrated", true)
+                .apply()
+            return emptyList()
+        }
         val str = prefs.getString("saved_highlights_json", null) ?: return emptyList()
         return try { json.decodeFromString(str) } catch (e: Exception) { emptyList() }
     }
@@ -392,21 +406,6 @@ class BibleRepository(private val context: Context) {
     private fun saveHighlightsToPrefs(list: List<HighlightItem>) {
         _highlightsFlow.value = list
         prefs.edit().putString("saved_highlights_json", json.encodeToString(list)).apply()
-    }
-
-    // No stored key yet means first launch (or upgrading from the old
-    // fixed-swatch picker, which never persisted any defs at all) — seed
-    // with the defaults rather than starting empty, same as Capacitor's own
-    // `highlightColors || defaultHighlightColors()` fallback.
-    private fun loadHighlightColorDefsFromPrefs(): List<HighlightColorDef> {
-        val str = prefs.getString("saved_highlight_color_defs_json", null)
-            ?: return DEFAULT_HIGHLIGHT_COLOR_DEFS
-        return try { json.decodeFromString(str) } catch (e: Exception) { DEFAULT_HIGHLIGHT_COLOR_DEFS }
-    }
-
-    private fun saveHighlightColorDefsToPrefs(list: List<HighlightColorDef>) {
-        _highlightColorDefsFlow.value = list
-        prefs.edit().putString("saved_highlight_color_defs_json", json.encodeToString(list)).apply()
     }
 
     // Load Telugu translation from assets
@@ -696,79 +695,6 @@ class BibleRepository(private val context: Context) {
         current.removeAll { it.book == book && it.chapter == chapter && it.verse == verse }
         saveHighlightsToPrefs(current)
         recordTombstone(highlightTombstoneKey(book, chapter, verse))
-    }
-
-    suspend fun addHighlightColor(label: String, colorHex: String) {
-        val current = _highlightColorDefsFlow.value.toMutableList()
-        current.add(HighlightColorDef(label, colorHex))
-        saveHighlightColorDefsToPrefs(current)
-    }
-
-    suspend fun renameHighlightColor(colorHex: String, newLabel: String) {
-        val current = _highlightColorDefsFlow.value.map {
-            if (it.colorHex == colorHex) it.copy(label = newLabel) else it
-        }
-        saveHighlightColorDefsToPrefs(current)
-    }
-
-    // Disabling hides a color from the picker without touching any verse
-    // already highlighted with it. Guards against disabling the last
-    // remaining enabled color, since that would leave no way to highlight
-    // anything new — mirrors the same "keep at least one" guard Capacitor
-    // applies before letting a color be turned off.
-    suspend fun setHighlightColorEnabled(colorHex: String, enabled: Boolean) {
-        val current = _highlightColorDefsFlow.value
-        if (!enabled && current.count { it.enabled } <= 1 &&
-            current.firstOrNull { it.colorHex == colorHex }?.enabled == true) {
-            return
-        }
-        val updated = current.map {
-            if (it.colorHex == colorHex) it.copy(enabled = enabled) else it
-        }
-        saveHighlightColorDefsToPrefs(updated)
-    }
-
-    // Since a color's identity IS its hex (see HighlightColors.kt), picking
-    // a new hex for an existing def has to carry every verse already
-    // highlighted with the old hex along with it — otherwise they'd
-    // silently fall out of that group. Capacitor doesn't need this step
-    // (it keys highlights by a separate colorId that never changes), but
-    // this achieves the same end result.
-    suspend fun recolorHighlightColor(oldHex: String, newHex: String) {
-        val updatedDefs = _highlightColorDefsFlow.value.map {
-            if (it.colorHex == oldHex) it.copy(colorHex = newHex) else it
-        }
-        saveHighlightColorDefsToPrefs(updatedDefs)
-
-        // Bumps updatedAt too, not just colorHex — this is a real local
-        // mutation of every affected highlight, and leaving updatedAt
-        // stale would let an older incoming backup's copy (still on the
-        // old hex) win a future merge purely on timestamp, undoing the
-        // recolor.
-        val now = System.currentTimeMillis()
-        val updatedHighlights = _highlightsFlow.value.map {
-            if (it.colorHex == oldHex) it.copy(colorHex = newHex, updatedAt = now) else it
-        }
-        saveHighlightsToPrefs(updatedHighlights)
-    }
-
-    // Matches Capacitor's confirm-then-delete: deleting a color un-highlights
-    // every verse that was using it, not just removes the def from the list.
-    suspend fun deleteHighlightColor(colorHex: String) {
-        val updatedDefs = _highlightColorDefsFlow.value.filter { it.colorHex != colorHex }
-        saveHighlightColorDefsToPrefs(updatedDefs)
-
-        // Every verse using this color gets un-highlighted too (see the
-        // comment above), so each of those needs its own tombstone as well
-        // as the color def itself — otherwise a restore could re-add the
-        // individual highlight entries even though the color they pointed
-        // to is (correctly) gone, leaving orphaned, unlabeled highlights.
-        val removedHighlights = _highlightsFlow.value.filter { it.colorHex == colorHex }
-        val updatedHighlights = _highlightsFlow.value.filter { it.colorHex != colorHex }
-        saveHighlightsToPrefs(updatedHighlights)
-
-        recordTombstone(colorTombstoneKey(colorHex))
-        removedHighlights.forEach { recordTombstone(highlightTombstoneKey(it.book, it.chapter, it.verse)) }
     }
 
     suspend fun saveNote(
@@ -1264,7 +1190,9 @@ class BibleRepository(private val context: Context) {
             tagDefs = _tagDefinitionsFlow.value,
             completed = _completedVersesFlow.value,
             highlights = _highlightsFlow.value,
-            highlightColorDefs = _highlightColorDefsFlow.value,
+            // Fixed now (see model/HighlightColors.kt) — included only so
+            // older builds reading this backup still find the key present.
+            highlightColorDefs = HIGHLIGHT_COLOR_DEFS,
             tombstones = SyncTombstones(_tombstonesFlow.value)
         )
         json.encodeToString(data)
@@ -1278,9 +1206,7 @@ class BibleRepository(private val context: Context) {
         val notesUpdated: Int,
         val tagsAdded: Int,
         val completedAdded: Int,
-        val highlightsAdded: Int,
-        val colorsAdded: Int,
-        val colorsRelabeled: Int
+        val highlightsAdded: Int
     )
 
     /** Restores from a backup produced by [exportBackupJson] (this device,
@@ -1437,37 +1363,16 @@ class BibleRepository(private val context: Context) {
         }
         saveHighlightsToPrefs(mergedHighlights)
 
-        // Highlight color defs: unioned by colorHex (a color's identity,
-        // not a separate id — see model/HighlightColors.kt). A tombstoned
-        // hex is skipped. A matching, non-tombstoned hex with a different
-        // label means the same color was renamed on another device; the
-        // backup's label wins since restoring is a deliberate action, same
-        // tiebreak rule highlights themselves use.
-        val existingColorDefs = _highlightColorDefsFlow.value
-        var colorsAdded = 0
-        var colorsRelabeled = 0
-        val mergedColorDefs = existingColorDefs.toMutableList()
-        for (incoming in data.highlightColorDefs) {
-            if (tombstones.containsKey(colorTombstoneKey(incoming.colorHex))) continue
-            val idx = mergedColorDefs.indexOfFirst { it.colorHex.equals(incoming.colorHex, ignoreCase = true) }
-            if (idx < 0) {
-                mergedColorDefs.add(incoming)
-                colorsAdded++
-            } else if (!mergedColorDefs[idx].label.equals(incoming.label, ignoreCase = true)) {
-                mergedColorDefs[idx] = incoming
-                colorsRelabeled++
-            }
-        }
-        saveHighlightColorDefsToPrefs(mergedColorDefs)
+        // Highlight colors are fixed now (see model/HighlightColors.kt) —
+        // `data.highlightColorDefs` is read by older builds only, nothing
+        // to merge on this one.
 
         ImportResult(
             notesAdded = notesAdded,
             notesUpdated = notesUpdated,
             tagsAdded = tagsAdded,
             completedAdded = completedAdded,
-            highlightsAdded = highlightsAdded,
-            colorsAdded = colorsAdded,
-            colorsRelabeled = colorsRelabeled
+            highlightsAdded = highlightsAdded
         )
     }
 

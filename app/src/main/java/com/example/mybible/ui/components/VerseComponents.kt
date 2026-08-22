@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 
 import androidx.compose.ui.unit.dp
@@ -45,7 +46,9 @@ import androidx.compose.ui.text.TextStyle
 import com.example.mybible.model.GreekWord
 import com.example.mybible.model.HebrewWord
 import com.example.mybible.model.HighlightColorDef
+import com.example.mybible.model.NoteItem
 import com.example.mybible.model.Verse
+import androidx.compose.foundation.BorderStroke
 import com.example.mybible.ui.theme.*
 
 // Default line-height ratio, matching Capacitor's fixed 1.85 — now the
@@ -454,23 +457,24 @@ fun VerseCard(
 @Composable
 fun VerseActionToolbar(
     verse: Verse,
-    isCompleted: Boolean,
     highlightColorDefs: List<HighlightColorDef>,
     currentHighlightColorHex: String?,
-    onToggleCompleted: () -> Unit,
     onSetHighlight: (String) -> Unit,
-    onManageHighlightColors: () -> Unit,
     onAddNote: () -> Unit,
-    onCrossRefClick: () -> Unit,
+    // Tapping the reference pill itself toggles the Greek/Hebrew
+    // interlinear view — Studied and Cross Ref dropped out of the toolbar
+    // entirely (both already reachable from the Reader directly: a
+    // long-press starts study-picking, and the verse's own cross-reference
+    // marker jumps straight there), which left Greek as the only action
+    // still needing a home once the bottom action row was removed.
     onToggleInterlinear: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
-    // Notes already attached to this exact verse — drives the same preview
-    // + "Add another note"/"View note(s)" behavior as Capacitor's
-    // verseSheetNotePreview/vsViewNote. Empty by default so existing call
-    // sites (if any aren't updated yet) keep compiling.
-    existingNotes: List<com.example.mybible.model.NoteItem> = emptyList(),
-    onViewNotes: (() -> Unit)? = null,
+    // Notes already attached to this exact verse — one preview row per
+    // note (not a collapsed "N notes" summary), each opening straight into
+    // that specific note.
+    existingNotes: List<NoteItem> = emptyList(),
+    onOpenNote: ((NoteItem) -> Unit)? = null,
     // Inline "why did I mark this" comment offered right after a highlight
     // is applied — see MainViewModel.addHighlightQuickNote. Null when the
     // caller doesn't wire this up, so the row simply doesn't show.
@@ -495,66 +499,118 @@ fun VerseActionToolbar(
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            val currentColorDef = highlightColorDefs.find { it.colorHex == currentHighlightColorHex }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Gold outlined pill — matches the reference-chip style
-                // already established in the Notes list/editor/reader
-                // (see NoteReaderScreen's ref line) rather than plain bold
-                // text, so a Scripture reference reads the same way
-                // everywhere it appears in the app.
-                Text(
-                    text = "${verse.book} ${verse.chapter}:${verse.number}",
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .border(1.dp, MaterialTheme.colorScheme.tertiary, RoundedCornerShape(10.dp))
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Gold outlined pill — matches the reference-chip style
+                    // already established in the Notes list/editor/reader
+                    // (see NoteReaderScreen's ref line). Also doubles as the
+                    // Greek/Hebrew interlinear toggle (see onToggleInterlinear
+                    // above) — no separate button needed for it.
+                    Text(
+                        text = "${verse.book} ${verse.chapter}:${verse.number}",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.tertiary, RoundedCornerShape(10.dp))
+                            .clickable(onClick = onToggleInterlinear)
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
+
+                    // Filled label pill for the current highlight color —
+                    // replaces the old separate "Highlighted — X" banner
+                    // row; the swatch row below still lets you change it.
+                    if (currentColorDef != null) {
+                        val swatchTint = parseHexColorOrNull(currentColorDef.colorHex) ?: Color.Gray
+                        Text(
+                            text = currentColorDef.label,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp,
+                            color = Color.Black,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(swatchTint)
+                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                        )
+                    }
+                }
                 IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
                     Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
-            // Current-highlight status — the swatch row below lets you
-            // change color, but its active swatch (a thin border + small
-            // checkmark among a dozen circles) is easy to miss at a glance.
-            // This tinted banner states the current state plainly instead
-            // of requiring the user to scan the row for which one's active.
-            val currentColorDef = highlightColorDefs.find { it.colorHex == currentHighlightColorHex }
-            if (currentColorDef != null) {
-                val swatchTint = parseHexColorOrNull(currentColorDef.colorHex) ?: Color.Gray
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(swatchTint.copy(alpha = 0.18f))
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(12.dp)
-                            .clip(CircleShape)
-                            .background(swatchTint)
-                    )
-                    Text(
-                        text = "Highlighted — ${currentColorDef.label}",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+            // Existing-note preview — one tinted row per note (not a
+            // collapsed "N notes" summary), each showing that note's own
+            // first line and opening straight into it in the note reader.
+            if (existingNotes.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    existingNotes.forEach { note ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.35f))
+                                .then(if (onOpenNote != null) Modifier.clickable { onOpenNote(note) } else Modifier)
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.StickyNote2,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = notePreviewLine(note),
+                                fontSize = 13.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Icon(
+                                imageVector = Icons.Default.ChevronRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
                 }
             }
 
-            // Highlight Colors — labeled, user-editable swatches (see
-            // model/HighlightColors.kt), not a fixed palette. Horizontally
-            // scrollable since the list can grow past what fits on screen.
+            // Always available — full editor, not the inline quick-note
+            // field below. Hollow/outlined rather than filled so it doesn't
+            // compete with the highlight swatches for attention.
+            OutlinedButton(
+                onClick = onAddNote,
+                modifier = Modifier.fillMaxWidth(),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Text(
+                    text = "+ Add New Note",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            // Highlight Colors — fixed palette (see model/HighlightColors.kt),
+            // no add/manage flow. Horizontally scrollable since 12 swatches
+            // plus Clear doesn't comfortably fit most screens at once.
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text("Highlight:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.height(6.dp))
@@ -581,7 +637,7 @@ fun VerseActionToolbar(
                         onClick = { onSetHighlight("") }
                     )
 
-                    highlightColorDefs.filter { it.enabled }.forEach { def ->
+                    highlightColorDefs.forEach { def ->
                         val isActive = currentHighlightColorHex == def.colorHex
                         HighlightSwatchItem(
                             label = def.label,
@@ -590,21 +646,6 @@ fun VerseActionToolbar(
                             onClick = { onSetHighlight(if (isActive) "" else def.colorHex) }
                         )
                     }
-
-                    // "Manage" — matches Capacitor's dashed "+"
-                    // manageRow at the end of the swatch list. (Compose has
-                    // no built-in dashed border, so this uses a plain muted
-                    // outline instead — same "this one's different" intent.)
-                    HighlightSwatchItem(
-                        label = "Manage",
-                        content = {
-                            Text("+", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        },
-                        swatchColor = Color.Transparent,
-                        outlineOnly = true,
-                        isActive = false,
-                        onClick = onManageHighlightColors
-                    )
                 }
             }
 
@@ -612,9 +653,7 @@ fun VerseActionToolbar(
             // highlight is applied, so a one-line "why did I mark this"
             // (doubt / prayer / learning) can be jotted down without
             // leaving the toolbar for the full Note Editor. Only shown
-            // once a color is active and the verse has no notes yet — once
-            // a note exists, "Add another" in the action row below covers
-            // it, same as the full editor flow.
+            // once a color is active and that highlight has no note yet.
             if (onAddQuickNote != null && !currentHighlightColorHex.isNullOrEmpty() && !highlightHasLinkedNote) {
                 var quickNoteText by remember(verse.book, verse.chapter, verse.number, currentHighlightColorHex) {
                     mutableStateOf("")
@@ -653,106 +692,16 @@ fun VerseActionToolbar(
                 }
             }
 
-            // Existing-note preview — mirrors Capacitor's
-            // verseSheetNotePreview: shows a one-line preview (or a count,
-            // when there's more than one) plus a "View note(s)" action, so
-            // this verse's notes are visible without leaving the Reader.
-            // Given its own tinted card (not a plain muted/italic line) —
-            // previously this blended in against the rest of the toolbar
-            // badly enough that users didn't realize it was there.
-            if (existingNotes.isNotEmpty()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.35f))
-                        .then(if (onViewNotes != null) Modifier.clickable { onViewNotes() } else Modifier)
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.StickyNote2,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = if (existingNotes.size == 1) "NOTE" else "${existingNotes.size} NOTES",
-                            fontSize = 11.sp,
-                            letterSpacing = 1.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.tertiary
-                        )
-                        Text(
-                            text = if (existingNotes.size == 1) {
-                                val t = existingNotes.first().text
-                                if (t.length > 90) t.take(89) + "\u2026" else t.ifBlank { "(empty note)" }
-                            } else {
-                                "Tap to view all"
-                            },
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    if (onViewNotes != null) {
-                        Icon(
-                            imageVector = Icons.Default.ChevronRight,
-                            contentDescription = "View notes",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
-            }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-
-            // All four actions share one accent tint (the theme's primary —
-            // the same coral/accent role Settings' outline buttons use)
-            // instead of "Studied" alone carrying an unrelated `secondary`
-            // tint and the rest defaulting to plain onSurface: a row of
-            // equally-weighted actions should read as one family, not one
-            // singled-out control among plain ones.
-            val actionTint = MaterialTheme.colorScheme.primary
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceAround
-            ) {
-                TextButton(onClick = onToggleCompleted, colors = ButtonDefaults.textButtonColors(contentColor = actionTint)) {
-                    Icon(
-                        imageVector = if (isCompleted) Icons.Default.CheckCircle else Icons.Default.CheckCircleOutline,
-                        contentDescription = "Studied",
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(if (isCompleted) "Studied" else "+ Studied", fontSize = 12.sp)
-                }
-
-                // Label switches to "Add another" once a note already
-                // exists on this verse, matching Capacitor's addBtn.textContent
-                // toggling between "Add note" / "Add another note".
-                TextButton(onClick = onAddNote, colors = ButtonDefaults.textButtonColors(contentColor = actionTint)) {
-                    Icon(Icons.Default.EditNote, contentDescription = "Add Note", modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(if (existingNotes.isEmpty()) "Note" else "Add another", fontSize = 12.sp)
-                }
-
-                TextButton(onClick = onCrossRefClick, colors = ButtonDefaults.textButtonColors(contentColor = actionTint)) {
-                    Icon(Icons.Default.FormatQuote, contentDescription = "Cross Ref", modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Cross Ref", fontSize = 12.sp)
-                }
-
-                TextButton(onClick = onToggleInterlinear, colors = ButtonDefaults.textButtonColors(contentColor = actionTint)) {
-                    Icon(Icons.Default.Translate, contentDescription = "Greek", modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Greek", fontSize = 12.sp)
-                }
-            }
         }
     }
+}
+
+/** First non-blank line of a note's body, trimmed and truncated — what
+ *  each row in the note-preview section shows instead of the full text. */
+private fun notePreviewLine(note: NoteItem, maxChars: Int = 90): String {
+    val firstLine = note.text.lineSequence().firstOrNull { it.isNotBlank() }?.trim().orEmpty()
+    if (firstLine.isEmpty()) return "(empty note)"
+    return if (firstLine.length > maxChars) firstLine.take(maxChars - 1) + "…" else firstLine
 }
 
 /** One labeled swatch in the highlight-color row: circle + short label

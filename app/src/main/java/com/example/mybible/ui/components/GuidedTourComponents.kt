@@ -78,7 +78,7 @@ val CURATED_TOUR_STEPS: List<TourStep> = listOf(
 
 /** Curated core plus deeper-cut features, still one step per idea rather
  *  than trying to choreograph a trip into a sub-screen (Tags, Note Editor,
- *  Manage Highlight Colors, etc.) blind. */
+ *  etc.) blind. */
 val FULL_TOUR_STEPS: List<TourStep> = CURATED_TOUR_STEPS + listOf(
     TourStep(
         NavTab.READER,

@@ -1,49 +1,24 @@
 package com.example.mybible.model
 
 /**
- * Capacitor lets people pick *any* color via the browser's native
- * `<input type=color>`. There's no equivalent control in Compose, and
- * building a full HSV picker was more than this feature needs, so instead
- * people choose from this curated palette when adding or recoloring a
- * highlight — a deliberate, discussed tradeoff (see conversation), not an
- * oversight. Two shades of each core hue plus a neutral, covering warm and
- * cool ranges without becoming an overwhelming grid.
+ * The full, fixed set of highlight colors — no add/rename/disable/manage
+ * flow anymore (that whole "Manage Highlight Colors" feature was removed
+ * along with the verse-action-toolbar revamp). Twelve pastel hues stepped
+ * evenly around the wheel (30° apart) at the same saturation/lightness, so
+ * every color is distinct at a glance and none reads as a near-duplicate of
+ * another.
  */
-val PRESET_HIGHLIGHT_PALETTE: List<String> = listOf(
-    "#FFF1A8", // Soft Yellow
-    "#F2C94C", // Gold
-    "#C8E6C9", // Soft Green
-    "#7DBE7D", // Green
-    "#BBDEFB", // Soft Blue
-    "#7FB2E0", // Blue
-    "#F8BBD0", // Soft Pink
-    "#E38FA8", // Rose
-    "#E1BEE7", // Lavender
-    "#CE93D8", // Purple
-    "#FFCC80", // Orange
-    "#FFAB91", // Coral
-    "#80CBC4", // Teal
-    "#B0BEC5"  // Gray
-)
-
-/**
- * Seeded on first launch (and merged in for anyone upgrading from the old
- * fixed 5-swatch picker). Covers two sources so nothing already-highlighted
- * loses its color or ends up unlabeled after upgrading:
- *  - Capacitor's own 4 defaults (same hexes, same labels — "Key Verse"
- *    etc.), for parity with the app you're used to.
- *  - The 5 hexes the old hardcoded Kotlin swatch picker used, given plain
- *    color-name labels, since verses already highlighted with those exact
- *    hexes need a matching def to show a label instead of "Uncategorized".
- */
-val DEFAULT_HIGHLIGHT_COLOR_DEFS: List<HighlightColorDef> = listOf(
-    HighlightColorDef("Key Verse", "#F2C94C"),
-    HighlightColorDef("Promise", "#7DBE7D"),
-    HighlightColorDef("Prayer", "#7FB2E0"),
-    HighlightColorDef("Important", "#E38FA8"),
-    HighlightColorDef("Yellow", "#FFF1A8"),
-    HighlightColorDef("Green", "#C8E6C9"),
-    HighlightColorDef("Blue", "#BBDEFB"),
-    HighlightColorDef("Pink", "#F8BBD0"),
-    HighlightColorDef("Purple", "#E1BEE7")
+val HIGHLIGHT_COLOR_DEFS: List<HighlightColorDef> = listOf(
+    HighlightColorDef("Rose", "#F1B1B1"),
+    HighlightColorDef("Peach", "#F1D1B1"),
+    HighlightColorDef("Sunshine", "#F1F1B1"),
+    HighlightColorDef("Lime", "#D1F1B1"),
+    HighlightColorDef("Mint", "#B1F1B1"),
+    HighlightColorDef("Seafoam", "#B1F1D1"),
+    HighlightColorDef("Sky", "#B1F1F1"),
+    HighlightColorDef("Azure", "#B1D1F1"),
+    HighlightColorDef("Periwinkle", "#B1B1F1"),
+    HighlightColorDef("Lavender", "#D1B1F1"),
+    HighlightColorDef("Orchid", "#F1B1F1"),
+    HighlightColorDef("Blush", "#F1B1D1")
 )
