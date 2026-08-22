@@ -1167,7 +1167,7 @@ fun ReaderScreen(
                     // menu), not something a plain tap should land you in.
                     viewModel.setSelectedVerse(null)
                     if (notesOnVerse.size == 1) {
-                        viewModel.openNoteReader(notesOnVerse.first())
+                        viewModel.openNoteReader(notesOnVerse.first(), originTab = NavTab.READER)
                     } else {
                         viewModel.selectTab(NavTab.NOTES)
                     }

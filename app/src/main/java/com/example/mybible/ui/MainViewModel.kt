@@ -486,8 +486,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun returnToNote() {
         val note = _noteReturnItem.value ?: return
         _noteReturnItem.value = null
-        openNoteReader(note)
-        selectTab(NavTab.NOTES)
+        val originTab = _noteReaderOriginTab.value
+        openNoteReader(note, originTab)
+        selectTab(originTab)
     }
 
     fun dismissNoteReturnBanner() {
@@ -1194,7 +1195,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { repository.deleteHighlightColor(colorHex) }
     }
 
-    fun openNoteReader(note: NoteItem) {
+    // Which tab NoteReaderScreen was opened from — the Notes tab (tapping a
+    // note card there) or straight from Reader (the verse action toolbar's
+    // "View notes", when a verse has exactly one existing note and there's
+    // no need to detour through the Notes list at all). returnToNote()
+    // needs this: following a verse mention out of a note that was opened
+    // the second way, then coming back, previously always switched to the
+    // Notes tab regardless — dropping the user somewhere they'd never
+    // actually visited instead of back on Reader where they started.
+    private val _noteReaderOriginTab = MutableStateFlow(NavTab.NOTES)
+
+    fun openNoteReader(note: NoteItem, originTab: NavTab = NavTab.NOTES) {
+        _noteReaderOriginTab.value = originTab
         _noteToRead.value = note
     }
 
