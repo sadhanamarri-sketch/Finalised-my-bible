@@ -96,34 +96,28 @@ fun CrossReferenceScreen(
         ) {
             // Base verse — the verse these cross-references were opened
             // from, pinned at the top so it stays visible while scrolling
-            // the list below. Elevated Card (matches the reference list
-            // below and Search/Notes), with its book name in coral and a
-            // larger verse-text size than the reference rows so the
-            // source stands out from what it points to.
+            // the list below. A coral wash (not the plain surface every
+            // other card here uses) distinguishes it at a glance as the
+            // source, not just another reference — idea #1's accent bar
+            // would be redundant on this same card, so a tint instead of a
+            // bar. The reference used to split book (coral) from
+            // chapter:verse (gold); unified to one color since that split
+            // read as arbitrary rather than meaningful.
             if (sourceVerse != null) {
                 val verse = sourceVerse!!
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
-                        Row {
-                            Text(
-                                text = verse.book.uppercase(),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.5.sp,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                text = " ${verse.chapter}:${verse.number}",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.5.sp,
-                                color = MaterialTheme.colorScheme.tertiary
-                            )
-                        }
+                        Text(
+                            text = "${verse.book.uppercase()} ${verse.chapter}:${verse.number}",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = verse.text,
