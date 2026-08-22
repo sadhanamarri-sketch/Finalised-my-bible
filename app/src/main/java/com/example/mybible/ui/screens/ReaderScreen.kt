@@ -305,27 +305,23 @@ fun ReaderScreen(
     // focusedVerseNumber stayed set forever. See clearVerseFocus()'s doc
     // for what that broke.
     //
-    // Also clears whichever "return to X" banner flag brought us here
-    // (clearStaleReaderDetours, not just clearVerseFocus) — every jump that
-    // sets focusedVerseNumber (openHighlightedVerse, markStudiedNavigation,
-    // openSearchResult, navigateToCrossReference, the lexicon/note "Open in
-    // Reader" actions) also flips one of the six detour flags, and until
-    // now *only* the banner's own Return/dismiss button cleared it. Scroll
-    // away without ever touching that banner (extremely easy to do — just
-    // keep reading) and the flag stayed stuck true indefinitely, which
-    // silently disables every position save gated on isDetourActive() —
-    // including the exact-verse resume the widget's Continue Reading
-    // depends on — for the rest of the session. Scrolling away is exactly
-    // the "settled here" signal isDetourActive's own doc calls for, so
-    // this is the same rule the explicit dismiss already applies, just
-    // triggered automatically instead of requiring a tap nothing prompts.
+    // Deliberately clearVerseFocus() only, NOT clearStaleReaderDetours() —
+    // a version of this once called clearStaleReaderDetours() so scrolling
+    // away also silently dismissed the "return to X" banner (reasoning:
+    // an untouched banner was blocking widget position-saves indefinitely
+    // via isDetourActive()). That broke normal reading: scrolling on to
+    // keep reading after a cross-reference/search/etc. jump killed the
+    // Return banner and its back-navigation immediately, while tapping the
+    // blurred verse first (clearVerseFocus only) left it working — the
+    // banner must only go away via its own explicit dismiss/Return, or a
+    // real tab switch/backgrounding, never from the reader just scrolling.
     LaunchedEffect(focusedVerseNumber, xrefFocusLandedIndex, xrefFocusLandedOffset) {
         if (focusedVerseNumber == null) return@LaunchedEffect
         snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
             .collect { (idx, offset) ->
                 if (idx != xrefFocusLandedIndex || kotlin.math.abs(offset - xrefFocusLandedOffset) > 4) {
                     xrefFocusActive = false
-                    viewModel.clearStaleReaderDetours()
+                    viewModel.clearVerseFocus()
                 }
             }
     }
