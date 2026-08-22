@@ -185,6 +185,18 @@ fun ReaderScreen(
     var xrefFocusActive by remember { mutableStateOf(false) }
     var xrefFocusLandedIndex by remember { mutableStateOf(-1) }
     var xrefFocusLandedOffset by remember { mutableStateOf(0) }
+    // Which verse xrefFocusLandedIndex/Offset actually belong to — set by
+    // the scroll-to-focus effect below in the same breath it updates those
+    // two, so the "did the user scroll away" watcher further down can tell
+    // "the target's landed position is stale/not-yet-computed for the
+    // *current* focusedVerseNumber" apart from "the position is current and
+    // a real emission means real movement." See that watcher's own doc for
+    // the race this closes: on a cold start (verses loads asynchronously),
+    // the watcher could otherwise start observing before the scroll effect
+    // — which waits on verses — ever got a chance to run, see the very
+    // first (unscrolled, index 0) frame as "moved away from -1", and clear
+    // focusedVerseNumber before it was ever acted on.
+    var landedForVerse by remember { mutableStateOf<Int?>(null) }
     // Tracks which chapter the effect below last ran for, so it can tell a
     // genuine chapter change (which should reset scroll to the top when
     // there's no focus target) apart from focusedVerseNumber simply being
@@ -252,9 +264,13 @@ fun ReaderScreen(
                 }
                 xrefFocusLandedIndex = listState.firstVisibleItemIndex
                 xrefFocusLandedOffset = listState.firstVisibleItemScrollOffset
+                landedForVerse = targetVerseNumber
                 xrefFocusActive = focusedVerseBlurEnabled
             } else {
                 listState.scrollToItem(0)
+                xrefFocusLandedIndex = 0
+                xrefFocusLandedOffset = 0
+                landedForVerse = targetVerseNumber
                 xrefFocusActive = false
             }
         } else if (isNewChapter) {
@@ -320,8 +336,17 @@ fun ReaderScreen(
     // the "settled here" signal isDetourActive's own doc calls for, so
     // this is the same rule the explicit dismiss already applies, just
     // triggered automatically instead of requiring a tap nothing prompts.
-    LaunchedEffect(focusedVerseNumber, xrefFocusLandedIndex, xrefFocusLandedOffset) {
+    LaunchedEffect(focusedVerseNumber, xrefFocusLandedIndex, xrefFocusLandedOffset, landedForVerse) {
         if (focusedVerseNumber == null) return@LaunchedEffect
+        // Not landed yet for *this* focusedVerseNumber — either the scroll
+        // effect above hasn't run yet (verses still loading, e.g. a cold
+        // start via the widget) or it's mid-flight for a just-changed
+        // target. Either way xrefFocusLandedIndex/Offset are stale (or the
+        // -1/0 initial defaults), so comparing against them here would read
+        // as spurious "moved away" and wipe the target before it's ever
+        // used. Wait for the scroll effect to catch up and bump
+        // landedForVerse to match, which re-triggers this effect.
+        if (landedForVerse != focusedVerseNumber) return@LaunchedEffect
         snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
             .collect { (idx, offset) ->
                 if (idx != xrefFocusLandedIndex || kotlin.math.abs(offset - xrefFocusLandedOffset) > 4) {
