@@ -64,6 +64,13 @@ enum class TourMode { NONE, CHOOSING, CURATED, FULL }
 // book/chapter granularity).
 data class ReaderScrollAnchor(val book: String, val chapter: Int, val verse: Int)
 
+// How long to wait after the last scroll update before writing the exact
+// reading position to disk (see MainViewModel.reportLiveTopVerse) — long
+// enough that active scrolling doesn't turn into a write per frame, short
+// enough that the on-disk position is never far behind if the process dies
+// without a clean onStop.
+private const val POSITION_SAVE_DEBOUNCE_MS = 1500L
+
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = BibleRepository(application)
@@ -771,9 +778,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // a StateFlow) is enough since nothing needs to observe this reactively.
     private var liveTopVerse: Int? = null
 
+    // Debounced disk-only save fired on every scroll update, independent of
+    // any single lifecycle callback getting a chance to run — a safety net
+    // alongside the onStop-triggered durable save (persistCurrentReadingPosition
+    // below), for cases where onStop itself either races a fast process kill
+    // or doesn't fire at all (some OEM "swipe away" implementations skip
+    // Activity lifecycle callbacks entirely). Cancel-and-relaunch means only
+    // the last scroll position in any given window actually hits disk.
+    private var positionSaveJob: Job? = null
+
     fun reportLiveTopVerse(book: String, chapter: Int, verse: Int?) {
         if (book == _currentBook.value && chapter == _currentChapter.value) {
             liveTopVerse = verse
+            positionSaveJob?.cancel()
+            positionSaveJob = viewModelScope.launch {
+                delay(POSITION_SAVE_DEBOUNCE_MS)
+                savePositionToDisk(durable = false)
+            }
         }
     }
 
@@ -818,9 +839,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // user hasn't settled on.
     fun persistCurrentReadingPosition() {
         if (!isDetourActive()) {
-            repository.saveLastReadPosition(_currentBook.value, _currentChapter.value, liveTopVerse)
+            // durable=true: this is the one guaranteed moment before Android
+            // may kill the process, so it blocks briefly on a synchronous
+            // write rather than risking apply()'s queued write losing the
+            // race (see saveLastReadPosition's own doc). The debounced path
+            // in reportLiveTopVerse above deliberately stays non-durable —
+            // this is the only call site that needs the stronger guarantee.
+            positionSaveJob?.cancel()
+            savePositionToDisk(durable = true)
             refreshContinueReadingWidget()
         }
+    }
+
+    private fun savePositionToDisk(durable: Boolean) {
+        repository.saveLastReadPosition(_currentBook.value, _currentChapter.value, liveTopVerse, durable = durable)
     }
 
     fun loadChapter(book: String, chapter: Int) {
