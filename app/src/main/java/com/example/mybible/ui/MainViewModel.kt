@@ -682,6 +682,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // cold-start restore look like any other in-app jump to Reader,
         // instead of a special pre-mount case.
         val restoredVerse = repository.getLastReadVerse()
+        initialScrollHintVerse = restoredVerse
         viewModelScope.launch {
             loadCurrentChapterSuspend()
             restoredVerse?.let { verse ->
@@ -783,6 +784,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // stale anchor from a much earlier visit.
     fun consumeReaderAnchor() {
         _readerAnchor.value = null
+    }
+
+    // One-shot, plain (non-reactive — deliberately not a StateFlow) hint
+    // for ReaderScreen's very first composition to seed its LazyListState
+    // near the right scroll position on a cold start, avoiding a visible
+    // top-of-chapter flash before the real scroll-to-focus effect corrects
+    // it. Set alongside the real restore in init{} above; kept completely
+    // separate from focusedVerseNumber on purpose — that field's timing is
+    // load-bearing for ReaderScreen's scroll-away watcher (see init{}'s own
+    // doc for the race that caused when this used to double as an early
+    // seed), so this hint must never feed into or influence that mechanism,
+    // only a plain initial pixel position that gets corrected regardless.
+    private var initialScrollHintVerse: Int? = null
+
+    // Only ever meaningful on ReaderScreen's first-ever composition this
+    // process (consuming it here means a later remount — e.g. returning
+    // from another tab — reads null and just starts at 0 as before).
+    fun consumeInitialScrollHint(): Int? {
+        val hint = initialScrollHintVerse
+        initialScrollHintVerse = null
+        return hint
     }
 
     // Continuously-updated "what verse is at the top of the Reader viewport
