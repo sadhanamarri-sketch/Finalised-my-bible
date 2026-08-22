@@ -62,13 +62,15 @@ class ContinueReadingWidget : GlanceAppWidget() {
         val lastBook = prefs.getString("last_book", "Genesis") ?: "Genesis"
         val lastChapter = prefs.getInt("last_chapter", 1)
         val lastVerse = prefs.getInt("last_verse", -1)
+        val debugTrace = formatDebugSaveTrace(prefs.getString("debug_save_trace", null))
 
         provideContent {
             ContinueReadingContent(
                 palette = palette,
                 lastBook = lastBook,
                 lastChapter = lastChapter,
-                lastVerse = lastVerse
+                lastVerse = lastVerse,
+                debugTrace = debugTrace
             )
         }
     }
@@ -79,7 +81,8 @@ private fun ContinueReadingContent(
     palette: WidgetPalette,
     lastBook: String,
     lastChapter: Int,
-    lastVerse: Int
+    lastVerse: Int,
+    debugTrace: String?
 ) {
     val context = LocalContext.current
     // Measured on-device (see commit history): default 4x1 placement is
@@ -150,6 +153,14 @@ private fun ContinueReadingContent(
                     maxLines = 1
                 )
             }
+        }
+
+        if (debugTrace != null) {
+            Text(
+                text = debugTrace,
+                style = TextStyle(fontSize = 9.sp, color = palette.accent),
+                maxLines = 1
+            )
         }
 
         if (isExpanded) {

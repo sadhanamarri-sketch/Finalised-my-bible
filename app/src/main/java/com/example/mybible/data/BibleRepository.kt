@@ -223,8 +223,15 @@ class BibleRepository(private val context: Context) {
     fun saveLastReadPosition(book: String, chapter: Int, verse: Int?, durable: Boolean = false) {
         val editor = prefs.edit().putString("last_book", book).putInt("last_chapter", chapter)
         if (verse != null) editor.putInt("last_verse", verse) else editor.remove("last_verse")
+        // Temporary diagnostic for the widget exact-resume bug — every call
+        // site, whether it wrote a real verse or removed the key, records
+        // what it saw so it can be read back (via the widget label) without
+        // adb. Remove alongside the widget's debug line once resolved.
+        editor.putString("debug_save_trace", "verse=$verse durable=$durable at=${System.currentTimeMillis()}")
         if (durable) editor.commit() else editor.apply()
     }
+
+    fun getDebugSaveTrace(): String? = prefs.getString("debug_save_trace", null)
 
     fun isFirstLaunch(): Boolean {
         return prefs.getBoolean("is_first_launch", true)

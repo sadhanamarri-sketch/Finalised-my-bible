@@ -15,6 +15,21 @@ import androidx.glance.unit.ColorProvider
 const val WIDGET_PREFS_NAME = "my_bible_prefs"
 const val WIDGET_THEME_KEY = "theme_mode"
 
+// Temporary diagnostic for the widget exact-resume bug — turns
+// BibleRepository.saveLastReadPosition's raw "verse=... durable=... at=..."
+// trace (see its own doc) into a compact on-widget line, e.g.
+// "v=null d=true 42s ago", so it can be read on-device without adb. Remove
+// alongside the trace write and the widget label lines that call this once
+// the bug is resolved.
+fun formatDebugSaveTrace(raw: String?): String? {
+    if (raw == null) return null
+    val verse = raw.substringAfter("verse=").substringBefore(" durable=")
+    val durable = raw.substringAfter("durable=").substringBefore(" at=")
+    val at = raw.substringAfter("at=").toLongOrNull() ?: return null
+    val agoSec = (System.currentTimeMillis() - at) / 1000
+    return "v=$verse d=$durable ${agoSec}s ago"
+}
+
 data class WidgetPalette(
     val background: ColorProvider,
     val text: ColorProvider,
