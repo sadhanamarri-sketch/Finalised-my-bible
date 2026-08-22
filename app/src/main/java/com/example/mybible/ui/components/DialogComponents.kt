@@ -393,10 +393,20 @@ fun VerseMentionPreviewSheet(
 
 // A modest curated palette for picking a new color's hex — avoids pulling
 // in a full color-picker dependency for what's a fairly rare action.
+//
+// Spread across distinct hues (~40-60° apart around the wheel) at similar
+// saturation/lightness, rather than the old 12-color set, which paired each
+// vivid color with a near-identical pastel tint of the same hue (e.g. gold
+// + a paler yellow, green + a paler green) — those pairs read as "the same
+// color twice" rather than two real choices.
 private val MANAGE_COLOR_PRESETS = listOf(
-    "#F2C94C", "#7DBE7D", "#7FB2E0", "#E38FA8",
-    "#FFF1A8", "#C8E6C9", "#BBDEFB", "#F8BBD0",
-    "#E1BEE7", "#FFCCBC", "#D7CCC8", "#B2DFDB"
+    "#F2C94C", // Gold
+    "#EB5757", // Coral
+    "#27AE60", // Green
+    "#17A398", // Teal
+    "#2F80ED", // Blue
+    "#9B51E0", // Purple
+    "#EB5296"  // Pink
 )
 
 private fun parseManageColorHex(hex: String): Color? {
