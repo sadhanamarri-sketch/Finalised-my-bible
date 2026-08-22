@@ -665,12 +665,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // observer below), not just the top of the saved chapter. Unblurred/
         // pinned-to-top — same as toggleTeluguInline's anchor restore — since
         // this is a silent position restore, not a "look at this verse" jump.
-        repository.getLastReadVerse()?.let { verse ->
-            _focusedVerseNumber.value = verse
-            _focusedVerseBlurEnabled.value = false
-            _focusedVersePinToTop.value = true
+        //
+        // Deliberately set *after* loadCurrentChapterSuspend() finishes,
+        // not before — ReaderScreen's scroll-to-focus effect and its
+        // "did the user scroll away" watcher both key off focusedVerseNumber
+        // and verses together; setting focusedVerseNumber here before
+        // ReaderScreen has even composed once meant the watcher could start
+        // observing (with nothing landed yet, since verses was still empty)
+        // before the scroll effect ever got a chance to run, misreading the
+        // very first unscrolled frame as "the user scrolled away" and
+        // clearing the target before it was used — this only ever showed up
+        // on a genuine cold start (e.g. via the widget), since a normal
+        // in-app jump always has verses already loaded by the time it sets
+        // focusedVerseNumber on an already-mounted Reader. Sequencing it
+        // after the chapter's verses are actually in _verses makes this
+        // cold-start restore look like any other in-app jump to Reader,
+        // instead of a special pre-mount case.
+        val restoredVerse = repository.getLastReadVerse()
+        viewModelScope.launch {
+            loadCurrentChapterSuspend()
+            restoredVerse?.let { verse ->
+                _focusedVerseNumber.value = verse
+                _focusedVerseBlurEnabled.value = false
+                _focusedVersePinToTop.value = true
+            }
         }
-        loadCurrentChapter()
 
         // Study time should only accrue while the app is actually in the
         // foreground — previously it started once here and never stopped,
@@ -938,17 +957,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         repository.getVerseText(book, chapter, verse)
 
     private fun loadCurrentChapter() {
-        viewModelScope.launch {
-            _isLoading.value = true
-            _selectedVerse.value = null
+        viewModelScope.launch { loadCurrentChapterSuspend() }
+    }
 
-            val bookName = _currentBook.value
-            val chap = _currentChapter.value
-            val result = repository.getChapterVerses(bookName, chap, includeTelugu = _showTeluguInline.value)
-            _verses.value = result
-            _verseNumbersWithXrefs.value = repository.getCrossReferenceVerseNumbers(bookName, chap)
-            _isLoading.value = false
-        }
+    // Suspend variant of loadCurrentChapter(), for callers that need to
+    // sequence something to run only after this chapter's verses have
+    // actually landed in _verses — see init{}'s use of it below. Every
+    // other call site still just fires loadCurrentChapter() and moves on.
+    private suspend fun loadCurrentChapterSuspend() {
+        _isLoading.value = true
+        _selectedVerse.value = null
+
+        val bookName = _currentBook.value
+        val chap = _currentChapter.value
+        val result = repository.getChapterVerses(bookName, chap, includeTelugu = _showTeluguInline.value)
+        _verses.value = result
+        _verseNumbersWithXrefs.value = repository.getCrossReferenceVerseNumbers(bookName, chap)
+        _isLoading.value = false
     }
 
     // Swiping chapters is plain forward/backward reading, not a "jump to a
