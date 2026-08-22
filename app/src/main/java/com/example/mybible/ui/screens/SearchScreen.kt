@@ -1,5 +1,6 @@
 package com.example.mybible.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.layout.IntrinsicSize
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
@@ -45,11 +47,29 @@ fun SearchScreen(
     val savedScrollIndex by viewModel.searchScrollIndex.collectAsState()
     val savedScrollOffset by viewModel.searchScrollOffset.collectAsState()
     val searchHistory by viewModel.searchHistory.collectAsState()
+    val lastTappedKey by viewModel.searchLastTappedKey.collectAsState()
 
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = savedScrollIndex,
         initialFirstVisibleItemScrollOffset = savedScrollOffset
     )
+
+    // Marks the last-tapped result with an accent bar on return, so the
+    // user can spot which one they already visited — cleared on the first
+    // scroll after landing (same "scroll to clear" idea as Reader's
+    // xrefFocusActive), not on a timer or tap, since scrolling is the
+    // natural signal that they've moved on to browsing something else.
+    LaunchedEffect(lastTappedKey) {
+        if (lastTappedKey == null) return@LaunchedEffect
+        val landedIndex = listState.firstVisibleItemIndex
+        val landedOffset = listState.firstVisibleItemScrollOffset
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collect { (idx, offset) ->
+                if (idx != landedIndex || kotlin.math.abs(offset - landedOffset) > 4) {
+                    viewModel.clearSearchLastTapped()
+                }
+            }
+    }
 
     // Auto-focus the search field and pop the keyboard the moment this
     // screen appears (e.g. tapping Search on the home screen widget) —
@@ -290,40 +310,56 @@ fun SearchScreen(
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(searchResults) { verse ->
+                    val itemKey = "${verse.book}:${verse.chapter}:${verse.number}"
+                    val isLastTapped = itemKey == lastTappedKey
                     Card(
                         onClick = { viewModel.openSearchResult(verse) },
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "${verse.book} ${verse.chapter}:${verse.number}".uppercase(),
-                                    fontSize = 12.5.sp,
-                                    fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
-                                    letterSpacing = 1.5.sp,
-                                    color = MaterialTheme.colorScheme.tertiary
-                                )
-                                Icon(
-                                    imageVector = Icons.Default.ArrowForward,
-                                    contentDescription = "Navigate",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(16.dp)
+                        // Same left-edge accent bar as Reader's highlight
+                        // style (idea #1) — height(Min) is required for the
+                        // bar's fillMaxHeight to have anything bounded to
+                        // fill, since this Row sits in a wrap-content Card.
+                        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                            if (isLastTapped) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(3.dp)
+                                        .fillMaxHeight()
+                                        .background(MaterialTheme.colorScheme.primary)
                                 )
                             }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = verse.text,
-                                fontSize = 15.sp,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
-                                lineHeight = 21.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                            Column(modifier = Modifier.weight(1f).padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "${verse.book} ${verse.chapter}:${verse.number}".uppercase(),
+                                        fontSize = 12.5.sp,
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
+                                        letterSpacing = 1.5.sp,
+                                        color = MaterialTheme.colorScheme.tertiary
+                                    )
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowForward,
+                                        contentDescription = "Navigate",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = verse.text,
+                                    fontSize = 15.sp,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+                                    lineHeight = 21.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
                         }
                     }
                 }

@@ -388,6 +388,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _crossReferenceReturnAvailable = MutableStateFlow(false)
     val crossReferenceReturnAvailable: StateFlow<Boolean> = _crossReferenceReturnAvailable.asStateFlow()
 
+    // "targetBook:targetChapter:targetVerse" key of the last reference
+    // tapped — same idea and lifecycle as _searchLastTappedKey above, for
+    // CrossReferenceScreen's list instead of Search's.
+    private val _crossReferenceLastTappedKey = MutableStateFlow<String?>(null)
+    val crossReferenceLastTappedKey: StateFlow<String?> = _crossReferenceLastTappedKey.asStateFlow()
+
+    fun clearCrossReferenceLastTapped() {
+        _crossReferenceLastTappedKey.value = null
+    }
+
     // Verse-mention preview sheet — opened by tapping a linkified reference
     // inside note text (see data/VerseMentionLinkifier.kt) or a clickable
     // Scripture citation inside a Greek/Hebrew lexicon definition (see
@@ -542,6 +552,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // either returns to Search via the banner or explicitly dismisses it.
     private val _searchReturnAvailable = MutableStateFlow(false)
     val searchReturnAvailable: StateFlow<Boolean> = _searchReturnAvailable.asStateFlow()
+
+    // "book:chapter:verse" key of the last search result tapped — lets
+    // SearchScreen mark that card with an accent bar on return, so the
+    // user can spot which result they already visited without having to
+    // remember it themselves. Cleared once the user scrolls the list
+    // (SearchScreen's own scroll-watching effect) or ends the session.
+    private val _searchLastTappedKey = MutableStateFlow<String?>(null)
+    val searchLastTappedKey: StateFlow<String?> = _searchLastTappedKey.asStateFlow()
+
+    fun clearSearchLastTapped() {
+        _searchLastTappedKey.value = null
+    }
 
     // Timer state
     private val _totalStudyTimeMs = MutableStateFlow(repository.getTotalStudyTimeMs())
@@ -947,6 +969,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // the list, which now stays intact for that return trip) and jumps.
     fun navigateToCrossReference(targetBook: String, targetChapter: Int, targetVerse: Int) {
         _crossReferenceReturnAvailable.value = true
+        _crossReferenceLastTappedKey.value = "$targetBook:$targetChapter:$targetVerse"
         _focusedVerseNumber.value = targetVerse
         _focusedVerseBlurEnabled.value = true
         _focusedVersePinToTop.value = false
@@ -1203,6 +1226,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _crossReferenceSourceVerse.value = null
         _crossReferenceScrollIndex.value = 0
         _crossReferenceScrollOffset.value = 0
+        _crossReferenceLastTappedKey.value = null
     }
 
     fun toggleCompletedVerse(book: String, chapter: Int, verse: Int) {
@@ -1754,6 +1778,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _searchQuery.value = ""
         _searchResults.value = emptyList()
         _isSearching.value = false
+        _searchLastTappedKey.value = null
     }
 
     // Tapping a recent-search suggestion re-runs that exact search and
@@ -1773,6 +1798,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // just keep reading.
     fun openSearchResult(verse: Verse) {
         _searchReturnAvailable.value = true
+        _searchLastTappedKey.value = "${verse.book}:${verse.chapter}:${verse.number}"
         _isBlurModeEnabled.value = false
         jumpToVerse(verse.book, verse.chapter, verse.number)
         selectTab(NavTab.READER)

@@ -1,5 +1,6 @@
 package com.example.mybible.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.IntrinsicSize
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -37,11 +39,29 @@ fun CrossReferenceScreen(
     val crossReferences by viewModel.crossReferenceList.collectAsState()
     val savedScrollIndex by viewModel.crossReferenceScrollIndex.collectAsState()
     val savedScrollOffset by viewModel.crossReferenceScrollOffset.collectAsState()
+    val lastTappedKey by viewModel.crossReferenceLastTappedKey.collectAsState()
 
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = savedScrollIndex,
         initialFirstVisibleItemScrollOffset = savedScrollOffset
     )
+
+    // Marks the last-tapped reference with an accent bar on return, so the
+    // user can spot which one they already followed — cleared on the first
+    // scroll after landing (same "scroll to clear" idea as Reader's
+    // xrefFocusActive), not on a timer or tap, since scrolling is the
+    // natural signal that they've moved on to browsing something else.
+    LaunchedEffect(lastTappedKey) {
+        if (lastTappedKey == null) return@LaunchedEffect
+        val landedIndex = listState.firstVisibleItemIndex
+        val landedOffset = listState.firstVisibleItemScrollOffset
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collect { (idx, offset) ->
+                if (idx != landedIndex || kotlin.math.abs(offset - landedOffset) > 4) {
+                    viewModel.clearCrossReferenceLastTapped()
+                }
+            }
+    }
 
     // CrossReferenceScreen is fully disposed (not just hidden) when the
     // user switches tabs — save scroll position on the way out so "return
@@ -147,6 +167,8 @@ fun CrossReferenceScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         items(crossReferences!!) { item ->
+                            val itemKey = "${item.targetBook}:${item.targetChapter}:${item.targetVerse}"
+                            val isLastTapped = itemKey == lastTappedKey
                             Card(
                                 onClick = {
                                     viewModel.navigateToCrossReference(
@@ -159,34 +181,49 @@ fun CrossReferenceScreen(
                                 shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "${item.targetBook} ${item.targetChapter}:${item.targetVerse}".uppercase(),
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            letterSpacing = 0.5.sp,
-                                            color = MaterialTheme.colorScheme.tertiary
-                                        )
-                                        Icon(
-                                            imageVector = Icons.Default.ArrowForward,
-                                            contentDescription = "Navigate",
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(16.dp)
+                                // Same left-edge accent bar as Reader's
+                                // highlight style (idea #1) — height(Min) is
+                                // required for the bar's fillMaxHeight to
+                                // have anything bounded to fill, since this
+                                // Row sits in a wrap-content Card.
+                                Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                                    if (isLastTapped) {
+                                        Box(
+                                            modifier = Modifier
+                                                .width(3.dp)
+                                                .fillMaxHeight()
+                                                .background(MaterialTheme.colorScheme.primary)
                                         )
                                     }
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = item.previewText,
-                                        fontSize = 15.sp,
-                                        fontFamily = FontFamily.Serif,
-                                        lineHeight = 21.sp,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
+                                    Column(modifier = Modifier.weight(1f).padding(12.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "${item.targetBook} ${item.targetChapter}:${item.targetVerse}".uppercase(),
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                letterSpacing = 0.5.sp,
+                                                color = MaterialTheme.colorScheme.tertiary
+                                            )
+                                            Icon(
+                                                imageVector = Icons.Default.ArrowForward,
+                                                contentDescription = "Navigate",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = item.previewText,
+                                            fontSize = 15.sp,
+                                            fontFamily = FontFamily.Serif,
+                                            lineHeight = 21.sp,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
                                 }
                             }
                         }
