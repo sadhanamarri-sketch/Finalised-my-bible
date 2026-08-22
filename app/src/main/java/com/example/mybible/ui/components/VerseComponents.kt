@@ -520,6 +520,38 @@ fun VerseActionToolbar(
                 }
             }
 
+            // Current-highlight status — the swatch row below lets you
+            // change color, but its active swatch (a thin border + small
+            // checkmark among a dozen circles) is easy to miss at a glance.
+            // This tinted banner states the current state plainly instead
+            // of requiring the user to scan the row for which one's active.
+            val currentColorDef = highlightColorDefs.find { it.colorHex == currentHighlightColorHex }
+            if (currentColorDef != null) {
+                val swatchTint = parseHexColorOrNull(currentColorDef.colorHex) ?: Color.Gray
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(swatchTint.copy(alpha = 0.18f))
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .clip(CircleShape)
+                            .background(swatchTint)
+                    )
+                    Text(
+                        text = "Highlighted — ${currentColorDef.label}",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+
             // Highlight Colors — labeled, user-editable swatches (see
             // model/HighlightColors.kt), not a fixed palette. Horizontally
             // scrollable since the list can grow past what fits on screen.
@@ -625,27 +657,45 @@ fun VerseActionToolbar(
             // verseSheetNotePreview: shows a one-line preview (or a count,
             // when there's more than one) plus a "View note(s)" action, so
             // this verse's notes are visible without leaving the Reader.
+            // Given its own tinted card (not a plain muted/italic line) —
+            // previously this blended in against the rest of the toolbar
+            // badly enough that users didn't realize it was there.
             if (existingNotes.isNotEmpty()) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.35f))
                         .then(if (onViewNotes != null) Modifier.clickable { onViewNotes() } else Modifier)
-                        .padding(vertical = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = if (existingNotes.size == 1) {
-                            val t = existingNotes.first().text
-                            if (t.length > 90) t.take(89) + "\u2026" else t.ifBlank { "(empty note)" }
-                        } else {
-                            "${existingNotes.size} notes on this verse"
-                        },
-                        fontSize = 12.sp,
-                        fontStyle = FontStyle.Italic,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f)
+                    Icon(
+                        imageVector = Icons.Default.StickyNote2,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.size(18.dp)
                     )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (existingNotes.size == 1) "NOTE" else "${existingNotes.size} NOTES",
+                            fontSize = 11.sp,
+                            letterSpacing = 1.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.tertiary
+                        )
+                        Text(
+                            text = if (existingNotes.size == 1) {
+                                val t = existingNotes.first().text
+                                if (t.length > 90) t.take(89) + "\u2026" else t.ifBlank { "(empty note)" }
+                            } else {
+                                "Tap to view all"
+                            },
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                     if (onViewNotes != null) {
                         Icon(
                             imageVector = Icons.Default.ChevronRight,
