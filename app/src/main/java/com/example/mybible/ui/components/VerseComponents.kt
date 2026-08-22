@@ -121,12 +121,16 @@ fun VerseCard(
     // not a fixed 5, so this parses whatever hex is actually stored rather
     // than pattern-matching a hardcoded set — a pattern-match would silently
     // stop rendering any color added or recolored since the original 5.
-    // 0x80 alpha matches the old hardcoded HighlightYellow/Green/etc.
-    // constants' translucency (they were ARGB with 0x80 alpha baked in).
-    val highlightBg = highlightColorHex
-        ?.let { parseHexColorOrNull(it) }
-        ?.copy(alpha = 0.5f)
-        ?: Color.Transparent
+    //
+    // Rendered as a slim left-edge accent bar + a tinted verse number,
+    // rather than a translucent full-row fill — a full-row wash across
+    // every highlighted verse in a chapter made the page read as "so much
+    // color" with no easy way to tell which color was which without
+    // staring at it. The bar+number combo keeps the reading text itself on
+    // the plain background (fully legible in every theme) while still
+    // being unmistakable at a glance, and it's a full-opacity color rather
+    // than translucent since it's a thin accent, not a wash over text.
+    val highlightColor = highlightColorHex?.let { parseHexColorOrNull(it) }
 
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val redLetterColor = if (isDark) DarkRedLetter else PaperRedLetter
@@ -175,18 +179,29 @@ fun VerseCard(
                 }
             )
             .background(
-                if (highlightBg != Color.Transparent) highlightBg.copy(alpha = 0.5f)
-                else if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
                 else Color.Transparent
             )
             .combinedClickable(
                 onClick = onVerseClick,
                 onLongClick = onVerseLongClick
             )
-            .padding(horizontal = 8.dp, vertical = 8.dp)
             .testTag("verse_item_${verse.number}")
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth()) {
+            if (highlightColor != null) {
+                Box(
+                    modifier = Modifier
+                        .width(3.dp)
+                        .fillMaxHeight()
+                        .background(highlightColor)
+                )
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 8.dp, vertical = 8.dp)
+            ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top
@@ -202,7 +217,8 @@ fun VerseCard(
                         text = "${verse.number}",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (isFocusedVerse) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                        color = highlightColor
+                            ?: if (isFocusedVerse) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
                     )
                     // Cross-reference marker (Capacitor's `.verse.has-xref
                     // .vnum::after` dagger, '\u2020', gold, superscript-ish).
@@ -421,6 +437,7 @@ fun VerseCard(
                 // the toolbar's toggle state when the verse is selected, and
                 // stamping every studied verse with a checkmark just added
                 // visual noise to a chapter you already know you've read.
+            }
             }
         }
     }
