@@ -244,6 +244,7 @@ class MainActivity : ComponentActivity() {
 
             val themeMode by viewModel.themeMode.collectAsState()
             val activeTab by viewModel.activeTab.collectAsState()
+            val initialRestoreComplete by viewModel.initialRestoreComplete.collectAsState()
 
             val showBookPicker by viewModel.showBookPicker.collectAsState()
             val currentBook by viewModel.currentBook.collectAsState()
@@ -376,6 +377,16 @@ class MainActivity : ComponentActivity() {
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.background)
                 ) {
+                    // Holds every tab's content back — not just Reader's —
+                    // until MainViewModel's cold-start restore has fully
+                    // landed (chapter loaded, saved verse applied). A blank
+                    // themed background for that one brief window beats
+                    // mounting Reader (or any tab) before it has real data
+                    // to show, which is what forced ReaderScreen into
+                    // fragile seed/hide/reveal timing to avoid a visible
+                    // wrong-position flash. See
+                    // MainViewModel.initialRestoreComplete's own doc.
+                    if (initialRestoreComplete) {
                     AnimatedContent(
                         targetState = activeTab,
                         label = "TabTransition"
@@ -411,6 +422,7 @@ class MainActivity : ComponentActivity() {
                                 onDriveRestore = { runDriveRestore() }
                             )
                         }
+                    }
                     }
 
                     // Bible data import banner — bundled/downloaded Telugu

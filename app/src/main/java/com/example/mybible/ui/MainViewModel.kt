@@ -671,6 +671,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // referenced inside an init block to be declared before that block.
     private var initialScrollHintVerse: Int? = null
 
+    // True once the cold-start restore below has fully landed: chapter
+    // loaded (verses populated) and, if there was one, the saved verse
+    // applied to focusedVerseNumber. MainActivity holds the whole app's UI
+    // back (a blank frame, not any tab's content) until this flips —
+    // rather than mounting Reader immediately and racing several layers of
+    // seed/hide/reveal machinery to hide the gap, there's simply nothing
+    // mounted yet to show a wrong position in. Reader mounting only once
+    // everything is already resolved makes a cold start look, to
+    // ReaderScreen, exactly like any other in-app jump to an
+    // already-loaded chapter — which already works correctly.
+    private val _initialRestoreComplete = MutableStateFlow(false)
+    val initialRestoreComplete: StateFlow<Boolean> = _initialRestoreComplete.asStateFlow()
+
     init {
         val (savedBook, savedChap) = repository.getLastPosition()
         _currentBook.value = savedBook
@@ -705,6 +718,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _focusedVerseBlurEnabled.value = false
                 _focusedVersePinToTop.value = true
             }
+            _initialRestoreComplete.value = true
         }
 
         // Study time should only accrue while the app is actually in the
