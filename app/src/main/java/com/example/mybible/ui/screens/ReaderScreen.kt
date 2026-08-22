@@ -266,10 +266,23 @@ fun ReaderScreen(
                 landedForVerse = targetVerseNumber
                 xrefFocusActive = focusedVerseBlurEnabled
             } else {
+                // Target verse not (yet) found in whatever verses currently
+                // holds — do NOT mark landedForVerse here. This is the
+                // common transient state right after a cross-chapter jump
+                // (search/cross-reference/notes/highlights/studied all
+                // navigate across chapters more often than not): verses is
+                // still empty or holds the *previous* chapter's list for a
+                // frame or two while the new chapter loads, so the target
+                // legitimately isn't found yet — it's not a real "verse
+                // doesn't exist" case. Leaving landedForVerse unset keeps
+                // the scroll-away watcher below gated off until this effect
+                // re-runs with the real chapter loaded and actually lands;
+                // marking it landed here (a previous attempt at this) let
+                // the watcher arm itself against this stale index-0
+                // position, so the *next* run's legitimate scroll to the
+                // real target read as "the user scrolled away" and
+                // immediately cleared the jump before it was ever seen.
                 listState.scrollToItem(0)
-                xrefFocusLandedIndex = 0
-                xrefFocusLandedOffset = 0
-                landedForVerse = targetVerseNumber
                 xrefFocusActive = false
             }
         } else if (isNewChapter) {
