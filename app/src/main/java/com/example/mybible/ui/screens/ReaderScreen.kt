@@ -1139,14 +1139,16 @@ fun ReaderScreen(
                 it.book == verse.book && it.chapter == verse.chapter && it.verse == verse.number
             }
             val notesOnVerse = notes.filter { it.matchesVerse(verse.book, verse.chapter, verse.number) }
+            val currentHighlight = highlights.find {
+                it.book == verse.book && it.chapter == verse.chapter && it.verse == verse.number
+            }
 
             VerseActionToolbar(
                 verse = verse,
                 isCompleted = isCompleted,
                 highlightColorDefs = highlightColorDefs,
-                currentHighlightColorHex = highlights.find {
-                    it.book == verse.book && it.chapter == verse.chapter && it.verse == verse.number
-                }?.colorHex,
+                currentHighlightColorHex = currentHighlight?.colorHex,
+                highlightHasLinkedNote = currentHighlight?.noteId != null,
                 existingNotes = notesOnVerse,
                 onToggleCompleted = {
                     viewModel.toggleCompletedVerse(verse.book, verse.chapter, verse.number)
@@ -1155,9 +1157,7 @@ fun ReaderScreen(
                     viewModel.setHighlightColor(verse.book, verse.chapter, verse.number, hex)
                 },
                 onAddQuickNote = { noteText ->
-                    val currentHex = highlights.find {
-                        it.book == verse.book && it.chapter == verse.chapter && it.verse == verse.number
-                    }?.colorHex
+                    val currentHex = currentHighlight?.colorHex
                     if (currentHex != null) {
                         val colorLabel = highlightColorDefs.find { it.colorHex == currentHex }?.label ?: "Highlight"
                         viewModel.addHighlightQuickNote(

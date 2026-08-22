@@ -474,7 +474,14 @@ fun VerseActionToolbar(
     // Inline "why did I mark this" comment offered right after a highlight
     // is applied — see MainViewModel.addHighlightQuickNote. Null when the
     // caller doesn't wire this up, so the row simply doesn't show.
-    onAddQuickNote: ((String) -> Unit)? = null
+    onAddQuickNote: ((String) -> Unit)? = null,
+    // Whether the *current highlight itself* already has a linked quick
+    // note (HighlightItem.noteId != null) — deliberately separate from
+    // existingNotes.isEmpty(): a verse can already carry an older, unrelated
+    // note (added before this verse was ever highlighted), and that must
+    // not hide the quick-note row for a highlight that has no note of its
+    // own yet.
+    highlightHasLinkedNote: Boolean = false
 ) {
     Surface(
         modifier = modifier
@@ -576,7 +583,7 @@ fun VerseActionToolbar(
             // once a color is active and the verse has no notes yet — once
             // a note exists, "Add another" in the action row below covers
             // it, same as the full editor flow.
-            if (onAddQuickNote != null && !currentHighlightColorHex.isNullOrEmpty() && existingNotes.isEmpty()) {
+            if (onAddQuickNote != null && !currentHighlightColorHex.isNullOrEmpty() && !highlightHasLinkedNote) {
                 var quickNoteText by remember(verse.book, verse.chapter, verse.number, currentHighlightColorHex) {
                     mutableStateOf("")
                 }

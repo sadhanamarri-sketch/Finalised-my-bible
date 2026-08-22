@@ -1228,7 +1228,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 text = trimmed,
                 noteDate = "",
                 refs = listOf(NoteReference(book, chapter, verse, verseText)),
-                tags = listOf(colorLabel)
+                tags = listOf("Highlighted Verse", colorLabel)
             )
             repository.setHighlight(book, chapter, verse, colorHex, noteId = noteId)
         }
