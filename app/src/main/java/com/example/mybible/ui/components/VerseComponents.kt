@@ -188,7 +188,14 @@ fun VerseCard(
             )
             .testTag("verse_item_${verse.number}")
     ) {
-        Row(modifier = Modifier.fillMaxWidth()) {
+        // height(IntrinsicSize.Min) forces this Row to resolve its own
+        // height from its children's intrinsic (measured) content height
+        // first — without it, the Row's incoming height constraint is
+        // unbounded (the outer Box wraps its content rather than having a
+        // fixed height), so the bar's fillMaxHeight() below has nothing
+        // real to fill and silently collapses to zero instead of matching
+        // the verse text's height.
+        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
             if (highlightColor != null) {
                 Box(
                     modifier = Modifier
