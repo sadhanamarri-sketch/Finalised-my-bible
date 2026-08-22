@@ -113,18 +113,7 @@ fun ReaderScreen(
     val pickedNoteRefs by viewModel.pickedNoteRefs.collectAsState()
     val noteToEdit by viewModel.noteToEdit.collectAsState()
 
-    // Best-effort initial position to avoid a visible top-of-chapter flash
-    // before the exact scroll-to-focus effect below corrects it — that
-    // effect can't run until `verses` finishes loading (async, e.g. a cold
-    // start via the widget), so without this the very first frame always
-    // renders at index 0 regardless of an already-known target. Approximates
-    // "verse N sits at LazyColumn index N" (index 0 is the chapter header,
-    // see itemsIndexed(verses) below) since chapters are verse-numbered
-    // 1..count without gaps in the vast majority of cases; any off-by-a-
-    // little from a rare gap is just a small correction once the real verse
-    // list loads, not a full top-of-chapter jump. Only read once (remember
-    // has no keys) — later focus changes go through scrollToItem instead.
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = focusedVerseNumber ?: 0)
+    val listState = rememberLazyListState()
 
     // Snapshots the top-visible verse into MainViewModel right before
     // ReaderScreen is torn down (visiting another tab) — see
