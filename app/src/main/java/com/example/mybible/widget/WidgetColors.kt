@@ -15,48 +15,6 @@ import androidx.glance.unit.ColorProvider
 const val WIDGET_PREFS_NAME = "my_bible_prefs"
 const val WIDGET_THEME_KEY = "theme_mode"
 
-// Temporary diagnostic for the widget exact-resume bug — turns
-// BibleRepository.saveLastReadPosition's raw "verse=... durable=... at=..."
-// trace (see its own doc) into a compact on-widget line, e.g.
-// "v=null d=true 42s ago", so it can be read on-device without adb. Remove
-// alongside the trace write and the widget label lines that call this once
-// the bug is resolved.
-fun formatDebugSaveTrace(raw: String?): String? {
-    if (raw == null) return null
-    val verse = raw.substringAfter("verse=").substringBefore(" durable=")
-    val durable = raw.substringAfter("durable=").substringBefore(" at=")
-    val at = raw.substringAfter("at=").toLongOrNull() ?: return null
-    val agoSec = (System.currentTimeMillis() - at) / 1000
-    return "save: v=$verse d=$durable ${agoSec}s ago"
-}
-
-// Companion to formatDebugSaveTrace above, decoding
-// MainViewModel's init{}-time "what did cold start read back" trace
-// (BibleRepository.setDebugRestoreTrace).
-fun formatDebugRestoreTrace(raw: String?): String? {
-    if (raw == null) return null
-    val book = raw.substringAfter("book=").substringBefore(" chap=")
-    val chap = raw.substringAfter("chap=").substringBefore(" verse=")
-    val verse = raw.substringAfter("verse=").substringBefore(" at=")
-    val at = raw.substringAfter("at=").toLongOrNull() ?: return null
-    val agoSec = (System.currentTimeMillis() - at) / 1000
-    return "init: $book $chap v=$verse ${agoSec}s ago"
-}
-
-// Companion to formatDebugSaveTrace above, decoding ReaderScreen's
-// scroll-to-focus attempt trace (BibleRepository.setDebugScrollTrace) —
-// foundIdx=-1 means the target verse was NOT in the loaded chapter, which
-// is exactly what falls back to scrolling to the top instead.
-fun formatDebugScrollTrace(raw: String?): String? {
-    if (raw == null) return null
-    val target = raw.substringAfter("target=").substringBefore(" foundIdx=")
-    val foundIdx = raw.substringAfter("foundIdx=").substringBefore(" versesSize=")
-    val versesSize = raw.substringAfter("versesSize=").substringBefore(" at=")
-    val at = raw.substringAfter("at=").toLongOrNull() ?: return null
-    val agoSec = (System.currentTimeMillis() - at) / 1000
-    return "scroll: t=$target idx=$foundIdx n=$versesSize ${agoSec}s ago"
-}
-
 data class WidgetPalette(
     val background: ColorProvider,
     val text: ColorProvider,

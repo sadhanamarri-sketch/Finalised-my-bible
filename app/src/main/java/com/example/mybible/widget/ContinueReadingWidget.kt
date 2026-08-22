@@ -61,20 +61,12 @@ class ContinueReadingWidget : GlanceAppWidget() {
         val prefs = context.getSharedPreferences(WIDGET_PREFS_NAME, Context.MODE_PRIVATE)
         val lastBook = prefs.getString("last_book", "Genesis") ?: "Genesis"
         val lastChapter = prefs.getInt("last_chapter", 1)
-        val lastVerse = prefs.getInt("last_verse", -1)
-        val debugLines = listOfNotNull(
-            formatDebugSaveTrace(prefs.getString("debug_save_trace", null)),
-            formatDebugRestoreTrace(prefs.getString("debug_restore_trace", null)),
-            formatDebugScrollTrace(prefs.getString("debug_scroll_trace", null))
-        )
 
         provideContent {
             ContinueReadingContent(
                 palette = palette,
                 lastBook = lastBook,
-                lastChapter = lastChapter,
-                lastVerse = lastVerse,
-                debugLines = debugLines
+                lastChapter = lastChapter
             )
         }
     }
@@ -84,9 +76,7 @@ class ContinueReadingWidget : GlanceAppWidget() {
 private fun ContinueReadingContent(
     palette: WidgetPalette,
     lastBook: String,
-    lastChapter: Int,
-    lastVerse: Int,
-    debugLines: List<String>
+    lastChapter: Int
 ) {
     val context = LocalContext.current
     // Measured on-device (see commit history): default 4x1 placement is
@@ -144,11 +134,7 @@ private fun ContinueReadingContent(
                 )
                 Spacer(modifier = GlanceModifier.width(6.dp))
                 Text(
-                    // Verse suffix is temporary diagnostics for the widget
-                    // exact-resume bug — lets it be checked on-device
-                    // (whether the saved verse itself is right) without
-                    // needing adb/logcat access. Remove once resolved.
-                    text = if (lastVerse > 0) "$lastBook $lastChapter:$lastVerse" else "$lastBook $lastChapter",
+                    text = "$lastBook $lastChapter",
                     style = TextStyle(
                         fontWeight = FontWeight.Bold,
                         fontSize = 17.sp,
@@ -157,14 +143,6 @@ private fun ContinueReadingContent(
                     maxLines = 1
                 )
             }
-        }
-
-        debugLines.forEach { line ->
-            Text(
-                text = line,
-                style = TextStyle(fontSize = 9.sp, color = palette.accent),
-                maxLines = 1
-            )
         }
 
         if (isExpanded) {

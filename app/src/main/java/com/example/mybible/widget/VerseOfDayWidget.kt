@@ -57,12 +57,6 @@ class VerseOfDayWidget : GlanceAppWidget() {
         val prefs = context.getSharedPreferences(WIDGET_PREFS_NAME, Context.MODE_PRIVATE)
         val lastBook = prefs.getString("last_book", "Genesis") ?: "Genesis"
         val lastChapter = prefs.getInt("last_chapter", 1)
-        val lastVerse = prefs.getInt("last_verse", -1)
-        val debugLines = listOfNotNull(
-            formatDebugSaveTrace(prefs.getString("debug_save_trace", null)),
-            formatDebugRestoreTrace(prefs.getString("debug_restore_trace", null)),
-            formatDebugScrollTrace(prefs.getString("debug_scroll_trace", null))
-        )
         val todayVerse = VerseOfDayRepository.verseForToday()
 
         provideContent {
@@ -70,8 +64,6 @@ class VerseOfDayWidget : GlanceAppWidget() {
                 palette = palette,
                 lastBook = lastBook,
                 lastChapter = lastChapter,
-                lastVerse = lastVerse,
-                debugLines = debugLines,
                 verse = todayVerse
             )
         }
@@ -83,8 +75,6 @@ private fun WidgetContent(
     palette: WidgetPalette,
     lastBook: String,
     lastChapter: Int,
-    lastVerse: Int,
-    debugLines: List<String>,
     verse: VerseOfDay
 ) {
     val context = LocalContext.current
@@ -218,10 +208,7 @@ private fun WidgetContent(
             )
             Spacer(modifier = GlanceModifier.width(6.dp))
             Text(
-                // Verse suffix is temporary diagnostics for the widget
-                // exact-resume bug — see the matching comment in
-                // ContinueReadingWidget. Remove once resolved.
-                text = if (lastVerse > 0) "$lastBook $lastChapter:$lastVerse" else "$lastBook $lastChapter",
+                text = "$lastBook $lastChapter",
                 style = TextStyle(
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
@@ -230,14 +217,6 @@ private fun WidgetContent(
                 maxLines = 1
             )
         }
-        }
-
-        debugLines.forEach { line ->
-            Text(
-                text = line,
-                style = TextStyle(fontSize = 9.sp, color = palette.accent),
-                maxLines = 1
-            )
         }
 
         Spacer(modifier = GlanceModifier.height(10.dp))
