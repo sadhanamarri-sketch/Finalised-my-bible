@@ -71,6 +71,17 @@ data class ReaderScrollAnchor(val book: String, val chapter: Int, val verse: Int
 // without a clean onStop.
 private const val POSITION_SAVE_DEBOUNCE_MS = 1500L
 
+// How long the user needs to have been continuously reading the current
+// chapter, while a "return to X" detour banner is still active, before that
+// position counts as "settled" enough to persist — see
+// MainViewModel.isPositionSettled's doc. Long enough that briefly glancing
+// at a search/cross-reference/etc. result (a few seconds, maybe a scroll or
+// two) never corrupts the saved position with a chapter the user didn't
+// mean to stay in; short enough that genuinely reading on past a detour for
+// several minutes doesn't get silently discarded just because the banner
+// was never explicitly dismissed.
+private const val DETOUR_SETTLE_MS = 300_000L
+
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = BibleRepository(application)
@@ -899,6 +910,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // a StateFlow) is enough since nothing needs to observe this reactively.
     private var liveTopVerse: Int? = null
 
+    // When the current book/chapter was last (re)entered — reset every time
+    // loadChapter runs, regardless of detour state. Used only to measure
+    // "how long has the user been sitting in this chapter" for
+    // isPositionSettled below; irrelevant outside a detour, since saves
+    // aren't gated on it then.
+    private var chapterEnteredAtMillis: Long = System.currentTimeMillis()
+
     // Debounced disk-only save fired on every scroll update, independent of
     // any single lifecycle callback getting a chance to run — a safety net
     // alongside the onStop-triggered durable save (persistCurrentReadingPosition
@@ -914,7 +932,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             positionSaveJob?.cancel()
             positionSaveJob = viewModelScope.launch {
                 delay(POSITION_SAVE_DEBOUNCE_MS)
-                savePositionToDisk(durable = false)
+                // Gated the same way persistCurrentReadingPosition is (see
+                // isPositionSettled's doc) — otherwise this debounced save,
+                // which has no reason of its own to know about detours,
+                // would silently overwrite the saved position with a
+                // search/cross-reference/etc. jump the user only glanced at.
+                if (isPositionSettled()) savePositionToDisk(durable = false)
             }
         }
     }
@@ -937,6 +960,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _highlightsReturnAvailable.value ||
             _studiedReturnAvailable.value
 
+    // What actually gates every position save (durable onStop save,
+    // debounced scroll save, and per-chapter-navigation save alike) — not
+    // just isDetourActive() by itself. A "return to X" banner is
+    // deliberately sticky now (see the scroll-away watcher in
+    // ReaderScreen — it no longer auto-clears on scroll, so browsing
+    // multiple search/cross-reference/etc. results doesn't kill the
+    // banner), which means isDetourActive() alone could stay true for as
+    // long as the user keeps reading, silently blocking their real
+    // position from ever being saved even after they've clearly settled
+    // into this chapter. DETOUR_SETTLE_MS is the escape hatch: once the
+    // user has been sitting in the current chapter that long, treat it as
+    // genuinely settled and allow saves through regardless of whether the
+    // banner itself has been dismissed.
+    private fun isPositionSettled(): Boolean =
+        !isDetourActive() || (System.currentTimeMillis() - chapterEnteredAtMillis >= DETOUR_SETTLE_MS)
+
     // Persists an exact resume position, not just book/chapter
     // (saveLastPosition already covers that on every chapter navigation) —
     // liveTopVerse is kept live by ReaderScreen's own scroll-reporting
@@ -953,13 +992,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // chapter. Activity.onStop fires synchronously the moment this Activity
     // loses the foreground, closing that window.
     //
-    // Skipped entirely while a detour banner is showing (see
-    // isDetourActive's doc) — backgrounding mid-detour, before the user has
-    // decided to stay or go back, must leave whatever was already saved
+    // Skipped while a detour banner is showing and the user hasn't been
+    // sitting in this chapter long enough yet to count as settled (see
+    // isPositionSettled's doc) — backgrounding mid-detour, before the user
+    // has decided to stay or go back, must leave whatever was already saved
     // untouched rather than silently overwriting it with a position the
-    // user hasn't settled on.
+    // user hasn't settled on. Once settled, goes through even with the
+    // banner still technically up.
     fun persistCurrentReadingPosition() {
-        if (!isDetourActive()) {
+        if (isPositionSettled()) {
             // durable=true: this is the one guaranteed moment before Android
             // may kill the process, so it blocks briefly on a synchronous
             // write rather than risking apply()'s queued write losing the
@@ -979,12 +1020,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun loadChapter(book: String, chapter: Int) {
         _currentBook.value = book
         _currentChapter.value = chapter
+        // Restarts the "how long has the user been sitting here" clock
+        // isPositionSettled uses — a fresh chapter (detour or not) always
+        // starts at 0 elapsed, same as before this existed.
+        chapterEnteredAtMillis = System.currentTimeMillis()
         // Only persist/refresh the widget for a genuine reading position —
         // swiping chapters or picking one from the Book/Chapter picker
         // (neither sets a detour flag) still does immediately, same as
         // before; a search/cross-reference/etc. jump (which does) skips
-        // this until the user settles there — see isDetourActive's doc.
-        if (!isDetourActive()) {
+        // this until the user settles there — see isPositionSettled's doc.
+        if (isPositionSettled()) {
             repository.saveLastPosition(book, chapter)
             refreshContinueReadingWidget()
         }
