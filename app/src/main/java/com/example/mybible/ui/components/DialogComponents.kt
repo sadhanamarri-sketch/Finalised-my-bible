@@ -347,30 +347,38 @@ fun RenameHighlightColorDialog(
     )
 }
 
-/** "6:00 AM" / "9:00 PM" style label for an hour-of-day (0-23), no minutes
- *  — reminders only ever fire on the hour, so a full HH:MM time picker
- *  would be showing a control the user can't actually use meaningfully. */
-fun formatHourLabel(hour: Int): String {
+/** "6:00 AM" / "6:30 AM" / "9:00 PM" style label for a minutes-since-
+ *  midnight value, at the 30-minute granularity the reminder window picker
+ *  uses (see [ReminderTimePickerDialog]). */
+fun formatMinutesLabel(minutesOfDay: Int): String {
+    val hour = minutesOfDay / 60
+    val minute = minutesOfDay % 60
     val period = if (hour < 12) "AM" else "PM"
     val display = when {
         hour == 0 -> 12
         hour > 12 -> hour - 12
         else -> hour
     }
-    return "$display:00 $period"
+    val minuteStr = if (minute == 0) "00" else minute.toString()
+    return "$display:$minuteStr $period"
 }
 
 /**
- * Purpose-built hour-of-day picker (see [formatHourLabel]) — Settings'
- * "Active hours" reminder window uses two of these (start/end) instead of
- * Material3's full TimePicker, which includes a minute wheel that would
- * just be dead weight here. Tapping a row selects it and dismisses
- * immediately, matching how a single-value picker list is expected to work.
+ * Purpose-built 30-minute-step time-of-day picker (see [formatMinutesLabel])
+ * — Settings' "Active hours" reminder window uses two of these (start/end)
+ * instead of Material3's full TimePicker. `options` is supplied by the
+ * caller rather than a fixed 0-23 range, since Start and End each need a
+ * different valid range (see ReminderScheduler.WINDOW_START_MINUTES /
+ * MIN_GAP_MINUTES) — Start is capped so a valid End always exists, and
+ * End's own options depend on whatever Start currently is. Tapping a row
+ * selects it and dismisses immediately, matching how a single-value picker
+ * list is expected to work.
  */
 @Composable
-fun HourPickerDialog(
+fun ReminderTimePickerDialog(
     title: String,
-    selectedHour: Int,
+    options: List<Int>,
+    selectedMinutes: Int?,
     onDismiss: () -> Unit,
     onSelect: (Int) -> Unit
 ) {
@@ -379,8 +387,8 @@ fun HourPickerDialog(
         title = { Text(title) },
         text = {
             LazyColumn(modifier = Modifier.heightIn(max = 340.dp)) {
-                items(24) { hour ->
-                    val isSelected = hour == selectedHour
+                items(options) { minutesOfDay ->
+                    val isSelected = minutesOfDay == selectedMinutes
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -390,14 +398,14 @@ fun HourPickerDialog(
                                 else Color.Transparent
                             )
                             .clickable {
-                                onSelect(hour)
+                                onSelect(minutesOfDay)
                                 onDismiss()
                             }
                             .padding(vertical = 12.dp, horizontal = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = formatHourLabel(hour),
+                            text = formatMinutesLabel(minutesOfDay),
                             fontSize = 16.sp,
                             fontFamily = FontFamily.SansSerif,
                             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,

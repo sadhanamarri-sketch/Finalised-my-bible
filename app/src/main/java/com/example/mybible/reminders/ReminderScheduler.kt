@@ -9,10 +9,11 @@ import java.util.Calendar
 private const val PREFS_NAME = "my_bible_prefs"
 private const val KEY_ENABLED = "reminders_enabled"
 private const val KEY_FREQUENCY = "reminders_frequency"
-private const val KEY_START_HOUR = "reminders_start_hour"
-private const val KEY_END_HOUR = "reminders_end_hour"
+private const val KEY_START_MINUTES = "reminders_start_minutes"
+private const val KEY_END_MINUTES = "reminders_end_minutes"
 private const val KEY_ENABLED_THEMES = "reminders_enabled_themes"
 private const val REQUEST_CODE_BASE = 78000
+private const val UNSET = -1
 
 /** How far apart notifications land within the active-hours window —
  *  replaces the old hardcoded "every 3 hours." */
@@ -36,16 +37,28 @@ enum class ReminderFrequency(val label: String, val stepHours: Int) {
  *
  * `AlarmManager` has no built-in "repeat exactly every 24h" — `setRepeating`
  * is inexact and drifts over time. Instead each alarm is one-shot, and
- * [ReminderReceiver] reschedules the same hour's alarm for +24h every time it
+ * [ReminderReceiver] reschedules the same slot's alarm for +24h every time it
  * fires — a standard, drift-free pattern for daily reminders. [BootReceiver]
  * re-arms everything after a device reboot, since these alarms don't survive one.
  */
 object ReminderScheduler {
 
-    // Used only for cancellation, so that changing the active-hours window
-    // or frequency can't leave orphaned alarms self-rearming forever for an
-    // hour that's no longer part of the current schedule.
-    private val ALL_POSSIBLE_HOURS = (0..23).toList()
+    // The selectable active-hours window (Settings' start/end time pickers),
+    // in minutes-since-midnight, at 30-minute steps — 6:00 AM through 9:00
+    // PM. MIN_GAP_MINUTES is the "end must be at least 4 hours after start"
+    // rule, so even the coarsest frequency (Gentle, every 4h) always fires
+    // at least twice in the window.
+    const val WINDOW_START_MINUTES = 6 * 60
+    const val WINDOW_END_MINUTES = 21 * 60
+    const val MINUTE_STEP = 30
+    const val MIN_GAP_MINUTES = 4 * 60
+
+    // Used only for cancellation, so that changing the window or frequency
+    // can't leave orphaned alarms self-rearming forever for a slot that's no
+    // longer part of the current schedule. Covers every half-hour slot the
+    // window could ever hold, not just the ones currently scheduled.
+    private val ALL_POSSIBLE_SLOTS =
+        generateSequence(WINDOW_START_MINUTES) { it + MINUTE_STEP }.takeWhile { it <= WINDOW_END_MINUTES }.toList()
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
@@ -61,18 +74,35 @@ object ReminderScheduler {
         if (isEnabled(context)) scheduleAll(context)
     }
 
-    /** (startHour, endHour), both 0-23, defaulting to the original fixed
-     *  6am-9pm window. */
-    fun getActiveHours(context: Context): Pair<Int, Int> {
+    /** Minutes-since-midnight, or null if the user has never picked a start
+     *  time. Deliberately no silent 6am default — a brand-new user (or
+     *  anyone who hasn't configured this yet) sees an explicit "Select"
+     *  state in Settings rather than a guessed window nobody chose; see
+     *  [slotsMinutes], which schedules nothing until this is set. */
+    fun getStartMinutes(context: Context): Int? =
+        prefs(context).getInt(KEY_START_MINUTES, UNSET).takeIf { it != UNSET }
+
+    /** Same as [getStartMinutes] but for the end time. Also cleared back to
+     *  null whenever [setStartMinutes] moves the start late enough that the
+     *  previously-chosen end no longer satisfies the 4-hour minimum gap —
+     *  forcing an explicit re-pick rather than silently keeping an
+     *  now-invalid window. */
+    fun getEndMinutes(context: Context): Int? =
+        prefs(context).getInt(KEY_END_MINUTES, UNSET).takeIf { it != UNSET }
+
+    fun setStartMinutes(context: Context, startMinutes: Int) {
         val p = prefs(context)
-        return p.getInt(KEY_START_HOUR, 6) to p.getInt(KEY_END_HOUR, 21)
+        val editor = p.edit().putInt(KEY_START_MINUTES, startMinutes)
+        val currentEnd = getEndMinutes(context)
+        if (currentEnd != null && currentEnd < startMinutes + MIN_GAP_MINUTES) {
+            editor.remove(KEY_END_MINUTES)
+        }
+        editor.apply()
+        if (isEnabled(context)) scheduleAll(context)
     }
 
-    fun setActiveHours(context: Context, startHour: Int, endHour: Int) {
-        prefs(context).edit()
-            .putInt(KEY_START_HOUR, startHour)
-            .putInt(KEY_END_HOUR, endHour)
-            .apply()
+    fun setEndMinutes(context: Context, endMinutes: Int) {
+        prefs(context).edit().putInt(KEY_END_MINUTES, endMinutes).apply()
         if (isEnabled(context)) scheduleAll(context)
     }
 
@@ -96,15 +126,15 @@ object ReminderScheduler {
         prefs(context).edit().putStringSet(KEY_ENABLED_THEMES, current.map { it.name }.toSet()).apply()
     }
 
-    /** The actual hours notifications fire at today, derived from the
-     *  configured frequency + active-hours window — replaces the old
-     *  hardcoded `(6..21 step 3)`. Always includes at least the start
-     *  hour, even if the window is narrower than one step. */
-    fun hours(context: Context): List<Int> {
-        val (start, end) = getActiveHours(context)
-        if (start > end) return listOf(start.coerceIn(0, 23))
-        val step = getFrequency(context).stepHours
-        return generateSequence(start) { it + step }.takeWhile { it <= end }.toList()
+    /** The actual minute-of-day slots notifications fire at today, derived
+     *  from the configured frequency + active-hours window. Empty until the
+     *  user has picked both a start and an end time (see [getStartMinutes]/
+     *  [getEndMinutes]) — nothing is scheduled on their behalf until then. */
+    fun slotsMinutes(context: Context): List<Int> {
+        val start = getStartMinutes(context) ?: return emptyList()
+        val end = getEndMinutes(context) ?: return emptyList()
+        val stepMinutes = getFrequency(context).stepHours * 60
+        return generateSequence(start) { it + stepMinutes }.takeWhile { it <= end }.toList()
     }
 
     /** Persists the flag and (re)schedules or cancels the alarms to match. Does NOT request
@@ -116,40 +146,37 @@ object ReminderScheduler {
 
     fun scheduleAll(context: Context) {
         cancelAll(context) // clears any stale alarms left over from a previous schedule
-        hours(context).forEach { hour -> scheduleForHour(context, hour) }
+        slotsMinutes(context).forEach { minutesOfDay -> scheduleForSlot(context, minutesOfDay) }
     }
 
     fun cancelAll(context: Context) {
         val alarmManager = context.getSystemService(AlarmManager::class.java) ?: return
-        ALL_POSSIBLE_HOURS.forEach { hour ->
-            alarmManager.cancel(pendingIntentFor(context, hour))
+        ALL_POSSIBLE_SLOTS.forEach { minutesOfDay ->
+            alarmManager.cancel(pendingIntentFor(context, minutesOfDay))
         }
     }
 
-    fun scheduleForHour(context: Context, hour: Int) {
+    fun scheduleForSlot(context: Context, minutesOfDay: Int) {
         val alarmManager = context.getSystemService(AlarmManager::class.java) ?: return
-        val triggerAtMillis = nextOccurrenceMillis(hour)
-        val pendingIntent = pendingIntentFor(context, hour)
+        val triggerAtMillis = nextOccurrenceMillis(minutesOfDay)
+        val pendingIntent = pendingIntentFor(context, minutesOfDay)
         alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
     }
 
-    private fun pendingIntentFor(context: Context, hour: Int): PendingIntent {
-        val intent = Intent(context, ReminderReceiver::class.java).putExtra("hour", hour)
+    private fun pendingIntentFor(context: Context, minutesOfDay: Int): PendingIntent {
+        val intent = Intent(context, ReminderReceiver::class.java).putExtra("minutesOfDay", minutesOfDay)
         return PendingIntent.getBroadcast(
             context,
-            REQUEST_CODE_BASE + hour,
+            REQUEST_CODE_BASE + minutesOfDay,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
     }
 
-    private fun nextOccurrenceMillis(hour: Int): Long {
+    private fun nextOccurrenceMillis(minutesOfDay: Int): Long {
         val cal = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, hour)
-            // :30 rather than :00 — the user has other important
-            // notifications landing on the hour, so reminders are offset
-            // by half an hour to avoid piling on top of them.
-            set(Calendar.MINUTE, 30)
+            set(Calendar.HOUR_OF_DAY, minutesOfDay / 60)
+            set(Calendar.MINUTE, minutesOfDay % 60)
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
         }

@@ -17,15 +17,15 @@ private const val PREFS_NAME = "my_bible_prefs"
 class ReminderReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
-        val hour = intent.getIntExtra("hour", -1)
-        if (hour == -1) return
+        val minutesOfDay = intent.getIntExtra("minutesOfDay", -1)
+        if (minutesOfDay == -1) return
 
-        // This hour is no longer part of the active schedule (e.g. the user
+        // This slot is no longer part of the active schedule (e.g. the user
         // changed the frequency or active-hours window since this alarm was
         // set) — don't notify, and don't re-arm it, so it stops firing for
         // good instead of self-perpetuating forever.
-        val activeHours = ReminderScheduler.hours(context)
-        if (hour !in activeHours) return
+        val activeSlots = ReminderScheduler.slotsMinutes(context)
+        if (minutesOfDay !in activeSlots) return
 
         // A stale alarm could still fire right after the user disables
         // reminders (there's an unavoidable race between cancel() and an
@@ -37,16 +37,16 @@ class ReminderReceiver : BroadcastReceiver() {
         val chapter = prefs.getInt("last_chapter", 1)
         val ref = "$book $chapter"
 
-        val slotIndex = activeHours.indexOf(hour).coerceAtLeast(0)
+        val slotIndex = activeSlots.indexOf(minutesOfDay).coerceAtLeast(0)
         val dayIndex = (System.currentTimeMillis() / 86_400_000L).toInt()
         val messages = ReminderMessages.forThemes(ReminderScheduler.getEnabledThemes(context))
-        val msgIndex = ((dayIndex * activeHours.size + slotIndex) % messages.size + messages.size) % messages.size
+        val msgIndex = ((dayIndex * activeSlots.size + slotIndex) % messages.size + messages.size) % messages.size
         val body = messages[msgIndex].replace("{ref}", ref)
 
-        NotificationHelper.show(context, notificationId = hour, body = body)
+        NotificationHelper.show(context, notificationId = minutesOfDay, body = body)
 
-        // AlarmManager alarms are one-shot; re-arm this same hour for
+        // AlarmManager alarms are one-shot; re-arm this same slot for
         // tomorrow so it keeps firing daily without drifting.
-        ReminderScheduler.scheduleForHour(context, hour)
+        ReminderScheduler.scheduleForSlot(context, minutesOfDay)
     }
 }

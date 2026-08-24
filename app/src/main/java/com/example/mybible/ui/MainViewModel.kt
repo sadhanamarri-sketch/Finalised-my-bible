@@ -1250,12 +1250,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _reminderFrequency.value = frequency
     }
 
-    private val _reminderActiveHours = MutableStateFlow(ReminderScheduler.getActiveHours(appContext))
-    val reminderActiveHours: StateFlow<Pair<Int, Int>> = _reminderActiveHours.asStateFlow()
+    // Minutes-since-midnight, null until the user has actually picked a
+    // value — no silent 6am-9pm default (see ReminderScheduler.getStartMinutes's
+    // doc). End is re-synced after every start change since setStartMinutes
+    // may have cleared a now-too-close end time server-side.
+    private val _reminderStartMinutes = MutableStateFlow(ReminderScheduler.getStartMinutes(appContext))
+    val reminderStartMinutes: StateFlow<Int?> = _reminderStartMinutes.asStateFlow()
 
-    fun setReminderActiveHours(startHour: Int, endHour: Int) {
-        ReminderScheduler.setActiveHours(appContext, startHour, endHour)
-        _reminderActiveHours.value = startHour to endHour
+    private val _reminderEndMinutes = MutableStateFlow(ReminderScheduler.getEndMinutes(appContext))
+    val reminderEndMinutes: StateFlow<Int?> = _reminderEndMinutes.asStateFlow()
+
+    fun setReminderStartMinutes(startMinutes: Int) {
+        ReminderScheduler.setStartMinutes(appContext, startMinutes)
+        _reminderStartMinutes.value = startMinutes
+        _reminderEndMinutes.value = ReminderScheduler.getEndMinutes(appContext)
+    }
+
+    fun setReminderEndMinutes(endMinutes: Int) {
+        ReminderScheduler.setEndMinutes(appContext, endMinutes)
+        _reminderEndMinutes.value = endMinutes
     }
 
     private val _reminderEnabledThemes = MutableStateFlow(ReminderScheduler.getEnabledThemes(appContext))

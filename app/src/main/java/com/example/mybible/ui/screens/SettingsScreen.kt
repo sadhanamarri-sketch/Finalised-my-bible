@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mybible.model.ThemeMode
 import com.example.mybible.reminders.ReminderFrequency
+import com.example.mybible.reminders.ReminderScheduler
 import com.example.mybible.reminders.ReminderTheme
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
@@ -37,8 +38,8 @@ import com.example.mybible.ui.components.DsSectionLabel
 import com.example.mybible.ui.components.DsSizeAdjustRow
 import com.example.mybible.ui.components.DsSwitch
 import com.example.mybible.ui.components.DsToggleRow
-import com.example.mybible.ui.components.HourPickerDialog
-import com.example.mybible.ui.components.formatHourLabel
+import com.example.mybible.ui.components.ReminderTimePickerDialog
+import com.example.mybible.ui.components.formatMinutesLabel
 import com.example.mybible.ui.theme.EbGaramondFontFamily
 import com.example.mybible.ui.theme.GelasioFontFamily
 import com.example.mybible.ui.theme.LoraFontFamily
@@ -105,11 +106,11 @@ fun SettingsScreen(
     val isBlurModeEnabled by viewModel.isBlurModeEnabled.collectAsState()
     val remindersEnabled by viewModel.remindersEnabled.collectAsState()
     val reminderFrequency by viewModel.reminderFrequency.collectAsState()
-    val reminderActiveHours by viewModel.reminderActiveHours.collectAsState()
-    val (reminderStartHour, reminderEndHour) = reminderActiveHours
+    val reminderStartMinutes by viewModel.reminderStartMinutes.collectAsState()
+    val reminderEndMinutes by viewModel.reminderEndMinutes.collectAsState()
     val reminderEnabledThemes by viewModel.reminderEnabledThemes.collectAsState()
-    var showStartHourPicker by remember { mutableStateOf(false) }
-    var showEndHourPicker by remember { mutableStateOf(false) }
+    var showStartTimePicker by remember { mutableStateOf(false) }
+    var showEndTimePicker by remember { mutableStateOf(false) }
 
     val driveAccount by viewModel.driveAccount.collectAsState()
     val isDriveSyncing by viewModel.isDriveSyncing.collectAsState()
@@ -371,16 +372,18 @@ fun SettingsScreen(
 
         // ---- Reminders ----
         DsSectionLabel("Reminders")
-        val notificationsPerDay = if (reminderStartHour > reminderEndHour) {
-            1
-        } else {
-            ((reminderEndHour - reminderStartHour) / reminderFrequency.stepHours) + 1
-        }
+        val startMinutesForSummary = reminderStartMinutes
+        val endMinutesForSummary = reminderEndMinutes
         DsToggleRow(
             label = "Reading reminders",
-            subLabel = "$notificationsPerDay ${if (notificationsPerDay == 1) "nudge" else "nudges"} a day, " +
-                "every ${reminderFrequency.stepHours}h from ${formatHourLabel(reminderStartHour)}\u2013" +
-                "${formatHourLabel(reminderEndHour)}, pointing back to where you left off",
+            subLabel = if (startMinutesForSummary != null && endMinutesForSummary != null) {
+                val notificationsPerDay = (endMinutesForSummary - startMinutesForSummary) / (reminderFrequency.stepHours * 60) + 1
+                "$notificationsPerDay ${if (notificationsPerDay == 1) "nudge" else "nudges"} a day, " +
+                    "every ${reminderFrequency.stepHours}h from ${formatMinutesLabel(startMinutesForSummary)}\u2013" +
+                    "${formatMinutesLabel(endMinutesForSummary)}, pointing back to where you left off"
+            } else {
+                "Choose active hours below to turn these on"
+            },
             checked = remindersEnabled,
             onCheckedChange = onToggleReminders
         )
@@ -437,14 +440,14 @@ fun SettingsScreen(
             )
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = formatHourLabel(reminderStartHour),
+                    text = reminderStartMinutes?.let { formatMinutesLabel(it) } ?: "Select",
                     fontSize = 14.5.sp,
                     fontFamily = FontFamily.SansSerif,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier
                         .clip(RoundedCornerShape(10.dp))
                         .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(10.dp))
-                        .clickable { showStartHourPicker = true }
+                        .clickable { showStartTimePicker = true }
                         .padding(horizontal = 14.dp, vertical = 10.dp)
                 )
                 Text(
@@ -453,15 +456,21 @@ fun SettingsScreen(
                     fontFamily = FontFamily.SansSerif,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                // Disabled (no click, dimmed) until Start has a value —
+                // there's no valid End range to offer otherwise.
                 Text(
-                    text = formatHourLabel(reminderEndHour),
+                    text = reminderEndMinutes?.let { formatMinutesLabel(it) } ?: "Select",
                     fontSize = 14.5.sp,
                     fontFamily = FontFamily.SansSerif,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = if (reminderStartMinutes != null) MaterialTheme.colorScheme.onSurface
+                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                     modifier = Modifier
                         .clip(RoundedCornerShape(10.dp))
                         .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(10.dp))
-                        .clickable { showEndHourPicker = true }
+                        .then(
+                            if (reminderStartMinutes != null) Modifier.clickable { showEndTimePicker = true }
+                            else Modifier
+                        )
                         .padding(horizontal = 14.dp, vertical = 10.dp)
                 )
             }
@@ -496,20 +505,32 @@ fun SettingsScreen(
             }
         }
 
-        if (showStartHourPicker) {
-            HourPickerDialog(
+        if (showStartTimePicker) {
+            // Capped at WINDOW_END_MINUTES - MIN_GAP_MINUTES (5:00 PM) so a
+            // valid 4h+ End always exists within the 6am-9pm window,
+            // whatever Start ends up being.
+            val startOptions = generateSequence(ReminderScheduler.WINDOW_START_MINUTES) { it + ReminderScheduler.MINUTE_STEP }
+                .takeWhile { it <= ReminderScheduler.WINDOW_END_MINUTES - ReminderScheduler.MIN_GAP_MINUTES }
+                .toList()
+            ReminderTimePickerDialog(
                 title = "Start time",
-                selectedHour = reminderStartHour,
-                onDismiss = { showStartHourPicker = false },
-                onSelect = { viewModel.setReminderActiveHours(it, reminderEndHour) }
+                options = startOptions,
+                selectedMinutes = reminderStartMinutes,
+                onDismiss = { showStartTimePicker = false },
+                onSelect = { viewModel.setReminderStartMinutes(it) }
             )
         }
-        if (showEndHourPicker) {
-            HourPickerDialog(
+        val startMinutesForEndPicker = reminderStartMinutes
+        if (showEndTimePicker && startMinutesForEndPicker != null) {
+            val endOptions = generateSequence(startMinutesForEndPicker + ReminderScheduler.MIN_GAP_MINUTES) { it + ReminderScheduler.MINUTE_STEP }
+                .takeWhile { it <= ReminderScheduler.WINDOW_END_MINUTES }
+                .toList()
+            ReminderTimePickerDialog(
                 title = "End time",
-                selectedHour = reminderEndHour,
-                onDismiss = { showEndHourPicker = false },
-                onSelect = { viewModel.setReminderActiveHours(reminderStartHour, it) }
+                options = endOptions,
+                selectedMinutes = reminderEndMinutes,
+                onDismiss = { showEndTimePicker = false },
+                onSelect = { viewModel.setReminderEndMinutes(it) }
             )
         }
 
