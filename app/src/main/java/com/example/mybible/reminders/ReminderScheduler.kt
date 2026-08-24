@@ -146,7 +146,10 @@ object ReminderScheduler {
     private fun nextOccurrenceMillis(hour: Int): Long {
         val cal = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, hour)
-            set(Calendar.MINUTE, 0)
+            // :30 rather than :00 — the user has other important
+            // notifications landing on the hour, so reminders are offset
+            // by half an hour to avoid piling on top of them.
+            set(Calendar.MINUTE, 30)
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
         }
