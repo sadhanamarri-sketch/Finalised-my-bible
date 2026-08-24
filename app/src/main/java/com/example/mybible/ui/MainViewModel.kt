@@ -163,7 +163,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val englishFontFamilyName: StateFlow<String> = _englishFontFamilyName.asStateFlow()
 
     // Blur Mode state
-    private val _isBlurModeEnabled = MutableStateFlow(repository.getSavedBlurModeEnabled())
+    private val _isBlurModeEnabled = MutableStateFlow(false)
     val isBlurModeEnabled: StateFlow<Boolean> = _isBlurModeEnabled.asStateFlow()
 
     // Focused Verse
@@ -1212,7 +1212,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleBlurMode() {
         _isBlurModeEnabled.value = !_isBlurModeEnabled.value
-        repository.saveBlurModeEnabled(_isBlurModeEnabled.value)
     }
 
     // Forces blur mode off — for deliberate "go read this specific verse"
