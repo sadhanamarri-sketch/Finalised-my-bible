@@ -172,6 +172,20 @@ class BibleRepository(private val context: Context) {
         prefs.edit().putBoolean("red_letter_enabled", enabled).apply()
     }
 
+    // Telugu inline text, Greek/Hebrew interlinear, and privacy Blur Mode —
+    // previously all three reset to their hardcoded defaults (on/off/off) on
+    // every app or widget cold start, regardless of what the user last had
+    // them set to. Defaults below match those old hardcoded values, so
+    // nobody's current session changes until they toggle something.
+    fun getSavedShowTeluguInline(): Boolean = prefs.getBoolean("show_telugu_inline", true)
+    fun saveShowTeluguInline(enabled: Boolean) = prefs.edit().putBoolean("show_telugu_inline", enabled).apply()
+
+    fun getSavedShowInterlinear(): Boolean = prefs.getBoolean("show_interlinear", false)
+    fun saveShowInterlinear(enabled: Boolean) = prefs.edit().putBoolean("show_interlinear", enabled).apply()
+
+    fun getSavedBlurModeEnabled(): Boolean = prefs.getBoolean("blur_mode_enabled", false)
+    fun saveBlurModeEnabled(enabled: Boolean) = prefs.edit().putBoolean("blur_mode_enabled", enabled).apply()
+
     fun getLastPosition(): Pair<String, Int> {
         val book = prefs.getString("last_book", "Genesis") ?: "Genesis"
         val chapter = prefs.getInt("last_chapter", 1)

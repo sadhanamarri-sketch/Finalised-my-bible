@@ -120,10 +120,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _redLetterEnabled = MutableStateFlow(repository.getRedLetterEnabled())
     val redLetterEnabled: StateFlow<Boolean> = _redLetterEnabled.asStateFlow()
 
-    private val _showTeluguInline = MutableStateFlow(true)
+    private val _showTeluguInline = MutableStateFlow(repository.getSavedShowTeluguInline())
     val showTeluguInline: StateFlow<Boolean> = _showTeluguInline.asStateFlow()
 
-    private val _showInterlinear = MutableStateFlow(false)
+    private val _showInterlinear = MutableStateFlow(repository.getSavedShowInterlinear())
     val showInterlinear: StateFlow<Boolean> = _showInterlinear.asStateFlow()
 
     private val _fontSizeSp = MutableStateFlow(repository.getSavedFontSize())
@@ -163,7 +163,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val englishFontFamilyName: StateFlow<String> = _englishFontFamilyName.asStateFlow()
 
     // Blur Mode state
-    private val _isBlurModeEnabled = MutableStateFlow(false)
+    private val _isBlurModeEnabled = MutableStateFlow(repository.getSavedBlurModeEnabled())
     val isBlurModeEnabled: StateFlow<Boolean> = _isBlurModeEnabled.asStateFlow()
 
     // Focused Verse
@@ -1184,6 +1184,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // each one re-anchors off the now-wrong top verse.
     fun toggleTeluguInline(anchorVerse: Int? = null) {
         _showTeluguInline.value = !_showTeluguInline.value
+        repository.saveShowTeluguInline(_showTeluguInline.value)
         if (anchorVerse != null) {
             _focusedVerseNumber.value = anchorVerse
             _focusedVerseBlurEnabled.value = false
@@ -1201,6 +1202,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // ReaderScreen's scroll-restore effect on its own).
     fun toggleInterlinear(anchorVerse: Int? = null) {
         _showInterlinear.value = !_showInterlinear.value
+        repository.saveShowInterlinear(_showInterlinear.value)
         if (anchorVerse != null) {
             _focusedVerseNumber.value = anchorVerse
             _focusedVerseBlurEnabled.value = false
@@ -1210,6 +1212,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleBlurMode() {
         _isBlurModeEnabled.value = !_isBlurModeEnabled.value
+        repository.saveBlurModeEnabled(_isBlurModeEnabled.value)
     }
 
     // Forces blur mode off — for deliberate "go read this specific verse"
