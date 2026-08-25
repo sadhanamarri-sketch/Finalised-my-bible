@@ -65,6 +65,15 @@ interface BibleDao {
     @Query("SELECT COUNT(DISTINCT book) FROM greek_words")
     suspend fun countDistinctGreekBooks(): Int
 
+    // Used by Settings' "Re-check Greek/Hebrew data" — wipes the table so
+    // maybeImportGreek's threshold check no longer sees it as "already
+    // complete" and does a genuine fresh re-import against the current
+    // upstream TAGNT file, rather than the REPLACE-on-insert conflict
+    // strategy alone, which would leave any word STEPBible has since
+    // removed/renumbered stranded as a stale leftover row.
+    @Query("DELETE FROM greek_words")
+    suspend fun deleteAllGreekWords()
+
     // ---- Hebrew interlinear (TAHOT) ----
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -81,6 +90,10 @@ interface BibleDao {
     // is needed alongside the aggregate count.
     @Query("SELECT COUNT(DISTINCT book) FROM hebrew_words")
     suspend fun countDistinctHebrewBooks(): Int
+
+    // See deleteAllGreekWords's doc — same reasoning, for TAHOT.
+    @Query("DELETE FROM hebrew_words")
+    suspend fun deleteAllHebrewWords()
 
     // ---- Cross references (Treasury of Scripture Knowledge) ----
 

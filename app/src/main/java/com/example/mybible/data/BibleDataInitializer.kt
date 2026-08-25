@@ -125,6 +125,28 @@ class BibleDataInitializer private constructor(
         ensureImported()
     }
 
+    /**
+     * Settings' "Re-check Greek/Hebrew data" action — unlike [retry], which
+     * only helps when a step never finished at all, this handles a step
+     * that DID finish but against a since-updated upstream source. TAGNT/
+     * TAHOT are STEPBible's living datasets; they periodically add words
+     * (e.g. manuscript-variant readings) to verses that already imported
+     * successfully once. maybeImportGreek/maybeImportHebrew's threshold
+     * checks only ask "is a book present at all," so a book that's missing
+     * just a handful of newer words per verse looks "already complete" and
+     * is never revisited — wiping both tables first forces a genuine
+     * from-scratch resync against whatever the source contains right now.
+     */
+    suspend fun forceReimportGreekAndHebrew() {
+        dao.deleteAllGreekWords()
+        dao.deleteAllHebrewWords()
+        greekAttemptedThisSession = false
+        hebrewAttemptedThisSession = false
+        maybeImportGreek()
+        maybeImportHebrew()
+        _progress.value = null
+    }
+
     private suspend fun maybeImportKjv() {
         if (dao.countAllVerses() >= FULL_BIBLE_VERSE_THRESHOLD) return
         if (kjvAttemptedThisSession) return

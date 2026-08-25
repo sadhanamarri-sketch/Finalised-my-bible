@@ -41,10 +41,11 @@ class BibleDataImportWorker(
     override suspend fun doWork(): Result {
         setForeground(createForegroundInfo())
         val repository = BibleRepository(applicationContext)
-        if (inputData.getBoolean(KEY_FORCE_RETRY, false)) {
-            repository.dataInitializer.retry()
-        } else {
-            repository.dataInitializer.ensureImported()
+        when {
+            inputData.getBoolean(KEY_FORCE_GREEK_HEBREW_REIMPORT, false) ->
+                repository.dataInitializer.forceReimportGreekAndHebrew()
+            inputData.getBoolean(KEY_FORCE_RETRY, false) -> repository.dataInitializer.retry()
+            else -> repository.dataInitializer.ensureImported()
         }
         return Result.success()
     }
@@ -78,6 +79,7 @@ class BibleDataImportWorker(
         private const val CHANNEL_ID = "bible_data_import"
         private const val NOTIFICATION_ID = 4821
         private const val KEY_FORCE_RETRY = "force_retry"
+        private const val KEY_FORCE_GREEK_HEBREW_REIMPORT = "force_greek_hebrew_reimport"
 
         /** Safe to call on every app launch — KEEP leaves a completed or
          *  already-in-progress import alone rather than restarting it. */
@@ -94,6 +96,20 @@ class BibleDataImportWorker(
         fun enqueueRetry(context: Context) {
             val request = OneTimeWorkRequestBuilder<BibleDataImportWorker>()
                 .setInputData(workDataOf(KEY_FORCE_RETRY to true))
+                .build()
+            WorkManager.getInstance(context)
+                .enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.REPLACE, request)
+        }
+
+        /** Settings' "Re-check Greek/Hebrew data" action — see
+         *  BibleDataInitializer.forceReimportGreekAndHebrew's doc for why
+         *  this needs to be distinct from [enqueueRetry]: retry() only
+         *  re-attempts a step that never finished, while this wipes both
+         *  tables first so a step that finished against a now-outdated
+         *  upstream snapshot gets a genuine from-scratch resync. */
+        fun enqueueGreekHebrewReimport(context: Context) {
+            val request = OneTimeWorkRequestBuilder<BibleDataImportWorker>()
+                .setInputData(workDataOf(KEY_FORCE_GREEK_HEBREW_REIMPORT to true))
                 .build()
             WorkManager.getInstance(context)
                 .enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.REPLACE, request)

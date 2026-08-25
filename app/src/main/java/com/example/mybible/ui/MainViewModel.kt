@@ -853,6 +853,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // Settings' "Re-check Greek/Hebrew data" — see
+    // BibleDataImportWorker.enqueueGreekHebrewReimport's doc for why this
+    // is separate from retryBibleDataImport above (that one only helps a
+    // step that never finished; this handles one that finished against a
+    // now-stale upstream snapshot). Reloads the current chapter afterward
+    // so any newly-imported words for the verse on screen show up
+    // immediately, same as retryBibleDataImport does.
+    fun reimportGreekAndHebrewData() {
+        BibleDataImportWorker.enqueueGreekHebrewReimport(appContext)
+        viewModelScope.launch {
+            BibleDataImportWorker.awaitCompletion(appContext)
+            loadCurrentChapter()
+        }
+    }
+
     private fun startStudyTimer() {
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
