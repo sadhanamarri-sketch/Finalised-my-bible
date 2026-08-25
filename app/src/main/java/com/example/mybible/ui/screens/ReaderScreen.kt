@@ -1232,6 +1232,11 @@ fun ReaderScreen(
                     }
                 },
                 onAddNote = {
+                    // Same "dismiss before navigating" as onOpenNote below —
+                    // without this the sheet (now a real modal with a scrim)
+                    // stayed open underneath the full-screen Note Editor
+                    // instead of closing when the user left it.
+                    viewModel.setSelectedVerse(null)
                     viewModel.openNoteEditor(defaultVerse = verse)
                 },
                 onOpenNote = { note ->

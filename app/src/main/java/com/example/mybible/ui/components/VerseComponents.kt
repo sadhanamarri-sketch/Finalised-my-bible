@@ -554,7 +554,17 @@ fun VerseActionToolbar(
                 .fillMaxWidth()
                 .navigationBarsPadding()
                 .padding(horizontal = 20.dp)
-                .padding(bottom = 12.dp),
+                // The highlight-color row is horizontally scrollable and,
+                // whenever the quick-note row below it isn't shown, ends up
+                // as the sheet's last element — landing its touch area right
+                // against the bottom edge, inside the strip Android reserves
+                // for the gesture-nav home swipe, where a horizontal drag on
+                // a swatch gets contested by the system gesture instead of
+                // scrolling the row. navigationBarsPadding() alone isn't a
+                // reliable enough floor (some gesture-nav devices report a
+                // thin inset there), so this adds a fixed buffer on top of
+                // it regardless of which section ends up last.
+                .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             val currentColorDef = highlightColorDefs.find { it.colorHex == currentHighlightColorHex }
