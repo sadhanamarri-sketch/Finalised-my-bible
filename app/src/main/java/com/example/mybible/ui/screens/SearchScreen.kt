@@ -45,7 +45,8 @@ fun SearchScreen(
 ) {
     val searchQuery by viewModel.searchQuery.collectAsState()
     val searchResults by viewModel.searchResults.collectAsState()
-    val searchRelatedSections by viewModel.searchRelatedSections.collectAsState()
+    val searchVariantSuggestions by viewModel.searchVariantSuggestions.collectAsState()
+    val searchRelatedWords by viewModel.searchRelatedWords.collectAsState()
     val searchCorrectedQuery by viewModel.searchCorrectedQuery.collectAsState()
     val isSearching by viewModel.isSearching.collectAsState()
     val caseSensitive by viewModel.searchCaseSensitive.collectAsState()
@@ -286,6 +287,22 @@ fun SearchScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
+        // Typo-correction note plus tappable "also try"/"related" word
+        // chips — tapping one runs a brand new search for that exact word
+        // (same as tapping a recent-search chip) rather than this screen
+        // eagerly searching and displaying results for every variant and
+        // every related word up front, which is what made a single search
+        // balloon into an unreadably long page.
+        if (searchCorrectedQuery != null || searchVariantSuggestions.isNotEmpty() || searchRelatedWords.isNotEmpty()) {
+            SearchSuggestions(
+                correctedQuery = searchCorrectedQuery,
+                variantSuggestions = searchVariantSuggestions,
+                relatedWords = searchRelatedWords,
+                onSuggestionClick = { viewModel.searchFromHistory(it) }
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+
         if (isSearching) {
             Box(
                 contentAlignment = Alignment.Center,
@@ -293,7 +310,7 @@ fun SearchScreen(
             ) {
                 CircularProgressIndicator()
             }
-        } else if (searchResults.isEmpty() && searchRelatedSections.isEmpty()) {
+        } else if (searchResults.isEmpty()) {
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier.fillMaxSize()
@@ -305,56 +322,22 @@ fun SearchScreen(
                 )
             }
         } else {
-            // One flat list of rows (headers + verse cards) rather than
-            // nested LazyColumns per related-word section — Compose doesn't
-            // handle nested scrollables well, and a single list keeps
-            // lazy recycling and the spacedBy rhythm consistent across the
-            // main results and every related-word section beneath them.
-            val listItems = remember(searchResults, searchRelatedSections) {
-                buildList {
-                    addAll(searchResults.map { SearchListItem.VerseRow(it) })
-                    searchRelatedSections.forEach { section ->
-                        add(SearchListItem.Header(section.word))
-                        addAll(section.verses.map { SearchListItem.VerseRow(it) })
-                    }
-                }
-            }
+            // Elevated Cards, not flat/hairline-divided rows — the one
+            // place in this pass keeping Material's card-with-shadow look
+            // rather than the flat-bordered treatment used elsewhere
+            // (Cross References/Highlighted Verses), by request.
             LazyColumn(
                 state = listState,
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                if (searchCorrectedQuery != null) {
-                    item {
-                        Text(
-                            text = "Showing results for “${searchCorrectedQuery}”",
-                            fontSize = 13.sp,
-                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-                items(listItems) { item ->
-                    when (item) {
-                        is SearchListItem.Header -> Text(
-                            text = "Related: ${item.word}".uppercase(),
-                            fontSize = 12.5.sp,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
-                            letterSpacing = 1.sp,
-                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(top = 6.dp, bottom = 2.dp)
-                        )
-                        is SearchListItem.VerseRow -> {
-                            val verse = item.verse
-                            val itemKey = "${verse.book}:${verse.chapter}:${verse.number}"
-                            SearchResultCard(
-                                verse = verse,
-                                isLastTapped = itemKey == lastTappedKey,
-                                onClick = { viewModel.openSearchResult(verse) }
-                            )
-                        }
-                    }
+                items(searchResults) { verse ->
+                    val itemKey = "${verse.book}:${verse.chapter}:${verse.number}"
+                    SearchResultCard(
+                        verse = verse,
+                        isLastTapped = itemKey == lastTappedKey,
+                        onClick = { viewModel.openSearchResult(verse) }
+                    )
                 }
             }
         }
@@ -362,16 +345,65 @@ fun SearchScreen(
     }
 }
 
-// One flat row type for the results LazyColumn — see its call site's doc
-// for why this is a single list rather than nested LazyColumns per
-// related-word section.
-private sealed class SearchListItem {
-    data class Header(val word: String) : SearchListItem()
-    data class VerseRow(val verse: com.example.mybible.model.Verse) : SearchListItem()
+// Typo-correction note plus two rows of tappable word chips — same
+// AssistChip look as the "Recent searches" row above the field, for visual
+// consistency. Only the rows that actually have something show up (e.g. a
+// word with no root-stripping candidates shows no "Also try" row at all).
+@Composable
+private fun SearchSuggestions(
+    correctedQuery: String?,
+    variantSuggestions: List<String>,
+    relatedWords: List<String>,
+    onSuggestionClick: (String) -> Unit
+) {
+    Column {
+        if (correctedQuery != null) {
+            Text(
+                text = "Showing results for “$correctedQuery”",
+                fontSize = 13.sp,
+                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+        }
+        if (variantSuggestions.isNotEmpty()) {
+            SuggestionChipRow(label = "Also try", words = variantSuggestions, onClick = onSuggestionClick)
+        }
+        if (relatedWords.isNotEmpty()) {
+            if (variantSuggestions.isNotEmpty()) Spacer(modifier = Modifier.height(8.dp))
+            SuggestionChipRow(label = "Related", words = relatedWords, onClick = onSuggestionClick)
+        }
+    }
 }
 
-// Extracted from SearchScreen's results list so both the main results and
-// every related-word section render identical cards.
+@Composable
+private fun SuggestionChipRow(label: String, words: List<String>, onClick: (String) -> Unit) {
+    Text(
+        text = label,
+        fontSize = 12.5.sp,
+        letterSpacing = 1.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(bottom = 6.dp)
+    )
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(words) { word ->
+            AssistChip(
+                onClick = { onClick(word) },
+                label = { Text(word, fontSize = 13.sp) },
+                colors = AssistChipDefaults.assistChipColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    labelColor = MaterialTheme.colorScheme.onSurface
+                ),
+                border = AssistChipDefaults.assistChipBorder(
+                    enabled = true,
+                    borderColor = MaterialTheme.colorScheme.outlineVariant
+                )
+            )
+        }
+    }
+}
+
+// Extracted from the results list into its own composable for readability.
 @Composable
 private fun SearchResultCard(
     verse: com.example.mybible.model.Verse,

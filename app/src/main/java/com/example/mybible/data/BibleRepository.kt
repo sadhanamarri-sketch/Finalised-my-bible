@@ -842,26 +842,39 @@ class BibleRepository(private val context: Context) {
             return@withContext SearchOutcome(mainResults = legacyFallbackSearch(q, caseSensitive))
         }
 
-        // Typo-correction, word-form expansion, and related-word sections
-        // only make sense for a single plain word — a multi-word phrase
-        // keeps the plain substring behavior this search always had.
+        // Typo-correction, root-word suggestions, and related-word
+        // suggestions only make sense for a single plain word — a
+        // multi-word phrase keeps the plain substring behavior this search
+        // always had.
         val isSingleWord = q.all { it.isLetter() }
         if (!isSingleWord) {
-            return@withContext SearchOutcome(mainResults = searchAnyTerm(setOf(q), caseSensitive))
+            return@withContext SearchOutcome(mainResults = searchAnyTerm(q, caseSensitive))
         }
 
         val lowerQ = q.lowercase()
         val corrected = correctTypo(lowerQ)
         val effectiveWord = corrected ?: lowerQ
 
-        val mainResults = searchAnyTerm(expandWordForms(effectiveWord), caseSensitive)
+        // Main results are a plain single-word search — substring matching
+        // on its own already surfaces most inflected forms for free
+        // ("love" matches "loved"/"loving"/"loveth" as substrings), so
+        // there's no need to OR in extra generated terms here. Root-word
+        // and related-word suggestions are offered as tappable chips
+        // instead (see SearchScreen) — tapping one runs a fresh search for
+        // that exact word rather than this search eagerly running (and
+        // displaying results for) every variant and every related word up
+        // front, which is what made results balloon into an unreadably
+        // long page.
+        val mainResults = searchAnyTerm(effectiveWord, caseSensitive)
+        val variantSuggestions = stripToRoots(effectiveWord) - effectiveWord
+        val relatedWords = findRelatedWords(effectiveWord)
 
-        val relatedSections = findRelatedWords(effectiveWord).mapNotNull { relatedWord ->
-            val results = searchAnyTerm(expandWordForms(relatedWord), caseSensitive)
-            if (results.isEmpty()) null else RelatedWordResults(relatedWord, results)
-        }
-
-        SearchOutcome(correctedQuery = corrected, mainResults = mainResults, relatedSections = relatedSections)
+        SearchOutcome(
+            correctedQuery = corrected,
+            mainResults = mainResults,
+            variantSuggestions = variantSuggestions.toList(),
+            relatedWords = relatedWords
+        )
     }
 
     private suspend fun legacyFallbackSearch(q: String, caseSensitive: Boolean): List<Verse> {
@@ -884,46 +897,42 @@ class BibleRepository(private val context: Context) {
         return results
     }
 
-    // Runs the existing single-term Room LIKE search once per candidate
-    // term and merges the results, deduping by verse identity — used both
-    // for the main search (terms = the word-form variants of the searched
-    // word) and each related-word section (terms = that related word's own
-    // variants). Room's LIKE is only reliably case-insensitive for ASCII,
-    // so it's a coarse (case-insensitive) candidate filter here; the actual
-    // case-sensitive check, when requested, happens in Kotlin, same
+    // Thin wrapper over the existing single-term Room LIKE search, mapping
+    // rows to Verse. Room's LIKE is only reliably case-insensitive for
+    // ASCII, so it's a coarse (case-insensitive) candidate filter here; the
+    // actual case-sensitive check, when requested, happens in Kotlin, same
     // approach this search always used.
-    private suspend fun searchAnyTerm(terms: Set<String>, caseSensitive: Boolean): List<Verse> {
-        val seen = LinkedHashSet<String>()
+    private suspend fun searchAnyTerm(term: String, caseSensitive: Boolean): List<Verse> {
+        if (term.length < 2) return emptyList()
         val results = mutableListOf<Verse>()
-        for (term in terms) {
-            if (term.length < 2) continue
-            for (row in bibleDao.search(term)) {
-                if (caseSensitive && !(row.text.contains(term) || (row.teluguText?.contains(term) == true))) continue
-                val key = "${row.book}|${row.chapter}|${row.number}"
-                if (seen.add(key)) {
-                    results += Verse(
-                        book = row.book,
-                        chapter = row.chapter,
-                        number = row.number,
-                        text = row.text,
-                        isRedLetter = row.isRedLetter,
-                        teluguText = row.teluguText
-                    )
-                }
-            }
+        for (row in bibleDao.search(term)) {
+            if (caseSensitive && !(row.text.contains(term) || (row.teluguText?.contains(term) == true))) continue
+            results += Verse(
+                book = row.book,
+                chapter = row.chapter,
+                number = row.number,
+                text = row.text,
+                isRedLetter = row.isRedLetter,
+                teluguText = row.teluguText
+            )
         }
         return results
     }
 
-    // Reverses lookupWebsterStem's archaic-suffix-*stripping* rules (see its
-    // doc) into suffix-*building* ones: given a base word (or a word already
-    // in some inflected form — it gets stripped back to candidate bases
-    // first, same rules), generates the plausible KJV-style surface forms
-    // to search for. Deliberately generous rather than precise — a
-    // generated form that isn't a real word just never matches anything in
-    // the LIKE search, so over-generating costs nothing, while under-
-    // generating would silently miss real verses.
-    private fun expandWordForms(word: String): Set<String> {
+    // Same archaic-suffix-stripping rules as lookupWebsterStem (see its doc)
+    // — reused here to offer a searched word's root form(s) as tappable
+    // "Also try" suggestions in Search (see SearchScreen), rather than
+    // silently folding every generated surface form into the results (that
+    // approach made a single search balloon into a long, mostly-redundant
+    // page — see the git history for why this was simplified). Backward
+    // (strip-a-suffix) only, deliberately: substring matching on the word
+    // as typed already surfaces its own forward inflections for free
+    // ("love" matches "loved"/"loving" as substrings), so there's nothing
+    // to gain from also generating those — only stripping down to a root
+    // the typed word doesn't already contain as a substring (e.g. "walked"
+    // -> "walk", which "walking"/"walketh" don't literally contain) adds
+    // real reach.
+    private fun stripToRoots(word: String): Set<String> {
         val roots = mutableSetOf(word)
         when {
             word.endsWith("ies") && word.length > 4 -> roots += word.dropLast(3) + "y"
@@ -945,23 +954,7 @@ class BibleRepository(private val context: Context) {
         }
         if (word.endsWith("ed") && word.length > 3) roots += word.dropLast(2)
         if (word.endsWith("ing") && word.length > 4) roots += word.dropLast(3)
-
-        val forms = mutableSetOf<String>()
-        for (root in roots) {
-            forms += root
-            forms += root + "s"
-            forms += root + "es"
-            forms += root + "eth"
-            forms += root + "est"
-            forms += root + "ed"
-            forms += root + "d"
-            forms += root + "ing"
-            if (root.endsWith("e")) forms += root.dropLast(1) + "ing"
-            if (root.endsWith("y") && root.length > 1 && root[root.length - 2] !in "aeiou") {
-                forms += root.dropLast(1) + "ies"
-            }
-        }
-        return forms
+        return roots
     }
 
     // "Related words" — English words that share a Strong's number with the
@@ -973,7 +966,7 @@ class BibleRepository(private val context: Context) {
     // in a way a generic English thesaurus wouldn't know to connect.
     //
     // Capped at 8 so a very common word (spread across many Strong's
-    // numbers) doesn't produce an unreasonably long results screen.
+    // numbers) doesn't produce an unreasonably long row of suggestion chips.
     private val relatedWordStopwords = setOf(
         "to", "a", "an", "the", "of", "in", "on", "and", "or", "is", "am", "are",
         "be", "was", "were", "thee", "thou", "thy", "ye", "his", "her", "its"
