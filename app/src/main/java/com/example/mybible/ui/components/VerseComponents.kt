@@ -554,17 +554,7 @@ fun VerseActionToolbar(
                 .fillMaxWidth()
                 .navigationBarsPadding()
                 .padding(horizontal = 20.dp)
-                // The highlight-color row is horizontally scrollable and,
-                // whenever the quick-note row below it isn't shown, ends up
-                // as the sheet's last element — landing its touch area right
-                // against the bottom edge, inside the strip Android reserves
-                // for the gesture-nav home swipe, where a horizontal drag on
-                // a swatch gets contested by the system gesture instead of
-                // scrolling the row. navigationBarsPadding() alone isn't a
-                // reliable enough floor (some gesture-nav devices report a
-                // thin inset there), so this adds a fixed buffer on top of
-                // it regardless of which section ends up last.
-                .padding(bottom = 24.dp),
+                .padding(bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             val currentColorDef = highlightColorDefs.find { it.colorHex == currentHighlightColorHex }
@@ -662,24 +652,6 @@ fun VerseActionToolbar(
                 }
             }
 
-            // Always available — full editor, not the inline quick-note
-            // field below. Hollow/outlined rather than filled so it doesn't
-            // compete with the highlight swatches for attention.
-            OutlinedButton(
-                onClick = onAddNote,
-                modifier = Modifier.fillMaxWidth(),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
-            ) {
-                Text(
-                    text = "+ Add New Note",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
             // Highlight Colors — fixed palette (see model/HighlightColors.kt),
             // no add/manage flow. Horizontally scrollable since 12 swatches
             // plus Clear doesn't comfortably fit most screens at once.
@@ -769,6 +741,29 @@ fun VerseActionToolbar(
                 }
             }
 
+            // Always available — full editor, not the inline quick-note
+            // field above. Hollow/outlined rather than filled so it doesn't
+            // compete with the highlight swatches for attention. Kept as
+            // the sheet's last element deliberately: it's a single
+            // full-width button rather than a horizontal-scroll drag
+            // target, so landing at the bottom edge (inside the strip
+            // Android reserves for the gesture-nav home swipe) doesn't
+            // create the same drag-vs-system-gesture conflict the
+            // highlight-color row had when it used to end up last.
+            OutlinedButton(
+                onClick = onAddNote,
+                modifier = Modifier.fillMaxWidth(),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Text(
+                    text = "+ Add New Note",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
     }
 }
