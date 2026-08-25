@@ -59,6 +59,15 @@ fun SearchScreen(
         initialFirstVisibleItemScrollOffset = savedScrollOffset
     )
 
+    // The "also try" suggestion chips live above the results list, not as
+    // a sticky header inside it — scrolling the results doesn't move them
+    // out of the way on its own. Tying their visibility to "are we back at
+    // the very top of the list" gives the list the full screen once the
+    // user scrolls into results, without needing a second scroll container.
+    val isScrolledToTop by remember {
+        derivedStateOf { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 }
+    }
+
     // Marks the last-tapped result with an accent bar on return, so the
     // user can spot which one they already visited — cleared on the first
     // scroll after landing (same "scroll to clear" idea as Reader's
@@ -291,14 +300,20 @@ fun SearchScreen(
         // tapping a recent-search chip) rather than this screen eagerly
         // searching and displaying results for every variant up front,
         // which is what made a single search balloon into an unreadably
-        // long page.
-        if (searchCorrectedQuery != null || searchVariantSuggestions.isNotEmpty()) {
-            SearchSuggestions(
-                correctedQuery = searchCorrectedQuery,
-                variantSuggestions = searchVariantSuggestions,
-                onSuggestionClick = { viewModel.searchFromHistory(it) }
-            )
-            Spacer(modifier = Modifier.height(10.dp))
+        // long page. Only shown while scrolled to the very top of the
+        // results — once the user scrolls down to read, the chips step
+        // aside instead of eating space above every screenful of results.
+        AnimatedVisibility(
+            visible = isScrolledToTop && (searchCorrectedQuery != null || searchVariantSuggestions.isNotEmpty())
+        ) {
+            Column {
+                SearchSuggestions(
+                    correctedQuery = searchCorrectedQuery,
+                    variantSuggestions = searchVariantSuggestions,
+                    onSuggestionClick = { viewModel.searchFromHistory(it) }
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+            }
         }
 
         if (isSearching) {
