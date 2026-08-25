@@ -499,6 +499,7 @@ fun VerseCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VerseActionToolbar(
     verse: Verse,
@@ -536,16 +537,24 @@ fun VerseActionToolbar(
     // makes long-press a no-op.
     onRenameColor: ((HighlightColorDef) -> Unit)? = null
 ) {
-    Surface(
+    // A real modal bottom sheet (dimmed scrim, swipe-down-to-dismiss, drag
+    // handle) rather than a floating Surface pinned above the nav bar —
+    // matches the sheet pattern already used for Notes' filter sheet and
+    // the Tag editor, instead of being the one action panel in Reader that
+    // looked like a toolbar wedged into the layout.
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
         modifier = modifier
-            .fillMaxWidth()
-            .padding(12.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 8.dp
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             val currentColorDef = highlightColorDefs.find { it.colorHex == currentHighlightColorHex }

@@ -1195,7 +1195,11 @@ fun ReaderScreen(
             )
         }
 
-        // Floating Action Toolbar for selected verse
+        // Verse action sheet — a real modal bottom sheet now (dimmed scrim,
+        // swipe-down-to-dismiss) rather than a floating bar pinned above the
+        // nav bar, so it no longer needs to report its height back into
+        // bottomOverlayHeightPx: the scrim already makes the rest of the
+        // screen non-interactive while it's open.
         if (selectedVerse != null) {
             val verse = selectedVerse!!
             val notesOnVerse = notes.filter { it.matchesVerse(verse.book, verse.chapter, verse.number) }
@@ -1252,11 +1256,7 @@ fun ReaderScreen(
                 onDismiss = {
                     viewModel.setSelectedVerse(null)
                 },
-                onRenameColor = { def -> colorToRename = def },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 12.dp)
-                    .onGloballyPositioned { bottomOverlayHeightPx = it.size.height }
+                onRenameColor = { def -> colorToRename = def }
             )
         } else {
             // The only chrome Reader has now — book label plus quick
