@@ -193,17 +193,22 @@ fun VerseCard(
             )
             .testTag("verse_item_${verse.number}")
     ) {
-        // height(IntrinsicSize.Min) forces this Row to resolve its own
-        // height from its children's intrinsic (measured) content height
-        // first — without it, the Row's incoming height constraint is
-        // unbounded (the outer Box wraps its content rather than having a
-        // fixed height), so the bar's fillMaxHeight() below has nothing
-        // real to fill and silently collapses to zero instead of matching
-        // the verse text's height.
-        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+        // A Box, not a Row+IntrinsicSize.Min (what this used to be) — that
+        // combination measures the content Column's required height via
+        // *intrinsic* estimation rather than its real layout pass, and for
+        // nested weight()ed wrapping content (the Greek/Hebrew interlinear
+        // FlowRows below) that estimate could come in short, silently
+        // clipping the last wrapped line — this was the actual cause of
+        // "the last Greek word or two is missing," a rendering bug, not a
+        // data/import problem. A Box's matchParentSize() children (see the
+        // highlight bar below) are measured only after the box's regular
+        // children resolve their real size, so this always gets the
+        // content Column's true rendered height instead.
+        Box(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier
-                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(end = 2.dp)
                     .padding(horizontal = 8.dp, vertical = 8.dp)
             ) {
             Row(
@@ -442,10 +447,12 @@ fun VerseCard(
                 // visual noise to a chapter you already know you've read.
             }
             }
-            // Sibling of the weighted content Column above (not nested
-            // inside it) — so this renders as a bar on the *right edge* of
-            // the whole card, not a sliver stacked underneath the verse
-            // text.
+            // Sibling of the content Column above (not nested inside it) —
+            // so this renders as a bar on the *right edge* of the whole
+            // card, not a sliver stacked underneath the verse text.
+            // matchParentSize() (see this Box's own doc above) gives it the
+            // content Column's true rendered height, wrapped interlinear
+            // lines included.
             //
             // Proportional and top-anchored rather than full-height: spans
             // 5%-30% of the verse's own measured height (English text plus
@@ -458,31 +465,33 @@ fun VerseCard(
             // read — always starts at the top; the midpoint drifts further
             // down the longer the optional scripts underneath it get.
             // The three weights (0.05/0.25/0.70) carve exact proportional
-            // segments out of whatever height the outer Box resolves to
-            // (fillMaxHeight() against the Row's IntrinsicSize.Min), same
-            // technique as any weighted Column, just used for spacing
-            // rather than visible content.
+            // segments out of whatever height matchParentSize() resolves
+            // to, same technique as any weighted Column, just used for
+            // spacing rather than visible content.
             if (highlightColor != null) {
-                Box(
-                    modifier = Modifier
-                        .width(2.dp)
-                        .fillMaxHeight()
-                ) {
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        // Top offset stays proportional (10% of the verse's
-                        // own height) so the bar still starts near the
-                        // English text regardless of how tall the verse
-                        // is — but the bar itself is a fixed 20dp rather
-                        // than scaling with verse height, so the remaining
-                        // space just absorbs whatever's left.
-                        Spacer(modifier = Modifier.weight(0.10f))
-                        Box(
-                            modifier = Modifier
-                                .height(20.dp)
-                                .fillMaxWidth()
-                                .background(highlightColor)
-                        )
-                        Spacer(modifier = Modifier.weight(0.90f))
+                Box(modifier = Modifier.matchParentSize()) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .width(2.dp)
+                            .fillMaxHeight()
+                    ) {
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            // Top offset stays proportional (10% of the verse's
+                            // own height) so the bar still starts near the
+                            // English text regardless of how tall the verse
+                            // is — but the bar itself is a fixed 20dp rather
+                            // than scaling with verse height, so the remaining
+                            // space just absorbs whatever's left.
+                            Spacer(modifier = Modifier.weight(0.10f))
+                            Box(
+                                modifier = Modifier
+                                    .height(20.dp)
+                                    .fillMaxWidth()
+                                    .background(highlightColor)
+                            )
+                            Spacer(modifier = Modifier.weight(0.90f))
+                        }
                     }
                 }
             }
