@@ -842,39 +842,99 @@ class BibleRepository(private val context: Context) {
             return@withContext SearchOutcome(mainResults = legacyFallbackSearch(q, caseSensitive))
         }
 
-        // Typo-correction, root-word suggestions, and related-word
-        // suggestions only make sense for a single plain word — a
-        // multi-word phrase keeps the plain substring behavior this search
-        // always had.
-        val isSingleWord = q.all { it.isLetter() }
-        if (!isSingleWord) {
-            return@withContext SearchOutcome(mainResults = searchAnyTerm(q, caseSensitive))
+        val words = q.split(Regex("\\s+")).filter { it.isNotBlank() }
+        val isSingleWord = words.size == 1 && words[0].all { it.isLetter() }
+
+        // Case-sensitive mode is a precise/literal mode — deliberately
+        // skips typo-correction and root-word suggestions entirely rather
+        // than trying to make them case-aware. Both work by lowercasing
+        // whatever was typed and reasoning about that lowercase form, which
+        // would silently break a case-sensitive search for something like
+        // "LORD" vs "Lord" (different underlying Hebrew words in the KJV,
+        // and exactly the kind of distinction case-sensitive mode exists
+        // to make) by matching against the wrong case. A multi-word phrase
+        // never had these enhancements either way.
+        if (caseSensitive || !isSingleWord) {
+            val mainResults = if (words.size > 1) {
+                searchCombination(words, caseSensitive)
+            } else {
+                searchAnyTerm(q, caseSensitive)
+            }
+            return@withContext SearchOutcome(mainResults = mainResults)
         }
 
+        val dictionary = getKjvWordSet()
         val lowerQ = q.lowercase()
-        val corrected = correctTypo(lowerQ)
+        val corrected = correctTypo(lowerQ, dictionary)
         val effectiveWord = corrected ?: lowerQ
 
         // Main results are a plain single-word search — substring matching
         // on its own already surfaces most inflected forms for free
         // ("love" matches "loved"/"loving"/"loveth" as substrings), so
         // there's no need to OR in extra generated terms here. Root-word
-        // and related-word suggestions are offered as tappable chips
-        // instead (see SearchScreen) — tapping one runs a fresh search for
-        // that exact word rather than this search eagerly running (and
-        // displaying results for) every variant and every related word up
-        // front, which is what made results balloon into an unreadably
-        // long page.
+        // suggestions are offered as tappable chips instead (see
+        // SearchScreen) — tapping one runs a fresh search for that exact
+        // word rather than this search eagerly running (and displaying
+        // results for) every variant up front, which is what made results
+        // balloon into an unreadably long page.
         val mainResults = searchAnyTerm(effectiveWord, caseSensitive)
-        val variantSuggestions = stripToRoots(effectiveWord) - effectiveWord
-        val relatedWords = findRelatedWords(effectiveWord)
+        // Filtered against the same real-word dictionary used for typo-
+        // correction: stripToRoots generates candidates mechanically (e.g.
+        // "loved" -> "lov", dropping the "ed" without restoring the silent
+        // "e" it needs), and only some of them are real words — a chip
+        // offering "lov" as a suggestion looks broken in a way a discarded
+        // internal search term never would.
+        val variantSuggestions = (stripToRoots(effectiveWord) - effectiveWord).filter { it in dictionary }
 
-        SearchOutcome(
-            correctedQuery = corrected,
-            mainResults = mainResults,
-            variantSuggestions = variantSuggestions.toList(),
-            relatedWords = relatedWords
-        )
+        SearchOutcome(correctedQuery = corrected, mainResults = mainResults, variantSuggestions = variantSuggestions)
+    }
+
+    // AND search across every word in a multi-word query — a verse must
+    // contain all of them, in any order/position, not just the exact typed
+    // phrase (which is what a plain LIKE '%q%' on the whole string would
+    // require, and almost never matches). Exact-phrase matches are ranked
+    // first since a verse containing the words together is a stronger,
+    // more relevant match than one with the same words scattered apart —
+    // they're always a subset of the AND results, not a separate search.
+    private suspend fun searchCombination(words: List<String>, caseSensitive: Boolean): List<Verse> {
+        val meaningfulWords = words.filter { it.length >= 2 }
+        if (meaningfulWords.isEmpty()) return emptyList()
+
+        fun verseContainsWord(row: VerseEntity, word: String): Boolean =
+            row.text.contains(word, ignoreCase = !caseSensitive) ||
+                (row.teluguText?.contains(word, ignoreCase = !caseSensitive) == true)
+
+        // Intersect each word's own (coarse, case-insensitive) Room LIKE
+        // candidates by verse identity, refining case-sensitively in
+        // Kotlin per word along the way — same "Room narrows, Kotlin
+        // refines" split every search here uses. Short-circuits the moment
+        // any word has zero remaining candidates.
+        var matches: LinkedHashMap<String, VerseEntity>? = null
+        for (word in meaningfulWords) {
+            val byKey = LinkedHashMap<String, VerseEntity>()
+            for (row in bibleDao.search(word)) {
+                if (!verseContainsWord(row, word)) continue
+                byKey["${row.book}|${row.chapter}|${row.number}"] = row
+            }
+            matches = if (matches == null) byKey else LinkedHashMap(matches.filterKeys { it in byKey })
+            if (matches.isEmpty()) break
+        }
+
+        val phrase = meaningfulWords.joinToString(" ")
+        val rows = matches?.values.orEmpty()
+        val (phraseMatches, scatteredMatches) = rows.partition { row ->
+            row.text.contains(phrase, ignoreCase = !caseSensitive)
+        }
+        return (phraseMatches + scatteredMatches).map { row ->
+            Verse(
+                book = row.book,
+                chapter = row.chapter,
+                number = row.number,
+                text = row.text,
+                isRedLetter = row.isRedLetter,
+                teluguText = row.teluguText
+            )
+        }
     }
 
     private suspend fun legacyFallbackSearch(q: String, caseSensitive: Boolean): List<Verse> {
@@ -952,52 +1012,15 @@ class BibleRepository(private val context: Context) {
             roots += word.dropLast(3)
             roots += word.dropLast(2)
         }
-        if (word.endsWith("ed") && word.length > 3) roots += word.dropLast(2)
-        if (word.endsWith("ing") && word.length > 4) roots += word.dropLast(3)
+        if (word.endsWith("ed") && word.length > 3) {
+            roots += word.dropLast(2)
+            roots += word.dropLast(2) + "e" // silent-e restore: loved -> lov -> love
+        }
+        if (word.endsWith("ing") && word.length > 4) {
+            roots += word.dropLast(3)
+            roots += word.dropLast(3) + "e" // silent-e restore: loving -> lov -> love
+        }
         return roots
-    }
-
-    // "Related words" — English words that share a Strong's number with the
-    // searched word, drawn from the same Greek/Hebrew interlinear data
-    // already imported for the reader's interlinear feature (see
-    // GreekImporter/HebrewImporter) rather than a separate synonym dataset:
-    // multiple KJV words translating the same underlying Greek/Hebrew word
-    // (e.g. "love" and "charity" both rendering G26) are genuinely related
-    // in a way a generic English thesaurus wouldn't know to connect.
-    //
-    // Capped at 8 so a very common word (spread across many Strong's
-    // numbers) doesn't produce an unreasonably long row of suggestion chips.
-    private val relatedWordStopwords = setOf(
-        "to", "a", "an", "the", "of", "in", "on", "and", "or", "is", "am", "are",
-        "be", "was", "were", "thee", "thou", "thy", "ye", "his", "her", "its"
-    )
-
-    private fun glossTokens(gloss: String): List<String> =
-        gloss.lowercase().replace(Regex("[^a-z\\s]"), " ").split(Regex("\\s+")).filter { it.isNotBlank() }
-
-    private suspend fun findRelatedWords(word: String): List<String> {
-        val greekMatches = bibleDao.getGreekWordsByGlossLike(word).filter { word in glossTokens(it.gloss) }
-        val hebrewMatches = bibleDao.getHebrewWordsByGlossLike(word).filter { word in glossTokens(it.gloss) }
-        if (greekMatches.isEmpty() && hebrewMatches.isEmpty()) return emptyList()
-
-        val related = mutableSetOf<String>()
-        val greekStrongs = greekMatches.map { it.strongs }.distinct()
-        if (greekStrongs.isNotEmpty()) {
-            for (gloss in bibleDao.getGreekGlossesForStrongs(greekStrongs)) {
-                for (token in glossTokens(gloss)) {
-                    if (token.length >= 3 && token != word && token !in relatedWordStopwords) related += token
-                }
-            }
-        }
-        val hebrewStrongs = hebrewMatches.map { it.strongs }.distinct()
-        if (hebrewStrongs.isNotEmpty()) {
-            for (gloss in bibleDao.getHebrewGlossesForStrongs(hebrewStrongs)) {
-                for (token in glossTokens(gloss)) {
-                    if (token.length >= 3 && token != word && token !in relatedWordStopwords) related += token
-                }
-            }
-        }
-        return related.take(8)
     }
 
     // Typo-tolerance's reference dictionary — every distinct word that
@@ -1041,8 +1064,7 @@ class BibleRepository(private val context: Context) {
     // guessing when nothing is close enough — a modern/non-KJV word should
     // just search as typed and come back empty, not get mangled into an
     // unrelated KJV word.
-    private suspend fun correctTypo(word: String): String? {
-        val dictionary = getKjvWordSet()
+    private fun correctTypo(word: String, dictionary: Set<String>): String? {
         if (word in dictionary) return null
         val maxDistance = if (word.length <= 4) 1 else 2
         var best: String? = null

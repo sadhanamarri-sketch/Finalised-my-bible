@@ -61,20 +61,24 @@ data class Verse(
 )
 
 // BibleRepository.searchBible's full result. variantSuggestions (root-word
-// forms, e.g. "walk" for a search of "walked") and relatedWords (words
-// sharing a Strong's number, e.g. "charity" for "love" — see
-// BibleRepository.findRelatedWords) are shown as tappable chips rather than
-// eagerly searched and displayed — tapping one runs a fresh search for that
-// exact word (see SearchScreen). Not @Serializable: search results are
-// always freshly computed, never cached to disk like Verse sometimes is.
-// correctedQuery is null when the typed word was already recognized (or
-// wasn't a single plain word to begin with), so the UI only shows a
-// "Showing results for…" note when a real correction happened.
+// forms, e.g. "walk" for a search of "walked") are shown as tappable chips
+// rather than eagerly searched and displayed — tapping one runs a fresh
+// search for that exact word (see SearchScreen). Not @Serializable: search
+// results are always freshly computed, never cached to disk like Verse
+// sometimes is. correctedQuery is null when the typed word was already
+// recognized (or wasn't a single plain word to begin with, or case-sensitive
+// mode was on), so the UI only shows a "Showing results for…" note when a
+// real correction happened.
+//
+// A Strong's-number-based "related words" feature (words sharing a Strong's
+// number with the searched word) was tried and dropped — it worked for
+// Greek (NT) but Hebrew (OT) Strong's numbers frequently lump unrelated
+// homonyms together, surfacing garbage like a proper name or an unrelated
+// noun as a "related" suggestion with no reliable way to filter it out.
 data class SearchOutcome(
     val correctedQuery: String? = null,
     val mainResults: List<Verse> = emptyList(),
-    val variantSuggestions: List<String> = emptyList(),
-    val relatedWords: List<String> = emptyList()
+    val variantSuggestions: List<String> = emptyList()
 )
 
 @Serializable

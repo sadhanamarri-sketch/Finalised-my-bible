@@ -46,7 +46,6 @@ fun SearchScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val searchResults by viewModel.searchResults.collectAsState()
     val searchVariantSuggestions by viewModel.searchVariantSuggestions.collectAsState()
-    val searchRelatedWords by viewModel.searchRelatedWords.collectAsState()
     val searchCorrectedQuery by viewModel.searchCorrectedQuery.collectAsState()
     val isSearching by viewModel.isSearching.collectAsState()
     val caseSensitive by viewModel.searchCaseSensitive.collectAsState()
@@ -287,17 +286,16 @@ fun SearchScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Typo-correction note plus tappable "also try"/"related" word
-        // chips — tapping one runs a brand new search for that exact word
-        // (same as tapping a recent-search chip) rather than this screen
-        // eagerly searching and displaying results for every variant and
-        // every related word up front, which is what made a single search
-        // balloon into an unreadably long page.
-        if (searchCorrectedQuery != null || searchVariantSuggestions.isNotEmpty() || searchRelatedWords.isNotEmpty()) {
+        // Typo-correction note plus tappable "also try" word-form chips —
+        // tapping one runs a brand new search for that exact word (same as
+        // tapping a recent-search chip) rather than this screen eagerly
+        // searching and displaying results for every variant up front,
+        // which is what made a single search balloon into an unreadably
+        // long page.
+        if (searchCorrectedQuery != null || searchVariantSuggestions.isNotEmpty()) {
             SearchSuggestions(
                 correctedQuery = searchCorrectedQuery,
                 variantSuggestions = searchVariantSuggestions,
-                relatedWords = searchRelatedWords,
                 onSuggestionClick = { viewModel.searchFromHistory(it) }
             )
             Spacer(modifier = Modifier.height(10.dp))
@@ -345,15 +343,14 @@ fun SearchScreen(
     }
 }
 
-// Typo-correction note plus two rows of tappable word chips — same
-// AssistChip look as the "Recent searches" row above the field, for visual
-// consistency. Only the rows that actually have something show up (e.g. a
-// word with no root-stripping candidates shows no "Also try" row at all).
+// Typo-correction note plus a row of tappable "also try" word-form chips —
+// same AssistChip look as the "Recent searches" row above the field, for
+// visual consistency. The chip row only shows up when there's something to
+// offer (e.g. a word with no root-stripping candidates shows no row at all).
 @Composable
 private fun SearchSuggestions(
     correctedQuery: String?,
     variantSuggestions: List<String>,
-    relatedWords: List<String>,
     onSuggestionClick: (String) -> Unit
 ) {
     Column {
@@ -368,10 +365,6 @@ private fun SearchSuggestions(
         }
         if (variantSuggestions.isNotEmpty()) {
             SuggestionChipRow(label = "Also try", words = variantSuggestions, onClick = onSuggestionClick)
-        }
-        if (relatedWords.isNotEmpty()) {
-            if (variantSuggestions.isNotEmpty()) Spacer(modifier = Modifier.height(8.dp))
-            SuggestionChipRow(label = "Related", words = relatedWords, onClick = onSuggestionClick)
         }
     }
 }

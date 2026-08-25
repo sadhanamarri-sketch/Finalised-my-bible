@@ -674,17 +674,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _searchResults = MutableStateFlow<List<Verse>>(emptyList())
     val searchResults: StateFlow<List<Verse>> = _searchResults.asStateFlow()
 
-    // Root-word and related-word suggestion chips (see BibleRepository's
-    // stripToRoots/findRelatedWords) and the typo-corrected query (null
-    // unless a correction actually applied) — all empty/null together with
-    // searchResults on a fresh/cleared query. Tapping a chip re-searches
-    // via searchFromHistory below rather than these driving their own
-    // eagerly-fetched results.
+    // Root-word suggestion chips (see BibleRepository.stripToRoots) and the
+    // typo-corrected query (null unless a correction actually applied) —
+    // both empty/null together with searchResults on a fresh/cleared query.
+    // Tapping a chip re-searches via searchFromHistory below rather than
+    // this driving its own eagerly-fetched results.
     private val _searchVariantSuggestions = MutableStateFlow<List<String>>(emptyList())
     val searchVariantSuggestions: StateFlow<List<String>> = _searchVariantSuggestions.asStateFlow()
-
-    private val _searchRelatedWords = MutableStateFlow<List<String>>(emptyList())
-    val searchRelatedWords: StateFlow<List<String>> = _searchRelatedWords.asStateFlow()
 
     private val _searchCorrectedQuery = MutableStateFlow<String?>(null)
     val searchCorrectedQuery: StateFlow<String?> = _searchCorrectedQuery.asStateFlow()
@@ -2092,7 +2088,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val outcome = repository.searchBible(query, caseSensitive = _searchCaseSensitive.value)
         _searchResults.value = outcome.mainResults
         _searchVariantSuggestions.value = outcome.variantSuggestions
-        _searchRelatedWords.value = outcome.relatedWords
         _searchCorrectedQuery.value = outcome.correctedQuery
         _isSearching.value = false
     }
@@ -2104,7 +2099,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _isSearching.value = false
             _searchResults.value = emptyList()
             _searchVariantSuggestions.value = emptyList()
-            _searchRelatedWords.value = emptyList()
             _searchCorrectedQuery.value = null
             return
         }
@@ -2154,7 +2148,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _searchQuery.value = ""
         _searchResults.value = emptyList()
         _searchVariantSuggestions.value = emptyList()
-        _searchRelatedWords.value = emptyList()
         _searchCorrectedQuery.value = null
         _isSearching.value = false
     }
@@ -2172,7 +2165,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _searchQuery.value = ""
         _searchResults.value = emptyList()
         _searchVariantSuggestions.value = emptyList()
-        _searchRelatedWords.value = emptyList()
         _searchCorrectedQuery.value = null
         _isSearching.value = false
         _searchLastTappedKey.value = null
