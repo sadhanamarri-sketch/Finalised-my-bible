@@ -45,6 +45,8 @@ fun SearchScreen(
 ) {
     val searchQuery by viewModel.searchQuery.collectAsState()
     val searchResults by viewModel.searchResults.collectAsState()
+    val searchRelatedSections by viewModel.searchRelatedSections.collectAsState()
+    val searchCorrectedQuery by viewModel.searchCorrectedQuery.collectAsState()
     val isSearching by viewModel.isSearching.collectAsState()
     val caseSensitive by viewModel.searchCaseSensitive.collectAsState()
     val savedScrollIndex by viewModel.searchScrollIndex.collectAsState()
@@ -291,7 +293,7 @@ fun SearchScreen(
             ) {
                 CircularProgressIndicator()
             }
-        } else if (searchResults.isEmpty()) {
+        } else if (searchResults.isEmpty() && searchRelatedSections.isEmpty()) {
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier.fillMaxSize()
@@ -303,81 +305,139 @@ fun SearchScreen(
                 )
             }
         } else {
-            // Elevated Cards, not flat/hairline-divided rows — the one
-            // place in this pass keeping Material's card-with-shadow look
-            // rather than the flat-bordered treatment used elsewhere
-            // (Cross References/Highlighted Verses), by request.
+            // One flat list of rows (headers + verse cards) rather than
+            // nested LazyColumns per related-word section — Compose doesn't
+            // handle nested scrollables well, and a single list keeps
+            // lazy recycling and the spacedBy rhythm consistent across the
+            // main results and every related-word section beneath them.
+            val listItems = remember(searchResults, searchRelatedSections) {
+                buildList {
+                    addAll(searchResults.map { SearchListItem.VerseRow(it) })
+                    searchRelatedSections.forEach { section ->
+                        add(SearchListItem.Header(section.word))
+                        addAll(section.verses.map { SearchListItem.VerseRow(it) })
+                    }
+                }
+            }
             LazyColumn(
                 state = listState,
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(searchResults) { verse ->
-                    val itemKey = "${verse.book}:${verse.chapter}:${verse.number}"
-                    val isLastTapped = itemKey == lastTappedKey
-                    Card(
-                        onClick = { viewModel.openSearchResult(verse) },
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        // Same left-edge accent bar as Reader's highlight
-                        // style (idea #1) — height(Min) is required for the
-                        // bar's fillMaxHeight to have anything bounded to
-                        // fill, since this Row sits in a wrap-content Card.
-                        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-                            // Fades out slowly rather than an instant on/off
-                            // — appears immediately on landing (enter =
-                            // None) but eases out over a full second once
-                            // cleared (see clearSearchLastTapped's caller),
-                            // giving the eye time to register which card it
-                            // was before it's gone.
-                            AnimatedVisibility(
-                                visible = isLastTapped,
-                                enter = EnterTransition.None,
-                                exit = fadeOut(animationSpec = tween(durationMillis = 1000))
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .width(3.dp)
-                                        .fillMaxHeight()
-                                        .background(MaterialTheme.colorScheme.primary)
-                                )
-                            }
-                            Column(modifier = Modifier.weight(1f).padding(12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "${verse.book} ${verse.chapter}:${verse.number}".uppercase(),
-                                        fontSize = 12.5.sp,
-                                        fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
-                                        letterSpacing = 1.5.sp,
-                                        color = MaterialTheme.colorScheme.tertiary
-                                    )
-                                    Icon(
-                                        imageVector = Icons.Default.ArrowForward,
-                                        contentDescription = "Navigate",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = verse.text,
-                                    fontSize = 15.sp,
-                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
-                                    lineHeight = 21.sp,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
+                if (searchCorrectedQuery != null) {
+                    item {
+                        Text(
+                            text = "Showing results for “${searchCorrectedQuery}”",
+                            fontSize = 13.sp,
+                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                items(listItems) { item ->
+                    when (item) {
+                        is SearchListItem.Header -> Text(
+                            text = "Related: ${item.word}".uppercase(),
+                            fontSize = 12.5.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
+                            letterSpacing = 1.sp,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 6.dp, bottom = 2.dp)
+                        )
+                        is SearchListItem.VerseRow -> {
+                            val verse = item.verse
+                            val itemKey = "${verse.book}:${verse.chapter}:${verse.number}"
+                            SearchResultCard(
+                                verse = verse,
+                                isLastTapped = itemKey == lastTappedKey,
+                                onClick = { viewModel.openSearchResult(verse) }
+                            )
                         }
                     }
                 }
             }
         }
     }
+    }
+}
+
+// One flat row type for the results LazyColumn — see its call site's doc
+// for why this is a single list rather than nested LazyColumns per
+// related-word section.
+private sealed class SearchListItem {
+    data class Header(val word: String) : SearchListItem()
+    data class VerseRow(val verse: com.example.mybible.model.Verse) : SearchListItem()
+}
+
+// Extracted from SearchScreen's results list so both the main results and
+// every related-word section render identical cards.
+@Composable
+private fun SearchResultCard(
+    verse: com.example.mybible.model.Verse,
+    isLastTapped: Boolean,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        // Same left-edge accent bar as Reader's highlight style (idea #1)
+        // — height(Min) is required for the bar's fillMaxHeight to have
+        // anything bounded to fill, since this Row sits in a wrap-content
+        // Card. Unlike the verse-reader card, this row's content (a
+        // reference line + a single Text of verse text) doesn't have
+        // dynamically-wrapping interlinear chips, so it isn't at risk of
+        // the same intrinsic-height clipping bug fixed there.
+        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            // Fades out slowly rather than an instant on/off — appears
+            // immediately on landing (enter = None) but eases out over a
+            // full second once cleared (see clearSearchLastTapped's
+            // caller), giving the eye time to register which card it was
+            // before it's gone.
+            AnimatedVisibility(
+                visible = isLastTapped,
+                enter = EnterTransition.None,
+                exit = fadeOut(animationSpec = tween(durationMillis = 1000))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(3.dp)
+                        .fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.primary)
+                )
+            }
+            Column(modifier = Modifier.weight(1f).padding(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "${verse.book} ${verse.chapter}:${verse.number}".uppercase(),
+                        fontSize = 12.5.sp,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
+                        letterSpacing = 1.5.sp,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                    Icon(
+                        imageVector = Icons.Default.ArrowForward,
+                        contentDescription = "Navigate",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = verse.text,
+                    fontSize = 15.sp,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+                    lineHeight = 21.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
     }
 }

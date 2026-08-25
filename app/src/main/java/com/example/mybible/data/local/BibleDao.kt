@@ -46,6 +46,13 @@ interface BibleDao {
     @Query("SELECT text FROM verses WHERE book = :book AND chapter = :chapter AND number = :verse LIMIT 1")
     suspend fun getVerseText(book: String, chapter: Int, verse: Int): String?
 
+    // Search's typo-tolerance builds an in-memory "words that actually
+    // appear in the KJV" set from this once, then caches it — see
+    // BibleRepository.getKjvWordSet. Only English text; typo-correction
+    // doesn't extend to Telugu.
+    @Query("SELECT text FROM verses")
+    suspend fun getAllVerseTexts(): List<String>
+
     // ---- Greek interlinear (TAGNT) ----
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -74,6 +81,17 @@ interface BibleDao {
     @Query("DELETE FROM greek_words")
     suspend fun deleteAllGreekWords()
 
+    // Search's "related words" feature (see BibleRepository.findRelatedWords)
+    // — a coarse substring candidate filter, same "LIKE then refine in
+    // Kotlin" pattern as the main verse search, since Room can't express a
+    // whole-word-boundary match. strongs != '' excludes untagged rows
+    // (dStrongCell can be blank in the source data).
+    @Query("SELECT * FROM greek_words WHERE gloss LIKE '%' || :word || '%' AND strongs != ''")
+    suspend fun getGreekWordsByGlossLike(word: String): List<GreekWordEntity>
+
+    @Query("SELECT DISTINCT gloss FROM greek_words WHERE strongs IN (:strongsList)")
+    suspend fun getGreekGlossesForStrongs(strongsList: List<String>): List<String>
+
     // ---- Hebrew interlinear (TAHOT) ----
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -94,6 +112,13 @@ interface BibleDao {
     // See deleteAllGreekWords's doc — same reasoning, for TAHOT.
     @Query("DELETE FROM hebrew_words")
     suspend fun deleteAllHebrewWords()
+
+    // See getGreekWordsByGlossLike's doc — same reasoning, for TAHOT.
+    @Query("SELECT * FROM hebrew_words WHERE gloss LIKE '%' || :word || '%' AND strongs != ''")
+    suspend fun getHebrewWordsByGlossLike(word: String): List<HebrewWordEntity>
+
+    @Query("SELECT DISTINCT gloss FROM hebrew_words WHERE strongs IN (:strongsList)")
+    suspend fun getHebrewGlossesForStrongs(strongsList: List<String>): List<String>
 
     // ---- Cross references (Treasury of Scripture Knowledge) ----
 

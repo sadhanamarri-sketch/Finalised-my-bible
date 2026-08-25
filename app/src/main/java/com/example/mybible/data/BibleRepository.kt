@@ -821,46 +821,50 @@ class BibleRepository(private val context: Context) {
     // and short-circuits straight to that chapter/verse instead of doing a
     // text search — this is what powers the reference examples shown in the
     // search box's placeholder text.
-    suspend fun searchBible(query: String, caseSensitive: Boolean = false): List<Verse> = withContext(Dispatchers.IO) {
+    suspend fun searchBible(query: String, caseSensitive: Boolean = false): SearchOutcome = withContext(Dispatchers.IO) {
         val q = query.trim()
-        if (q.length < 2) return@withContext emptyList()
+        if (q.length < 2) return@withContext SearchOutcome()
 
         parseReference(q)?.let { ref ->
             val chapterVerses = getChapterVerses(ref.book, ref.chapter, includeTelugu = true)
-            return@withContext if (ref.verse != null) {
-                chapterVerses.filter { it.number == ref.verse }
-            } else {
-                chapterVerses
-            }
+            val verses = if (ref.verse != null) chapterVerses.filter { it.number == ref.verse } else chapterVerses
+            return@withContext SearchOutcome(mainResults = verses)
         }
 
-        // Room's LIKE is only reliably case-insensitive for ASCII, so it's
-        // used purely as a coarse (case-insensitive) candidate filter here;
-        // the actual case-sensitive check, when requested, happens in
-        // Kotlin below where Char.equals(ignoreCase) is unambiguous for
-        // both English and Telugu text.
-        val roomCandidates = bibleDao.search(q)
-        val bibleImported = roomCandidates.isNotEmpty() || bibleDao.countAllVerses() > 0
-        if (bibleImported) {
-            val matched = if (caseSensitive) {
-                roomCandidates.filter { row ->
-                    row.text.contains(q) || (row.teluguText?.contains(q) == true)
-                }
-            } else {
-                roomCandidates
-            }
-            return@withContext matched.map { row ->
-                Verse(
-                    book = row.book,
-                    chapter = row.chapter,
-                    number = row.number,
-                    text = row.text,
-                    isRedLetter = row.isRedLetter,
-                    teluguText = row.teluguText
-                )
-            }
+        if (bibleDao.countAllVerses() == 0) {
+            // Degraded first-run fallback (KJV not imported into Room yet) —
+            // plain substring search over a small hardcoded set, same as
+            // this function's whole behavior before the typo/word-form/
+            // related-word enhancements below existed. Those all depend on
+            // Room data (the full verse text for typo-correction, the
+            // Greek/Hebrew word tables for related words) that doesn't
+            // exist yet in this state, so there's nothing to enhance.
+            return@withContext SearchOutcome(mainResults = legacyFallbackSearch(q, caseSensitive))
         }
 
+        // Typo-correction, word-form expansion, and related-word sections
+        // only make sense for a single plain word — a multi-word phrase
+        // keeps the plain substring behavior this search always had.
+        val isSingleWord = q.all { it.isLetter() }
+        if (!isSingleWord) {
+            return@withContext SearchOutcome(mainResults = searchAnyTerm(setOf(q), caseSensitive))
+        }
+
+        val lowerQ = q.lowercase()
+        val corrected = correctTypo(lowerQ)
+        val effectiveWord = corrected ?: lowerQ
+
+        val mainResults = searchAnyTerm(expandWordForms(effectiveWord), caseSensitive)
+
+        val relatedSections = findRelatedWords(effectiveWord).mapNotNull { relatedWord ->
+            val results = searchAnyTerm(expandWordForms(relatedWord), caseSensitive)
+            if (results.isEmpty()) null else RelatedWordResults(relatedWord, results)
+        }
+
+        SearchOutcome(correctedQuery = corrected, mainResults = mainResults, relatedSections = relatedSections)
+    }
+
+    private suspend fun legacyFallbackSearch(q: String, caseSensitive: Boolean): List<Verse> {
         val qLower = q.lowercase()
         val results = mutableListOf<Verse>()
         val searchBooks = listOf("Genesis", "Psalms", "Proverbs", "Matthew", "John", "Romans")
@@ -877,7 +881,188 @@ class BibleRepository(private val context: Context) {
                 }
             }
         }
-        results
+        return results
+    }
+
+    // Runs the existing single-term Room LIKE search once per candidate
+    // term and merges the results, deduping by verse identity — used both
+    // for the main search (terms = the word-form variants of the searched
+    // word) and each related-word section (terms = that related word's own
+    // variants). Room's LIKE is only reliably case-insensitive for ASCII,
+    // so it's a coarse (case-insensitive) candidate filter here; the actual
+    // case-sensitive check, when requested, happens in Kotlin, same
+    // approach this search always used.
+    private suspend fun searchAnyTerm(terms: Set<String>, caseSensitive: Boolean): List<Verse> {
+        val seen = LinkedHashSet<String>()
+        val results = mutableListOf<Verse>()
+        for (term in terms) {
+            if (term.length < 2) continue
+            for (row in bibleDao.search(term)) {
+                if (caseSensitive && !(row.text.contains(term) || (row.teluguText?.contains(term) == true))) continue
+                val key = "${row.book}|${row.chapter}|${row.number}"
+                if (seen.add(key)) {
+                    results += Verse(
+                        book = row.book,
+                        chapter = row.chapter,
+                        number = row.number,
+                        text = row.text,
+                        isRedLetter = row.isRedLetter,
+                        teluguText = row.teluguText
+                    )
+                }
+            }
+        }
+        return results
+    }
+
+    // Reverses lookupWebsterStem's archaic-suffix-*stripping* rules (see its
+    // doc) into suffix-*building* ones: given a base word (or a word already
+    // in some inflected form — it gets stripped back to candidate bases
+    // first, same rules), generates the plausible KJV-style surface forms
+    // to search for. Deliberately generous rather than precise — a
+    // generated form that isn't a real word just never matches anything in
+    // the LIKE search, so over-generating costs nothing, while under-
+    // generating would silently miss real verses.
+    private fun expandWordForms(word: String): Set<String> {
+        val roots = mutableSetOf(word)
+        when {
+            word.endsWith("ies") && word.length > 4 -> roots += word.dropLast(3) + "y"
+            word.endsWith("ves") && word.length > 4 -> {
+                roots += word.dropLast(3) + "f"
+                roots += word.dropLast(3) + "fe"
+            }
+            word.endsWith("ches") || word.endsWith("shes") || word.endsWith("xes") || word.endsWith("sses") ->
+                roots += word.dropLast(2)
+        }
+        if (word.endsWith("s") && !word.endsWith("ss") && word.length > 2) roots += word.dropLast(1)
+        if (word.endsWith("eth") && word.length > 4) {
+            roots += word.dropLast(3)
+            roots += word.dropLast(2)
+        }
+        if (word.endsWith("est") && word.length > 4) {
+            roots += word.dropLast(3)
+            roots += word.dropLast(2)
+        }
+        if (word.endsWith("ed") && word.length > 3) roots += word.dropLast(2)
+        if (word.endsWith("ing") && word.length > 4) roots += word.dropLast(3)
+
+        val forms = mutableSetOf<String>()
+        for (root in roots) {
+            forms += root
+            forms += root + "s"
+            forms += root + "es"
+            forms += root + "eth"
+            forms += root + "est"
+            forms += root + "ed"
+            forms += root + "d"
+            forms += root + "ing"
+            if (root.endsWith("e")) forms += root.dropLast(1) + "ing"
+            if (root.endsWith("y") && root.length > 1 && root[root.length - 2] !in "aeiou") {
+                forms += root.dropLast(1) + "ies"
+            }
+        }
+        return forms
+    }
+
+    // "Related words" — English words that share a Strong's number with the
+    // searched word, drawn from the same Greek/Hebrew interlinear data
+    // already imported for the reader's interlinear feature (see
+    // GreekImporter/HebrewImporter) rather than a separate synonym dataset:
+    // multiple KJV words translating the same underlying Greek/Hebrew word
+    // (e.g. "love" and "charity" both rendering G26) are genuinely related
+    // in a way a generic English thesaurus wouldn't know to connect.
+    //
+    // Capped at 8 so a very common word (spread across many Strong's
+    // numbers) doesn't produce an unreasonably long results screen.
+    private val relatedWordStopwords = setOf(
+        "to", "a", "an", "the", "of", "in", "on", "and", "or", "is", "am", "are",
+        "be", "was", "were", "thee", "thou", "thy", "ye", "his", "her", "its"
+    )
+
+    private fun glossTokens(gloss: String): List<String> =
+        gloss.lowercase().replace(Regex("[^a-z\\s]"), " ").split(Regex("\\s+")).filter { it.isNotBlank() }
+
+    private suspend fun findRelatedWords(word: String): List<String> {
+        val greekMatches = bibleDao.getGreekWordsByGlossLike(word).filter { word in glossTokens(it.gloss) }
+        val hebrewMatches = bibleDao.getHebrewWordsByGlossLike(word).filter { word in glossTokens(it.gloss) }
+        if (greekMatches.isEmpty() && hebrewMatches.isEmpty()) return emptyList()
+
+        val related = mutableSetOf<String>()
+        val greekStrongs = greekMatches.map { it.strongs }.distinct()
+        if (greekStrongs.isNotEmpty()) {
+            for (gloss in bibleDao.getGreekGlossesForStrongs(greekStrongs)) {
+                for (token in glossTokens(gloss)) {
+                    if (token.length >= 3 && token != word && token !in relatedWordStopwords) related += token
+                }
+            }
+        }
+        val hebrewStrongs = hebrewMatches.map { it.strongs }.distinct()
+        if (hebrewStrongs.isNotEmpty()) {
+            for (gloss in bibleDao.getHebrewGlossesForStrongs(hebrewStrongs)) {
+                for (token in glossTokens(gloss)) {
+                    if (token.length >= 3 && token != word && token !in relatedWordStopwords) related += token
+                }
+            }
+        }
+        return related.take(8)
+    }
+
+    // Typo-tolerance's reference dictionary — every distinct word that
+    // actually appears in the KJV text, built once from Room and cached for
+    // the rest of the process's lifetime (the text never changes at
+    // runtime, so there's nothing to invalidate this cache).
+    private var kjvWordSetCache: Set<String>? = null
+
+    private suspend fun getKjvWordSet(): Set<String> {
+        kjvWordSetCache?.let { return it }
+        val words = mutableSetOf<String>()
+        val wordRegex = Regex("[A-Za-z]+")
+        for (text in bibleDao.getAllVerseTexts()) {
+            for (m in wordRegex.findAll(text)) words += m.value.lowercase()
+        }
+        kjvWordSetCache = words
+        return words
+    }
+
+    private fun levenshteinDistance(a: String, b: String): Int {
+        val dp = Array(a.length + 1) { IntArray(b.length + 1) }
+        for (i in 0..a.length) dp[i][0] = i
+        for (j in 0..b.length) dp[0][j] = j
+        for (i in 1..a.length) {
+            for (j in 1..b.length) {
+                dp[i][j] = if (a[i - 1] == b[j - 1]) {
+                    dp[i - 1][j - 1]
+                } else {
+                    1 + minOf(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1])
+                }
+            }
+        }
+        return dp[a.length][b.length]
+    }
+
+    // Returns a correction only when the typed word isn't itself a
+    // recognized KJV word AND a close-enough match exists — a shorter max
+    // edit distance for short words avoids "correcting" one legitimate
+    // short word into another (e.g. "cat" -> "car" is 1 edit but almost
+    // certainly not a typo). Returns null (no correction) rather than
+    // guessing when nothing is close enough — a modern/non-KJV word should
+    // just search as typed and come back empty, not get mangled into an
+    // unrelated KJV word.
+    private suspend fun correctTypo(word: String): String? {
+        val dictionary = getKjvWordSet()
+        if (word in dictionary) return null
+        val maxDistance = if (word.length <= 4) 1 else 2
+        var best: String? = null
+        var bestDistance = Int.MAX_VALUE
+        for (candidate in dictionary) {
+            if (kotlin.math.abs(candidate.length - word.length) > maxDistance) continue
+            val distance = levenshteinDistance(word, candidate)
+            if (distance < bestDistance) {
+                bestDistance = distance
+                best = candidate
+            }
+        }
+        return if (best != null && bestDistance <= maxDistance) best else null
     }
 
     private data class ParsedReference(val book: String, val chapter: Int, val verse: Int?)

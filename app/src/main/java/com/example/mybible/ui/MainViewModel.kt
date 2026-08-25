@@ -674,6 +674,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _searchResults = MutableStateFlow<List<Verse>>(emptyList())
     val searchResults: StateFlow<List<Verse>> = _searchResults.asStateFlow()
 
+    // Related-word sections (see BibleRepository.findRelatedWords) and the
+    // typo-corrected query (null unless a correction actually applied) —
+    // both empty/null together with searchResults on a fresh/cleared query.
+    private val _searchRelatedSections = MutableStateFlow<List<RelatedWordResults>>(emptyList())
+    val searchRelatedSections: StateFlow<List<RelatedWordResults>> = _searchRelatedSections.asStateFlow()
+
+    private val _searchCorrectedQuery = MutableStateFlow<String?>(null)
+    val searchCorrectedQuery: StateFlow<String?> = _searchCorrectedQuery.asStateFlow()
+
     private val _isSearching = MutableStateFlow(false)
     val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
 
@@ -2074,8 +2083,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun performSearch(query: String) {
         _isSearching.value = true
-        val results = repository.searchBible(query, caseSensitive = _searchCaseSensitive.value)
-        _searchResults.value = results
+        val outcome = repository.searchBible(query, caseSensitive = _searchCaseSensitive.value)
+        _searchResults.value = outcome.mainResults
+        _searchRelatedSections.value = outcome.relatedSections
+        _searchCorrectedQuery.value = outcome.correctedQuery
         _isSearching.value = false
     }
 
@@ -2085,6 +2096,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (query.trim().length < 2) {
             _isSearching.value = false
             _searchResults.value = emptyList()
+            _searchRelatedSections.value = emptyList()
+            _searchCorrectedQuery.value = null
             return
         }
         searchJob = viewModelScope.launch {
@@ -2132,6 +2145,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         searchJob?.cancel()
         _searchQuery.value = ""
         _searchResults.value = emptyList()
+        _searchRelatedSections.value = emptyList()
+        _searchCorrectedQuery.value = null
         _isSearching.value = false
     }
 
@@ -2147,6 +2162,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         searchJob?.cancel()
         _searchQuery.value = ""
         _searchResults.value = emptyList()
+        _searchRelatedSections.value = emptyList()
+        _searchCorrectedQuery.value = null
         _isSearching.value = false
         _searchLastTappedKey.value = null
         _searchSourceVerse.value = null
