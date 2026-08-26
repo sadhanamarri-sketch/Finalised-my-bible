@@ -329,6 +329,7 @@ fun NotesScreen(
                                     text = note.title.ifBlank { "Untitled note" }.uppercase(),
                                     fontSize = 15.sp,
                                     fontFamily = WorkSansFontFamily,
+                                    fontWeight = FontWeight.SemiBold,
                                     letterSpacing = 0.sp,
                                     color = MaterialTheme.colorScheme.tertiary,
                                     modifier = Modifier.weight(1f)
