@@ -395,6 +395,7 @@ fun NotesScreen(
                                 fontFamily = notoSerifOrTestFontFamily,
                                 fontSize = com.example.mybible.ui.theme.FontTestLab.listPreviewFontSizeSp.sp,
                                 lineHeight = (com.example.mybible.ui.theme.FontTestLab.listPreviewFontSizeSp * com.example.mybible.ui.theme.FontTestLab.listPreviewLineHeightMultiplier).sp,
+                                letterSpacing = 0.sp,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 3,
                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
