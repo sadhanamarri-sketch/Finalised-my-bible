@@ -60,25 +60,24 @@ data class Verse(
     val hebrewWords: List<HebrewWord>? = null
 )
 
-// BibleRepository.searchBible's full result. variantSuggestions (root-word
-// forms, e.g. "walk" for a search of "walked") are shown as tappable chips
-// rather than eagerly searched and displayed — tapping one runs a fresh
-// search for that exact word (see SearchScreen). Not @Serializable: search
+// BibleRepository.searchBible's full result. Not @Serializable: search
 // results are always freshly computed, never cached to disk like Verse
-// sometimes is. correctedQuery is null when the typed word was already
-// recognized (or wasn't a single plain word to begin with, or case-sensitive
-// mode was on), so the UI only shows a "Showing results for…" note when a
-// real correction happened.
+// sometimes is.
 //
-// A Strong's-number-based "related words" feature (words sharing a Strong's
-// number with the searched word) was tried and dropped — it worked for
-// Greek (NT) but Hebrew (OT) Strong's numbers frequently lump unrelated
-// homonyms together, surfacing garbage like a proper name or an unrelated
-// noun as a "related" suggestion with no reliable way to filter it out.
+// Two enhancements were tried here and dropped, both for the same reason —
+// speed. A Strong's-number-based "related words" feature (words sharing a
+// Strong's number with the searched word) worked for Greek (NT) but Hebrew
+// (OT) Strong's numbers frequently lump unrelated homonyms together,
+// surfacing garbage like a proper name as a "related" suggestion with no
+// reliable way to filter it out. Typo-correction plus root-word ("also
+// try") suggestion chips worked correctly, but required building an
+// in-memory dictionary of every distinct word in the KJV on first use — a
+// one-time scan over all verse text that made the first single-word search
+// of a session noticeably slow, for a feature most searches never needed
+// (a plain substring search already surfaces "loved"/"loving" for a search
+// of "love" with no lookup at all).
 data class SearchOutcome(
-    val correctedQuery: String? = null,
-    val mainResults: List<Verse> = emptyList(),
-    val variantSuggestions: List<String> = emptyList()
+    val mainResults: List<Verse> = emptyList()
 )
 
 @Serializable

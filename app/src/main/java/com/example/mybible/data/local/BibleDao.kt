@@ -46,13 +46,6 @@ interface BibleDao {
     @Query("SELECT text FROM verses WHERE book = :book AND chapter = :chapter AND number = :verse LIMIT 1")
     suspend fun getVerseText(book: String, chapter: Int, verse: Int): String?
 
-    // Search's typo-tolerance builds an in-memory "words that actually
-    // appear in the KJV" set from this once, then caches it — see
-    // BibleRepository.getKjvWordSet. Only English text; typo-correction
-    // doesn't extend to Telugu.
-    @Query("SELECT text FROM verses")
-    suspend fun getAllVerseTexts(): List<String>
-
     // ---- Greek interlinear (TAGNT) ----
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

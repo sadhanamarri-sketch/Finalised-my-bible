@@ -674,17 +674,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _searchResults = MutableStateFlow<List<Verse>>(emptyList())
     val searchResults: StateFlow<List<Verse>> = _searchResults.asStateFlow()
 
-    // Root-word suggestion chips (see BibleRepository.stripToRoots) and the
-    // typo-corrected query (null unless a correction actually applied) —
-    // both empty/null together with searchResults on a fresh/cleared query.
-    // Tapping a chip re-searches via searchFromHistory below rather than
-    // this driving its own eagerly-fetched results.
-    private val _searchVariantSuggestions = MutableStateFlow<List<String>>(emptyList())
-    val searchVariantSuggestions: StateFlow<List<String>> = _searchVariantSuggestions.asStateFlow()
-
-    private val _searchCorrectedQuery = MutableStateFlow<String?>(null)
-    val searchCorrectedQuery: StateFlow<String?> = _searchCorrectedQuery.asStateFlow()
-
     private val _isSearching = MutableStateFlow(false)
     val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
 
@@ -2087,8 +2076,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _isSearching.value = true
         val outcome = repository.searchBible(query, caseSensitive = _searchCaseSensitive.value)
         _searchResults.value = outcome.mainResults
-        _searchVariantSuggestions.value = outcome.variantSuggestions
-        _searchCorrectedQuery.value = outcome.correctedQuery
         _isSearching.value = false
     }
 
@@ -2098,8 +2085,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (query.trim().length < 2) {
             _isSearching.value = false
             _searchResults.value = emptyList()
-            _searchVariantSuggestions.value = emptyList()
-            _searchCorrectedQuery.value = null
             return
         }
         searchJob = viewModelScope.launch {
@@ -2147,8 +2132,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         searchJob?.cancel()
         _searchQuery.value = ""
         _searchResults.value = emptyList()
-        _searchVariantSuggestions.value = emptyList()
-        _searchCorrectedQuery.value = null
         _isSearching.value = false
     }
 
@@ -2164,8 +2147,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         searchJob?.cancel()
         _searchQuery.value = ""
         _searchResults.value = emptyList()
-        _searchVariantSuggestions.value = emptyList()
-        _searchCorrectedQuery.value = null
         _isSearching.value = false
         _searchLastTappedKey.value = null
         _searchSourceVerse.value = null
