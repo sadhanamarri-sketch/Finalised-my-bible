@@ -31,6 +31,9 @@ import com.example.mybible.model.SavedWordItem
 import com.example.mybible.model.SavedWordLanguage
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.components.BackTopBar
+import com.example.mybible.ui.theme.FrauncesFontFamily
+import com.example.mybible.ui.theme.LiterataFontFamily
+import com.example.mybible.ui.theme.WorkSansFontFamily
 import kotlinx.coroutines.delay
 
 /**
@@ -115,7 +118,7 @@ fun SavedWordsScreen(
                         // that.
                         icon = {}
                     ) {
-                        Text(label)
+                        Text(label, fontFamily = WorkSansFontFamily)
                     }
                 }
             }
@@ -128,6 +131,7 @@ fun SavedWordsScreen(
                     Text(
                         text = "No saved words yet. Tap the star icon on a word's lookup (Greek, Hebrew, or English) to save it here.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontFamily = WorkSansFontFamily,
                         fontSize = 14.sp,
                         textAlign = TextAlign.Center
                     )
@@ -140,6 +144,7 @@ fun SavedWordsScreen(
                     Text(
                         text = "No saved ${selectedLanguage.name.lowercase().replaceFirstChar { it.uppercase() }} words yet.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontFamily = WorkSansFontFamily,
                         fontSize = 14.sp,
                         textAlign = TextAlign.Center
                     )
@@ -200,6 +205,7 @@ fun SavedWordsScreen(
                                     Text(
                                         text = saved.word,
                                         fontSize = 14.sp,
+                                        fontFamily = LiterataFontFamily,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
@@ -207,6 +213,7 @@ fun SavedWordsScreen(
                                     Text(
                                         text = saved.transliteration,
                                         fontSize = 13.5.sp,
+                                        fontFamily = LiterataFontFamily,
                                         fontStyle = FontStyle.Italic,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         modifier = Modifier.padding(top = 2.dp)
@@ -216,6 +223,7 @@ fun SavedWordsScreen(
                                 Text(
                                     text = translation,
                                     fontSize = 19.sp,
+                                    fontFamily = LiterataFontFamily,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.tertiary,
                                     modifier = Modifier.padding(top = if (isForeign) 4.dp else 0.dp)
@@ -224,6 +232,7 @@ fun SavedWordsScreen(
                                     Text(
                                         text = "${saved.sourceBook} ${saved.sourceChapter}:${saved.sourceVerse}",
                                         fontSize = 12.sp,
+                                        fontFamily = WorkSansFontFamily,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
@@ -251,7 +260,7 @@ fun SavedWordsScreen(
                                     onDismissRequest = { showMenu = false }
                                 ) {
                                     DropdownMenuItem(
-                                        text = { Text("Open in Reader") },
+                                        text = { Text("Open in Reader", fontFamily = WorkSansFontFamily) },
                                         leadingIcon = { Icon(Icons.Default.Book, contentDescription = null) },
                                         enabled = hasSourceVerse,
                                         onClick = {
@@ -260,7 +269,7 @@ fun SavedWordsScreen(
                                         }
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                                        text = { Text("Delete", color = MaterialTheme.colorScheme.error, fontFamily = WorkSansFontFamily) },
                                         leadingIcon = {
                                             Icon(
                                                 Icons.Default.Delete,
@@ -288,8 +297,8 @@ fun SavedWordsScreen(
     if (deleteTarget != null) {
         AlertDialog(
             onDismissRequest = { wordPendingDelete = null },
-            title = { Text("Remove “${deleteTarget.word}”?") },
-            text = { Text("This can't be undone.") },
+            title = { Text("Remove “${deleteTarget.word}”?", fontFamily = FrauncesFontFamily) },
+            text = { Text("This can't be undone.", fontFamily = WorkSansFontFamily) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -297,11 +306,11 @@ fun SavedWordsScreen(
                         wordPendingDelete = null
                     }
                 ) {
-                    Text("Remove", color = MaterialTheme.colorScheme.error)
+                    Text("Remove", color = MaterialTheme.colorScheme.error, fontFamily = WorkSansFontFamily)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { wordPendingDelete = null }) { Text("Cancel") }
+                TextButton(onClick = { wordPendingDelete = null }) { Text("Cancel", fontFamily = WorkSansFontFamily) }
             }
         )
     }

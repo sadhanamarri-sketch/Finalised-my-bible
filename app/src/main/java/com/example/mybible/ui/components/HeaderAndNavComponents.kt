@@ -25,11 +25,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mybible.model.ThemeMode
+import com.example.mybible.ui.theme.FrauncesFontFamily
+import com.example.mybible.ui.theme.WorkSansFontFamily
 
 val BIBLE_BOOKS = listOf(
     "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy", "Joshua", "Judges", "Ruth",
@@ -82,11 +83,11 @@ fun BackTopBar(
     Column(modifier = modifier) {
         TopAppBar(
             title = {
-                // Serif, not the default Material sans — every other
-                // "title" in the app (note titles, DsToggleRow labels, the
-                // Reader's verse-ref chip) reads in the same serif family;
-                // this was the one holdout still in plain Material type.
-                Text(text = title, fontSize = 19.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Serif)
+                // Fraunces — the app's display face for headers/titles,
+                // bundled (see AppFonts.kt) instead of the generic
+                // FontFamily.Serif alias this used to read, which drifted
+                // by device/OEM.
+                Text(text = title, fontSize = 19.sp, fontWeight = FontWeight.SemiBold, fontFamily = FrauncesFontFamily)
             },
             navigationIcon = {
                 IconButton(onClick = onBack, modifier = Modifier.testTag("back_to_reader")) {
@@ -250,6 +251,7 @@ fun BookChapterPickerSheet(
                         else -> "Books"
                     },
                     fontSize = 17.sp,
+                    fontFamily = FrauncesFontFamily,
                     fontWeight = FontWeight.Normal,
                     color = MaterialTheme.colorScheme.onBackground
                 )
@@ -257,7 +259,7 @@ fun BookChapterPickerSheet(
                     onClick = onDismiss,
                     modifier = Modifier.testTag("picker_close")
                 ) {
-                    Text("Close", fontSize = 14.5.sp, color = MaterialTheme.colorScheme.primary)
+                    Text("Close", fontSize = 14.5.sp, fontFamily = WorkSansFontFamily, color = MaterialTheme.colorScheme.primary)
                 }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -306,6 +308,7 @@ internal fun BookListStep(
         Text(
             text = "${BOOK_CHAPTER_COUNTS[book] ?: 1} ch",
             fontSize = 13.5.sp,
+            fontFamily = WorkSansFontFamily,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
@@ -343,6 +346,7 @@ internal fun BookListStep(
                 Text(
                     text = book,
                     fontSize = 17.sp,
+                    fontFamily = WorkSansFontFamily,
                     fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
                     color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
                 )
@@ -358,6 +362,7 @@ private fun BookListGroupBanner(text: String, color: Color) {
     Text(
         text = text.uppercase(),
         fontSize = 10.sp,
+        fontFamily = FrauncesFontFamily,
         letterSpacing = 2.sp,
         color = color,
         modifier = Modifier.padding(top = 18.dp, bottom = 6.dp)
@@ -379,6 +384,7 @@ internal fun ChapterGridStep(
         Text(
             text = "$chap",
             fontSize = 15.5.sp,
+            fontFamily = WorkSansFontFamily,
             color = MaterialTheme.colorScheme.onBackground
         )
     }
@@ -391,6 +397,7 @@ internal fun ChapterGridStep(
         Text(
             text = "\u2039 All books",
             fontSize = 14.5.sp,
+            fontFamily = WorkSansFontFamily,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier
                 .clickable(onClick = onBack)
@@ -451,6 +458,7 @@ internal fun VerseGridStep(
         Text(
             text = "$verse",
             fontSize = 15.5.sp,
+            fontFamily = WorkSansFontFamily,
             color = MaterialTheme.colorScheme.onBackground
         )
     }
@@ -472,6 +480,7 @@ internal fun VerseGridStep(
         Text(
             text = "\u2039 $bookName",
             fontSize = 14.5.sp,
+            fontFamily = WorkSansFontFamily,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier
                 .clickable(onClick = onBack)
@@ -482,6 +491,7 @@ internal fun VerseGridStep(
             Text(
                 text = "Start of chapter",
                 fontSize = 17.sp,
+                fontFamily = WorkSansFontFamily,
                 color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -495,12 +505,14 @@ internal fun VerseGridStep(
             null -> Text(
                 text = "Loading verses\u2026",
                 fontSize = 14.sp,
+                fontFamily = WorkSansFontFamily,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp)
             )
             0 -> Text(
                 text = "Verse numbers need this chapter downloaded first \u2014 tap Start of chapter above.",
                 fontSize = 14.sp,
+                fontFamily = WorkSansFontFamily,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp)
             )

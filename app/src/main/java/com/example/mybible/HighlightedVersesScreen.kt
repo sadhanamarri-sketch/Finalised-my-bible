@@ -22,12 +22,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mybible.model.ThemeMode
 import com.example.mybible.ui.components.BackTopBar
+import com.example.mybible.ui.theme.LiterataFontFamily
+import com.example.mybible.ui.theme.WorkSansFontFamily
 
 data class HighlightedVerseItem(
     val key: String,
@@ -101,7 +102,7 @@ fun HighlightedVersesScreen(
                         FilterChip(
                             selected = selected,
                             onClick = { selectedColor = color },
-                            label = { Text(color) },
+                            label = { Text(color, fontFamily = WorkSansFontFamily) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                                 // Classic Dark's primaryContainer (accent-solid,
@@ -131,6 +132,7 @@ fun HighlightedVersesScreen(
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
                         text = if (highlights.isEmpty()) "No highlighted verses" else "No verses for this color",
+                        fontFamily = WorkSansFontFamily,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -166,18 +168,19 @@ private fun HighlightedVerseRow(
                 text = item.colorName.uppercase(),
                 fontSize = 12.5.sp,
                 letterSpacing = 1.5.sp,
+                fontFamily = WorkSansFontFamily,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(bottom = 4.dp)
             )
             // Reference — matches DsSectionLabel's gold heading style
             // exactly (Settings/Search): 12.5sp, 1.5sp letter-spacing,
-            // SansSerif, tertiary, not bold.
+            // Work Sans, tertiary, not bold.
             Text(
                 text = "${item.book} ${item.chapter}:${item.verse}".uppercase(),
                 fontSize = 12.5.sp,
                 letterSpacing = 1.5.sp,
-                fontFamily = FontFamily.SansSerif,
+                fontFamily = WorkSansFontFamily,
                 color = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.padding(bottom = 6.dp)
             )
@@ -187,6 +190,7 @@ private fun HighlightedVerseRow(
             Text(
                 text = item.text,
                 fontSize = 15.sp,
+                fontFamily = LiterataFontFamily,
                 lineHeight = 21.sp,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -194,6 +198,7 @@ private fun HighlightedVerseRow(
                 Text(
                     text = item.noteText.let { if (it.length > 90) it.take(89) + "…" else it },
                     fontSize = 13.sp,
+                    fontFamily = WorkSansFontFamily,
                     fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp)

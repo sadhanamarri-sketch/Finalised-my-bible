@@ -38,6 +38,8 @@ import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.components.BackTopBar
 import com.example.mybible.ui.components.DsSwitch
+import com.example.mybible.ui.theme.LiterataFontFamily
+import com.example.mybible.ui.theme.WorkSansFontFamily
 
 @Composable
 fun SearchScreen(
@@ -231,12 +233,14 @@ fun SearchScreen(
                 Text(
                     text = "Recent searches",
                     fontSize = 12.5.sp,
+                    fontFamily = WorkSansFontFamily,
                     letterSpacing = 1.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
                     text = "Clear",
                     fontSize = 12.5.sp,
+                    fontFamily = WorkSansFontFamily,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.clickable { viewModel.clearSearchHistory() }
                 )
@@ -250,7 +254,7 @@ fun SearchScreen(
                     // rather than a solid Material surface-tint fill.
                     AssistChip(
                         onClick = { viewModel.searchFromHistory(term) },
-                        label = { Text(term, fontSize = 13.sp) },
+                        label = { Text(term, fontSize = 13.sp, fontFamily = WorkSansFontFamily) },
                         leadingIcon = {
                             Icon(
                                 Icons.Default.History,
@@ -292,6 +296,7 @@ fun SearchScreen(
                 else -> "${searchResults.size} results"
             },
             fontSize = 13.sp,
+            fontFamily = WorkSansFontFamily,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
@@ -311,6 +316,7 @@ fun SearchScreen(
                 Text(
                     text = "Case-sensitive",
                     fontSize = 13.sp,
+                    fontFamily = WorkSansFontFamily,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.width(6.dp))
@@ -325,6 +331,7 @@ fun SearchScreen(
                 Text(
                     text = "Extensive search",
                     fontSize = 13.sp,
+                    fontFamily = WorkSansFontFamily,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.width(6.dp))
@@ -375,6 +382,7 @@ fun SearchScreen(
                 Text(
                     text = if (searchQuery.isBlank()) "Type a keyword (e.g., 'love', 'faith') or a reference (e.g., 'John 3', 'John 3:16') to search" else "No matching verses found",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontFamily = WorkSansFontFamily,
                     fontSize = 14.sp
                 )
             }
@@ -417,6 +425,7 @@ private fun SearchSuggestions(
             Text(
                 text = "Showing results for “$correctedQuery”",
                 fontSize = 13.sp,
+                fontFamily = WorkSansFontFamily,
                 fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp)
@@ -433,6 +442,7 @@ private fun SuggestionChipRow(label: String, words: List<String>, onClick: (Stri
     Text(
         text = label,
         fontSize = 12.5.sp,
+        fontFamily = WorkSansFontFamily,
         letterSpacing = 1.sp,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(bottom = 6.dp)
@@ -441,7 +451,7 @@ private fun SuggestionChipRow(label: String, words: List<String>, onClick: (Stri
         items(words) { word ->
             AssistChip(
                 onClick = { onClick(word) },
-                label = { Text(word, fontSize = 13.sp) },
+                label = { Text(word, fontSize = 13.sp, fontFamily = WorkSansFontFamily) },
                 colors = AssistChipDefaults.assistChipColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant,
                     labelColor = MaterialTheme.colorScheme.onSurface
@@ -502,7 +512,7 @@ private fun SearchResultCard(
                     Text(
                         text = "${verse.book} ${verse.chapter}:${verse.number}".uppercase(),
                         fontSize = 12.5.sp,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
+                        fontFamily = com.example.mybible.ui.theme.WorkSansFontFamily,
                         letterSpacing = 1.5.sp,
                         color = MaterialTheme.colorScheme.tertiary
                     )
@@ -517,7 +527,7 @@ private fun SearchResultCard(
                 Text(
                     text = verse.text,
                     fontSize = 15.sp,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+                    fontFamily = LiterataFontFamily,
                     lineHeight = 21.sp,
                     color = MaterialTheme.colorScheme.onSurface
                 )

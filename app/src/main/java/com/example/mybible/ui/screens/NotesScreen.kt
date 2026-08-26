@@ -34,7 +34,8 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
+import com.example.mybible.ui.theme.NotoSerifFontFamily
+import com.example.mybible.ui.theme.WorkSansFontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -171,7 +172,7 @@ fun NotesScreen(
                         onValueChange = { textQuery = it },
                         singleLine = true,
                         textStyle = TextStyle(
-                            fontFamily = FontFamily.SansSerif,
+                            fontFamily = WorkSansFontFamily,
                             fontSize = 16.sp,
                             color = MaterialTheme.colorScheme.onSurface
                         ),
@@ -183,7 +184,7 @@ fun NotesScreen(
                         Text(
                             text = "Search notes\u2026",
                             fontSize = 16.sp,
-                            fontFamily = FontFamily.SansSerif,
+                            fontFamily = WorkSansFontFamily,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -326,7 +327,7 @@ fun NotesScreen(
                                     text = note.title.ifBlank { "Untitled note" }.uppercase(),
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.SansSerif,
+                                    fontFamily = WorkSansFontFamily,
                                     color = MaterialTheme.colorScheme.tertiary,
                                     modifier = Modifier.weight(1f)
                                 )
@@ -391,7 +392,7 @@ fun NotesScreen(
                             // NoteReaderScreen's use of LinkifiedNoteText.
                             Text(
                                 text = note.text,
-                                fontFamily = FontFamily.Serif,
+                                fontFamily = NotoSerifFontFamily,
                                 fontSize = 14.sp,
                                 lineHeight = 20.sp,
                                 color = MaterialTheme.colorScheme.onSurface,

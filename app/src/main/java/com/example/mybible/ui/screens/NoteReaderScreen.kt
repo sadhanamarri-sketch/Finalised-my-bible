@@ -22,7 +22,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontFamily
+import com.example.mybible.ui.theme.NotoSerifFontFamily
+import com.example.mybible.ui.theme.WorkSansFontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -112,7 +113,7 @@ fun NoteReaderScreen(
                     text = noteItem.title.ifBlank { "Untitled note" }.uppercase(),
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.SansSerif,
+                    fontFamily = WorkSansFontFamily,
                     color = MaterialTheme.colorScheme.tertiary,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     maxLines = 1,
@@ -191,7 +192,7 @@ fun NoteReaderScreen(
                     text = noteItem.text,
                     onMentionClick = { b, c, v -> onOpenVerseMention?.invoke(b, c, v) },
                     style = androidx.compose.ui.text.TextStyle(
-                        fontFamily = FontFamily.Serif,
+                        fontFamily = NotoSerifFontFamily,
                         fontSize = 18.sp,
                         lineHeight = 29.sp,
                         color = MaterialTheme.colorScheme.onSurface

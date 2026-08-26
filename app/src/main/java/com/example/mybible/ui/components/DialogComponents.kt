@@ -36,6 +36,9 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import com.example.mybible.model.EnglishDictionaryEntry
 import com.example.mybible.model.HighlightColorDef
+import com.example.mybible.ui.theme.FrauncesFontFamily
+import com.example.mybible.ui.theme.LiterataFontFamily
+import com.example.mybible.ui.theme.WorkSansFontFamily
 
 // A YYYY-MM-DD text field with a calendar icon that opens a native
 // DatePickerDialog. Typing is still allowed (e.g. for quick edits or
@@ -142,6 +145,7 @@ fun EnglishDictionarySheet(
                 text = "ENGLISH DICTIONARY",
                 fontSize = 11.sp,
                 letterSpacing = 1.5.sp,
+                fontFamily = WorkSansFontFamily,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -155,7 +159,7 @@ fun EnglishDictionarySheet(
                     text = word.lowercase(),
                     fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Serif,
+                    fontFamily = LiterataFontFamily,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 if (onToggleSave != null) {
@@ -173,6 +177,7 @@ fun EnglishDictionarySheet(
                 Text(
                     text = entry!!.phonetic!!,
                     fontSize = 14.sp,
+                    fontFamily = WorkSansFontFamily,
                     fontStyle = FontStyle.Italic,
                     color = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
@@ -186,6 +191,7 @@ fun EnglishDictionarySheet(
                 Text(
                     text = "Showing definition for \"${entry.resolvedFrom}\"",
                     fontSize = 13.sp,
+                    fontFamily = WorkSansFontFamily,
                     fontStyle = FontStyle.Italic,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
@@ -207,6 +213,7 @@ fun EnglishDictionarySheet(
                 Text(
                     text = "No definition found for '$word'.",
                     fontSize = 14.sp,
+                    fontFamily = WorkSansFontFamily,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 16.dp)
                 )
@@ -229,6 +236,7 @@ fun EnglishDictionarySheet(
                                     Text(
                                         text = meaning.partOfSpeech.uppercase(),
                                         fontSize = 11.sp,
+                                        fontFamily = WorkSansFontFamily,
                                         fontWeight = FontWeight.Bold,
                                         letterSpacing = 1.2.sp,
                                         color = MaterialTheme.colorScheme.primary,
@@ -243,12 +251,14 @@ fun EnglishDictionarySheet(
                                         Text(
                                             text = "${idx + 1}. ",
                                             fontSize = 14.sp,
+                                            fontFamily = LiterataFontFamily,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.primary
                                         )
                                         Text(
                                             text = def,
                                             fontSize = 14.sp,
+                                            fontFamily = LiterataFontFamily,
                                             color = MaterialTheme.colorScheme.onSurface,
                                             lineHeight = 20.sp
                                         )
@@ -265,7 +275,7 @@ fun EnglishDictionarySheet(
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Close")
+                Text("Close", fontFamily = WorkSansFontFamily)
             }
         }
     }
@@ -312,6 +322,7 @@ fun VerseMentionPreviewSheet(
             Text(
                 text = "$book $chapter:$verse",
                 fontSize = 16.sp,
+                fontFamily = WorkSansFontFamily,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.tertiary
             )
@@ -319,7 +330,7 @@ fun VerseMentionPreviewSheet(
             Text(
                 text = verseText ?: "Loading\u2026",
                 fontSize = 15.sp,
-                fontFamily = FontFamily.Serif,
+                fontFamily = LiterataFontFamily,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(18.dp))
@@ -327,14 +338,14 @@ fun VerseMentionPreviewSheet(
                 onClick = onOpenInReader,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Open in Reader")
+                Text("Open in Reader", fontFamily = WorkSansFontFamily)
             }
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedButton(
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Close")
+                Text("Close", fontFamily = WorkSansFontFamily)
             }
         }
     }

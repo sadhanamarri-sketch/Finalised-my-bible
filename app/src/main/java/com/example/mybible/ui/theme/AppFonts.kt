@@ -2,6 +2,7 @@ package com.example.mybible.ui.theme
 
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import com.example.mybible.R
 
@@ -74,3 +75,79 @@ val GelasioFontFamily: FontFamily = FontFamily(
 // doesn't permit redistributing the .ttf, even for a private/personal
 // build. Gelasio is Google's metric-compatible, SIL-OFL-licensed
 // substitute — same letterforms and spacing as Georgia, free to bundle.
+
+/**
+ * Font-consistency pass: Literata (secondary Scripture surfaces — search
+ * results, cross references, lexicon, verse previews), Work Sans (UI
+ * chrome — buttons, menus, segmented controls, switch labels), Fraunces
+ * (headers/titles), and Noto Serif (Notes) are pinned to real bundled
+ * files instead of the generic FontFamily.Serif / FontFamily.Default
+ * aliases used before. Those aliases resolve to whatever a given device
+ * or OEM ships as its system serif/sans-serif, which is exactly what made
+ * "Noto Serif" render differently across devices/renderers.
+ *
+ * All four ship upstream as variable fonts, so each named weight below is
+ * an instance of the SAME bundled file selected via FontVariation, not a
+ * separate download — one file per family, multiple weights for free.
+ */
+val LiterataFontFamily: FontFamily = FontFamily(
+    Font(
+        R.font.literata_variable,
+        FontWeight.Normal,
+        variationSettings = FontVariation.Settings(FontVariation.weight(400))
+    ),
+    Font(
+        R.font.literata_variable,
+        FontWeight.Bold,
+        variationSettings = FontVariation.Settings(FontVariation.weight(700))
+    )
+)
+
+val WorkSansFontFamily: FontFamily = FontFamily(
+    Font(
+        R.font.work_sans_variable,
+        FontWeight.Normal,
+        variationSettings = FontVariation.Settings(FontVariation.weight(400))
+    ),
+    Font(
+        R.font.work_sans_variable,
+        FontWeight.Medium,
+        variationSettings = FontVariation.Settings(FontVariation.weight(500))
+    ),
+    Font(
+        R.font.work_sans_variable,
+        FontWeight.SemiBold,
+        variationSettings = FontVariation.Settings(FontVariation.weight(600))
+    ),
+    Font(
+        R.font.work_sans_variable,
+        FontWeight.Bold,
+        variationSettings = FontVariation.Settings(FontVariation.weight(700))
+    )
+)
+
+val FrauncesFontFamily: FontFamily = FontFamily(
+    Font(
+        R.font.fraunces_variable,
+        FontWeight.SemiBold,
+        variationSettings = FontVariation.Settings(FontVariation.weight(600))
+    ),
+    Font(
+        R.font.fraunces_variable,
+        FontWeight.Bold,
+        variationSettings = FontVariation.Settings(FontVariation.weight(700))
+    )
+)
+
+val NotoSerifFontFamily: FontFamily = FontFamily(
+    Font(
+        R.font.noto_serif_variable,
+        FontWeight.Normal,
+        variationSettings = FontVariation.Settings(FontVariation.weight(400))
+    ),
+    Font(
+        R.font.noto_serif_variable,
+        FontWeight.Bold,
+        variationSettings = FontVariation.Settings(FontVariation.weight(700))
+    )
+)

@@ -16,13 +16,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.components.BackTopBar
+import com.example.mybible.ui.theme.LiterataFontFamily
+import com.example.mybible.ui.theme.WorkSansFontFamily
 
 /**
  * Full-page cross-reference list, replacing the old CrossReferenceSheet
@@ -117,6 +118,7 @@ fun CrossReferenceScreen(
                         Text(
                             text = "${verse.book.uppercase()} ${verse.chapter}:${verse.number}",
                             fontSize = 13.sp,
+                            fontFamily = WorkSansFontFamily,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 0.5.sp,
                             color = MaterialTheme.colorScheme.primary
@@ -125,7 +127,7 @@ fun CrossReferenceScreen(
                         Text(
                             text = verse.text,
                             fontSize = 17.sp,
-                            fontFamily = FontFamily.Serif,
+                            fontFamily = LiterataFontFamily,
                             lineHeight = 24.sp,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -151,6 +153,7 @@ fun CrossReferenceScreen(
                         Text(
                             text = "No cross references found for this verse",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontFamily = WorkSansFontFamily,
                             fontSize = 14.sp
                         )
                     }
@@ -212,6 +215,7 @@ fun CrossReferenceScreen(
                                             Text(
                                                 text = "${item.targetBook} ${item.targetChapter}:${item.targetVerse}".uppercase(),
                                                 fontSize = 13.sp,
+                                                fontFamily = WorkSansFontFamily,
                                                 fontWeight = FontWeight.Bold,
                                                 letterSpacing = 0.5.sp,
                                                 color = MaterialTheme.colorScheme.tertiary
@@ -227,7 +231,7 @@ fun CrossReferenceScreen(
                                         Text(
                                             text = item.previewText,
                                             fontSize = 15.sp,
-                                            fontFamily = FontFamily.Serif,
+                                            fontFamily = LiterataFontFamily,
                                             lineHeight = 21.sp,
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
