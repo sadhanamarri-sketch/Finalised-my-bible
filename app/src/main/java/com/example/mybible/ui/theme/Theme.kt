@@ -128,7 +128,9 @@ private val DarkColorScheme = darkColorScheme(
 // --paper:#1C1A17 --paper-dim:#262320 --ink:#EDE8DD --ink-soft:#A29C8E
 // --accent:#E0836F --accent-solid:#A8503D --gold:#D2A94F --line:#3A3631 --input-bg:#262320
 private val ClassicDarkColorScheme = darkColorScheme(
-    primary = Color(0xFFE0836F),           // --accent
+    // Deliberately matches `error` below (--redletter) — the accent was
+    // moved on request from the original --accent (#E0836F) to this tone.
+    primary = Color(0xFFE2694F),
     onPrimary = Color(0xFF1C1A17),         // --paper (dark text on the lighter coral accent)
     primaryContainer = Color(0xFFA8503D),  // --accent-solid
     onPrimaryContainer = Color(0xFFFFF3EC),
