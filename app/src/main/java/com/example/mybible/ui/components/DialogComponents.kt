@@ -120,8 +120,17 @@ fun EnglishDictionarySheet(
     isSaved: Boolean = false,
     onToggleSave: (() -> Unit)? = null
 ) {
+    // Without skipPartiallyExpanded, the sheet has a third settle point
+    // halfway up (Material's own "partially expanded" state) alongside
+    // hidden/fully-expanded — a swipe or drag that doesn't clear its
+    // velocity/distance threshold settles there instead of continuing to
+    // either end, which reads as the sheet getting "stuck" with content
+    // cut off. Matches VerseActionToolbar/TagEditorSheet/Notes' filter
+    // sheet, which already skip it.
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface
     ) {
         Column(
@@ -291,8 +300,12 @@ fun VerseMentionPreviewSheet(
     onOpenInReader: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    // See EnglishDictionarySheet's identical doc above — same fix for the
+    // same "stuck halfway" bug.
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.background
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
