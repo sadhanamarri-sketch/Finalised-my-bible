@@ -108,7 +108,12 @@ fun SavedWordsScreen(
                     SegmentedButton(
                         selected = selectedLanguage == language,
                         onClick = { selectedLanguage = language },
-                        shape = SegmentedButtonDefaults.itemShape(index = index, count = languages.size)
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = languages.size),
+                        // The selected segment already has its own
+                        // fill/border treatment — the default checkmark
+                        // icon next to the label is redundant on top of
+                        // that.
+                        icon = {}
                     ) {
                         Text(label)
                     }
