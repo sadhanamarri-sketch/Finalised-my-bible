@@ -2,10 +2,9 @@
 
 package com.example.mybible.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -23,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -142,11 +142,27 @@ fun SavedWordsScreen(
                     items(filteredWords, key = { it.id }) { saved ->
                         val hasSourceVerse = saved.sourceBook.isNotBlank()
                         val isLastTapped = lastTappedKey == saved.id.toString()
+                        // A soft background wash across the whole row
+                        // instead of a card's left-edge accent bar — this
+                        // list is flat/divider-separated, not cards, so an
+                        // edge bar had nothing to visually attach to.
+                        // Appears instantly, fades out slowly (see
+                        // clearSavedWordsLastTapped's caller), same timing
+                        // as the accent bar it replaced.
+                        val rowTint by animateColorAsState(
+                            targetValue = if (isLastTapped) {
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+                            } else {
+                                Color.Transparent
+                            },
+                            animationSpec = if (isLastTapped) snap() else tween(durationMillis = 1000),
+                            label = "savedWordRowTint"
+                        )
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(IntrinsicSize.Min)
+                                .background(rowTint)
                                 .clickable { viewModel.openLexiconForSavedWord(saved) }
                                 .drawBehind {
                                     val strokeWidth = 1.dp.toPx()
@@ -158,44 +174,23 @@ fun SavedWordsScreen(
                                     )
                                 }
                         ) {
-                            // Same left-edge accent bar as Search's own
-                            // last-tapped marker — fades out slowly rather
-                            // than an instant on/off (see
-                            // clearSavedWordsLastTapped's caller).
-                            AnimatedVisibility(
-                                visible = isLastTapped,
-                                enter = EnterTransition.None,
-                                exit = fadeOut(animationSpec = tween(durationMillis = 1000))
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .width(3.dp)
-                                        .fillMaxHeight()
-                                        .background(MaterialTheme.colorScheme.primary)
-                                )
-                            }
                             Column(modifier = Modifier.weight(1f).padding(vertical = 12.dp)) {
-                                // English readability comes first: for a
-                                // Greek/Hebrew entry the gloss (not the
-                                // native script) is the big, gold, most
-                                // prominent line — falling back to the
-                                // native word only if no gloss was ever
-                                // captured. For an English entry the word
-                                // itself already is the readable form.
+                                // Native word, then transliteration, then
+                                // the English translation — reading order
+                                // for a Greek/Hebrew entry. The translation
+                                // stays the big/gold emphasis line (most
+                                // users can't read the native script and
+                                // are here for the gloss), it's just last
+                                // rather than first. An English entry has
+                                // no native/transliteration lines at all —
+                                // the word itself is already the readable
+                                // form.
                                 val isForeign = saved.language != SavedWordLanguage.ENGLISH
-                                val primaryText = if (isForeign) saved.gloss.ifBlank { saved.word } else saved.word
-                                Text(
-                                    text = primaryText,
-                                    fontSize = 19.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.tertiary
-                                )
                                 if (isForeign && saved.word.isNotBlank()) {
                                     Text(
                                         text = saved.word,
                                         fontSize = 14.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(top = 2.dp)
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                                 if (saved.transliteration.isNotBlank()) {
@@ -204,9 +199,17 @@ fun SavedWordsScreen(
                                         fontSize = 13.5.sp,
                                         fontStyle = FontStyle.Italic,
                                         color = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.padding(top = 1.dp)
+                                        modifier = Modifier.padding(top = 2.dp)
                                     )
                                 }
+                                val translation = if (isForeign) saved.gloss.ifBlank { saved.word } else saved.word
+                                Text(
+                                    text = translation,
+                                    fontSize = 19.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.tertiary,
+                                    modifier = Modifier.padding(top = if (isForeign) 4.dp else 0.dp)
+                                )
                                 if (hasSourceVerse) {
                                     Text(
                                         text = "${saved.sourceBook} ${saved.sourceChapter}:${saved.sourceVerse}",

@@ -16,6 +16,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -150,7 +152,7 @@ fun EnglishDictionarySheet(
                 if (onToggleSave != null) {
                     IconButton(onClick = onToggleSave) {
                         Icon(
-                            imageVector = if (isSaved) Icons.Default.Star else Icons.Default.StarBorder,
+                            imageVector = if (isSaved) Icons.Rounded.Star else Icons.Rounded.StarBorder,
                             contentDescription = if (isSaved) "Remove from saved words" else "Save word",
                             tint = if (isSaved) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
