@@ -137,6 +137,11 @@ fun NoteEditorScreen(
     // Title/Date/References/Tags on the same scrollable page.
     var showFullTextEditor by remember { mutableStateOf(false) }
 
+    // Guards the destructive "Delete note" action below with the same
+    // confirm/cancel dialog NotesScreen's own list-row delete uses, instead
+    // of deleting immediately on tap.
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
     // Any ref freshly merged in by Reader picking (see onAddAnotherVerse
     // above) may not have verseText resolved yet — resolve on first
     // composition/whenever refs changes, same "eager resolve before Save"
@@ -460,7 +465,7 @@ fun NoteEditorScreen(
             // the body when editing an existing one.
             if (noteItem.id > 0 && onDelete != null) {
                 TextButton(
-                    onClick = onDelete,
+                    onClick = { showDeleteConfirm = true },
                     modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.error
@@ -485,6 +490,27 @@ fun NoteEditorScreen(
                 onDone = { newText ->
                     text = newText
                     showFullTextEditor = false
+                }
+            )
+        }
+
+        if (showDeleteConfirm) {
+            AlertDialog(
+                onDismissRequest = { showDeleteConfirm = false },
+                title = { Text("Delete note?") },
+                text = { Text("This can't be undone.") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showDeleteConfirm = false
+                            onDelete?.invoke()
+                        }
+                    ) {
+                        Text("Delete", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
                 }
             )
         }
