@@ -536,26 +536,6 @@ fun SettingsScreen(
 
         HorizontalDivider(modifier = Modifier.padding(top = 18.dp), color = MaterialTheme.colorScheme.surfaceVariant)
 
-        // ---- Bible study data ----
-        DsSectionLabel("Bible study data")
-        Text(
-            text = "The Greek/Hebrew interlinear datasets are occasionally expanded " +
-                "upstream (e.g. new manuscript-variant readings). If a verse looks " +
-                "like it's missing a word or two at the end, re-checking pulls in " +
-                "whatever's been added since this device first downloaded it.",
-            fontSize = 13.5.sp,
-            fontFamily = FontFamily.SansSerif,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 14.dp)
-        )
-        DsOutlineAccentButton(
-            text = "Re-check Greek/Hebrew data",
-            onClick = { viewModel.reimportGreekAndHebrewData() },
-            modifier = Modifier.fillMaxWidth().testTag("settings_reimport_greek_hebrew_button")
-        )
-
-        HorizontalDivider(modifier = Modifier.padding(top = 18.dp), color = MaterialTheme.colorScheme.surfaceVariant)
-
         // ---- Backup & sync ----
         DsSectionLabel("Backup & sync")
         Text(
