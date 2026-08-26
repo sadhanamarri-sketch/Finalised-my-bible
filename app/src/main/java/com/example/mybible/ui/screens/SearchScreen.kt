@@ -133,11 +133,22 @@ fun SearchScreen(
             BackTopBar(
                 title = "Search",
                 onBack = {
+                    // Same "hide before navigating away" as the field's own
+                    // search action below — otherwise a focused field's
+                    // keyboard state stays dangling on a screen the user
+                    // has already left, and can resurface later (e.g. once
+                    // a sheet opened from a still-composed screen closes).
+                    keyboardController?.hide()
+                    focusManager.clearFocus()
                     viewModel.backToSearchSourceVerse()
                     viewModel.selectTab(NavTab.READER)
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.openSavedWordsScreen() }) {
+                    IconButton(onClick = {
+                        keyboardController?.hide()
+                        focusManager.clearFocus()
+                        viewModel.openSavedWordsScreen()
+                    }) {
                         Icon(
                             imageVector = Icons.Rounded.Star,
                             contentDescription = "Saved Words"
