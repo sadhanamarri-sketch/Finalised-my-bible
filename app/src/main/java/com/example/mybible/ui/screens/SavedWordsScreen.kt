@@ -2,15 +2,16 @@
 
 package com.example.mybible.ui.screens
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.snap
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.ChevronRight
@@ -20,9 +21,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -142,9 +140,9 @@ fun SavedWordsScreen(
                     )
                 }
             } else {
-                val dividerColor = MaterialTheme.colorScheme.outlineVariant
                 LazyColumn(
                     state = listState,
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 16.dp)
@@ -152,39 +150,36 @@ fun SavedWordsScreen(
                     items(filteredWords, key = { it.id }) { saved ->
                         val hasSourceVerse = saved.sourceBook.isNotBlank()
                         val isLastTapped = lastTappedKey == saved.id.toString()
-                        // A soft background wash across the whole row
-                        // instead of a card's left-edge accent bar — this
-                        // list is flat/divider-separated, not cards, so an
-                        // edge bar had nothing to visually attach to.
-                        // Appears instantly, fades out slowly (see
-                        // clearSavedWordsLastTapped's caller), same timing
-                        // as the accent bar it replaced.
-                        val rowTint by animateColorAsState(
-                            targetValue = if (isLastTapped) {
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
-                            } else {
-                                Color.Transparent
-                            },
-                            animationSpec = if (isLastTapped) snap() else tween(durationMillis = 1000),
-                            label = "savedWordRowTint"
-                        )
+                        // Elevated Card, same look as Search's own result
+                        // list — matches its left-edge accent bar for the
+                        // last-tapped marker too, height(Min) required for
+                        // the bar's fillMaxHeight to have anything bounded
+                        // to fill inside a wrap-content Card.
+                        Card(
+                            onClick = { viewModel.openLexiconForSavedWord(saved) },
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(rowTint)
-                                .clickable { viewModel.openLexiconForSavedWord(saved) }
-                                .drawBehind {
-                                    val strokeWidth = 1.dp.toPx()
-                                    drawLine(
-                                        color = dividerColor,
-                                        start = Offset(0f, size.height - strokeWidth / 2),
-                                        end = Offset(size.width, size.height - strokeWidth / 2),
-                                        strokeWidth = strokeWidth
-                                    )
-                                }
+                                .height(IntrinsicSize.Min)
                         ) {
-                            Column(modifier = Modifier.weight(1f).padding(vertical = 12.dp)) {
+                            AnimatedVisibility(
+                                visible = isLastTapped,
+                                enter = EnterTransition.None,
+                                exit = fadeOut(animationSpec = tween(durationMillis = 1000))
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(3.dp)
+                                        .fillMaxHeight()
+                                        .background(MaterialTheme.colorScheme.primary)
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f).padding(12.dp)) {
                                 // Native word, then transliteration, then
                                 // the English translation — reading order
                                 // for a Greek/Hebrew entry. The translation
@@ -275,6 +270,7 @@ fun SavedWordsScreen(
                                     )
                                 }
                             }
+                        }
                         }
                     }
                     item { Spacer(modifier = Modifier.height(24.dp)) }
