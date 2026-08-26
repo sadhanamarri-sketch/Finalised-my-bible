@@ -41,6 +41,11 @@ object FontTestLab {
 
     var readerFontSizeSp by mutableFloatStateOf(18f)
     var readerLineHeightMultiplier by mutableFloatStateOf(29f / 18f)
+
+    // Note title (list card + reader) was hardcoded bold+uppercase; both
+    // now toggle live from Settings instead.
+    var noteTitleBold by mutableStateOf(true)
+    var noteTitleUppercase by mutableStateOf(true)
 }
 
 /** Literata (secondary Scripture surfaces) unless a Font Lab test font is active. */

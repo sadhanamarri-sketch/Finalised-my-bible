@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import com.example.mybible.ui.theme.FontTestLab
 import com.example.mybible.ui.theme.notoSerifOrTestFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -110,9 +111,11 @@ fun NoteReaderScreen(
                     modifier = Modifier.clickable(onClick = onBack)
                 )
                 Text(
-                    text = noteItem.title.ifBlank { "Untitled note" }.uppercase(),
+                    text = noteItem.title.ifBlank { "Untitled note" }.let {
+                        if (FontTestLab.noteTitleUppercase) it.uppercase() else it
+                    },
                     fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = if (FontTestLab.noteTitleBold) FontWeight.Bold else FontWeight.Normal,
                     fontFamily = WorkSansFontFamily,
                     color = MaterialTheme.colorScheme.tertiary,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,

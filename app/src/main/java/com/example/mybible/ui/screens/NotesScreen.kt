@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
+import com.example.mybible.ui.theme.FontTestLab
 import com.example.mybible.ui.theme.notoSerifOrTestFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -324,9 +325,11 @@ fun NotesScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = note.title.ifBlank { "Untitled note" }.uppercase(),
+                                    text = note.title.ifBlank { "Untitled note" }.let {
+                                        if (FontTestLab.noteTitleUppercase) it.uppercase() else it
+                                    },
                                     fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold,
+                                    fontWeight = if (FontTestLab.noteTitleBold) FontWeight.Bold else FontWeight.Normal,
                                     fontFamily = WorkSansFontFamily,
                                     color = MaterialTheme.colorScheme.tertiary,
                                     modifier = Modifier.weight(1f)

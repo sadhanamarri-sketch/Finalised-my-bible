@@ -420,6 +420,18 @@ fun SettingsScreen(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+        DsToggleRow(
+            label = "Bold note title",
+            checked = FontTestLab.noteTitleBold,
+            onCheckedChange = { FontTestLab.noteTitleBold = it }
+        )
+        DsToggleRow(
+            label = "Uppercase note title",
+            checked = FontTestLab.noteTitleUppercase,
+            onCheckedChange = { FontTestLab.noteTitleUppercase = it }
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
         Text(
             text = "List preview size",
             fontSize = 13.sp,
