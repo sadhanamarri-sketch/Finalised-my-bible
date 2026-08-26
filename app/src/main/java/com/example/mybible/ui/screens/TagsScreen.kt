@@ -34,6 +34,8 @@ import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.components.BackTopBar
 import com.example.mybible.ui.components.NeSectionLabel
 import com.example.mybible.ui.components.NeTextField
+import com.example.mybible.ui.theme.FrauncesFontFamily
+import com.example.mybible.ui.theme.WorkSansFontFamily
 
 /**
  * Full-page Tags list, pushed over Notes (opened from its top-bar tag
@@ -119,12 +121,13 @@ fun TagsScreen(
                             Text(
                                 text = tag.name,
                                 fontSize = 16.5.sp,
-                                fontWeight = FontWeight.Bold,
+                                fontFamily = WorkSansFontFamily,
                                 color = MaterialTheme.colorScheme.tertiary
                             )
                             Text(
                                 text = tag.description.ifBlank { "No description" },
                                 fontSize = 13.5.sp,
+                                fontFamily = WorkSansFontFamily,
                                 fontStyle = if (tag.description.isBlank()) FontStyle.Italic else FontStyle.Normal,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 2,
@@ -265,7 +268,8 @@ private fun TagEditorSheet(
             Text(
                 text = if (initial == null) "New Tag" else "Edit Tag",
                 fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
+                fontFamily = FrauncesFontFamily,
+                fontWeight = FontWeight.SemiBold
             )
 
             NeSectionLabel("Name")
