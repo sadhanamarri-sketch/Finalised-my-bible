@@ -22,6 +22,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.mybible.model.SavedWordItem
+import com.example.mybible.model.SavedWordLanguage
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.ReaderPickMode
@@ -253,6 +255,8 @@ class MainActivity : ComponentActivity() {
             val isLoadingDictionary by viewModel.isLoadingDictionary.collectAsState()
             val showNoteEditor by viewModel.showNoteEditor.collectAsState()
             val showTagsScreen by viewModel.showTagsScreen.collectAsState()
+            val showSavedWordsScreen by viewModel.showSavedWordsScreen.collectAsState()
+            val savedWords by viewModel.savedWords.collectAsState(initial = emptyList())
             val noteToEdit by viewModel.noteToEdit.collectAsState()
             val noteToRead by viewModel.noteToRead.collectAsState()
             val readerPickMode by viewModel.readerPickMode.collectAsState()
@@ -365,6 +369,9 @@ class MainActivity : ComponentActivity() {
             }
             BackHandler(enabled = showTagsScreen) {
                 viewModel.closeTagsScreen()
+            }
+            BackHandler(enabled = showSavedWordsScreen) {
+                viewModel.closeSavedWordsScreen()
             }
             BackHandler(enabled = noteToRead != null) {
                 viewModel.closeNoteReader()
@@ -504,11 +511,16 @@ class MainActivity : ComponentActivity() {
 
                     // English Dictionary Sheet
                     if (selectedEnglishWord != null) {
+                        val isWordSaved = savedWords.any {
+                            it.dedupeKey() == SavedWordItem(language = SavedWordLanguage.ENGLISH, word = selectedEnglishWord!!).dedupeKey()
+                        }
                         EnglishDictionarySheet(
                             word = selectedEnglishWord!!,
                             entry = dictionaryEntry,
                             isLoading = isLoadingDictionary,
-                            onDismiss = { viewModel.dismissEnglishWordSheet() }
+                            onDismiss = { viewModel.dismissEnglishWordSheet() },
+                            isSaved = isWordSaved,
+                            onToggleSave = { viewModel.toggleSaveCurrentEnglishWord() }
                         )
                     }
 
@@ -670,6 +682,22 @@ class MainActivity : ComponentActivity() {
                         )
                     ) {
                         TagsScreen(viewModel = viewModel)
+                    }
+
+                    // Saved Words screen — full page pushed over Search,
+                    // same slide-up treatment as Tags above.
+                    AnimatedVisibility(
+                        visible = showSavedWordsScreen,
+                        enter = slideInVertically(
+                            animationSpec = tween(300),
+                            initialOffsetY = { fullHeight -> fullHeight }
+                        ),
+                        exit = slideOutVertically(
+                            animationSpec = tween(300),
+                            targetOffsetY = { fullHeight -> fullHeight }
+                        )
+                    ) {
+                        SavedWordsScreen(viewModel = viewModel)
                     }
 
                     // Guided app tour — see MainViewModel's TourMode doc and

@@ -48,6 +48,39 @@ data class HebrewWord(
     val morphology: String = ""
 )
 
+enum class SavedWordLanguage { GREEK, HEBREW, ENGLISH }
+
+// A word bookmarked from a Greek/Hebrew interlinear lookup or an English
+// dictionary lookup (see BibleRepository.toggleSavedWord) — a personal
+// glossary the user builds up over time, browsed from Search (see
+// SavedWordsScreen), the same way Tags are managed from Notes. Local-only
+// for now: not part of BackupData, so saved words don't survive a
+// backup/restore yet.
+//
+// dedupeKey identifies "the same word" for toggling save/unsave: language
+// plus the word text and transliteration, lowercased. Not Strong's number
+// alone, since an English lookup has none and two genuinely different
+// words can share a Strong's number in this data (see the dropped
+// Strong's-based related-words feature's doc in git history for why that
+// number alone isn't a safe identity to key on).
+@Serializable
+data class SavedWordItem(
+    val id: Long = 0,
+    val language: SavedWordLanguage,
+    val word: String,
+    val transliteration: String = "",
+    val gloss: String = "",
+    val definition: String = "",
+    val morphology: String = "",
+    val strongs: String? = null,
+    val sourceBook: String = "",
+    val sourceChapter: Int = 0,
+    val sourceVerse: Int = 0,
+    val savedAt: Long = System.currentTimeMillis()
+) {
+    fun dedupeKey(): String = "$language|${word.lowercase()}|${transliteration.lowercase()}"
+}
+
 @Serializable
 data class Verse(
     val book: String,

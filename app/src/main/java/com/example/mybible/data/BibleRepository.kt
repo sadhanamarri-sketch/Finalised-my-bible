@@ -354,6 +354,9 @@ class BibleRepository(private val context: Context) {
     private val _highlightsFlow = MutableStateFlow<List<HighlightItem>>(loadHighlightsFromPrefs())
     val allHighlights: Flow<List<HighlightItem>> = _highlightsFlow.asStateFlow()
 
+    private val _savedWordsFlow = MutableStateFlow<List<SavedWordItem>>(loadSavedWordsFromPrefs())
+    val allSavedWords: Flow<List<SavedWordItem>> = _savedWordsFlow.asStateFlow()
+
     // Fixed set of colors now (see model/HighlightColors.kt) — no add/
     // delete/enable-disable — but a label can still be renamed, so this
     // stays a real flow: the base palette with any saved label overrides
@@ -432,6 +435,16 @@ class BibleRepository(private val context: Context) {
     private fun saveHighlightsToPrefs(list: List<HighlightItem>) {
         _highlightsFlow.value = list
         prefs.edit().putString("saved_highlights_json", json.encodeToString(list)).apply()
+    }
+
+    private fun loadSavedWordsFromPrefs(): List<SavedWordItem> {
+        val str = prefs.getString("saved_words_json", null) ?: return emptyList()
+        return try { json.decodeFromString(str) } catch (e: Exception) { emptyList() }
+    }
+
+    private fun saveSavedWordsToPrefs(list: List<SavedWordItem>) {
+        _savedWordsFlow.value = list
+        prefs.edit().putString("saved_words_json", json.encodeToString(list)).apply()
     }
 
     // Keyed by colorHex (a color's fixed identity — see model/HighlightColors.kt),
@@ -740,6 +753,27 @@ class BibleRepository(private val context: Context) {
         current.removeAll { it.book == book && it.chapter == chapter && it.verse == verse }
         saveHighlightsToPrefs(current)
         recordTombstone(highlightTombstoneKey(book, chapter, verse))
+    }
+
+    // Bookmark toggle for the Save button on a Greek/Hebrew/English word
+    // lookup — same "tap again to undo" shape as setHighlight/removeHighlight
+    // above. Adding when already saved is a no-op rather than a duplicate
+    // entry, keyed by SavedWordItem.dedupeKey (see its doc).
+    suspend fun toggleSavedWord(item: SavedWordItem) {
+        val current = _savedWordsFlow.value.toMutableList()
+        val key = item.dedupeKey()
+        if (current.any { it.dedupeKey() == key }) {
+            current.removeAll { it.dedupeKey() == key }
+        } else {
+            current.add(0, item.copy(id = System.currentTimeMillis()))
+        }
+        saveSavedWordsToPrefs(current)
+    }
+
+    suspend fun deleteSavedWord(id: Long) {
+        val current = _savedWordsFlow.value.toMutableList()
+        current.removeAll { it.id == id }
+        saveSavedWordsToPrefs(current)
     }
 
     suspend fun saveNote(

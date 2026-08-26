@@ -16,6 +16,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
@@ -134,6 +135,14 @@ fun SearchScreen(
                 onBack = {
                     viewModel.backToSearchSourceVerse()
                     viewModel.selectTab(NavTab.READER)
+                },
+                actions = {
+                    IconButton(onClick = { viewModel.openSavedWordsScreen() }) {
+                        Icon(
+                            imageVector = Icons.Default.Bookmark,
+                            contentDescription = "Saved Words"
+                        )
+                    }
                 }
             )
         },

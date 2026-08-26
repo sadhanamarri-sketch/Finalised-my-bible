@@ -111,7 +111,12 @@ fun EnglishDictionarySheet(
     word: String,
     entry: EnglishDictionaryEntry?,
     isLoading: Boolean,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    // Bookmark toggle — null hides the button entirely (no caller wired
+    // it up), same "null means don't show it" convention VerseActionToolbar
+    // uses for its own optional actions.
+    isSaved: Boolean = false,
+    onToggleSave: (() -> Unit)? = null
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -130,13 +135,28 @@ fun EnglishDictionarySheet(
                 color = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = word.lowercase(),
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Serif,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = word.lowercase(),
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Serif,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                if (onToggleSave != null) {
+                    IconButton(onClick = onToggleSave) {
+                        Icon(
+                            imageVector = if (isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                            contentDescription = if (isSaved) "Remove from saved words" else "Save word",
+                            tint = if (isSaved) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
 
             if (!entry?.phonetic.isNullOrEmpty()) {
                 Text(

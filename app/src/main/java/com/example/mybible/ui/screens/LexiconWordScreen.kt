@@ -4,6 +4,9 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -14,6 +17,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mybible.data.LexiconLookupResult
 import com.example.mybible.data.MorphologyParser
+import com.example.mybible.model.SavedWordItem
+import com.example.mybible.model.SavedWordLanguage
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.components.BackTopBar
@@ -38,6 +43,11 @@ fun GreekWordScreen(
     val isLoading by viewModel.isLoadingLexicon.collectAsState()
     val savedScrollPosition by viewModel.greekWordScrollPosition.collectAsState()
     val scrollState = rememberScrollState(initial = savedScrollPosition)
+    val savedWords by viewModel.savedWords.collectAsState(initial = emptyList())
+    val isSaved = greekWord?.let { w ->
+        val key = SavedWordItem(language = SavedWordLanguage.GREEK, word = w.greek, transliteration = w.transliteration).dedupeKey()
+        savedWords.any { it.dedupeKey() == key }
+    } ?: false
 
     DisposableEffect(Unit) {
         onDispose { viewModel.saveGreekWordScrollPosition(scrollState.value) }
@@ -47,7 +57,16 @@ fun GreekWordScreen(
         topBar = {
             BackTopBar(
                 title = "Greek Word",
-                onBack = { viewModel.closeGreekWordPage() }
+                onBack = { viewModel.closeGreekWordPage() },
+                actions = {
+                    IconButton(onClick = { viewModel.toggleSaveCurrentGreekWord() }) {
+                        Icon(
+                            imageVector = if (isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                            contentDescription = if (isSaved) "Remove from saved words" else "Save word",
+                            tint = if (isSaved) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             )
         },
         modifier = modifier
@@ -100,6 +119,11 @@ fun HebrewWordScreen(
     val isLoading by viewModel.isLoadingHebrewLexicon.collectAsState()
     val savedScrollPosition by viewModel.hebrewWordScrollPosition.collectAsState()
     val scrollState = rememberScrollState(initial = savedScrollPosition)
+    val savedWords by viewModel.savedWords.collectAsState(initial = emptyList())
+    val isSaved = hebrewWord?.let { w ->
+        val key = SavedWordItem(language = SavedWordLanguage.HEBREW, word = w.hebrew, transliteration = w.transliteration).dedupeKey()
+        savedWords.any { it.dedupeKey() == key }
+    } ?: false
 
     DisposableEffect(Unit) {
         onDispose { viewModel.saveHebrewWordScrollPosition(scrollState.value) }
@@ -109,7 +133,16 @@ fun HebrewWordScreen(
         topBar = {
             BackTopBar(
                 title = "Hebrew Word",
-                onBack = { viewModel.closeHebrewWordPage() }
+                onBack = { viewModel.closeHebrewWordPage() },
+                actions = {
+                    IconButton(onClick = { viewModel.toggleSaveCurrentHebrewWord() }) {
+                        Icon(
+                            imageVector = if (isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                            contentDescription = if (isSaved) "Remove from saved words" else "Save word",
+                            tint = if (isSaved) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             )
         },
         modifier = modifier

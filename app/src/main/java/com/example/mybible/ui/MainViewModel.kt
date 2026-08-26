@@ -213,6 +213,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val tagDefinitions = repository.allTagDefinitions
     val highlights = repository.allHighlights
     val highlightColorDefs = repository.allHighlightColorDefs
+    val savedWords = repository.allSavedWords
 
     // NotesScreen is fully disposed (not just hidden) when the user
     // switches tabs, same as Search/CrossReferenceScreen — without this,
@@ -1443,6 +1444,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _isLoadingDictionary.value = false
     }
 
+    // Bookmark toggle for the Save button on the English dictionary sheet
+    // — see BibleRepository.toggleSavedWord's doc. Concatenates every
+    // part-of-speech's definitions into one plain-text block since
+    // SavedWordItem only has a single definition field (English lookups
+    // never had the Greek/Hebrew lexicon's single "definition" string to
+    // begin with — meanings is the closest equivalent).
+    fun toggleSaveCurrentEnglishWord() {
+        val word = _selectedEnglishWord.value ?: return
+        val entry = _dictionaryEntry.value
+        val definition = entry?.meanings.orEmpty().joinToString("\n\n") { meaning ->
+            val body = meaning.definitions.joinToString("\n") { "• $it" }
+            if (meaning.partOfSpeech.isNotBlank()) "${meaning.partOfSpeech}\n$body" else body
+        }
+        viewModelScope.launch {
+            repository.toggleSavedWord(
+                SavedWordItem(language = SavedWordLanguage.ENGLISH, word = word, definition = definition)
+            )
+        }
+    }
+
     fun setSelectedVerse(verse: Verse?) {
         _selectedVerse.value = verse
     }
@@ -1499,6 +1520,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         selectTab(NavTab.READER)
     }
 
+    // Bookmark toggle for GreekWordScreen's Save action — see
+    // BibleRepository.toggleSavedWord's doc. sourceBook/Chapter/Verse come
+    // from _lexiconBaseVerse (the verse this lookup was opened from), the
+    // same anchor closeGreekWordPage uses to jump back.
+    fun toggleSaveCurrentGreekWord() {
+        val word = _selectedGreekWord.value ?: return
+        val foundEntry = (_lexiconResult.value as? LexiconLookupResult.Found)?.entry
+        val baseVerse = _lexiconBaseVerse.value
+        viewModelScope.launch {
+            repository.toggleSavedWord(
+                SavedWordItem(
+                    language = SavedWordLanguage.GREEK,
+                    word = word.greek,
+                    transliteration = word.transliteration,
+                    gloss = word.englishGloss.ifBlank { foundEntry?.gloss.orEmpty() },
+                    definition = foundEntry?.definition.orEmpty(),
+                    morphology = word.morphology,
+                    strongs = word.strongs,
+                    sourceBook = baseVerse?.book.orEmpty(),
+                    sourceChapter = baseVerse?.chapter ?: 0,
+                    sourceVerse = baseVerse?.number ?: 0
+                )
+            )
+        }
+    }
+
     fun selectHebrewWord(hebrewWord: HebrewWord?, baseVerse: Verse? = null) {
         _selectedHebrewWord.value = hebrewWord
         hebrewLexiconLookupJob?.cancel()
@@ -1515,6 +1562,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _isLoadingHebrewLexicon.value = false
         }
         selectTab(NavTab.HEBREW_WORD)
+    }
+
+    // Bookmark toggle for HebrewWordScreen's Save action — mirrors
+    // toggleSaveCurrentGreekWord above.
+    fun toggleSaveCurrentHebrewWord() {
+        val word = _selectedHebrewWord.value ?: return
+        val foundEntry = (_hebrewLexiconResult.value as? LexiconLookupResult.Found)?.entry
+        val baseVerse = _lexiconBaseVerse.value
+        viewModelScope.launch {
+            repository.toggleSavedWord(
+                SavedWordItem(
+                    language = SavedWordLanguage.HEBREW,
+                    word = word.hebrew,
+                    transliteration = word.transliteration,
+                    gloss = word.englishGloss.ifBlank { foundEntry?.gloss.orEmpty() },
+                    definition = foundEntry?.definition.orEmpty(),
+                    morphology = word.morphology,
+                    strongs = word.strongs,
+                    sourceBook = baseVerse?.book.orEmpty(),
+                    sourceChapter = baseVerse?.chapter ?: 0,
+                    sourceVerse = baseVerse?.number ?: 0
+                )
+            )
+        }
     }
 
     fun closeHebrewWordPage() {
@@ -2055,6 +2126,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearPendingNoteTagFilter() { _pendingNoteTagFilter.value = null }
+
+    // ── Saved Words screen ──────────────────────────────────────────────
+    // Full page pushed over Search (opened from its top-bar bookmark icon),
+    // same "overlay above the active tab" shape as Tags above — back
+    // returns to Search, not Reader.
+    private val _showSavedWordsScreen = MutableStateFlow(false)
+    val showSavedWordsScreen: StateFlow<Boolean> = _showSavedWordsScreen.asStateFlow()
+
+    fun openSavedWordsScreen() { _showSavedWordsScreen.value = true }
+    fun closeSavedWordsScreen() { _showSavedWordsScreen.value = false }
+
+    fun deleteSavedWord(id: Long) { viewModelScope.launch { repository.deleteSavedWord(id) } }
 
     fun setShowBookPicker(show: Boolean) {
         _showBookPicker.value = show
