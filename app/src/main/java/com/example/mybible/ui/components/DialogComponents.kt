@@ -320,7 +320,7 @@ fun VerseMentionPreviewSheet(
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Text(
-                text = "$book $chapter:$verse",
+                text = "$book $chapter:$verse".uppercase(),
                 fontSize = 16.sp,
                 fontFamily = WorkSansFontFamily,
                 fontWeight = FontWeight.Bold,
