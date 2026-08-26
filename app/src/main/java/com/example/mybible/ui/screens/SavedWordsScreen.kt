@@ -33,6 +33,7 @@ import com.example.mybible.model.SavedWordItem
 import com.example.mybible.model.SavedWordLanguage
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.components.BackTopBar
+import kotlinx.coroutines.delay
 
 /**
  * Personal glossary of words bookmarked from a Greek/Hebrew interlinear
@@ -61,9 +62,13 @@ fun SavedWordsScreen(
     val listState = rememberLazyListState()
 
     // Marks the last-tapped row with an accent bar on return (e.g. coming
-    // back from that word's lexicon/dictionary entry) — same "clear on
-    // first scroll" idea as Search/Cross References' own last-tapped
-    // markers, not a timer or tap.
+    // back from that word's lexicon/dictionary entry) — cleared on the
+    // first scroll (same idea as Search/Cross References' own last-tapped
+    // markers) or after 3s, whichever comes first: unlike a results list
+    // you're actively scanning, Saved Words is often revisited to check
+    // just the one word, so there may be no scroll at all to clear it.
+    // clearSavedWordsLastTapped is idempotent, so both racing to call it
+    // is harmless.
     LaunchedEffect(lastTappedKey) {
         if (lastTappedKey == null) return@LaunchedEffect
         val landedIndex = listState.firstVisibleItemIndex
@@ -74,6 +79,11 @@ fun SavedWordsScreen(
                     viewModel.clearSavedWordsLastTapped()
                 }
             }
+    }
+    LaunchedEffect(lastTappedKey) {
+        if (lastTappedKey == null) return@LaunchedEffect
+        delay(3000)
+        viewModel.clearSavedWordsLastTapped()
     }
 
     Scaffold(
