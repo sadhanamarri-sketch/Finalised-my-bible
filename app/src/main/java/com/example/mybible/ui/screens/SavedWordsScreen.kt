@@ -2,10 +2,16 @@
 
 package com.example.mybible.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.ChevronRight
@@ -51,6 +57,24 @@ fun SavedWordsScreen(
     var selectedLanguage by remember { mutableStateOf(SavedWordLanguage.ENGLISH) }
     var wordPendingDelete by remember { mutableStateOf<SavedWordItem?>(null) }
     val filteredWords = savedWords.filter { it.language == selectedLanguage }
+    val lastTappedKey by viewModel.savedWordsLastTappedKey.collectAsState()
+    val listState = rememberLazyListState()
+
+    // Marks the last-tapped row with an accent bar on return (e.g. coming
+    // back from that word's lexicon/dictionary entry) — same "clear on
+    // first scroll" idea as Search/Cross References' own last-tapped
+    // markers, not a timer or tap.
+    LaunchedEffect(lastTappedKey) {
+        if (lastTappedKey == null) return@LaunchedEffect
+        val landedIndex = listState.firstVisibleItemIndex
+        val landedOffset = listState.firstVisibleItemScrollOffset
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collect { (idx, offset) ->
+                if (idx != landedIndex || kotlin.math.abs(offset - landedOffset) > 4) {
+                    viewModel.clearSavedWordsLastTapped()
+                }
+            }
+    }
 
     Scaffold(
         topBar = {
@@ -110,16 +134,19 @@ fun SavedWordsScreen(
             } else {
                 val dividerColor = MaterialTheme.colorScheme.outlineVariant
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 16.dp)
                 ) {
                     items(filteredWords, key = { it.id }) { saved ->
                         val hasSourceVerse = saved.sourceBook.isNotBlank()
+                        val isLastTapped = lastTappedKey == saved.id.toString()
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .height(IntrinsicSize.Min)
                                 .clickable { viewModel.openLexiconForSavedWord(saved) }
                                 .drawBehind {
                                     val strokeWidth = 1.dp.toPx()
@@ -130,9 +157,24 @@ fun SavedWordsScreen(
                                         strokeWidth = strokeWidth
                                     )
                                 }
-                                .padding(vertical = 12.dp)
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
+                            // Same left-edge accent bar as Search's own
+                            // last-tapped marker — fades out slowly rather
+                            // than an instant on/off (see
+                            // clearSavedWordsLastTapped's caller).
+                            AnimatedVisibility(
+                                visible = isLastTapped,
+                                enter = EnterTransition.None,
+                                exit = fadeOut(animationSpec = tween(durationMillis = 1000))
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(3.dp)
+                                        .fillMaxHeight()
+                                        .background(MaterialTheme.colorScheme.primary)
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f).padding(vertical = 12.dp)) {
                                 // English readability comes first: for a
                                 // Greek/Hebrew entry the gloss (not the
                                 // native script) is the big, gold, most

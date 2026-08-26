@@ -1501,19 +1501,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // chapter's verse list.
     private val _lexiconBaseVerse = MutableStateFlow<Verse?>(null)
 
+    // Whether the currently-open Greek/Hebrew word page was reached from
+    // Saved Words (openLexiconForSavedWord) rather than Reader — its own
+    // back button needs to undo that detour and land back on Saved Words,
+    // not jump into Reader, the same "system back means take me back to
+    // where I actually was" rule every other detour in this app already
+    // follows (search, cross-references, notes, etc. — see the DETOUR_
+    // SETTLE_MS doc up top). Shared by both languages since only one of
+    // GreekWordScreen/HebrewWordScreen is ever open at a time.
+    private val _lexiconOpenedFromSavedWords = MutableStateFlow(false)
+
     // Opens GreekWordScreen for this word — same "land on a full page,
     // fetch lazily" shape as CrossReferenceScreen/openCrossReferences.
     // Passing null instead clears the selection without switching tabs
     // (used internally by closeGreekWordPage(), and safe to leave as a
     // dedicated no-op path for any future non-navigating "just clear it"
     // caller); baseVerse is only meaningful on that real-selection path.
-    fun selectGreekWord(greekWord: GreekWord?, baseVerse: Verse? = null) {
+    fun selectGreekWord(greekWord: GreekWord?, baseVerse: Verse? = null, openedFromSavedWords: Boolean = false) {
         _selectedGreekWord.value = greekWord
         lexiconLookupJob?.cancel()
         _lexiconResult.value = null
         _isLoadingLexicon.value = false
         if (greekWord == null) return
         if (baseVerse != null) _lexiconBaseVerse.value = baseVerse
+        _lexiconOpenedFromSavedWords.value = openedFromSavedWords
 
         _greekWordScrollPosition.value = 0
         _isLoadingLexicon.value = true
@@ -1526,12 +1537,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // GreekWordScreen's own back button — mirrors endCrossReferenceSession()
-    // + selectTab(READER), plus focusing the base verse (see
-    // jumpToLexiconBaseVerse).
+    // + selectTab(READER) when opened from Reader (the common case), or
+    // reopens Saved Words without touching Reader at all when that's where
+    // this detour started (see _lexiconOpenedFromSavedWords's doc) — Search
+    // is hardcoded as the tab underneath since Saved Words is only ever
+    // reachable from there today.
     fun closeGreekWordPage() {
         selectGreekWord(null)
-        jumpToLexiconBaseVerse()
-        selectTab(NavTab.READER)
+        if (_lexiconOpenedFromSavedWords.value) {
+            _lexiconOpenedFromSavedWords.value = false
+            openSavedWordsScreen()
+            selectTab(NavTab.SEARCH)
+        } else {
+            jumpToLexiconBaseVerse()
+            selectTab(NavTab.READER)
+        }
     }
 
     // Bookmark toggle for GreekWordScreen's Save action — see
@@ -1560,13 +1580,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun selectHebrewWord(hebrewWord: HebrewWord?, baseVerse: Verse? = null) {
+    fun selectHebrewWord(hebrewWord: HebrewWord?, baseVerse: Verse? = null, openedFromSavedWords: Boolean = false) {
         _selectedHebrewWord.value = hebrewWord
         hebrewLexiconLookupJob?.cancel()
         _hebrewLexiconResult.value = null
         _isLoadingHebrewLexicon.value = false
         if (hebrewWord == null) return
         if (baseVerse != null) _lexiconBaseVerse.value = baseVerse
+        _lexiconOpenedFromSavedWords.value = openedFromSavedWords
 
         _hebrewWordScrollPosition.value = 0
         _isLoadingHebrewLexicon.value = true
@@ -1602,10 +1623,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // Mirrors closeGreekWordPage's origin-aware branch above.
     fun closeHebrewWordPage() {
         selectHebrewWord(null)
-        jumpToLexiconBaseVerse()
-        selectTab(NavTab.READER)
+        if (_lexiconOpenedFromSavedWords.value) {
+            _lexiconOpenedFromSavedWords.value = false
+            openSavedWordsScreen()
+            selectTab(NavTab.SEARCH)
+        } else {
+            jumpToLexiconBaseVerse()
+            selectTab(NavTab.READER)
+        }
     }
 
     // Shared by closeGreekWordPage/closeHebrewWordPage and
@@ -2153,6 +2181,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deleteSavedWord(id: Long) { viewModelScope.launch { repository.deleteSavedWord(id) } }
 
+    // "id.toString()" key of the last Saved Words row tapped — lets
+    // SavedWordsScreen mark that row with an accent bar on return, same
+    // idea and lifecycle as _searchLastTappedKey/_crossReferenceLastTappedKey.
+    // Cleared once the user scrolls the list (SavedWordsScreen's own
+    // scroll-watching effect).
+    private val _savedWordsLastTappedKey = MutableStateFlow<String?>(null)
+    val savedWordsLastTappedKey: StateFlow<String?> = _savedWordsLastTappedKey.asStateFlow()
+
+    fun clearSavedWordsLastTapped() {
+        _savedWordsLastTappedKey.value = null
+    }
+
     // Tapping a Saved Words row reopens its full lexicon/dictionary entry
     // rather than just jumping to the verse — "Open in Reader" below is
     // the separate, explicit action for that. Greek/Hebrew are full-page
@@ -2160,13 +2200,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // closes the overlay first (otherwise it would render behind it,
     // invisible); the English sheet is a bottom sheet independent of both
     // the active tab and this overlay, so it can show right on top of
-    // Saved Words without closing anything. Closing the resulting
-    // Greek/Hebrew page lands back in Reader at the source verse (if any)
-    // — the same place it always returns to — not back in Saved Words.
+    // Saved Words without closing anything. Greek/Hebrew are opened with
+    // openedFromSavedWords = true so their own back button returns here
+    // (see _lexiconOpenedFromSavedWords's doc) instead of detouring into
+    // Reader — the whole point of ignoring a detour is that browsing a
+    // saved word's definition doesn't touch where you were actually
+    // reading, the same way every other "return to X" flow in this app
+    // already respects its own origin.
     fun openLexiconForSavedWord(item: SavedWordItem) {
         val sourceVerse = if (item.sourceBook.isNotBlank()) {
             Verse(book = item.sourceBook, chapter = item.sourceChapter, number = item.sourceVerse, text = "")
         } else null
+        _savedWordsLastTappedKey.value = item.id.toString()
         when (item.language) {
             SavedWordLanguage.GREEK -> {
                 closeSavedWordsScreen()
@@ -2178,7 +2223,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         strongs = item.strongs,
                         morphology = item.morphology
                     ),
-                    baseVerse = sourceVerse
+                    baseVerse = sourceVerse,
+                    openedFromSavedWords = true
                 )
             }
             SavedWordLanguage.HEBREW -> {
@@ -2191,7 +2237,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         strongs = item.strongs,
                         morphology = item.morphology
                     ),
-                    baseVerse = sourceVerse
+                    baseVerse = sourceVerse,
+                    openedFromSavedWords = true
                 )
             }
             SavedWordLanguage.ENGLISH -> openEnglishWordLookup(item.word, baseVerse = sourceVerse)
