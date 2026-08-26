@@ -150,7 +150,7 @@ fun EnglishDictionarySheet(
                 if (onToggleSave != null) {
                     IconButton(onClick = onToggleSave) {
                         Icon(
-                            imageVector = if (isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                            imageVector = if (isSaved) Icons.Default.Star else Icons.Default.StarBorder,
                             contentDescription = if (isSaved) "Remove from saved words" else "Save word",
                             tint = if (isSaved) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )

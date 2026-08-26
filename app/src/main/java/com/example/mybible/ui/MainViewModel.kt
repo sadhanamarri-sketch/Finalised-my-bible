@@ -1426,10 +1426,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (clearFocus) clearVerseFocus()
     }
 
-    fun openEnglishWordLookup(word: String) {
+    // baseVerse mirrors selectGreekWord/selectHebrewWord's own parameter —
+    // the verse this lookup was opened from, recorded into the same
+    // _lexiconBaseVerse used to save a source verse alongside a saved word
+    // (see toggleSaveCurrentEnglishWord) and to jump back to it (see
+    // openReaderForSavedWord). Null for callers with no verse context.
+    fun openEnglishWordLookup(word: String, baseVerse: Verse? = null) {
         val cleanWord = word.lowercase().replace(Regex("[^a-z]"), "")
         if (cleanWord.isEmpty()) return
         _selectedEnglishWord.value = cleanWord
+        if (baseVerse != null) _lexiconBaseVerse.value = baseVerse
         viewModelScope.launch {
             _isLoadingDictionary.value = true
             val entry = repository.lookupEnglishWord(cleanWord)
@@ -1457,9 +1463,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val body = meaning.definitions.joinToString("\n") { "• $it" }
             if (meaning.partOfSpeech.isNotBlank()) "${meaning.partOfSpeech}\n$body" else body
         }
+        val baseVerse = _lexiconBaseVerse.value
         viewModelScope.launch {
             repository.toggleSavedWord(
-                SavedWordItem(language = SavedWordLanguage.ENGLISH, word = word, definition = definition)
+                SavedWordItem(
+                    language = SavedWordLanguage.ENGLISH,
+                    word = word,
+                    definition = definition,
+                    sourceBook = baseVerse?.book.orEmpty(),
+                    sourceChapter = baseVerse?.chapter ?: 0,
+                    sourceVerse = baseVerse?.number ?: 0
+                )
             )
         }
     }
@@ -2138,6 +2152,62 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun closeSavedWordsScreen() { _showSavedWordsScreen.value = false }
 
     fun deleteSavedWord(id: Long) { viewModelScope.launch { repository.deleteSavedWord(id) } }
+
+    // Tapping a Saved Words row reopens its full lexicon/dictionary entry
+    // rather than just jumping to the verse — "Open in Reader" below is
+    // the separate, explicit action for that. Greek/Hebrew are full-page
+    // NavTab screens layered under the Saved Words overlay, so opening one
+    // closes the overlay first (otherwise it would render behind it,
+    // invisible); the English sheet is a bottom sheet independent of both
+    // the active tab and this overlay, so it can show right on top of
+    // Saved Words without closing anything. Closing the resulting
+    // Greek/Hebrew page lands back in Reader at the source verse (if any)
+    // — the same place it always returns to — not back in Saved Words.
+    fun openLexiconForSavedWord(item: SavedWordItem) {
+        val sourceVerse = if (item.sourceBook.isNotBlank()) {
+            Verse(book = item.sourceBook, chapter = item.sourceChapter, number = item.sourceVerse, text = "")
+        } else null
+        when (item.language) {
+            SavedWordLanguage.GREEK -> {
+                closeSavedWordsScreen()
+                selectGreekWord(
+                    GreekWord(
+                        greek = item.word,
+                        transliteration = item.transliteration,
+                        englishGloss = item.gloss,
+                        strongs = item.strongs,
+                        morphology = item.morphology
+                    ),
+                    baseVerse = sourceVerse
+                )
+            }
+            SavedWordLanguage.HEBREW -> {
+                closeSavedWordsScreen()
+                selectHebrewWord(
+                    HebrewWord(
+                        hebrew = item.word,
+                        transliteration = item.transliteration,
+                        englishGloss = item.gloss,
+                        strongs = item.strongs,
+                        morphology = item.morphology
+                    ),
+                    baseVerse = sourceVerse
+                )
+            }
+            SavedWordLanguage.ENGLISH -> openEnglishWordLookup(item.word, baseVerse = sourceVerse)
+        }
+    }
+
+    // 3-dot menu's "Open in Reader" — jumps straight to the verse a saved
+    // word came from, bypassing its lexicon/dictionary entry entirely.
+    // No-op if this word has no recorded source verse (the menu item
+    // itself is disabled in that case — see SavedWordsScreen).
+    fun openReaderForSavedWord(item: SavedWordItem) {
+        if (item.sourceBook.isBlank()) return
+        closeSavedWordsScreen()
+        jumpToVerse(item.sourceBook, item.sourceChapter, item.sourceVerse)
+        selectTab(NavTab.READER)
+    }
 
     fun setShowBookPicker(show: Boolean) {
         _showBookPicker.value = show

@@ -5,8 +5,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -61,7 +61,7 @@ fun GreekWordScreen(
                 actions = {
                     IconButton(onClick = { viewModel.toggleSaveCurrentGreekWord() }) {
                         Icon(
-                            imageVector = if (isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                            imageVector = if (isSaved) Icons.Default.Star else Icons.Default.StarBorder,
                             contentDescription = if (isSaved) "Remove from saved words" else "Save word",
                             tint = if (isSaved) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -137,7 +137,7 @@ fun HebrewWordScreen(
                 actions = {
                     IconButton(onClick = { viewModel.toggleSaveCurrentHebrewWord() }) {
                         Icon(
-                            imageVector = if (isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                            imageVector = if (isSaved) Icons.Default.Star else Icons.Default.StarBorder,
                             contentDescription = if (isSaved) "Remove from saved words" else "Save word",
                             tint = if (isSaved) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )

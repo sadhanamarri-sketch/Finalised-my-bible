@@ -1169,7 +1169,7 @@ fun ReaderScreen(
                                 runUnlessBlurred { viewModel.openCrossReferences(verse) }
                             },
                             onEnglishWordClick = { word ->
-                                runUnlessBlurred { viewModel.openEnglishWordLookup(word) }
+                                runUnlessBlurred { viewModel.openEnglishWordLookup(word, baseVerse = verse) }
                             }
                         )
                     }

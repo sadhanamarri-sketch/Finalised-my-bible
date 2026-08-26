@@ -27,6 +27,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -543,8 +545,22 @@ fun VerseActionToolbar(
     // the Tag editor, instead of being the one action panel in Reader that
     // looked like a toolbar wedged into the layout.
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+    // The quick-note field below can hold focus (and the keyboard open)
+    // when this sheet closes — swipe-to-dismiss, tapping the scrim, or
+    // system back all skip the field's own IME "done" handling entirely.
+    // Left as-is, the keyboard stayed up over whatever Reader showed
+    // underneath once the sheet was gone. Explicit here rather than
+    // relying on focus-follows-composition, since a composable being torn
+    // down doesn't reliably hide the IME on its own.
+    val dismiss = {
+        keyboardController?.hide()
+        focusManager.clearFocus(force = true)
+        onDismiss()
+    }
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = dismiss,
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
         modifier = modifier
@@ -602,7 +618,7 @@ fun VerseActionToolbar(
                         )
                     }
                 }
-                IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
+                IconButton(onClick = dismiss, modifier = Modifier.size(24.dp)) {
                     Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
