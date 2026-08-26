@@ -404,25 +404,6 @@ fun NotesScreen(
                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                                 modifier = Modifier.padding(top = 6.dp)
                             )
-
-                            // "Read more" — right-aligned, coral (the
-                            // theme's primary/accent tone). Only shown when
-                            // the 3-line preview above is actually likely
-                            // to have clipped something.
-                            if (note.text.length > 140) {
-                                Box(modifier = Modifier.fillMaxWidth()) {
-                                    Text(
-                                        text = "Read more",
-                                        fontSize = 13.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier
-                                            .align(Alignment.CenterEnd)
-                                            .padding(top = 4.dp)
-                                            .clickable { viewModel.openNoteReader(note) }
-                                    )
-                                }
-                            }
                         }
                         }
                     }
