@@ -4,7 +4,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import com.example.mybible.R
 
 /**
  * Temporary, in-memory-only test rig for the Notes-tab font pass — see the
@@ -16,9 +19,20 @@ import androidx.compose.ui.text.font.FontFamily
  * properties below to plain references) once a font is chosen.
  */
 object FontTestLab {
-    // Populated with real bundled FontFamily entries once the candidate
-    // Google Fonts are named — see AppFonts.kt for the bundling pattern.
-    val testFonts: Map<String, FontFamily> = emptyMap()
+    // Candidate fonts requested for the Notes-tab A/B test. Regular weight
+    // only (single static file per family, no variable-font axes) — bold
+    // synthesizes if ever requested, same as EbGaramond/PlayfairDisplay in
+    // AppFonts.kt.
+    val testFonts: Map<String, FontFamily> = linkedMapOf(
+        "Nunito" to FontFamily(Font(R.font.nunito_regular, FontWeight.Normal)),
+        "Quicksand" to FontFamily(Font(R.font.quicksand_regular, FontWeight.Normal)),
+        "Dosis" to FontFamily(Font(R.font.dosis_regular, FontWeight.Normal)),
+        "Zilla Slab" to FontFamily(Font(R.font.zilla_slab_regular, FontWeight.Normal)),
+        "Source Serif 4" to FontFamily(Font(R.font.source_serif_4_regular, FontWeight.Normal)),
+        "Varela Round" to FontFamily(Font(R.font.varela_round_regular, FontWeight.Normal)),
+        "Antic Slab" to FontFamily(Font(R.font.antic_slab_regular, FontWeight.Normal)),
+        "Crimson Text" to FontFamily(Font(R.font.crimson_text_regular, FontWeight.Normal))
+    )
 
     var selectedFontKey by mutableStateOf<String?>(null)
 
