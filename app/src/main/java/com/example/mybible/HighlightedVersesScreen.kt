@@ -174,13 +174,14 @@ private fun HighlightedVerseRow(
                 modifier = Modifier.padding(bottom = 4.dp)
             )
             // Reference — matches DsSectionLabel's gold heading style
-            // exactly (Settings/Search): 12.5sp, 1.5sp letter-spacing,
-            // Work Sans, tertiary, not bold.
+            // (Settings/Search): 12.5sp, 1.5sp letter-spacing, Work Sans,
+            // tertiary — now bold, by request.
             Text(
                 text = "${item.book} ${item.chapter}:${item.verse}".uppercase(),
                 fontSize = 12.5.sp,
                 letterSpacing = 1.5.sp,
                 fontFamily = WorkSansFontFamily,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.padding(bottom = 6.dp)
             )
