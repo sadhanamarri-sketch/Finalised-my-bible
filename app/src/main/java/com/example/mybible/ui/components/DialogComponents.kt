@@ -250,17 +250,17 @@ fun EnglishDictionarySheet(
                                     ) {
                                         Text(
                                             text = "${idx + 1}. ",
-                                            fontSize = 14.sp,
+                                            fontSize = 16.sp,
                                             fontFamily = LiterataFontFamily,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.primary
                                         )
                                         Text(
                                             text = def,
-                                            fontSize = 14.sp,
+                                            fontSize = 16.sp,
                                             fontFamily = LiterataFontFamily,
                                             color = MaterialTheme.colorScheme.onSurface,
-                                            lineHeight = 20.sp
+                                            lineHeight = 23.sp
                                         )
                                     }
                                 }
