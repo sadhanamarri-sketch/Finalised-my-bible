@@ -885,6 +885,14 @@ class BibleRepository(private val context: Context) {
         val words = q.split(Regex("\\s+")).filter { it.isNotBlank() }
         val isSingleWord = words.size == 1 && words[0].all { it.isLetter() }
 
+        // Precise (word-boundary) matching whenever Extensive search is
+        // off, loose (plain substring, the original behavior) whenever
+        // it's on — see containsWholeWord's doc for what "precise" means.
+        // Applies uniformly regardless of case-sensitivity or word count,
+        // so a multi-word combo search is just as precise/loose as a
+        // single-word one.
+        val wholeWord = !extensiveSearch
+
         // Case-sensitive mode is a precise/literal mode — deliberately
         // skips typo-correction and root-word suggestions entirely rather
         // than trying to make them case-aware, since both work by
@@ -894,9 +902,9 @@ class BibleRepository(private val context: Context) {
         // enhancements either way regardless of the toggle.
         if (!extensiveSearch || caseSensitive || !isSingleWord) {
             val mainResults = if (words.size > 1) {
-                searchCombination(words, caseSensitive)
+                searchCombination(words, caseSensitive, wholeWord)
             } else {
-                searchAnyTerm(q, caseSensitive)
+                searchAnyTerm(q, caseSensitive, wholeWord)
             }
             return@withContext SearchOutcome(mainResults = mainResults)
         }
@@ -906,15 +914,15 @@ class BibleRepository(private val context: Context) {
         val corrected = correctTypo(lowerQ, index)
         val effectiveWord = corrected ?: lowerQ
 
-        // Main results are a plain single-word search — substring matching
-        // on its own already surfaces most inflected forms for free
-        // ("love" matches "loved"/"loving"/"loveth" as substrings), so
-        // there's no need to OR in extra generated terms here. Root-word
-        // suggestions are offered as tappable chips instead (see
-        // SearchScreen) — tapping one runs a fresh search for that exact
-        // word rather than this search eagerly running (and displaying
-        // results for) every variant up front.
-        val mainResults = searchAnyTerm(effectiveWord, caseSensitive)
+        // Main results are a plain single-word search — loose substring
+        // matching (this is the Extensive-search path) on its own already
+        // surfaces most inflected forms for free ("love" matches
+        // "loved"/"loveth" as substrings), so there's no need to OR in
+        // extra generated terms here. Root-word suggestions are offered as
+        // tappable chips instead (see SearchScreen) — tapping one runs a
+        // fresh search for that exact word rather than this search eagerly
+        // running (and displaying results for) every variant up front.
+        val mainResults = searchAnyTerm(effectiveWord, caseSensitive, wholeWord = false)
         // Filtered against the same real-word dictionary used for typo-
         // correction: stripToRoots generates candidates mechanically (e.g.
         // "loved" -> "lov", dropping the "ed" without restoring the silent
@@ -944,13 +952,20 @@ class BibleRepository(private val context: Context) {
     // first since a verse containing the words together is a stronger,
     // more relevant match than one with the same words scattered apart —
     // they're always a subset of the AND results, not a separate search.
-    private suspend fun searchCombination(words: List<String>, caseSensitive: Boolean): List<Verse> {
+    private suspend fun searchCombination(words: List<String>, caseSensitive: Boolean, wholeWord: Boolean): List<Verse> {
         val meaningfulWords = words.filter { it.length >= 2 }
         if (meaningfulWords.isEmpty()) return emptyList()
 
-        fun verseContainsWord(row: VerseEntity, word: String): Boolean =
-            row.text.contains(word, ignoreCase = !caseSensitive) ||
-                (row.teluguText?.contains(word, ignoreCase = !caseSensitive) == true)
+        // Telugu always stays plain substring — see containsWholeWord's
+        // doc for why word-boundary matching doesn't extend to it.
+        fun verseContainsWord(row: VerseEntity, word: String): Boolean {
+            val englishMatch = if (wholeWord) {
+                containsWholeWord(row.text, word, caseSensitive)
+            } else {
+                row.text.contains(word, ignoreCase = !caseSensitive)
+            }
+            return englishMatch || (row.teluguText?.contains(word, ignoreCase = !caseSensitive) == true)
+        }
 
         // Intersect each word's own (coarse, case-insensitive) Room LIKE
         // candidates by verse identity, refining case-sensitively in
@@ -1007,14 +1022,25 @@ class BibleRepository(private val context: Context) {
 
     // Thin wrapper over the existing single-term Room LIKE search, mapping
     // rows to Verse. Room's LIKE is only reliably case-insensitive for
-    // ASCII, so it's a coarse (case-insensitive) candidate filter here; the
-    // actual case-sensitive check, when requested, happens in Kotlin, same
-    // approach this search always used.
-    private suspend fun searchAnyTerm(term: String, caseSensitive: Boolean): List<Verse> {
+    // ASCII, so it's a coarse (case-insensitive) candidate filter here.
+    // When wholeWord is false (the original, pre-word-boundary behavior,
+    // now only used by Extensive search), a non-case-sensitive candidate
+    // is accepted as-is — Room's LIKE already did the substring check —
+    // and only case-sensitive mode re-verifies in Kotlin. When wholeWord
+    // is true, every candidate is always re-verified in Kotlin regardless
+    // of case-sensitivity, since word-boundary matching isn't something
+    // SQL's LIKE can express at all.
+    private suspend fun searchAnyTerm(term: String, caseSensitive: Boolean, wholeWord: Boolean): List<Verse> {
         if (term.length < 2) return emptyList()
         val results = mutableListOf<Verse>()
         for (row in bibleDao.search(term)) {
-            if (caseSensitive && !(row.text.contains(term) || (row.teluguText?.contains(term) == true))) continue
+            val matches = if (wholeWord) {
+                containsWholeWord(row.text, term, caseSensitive) ||
+                    (row.teluguText?.contains(term, ignoreCase = !caseSensitive) == true)
+            } else {
+                !caseSensitive || row.text.contains(term) || (row.teluguText?.contains(term) == true)
+            }
+            if (!matches) continue
             results += Verse(
                 book = row.book,
                 chapter = row.chapter,
@@ -1067,6 +1093,49 @@ class BibleRepository(private val context: Context) {
             roots += word.dropLast(3) + "e" // silent-e restore: loving -> lov -> love
         }
         return roots
+    }
+
+    private val wordTokenRegex = Regex("[A-Za-z]+")
+
+    // "Precise" search's word-boundary matching, used whenever Extensive
+    // search is off (see searchBible's wholeWord). A hit only counts if
+    // nothing precedes it within the same run of letters — that alone is
+    // enough to stop "new" matching "knew" or "love" matching "beloved"/
+    // "gloves", none of which are the searched word at all, just letters
+    // that happen to appear inside a longer, unrelated one.
+    //
+    // A recognized inflectional suffix is still allowed to follow the
+    // match, so "love" still finds "loved"/"loving"/"loveth" — rather
+    // than maintaining a second, separately-written list of suffixes to
+    // generate forward, this reuses stripToRoots (which already knows
+    // those rules, including silent-e restoration) in reverse: strip each
+    // candidate token's own suffix and see if the searched word is one of
+    // the roots that comes out. A token that equals the searched word
+    // outright is always a match irrespective of this.
+    //
+    // Only ever applied to the English verse text — Telugu script isn't
+    // covered by wordTokenRegex, and there's no established word-boundary
+    // convention plugged in for it here, so Telugu matching stays plain
+    // substring regardless of this toggle (see every caller's separate
+    // teluguText check).
+    //
+    // Case-sensitive mode only ever accepts an exact-case token match, no
+    // suffix leniency — case-sensitive is already a precise/literal mode
+    // in this app (see its own doc elsewhere), and the archaic-suffix
+    // rules aren't case-aware to begin with.
+    private fun containsWholeWord(text: String, word: String, caseSensitive: Boolean): Boolean {
+        for (match in wordTokenRegex.findAll(text)) {
+            val token = match.value
+            if (caseSensitive) {
+                if (token == word) return true
+            } else {
+                val lowerToken = token.lowercase()
+                val lowerWord = word.lowercase()
+                if (lowerToken == lowerWord) return true
+                if (stripToRoots(lowerToken).contains(lowerWord)) return true
+            }
+        }
+        return false
     }
 
     // Typo-tolerance's reference dictionary — every distinct word that
