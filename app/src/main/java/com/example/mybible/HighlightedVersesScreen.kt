@@ -189,9 +189,9 @@ private fun HighlightedVerseRow(
             // this already resolves to a near-white cream.
             Text(
                 text = item.text,
-                fontSize = 15.sp,
+                fontSize = 17.sp,
                 fontFamily = LiterataFontFamily,
-                lineHeight = 21.sp,
+                lineHeight = 24.sp,
                 color = MaterialTheme.colorScheme.onSurface
             )
             if (!item.noteText.isNullOrBlank()) {
