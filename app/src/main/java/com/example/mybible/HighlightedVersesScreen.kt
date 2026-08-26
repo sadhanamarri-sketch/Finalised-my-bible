@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mybible.model.ThemeMode
 import com.example.mybible.ui.components.BackTopBar
-import com.example.mybible.ui.theme.literataOrTestFontFamily
+import com.example.mybible.ui.theme.LiterataFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
 
 data class HighlightedVerseItem(
@@ -190,7 +190,7 @@ private fun HighlightedVerseRow(
             Text(
                 text = item.text,
                 fontSize = 15.sp,
-                fontFamily = literataOrTestFontFamily,
+                fontFamily = LiterataFontFamily,
                 lineHeight = 21.sp,
                 color = MaterialTheme.colorScheme.onSurface
             )

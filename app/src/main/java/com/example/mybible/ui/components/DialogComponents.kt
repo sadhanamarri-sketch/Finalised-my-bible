@@ -37,7 +37,7 @@ import java.time.format.DateTimeFormatter
 import com.example.mybible.model.EnglishDictionaryEntry
 import com.example.mybible.model.HighlightColorDef
 import com.example.mybible.ui.theme.FrauncesFontFamily
-import com.example.mybible.ui.theme.literataOrTestFontFamily
+import com.example.mybible.ui.theme.LiterataFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
 
 // A YYYY-MM-DD text field with a calendar icon that opens a native
@@ -159,7 +159,7 @@ fun EnglishDictionarySheet(
                     text = word.lowercase(),
                     fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = literataOrTestFontFamily,
+                    fontFamily = LiterataFontFamily,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 if (onToggleSave != null) {
@@ -251,14 +251,14 @@ fun EnglishDictionarySheet(
                                         Text(
                                             text = "${idx + 1}. ",
                                             fontSize = 14.sp,
-                                            fontFamily = literataOrTestFontFamily,
+                                            fontFamily = LiterataFontFamily,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.primary
                                         )
                                         Text(
                                             text = def,
                                             fontSize = 14.sp,
-                                            fontFamily = literataOrTestFontFamily,
+                                            fontFamily = LiterataFontFamily,
                                             color = MaterialTheme.colorScheme.onSurface,
                                             lineHeight = 20.sp
                                         )
@@ -330,7 +330,7 @@ fun VerseMentionPreviewSheet(
             Text(
                 text = verseText ?: "Loading\u2026",
                 fontSize = 15.sp,
-                fontFamily = literataOrTestFontFamily,
+                fontFamily = LiterataFontFamily,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(18.dp))

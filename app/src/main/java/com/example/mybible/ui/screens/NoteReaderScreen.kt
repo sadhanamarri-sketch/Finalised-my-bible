@@ -22,10 +22,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import com.example.mybible.ui.theme.FontTestLab
-import com.example.mybible.ui.theme.notoSerifOrTestFontFamily
+import com.example.mybible.ui.theme.NotoSerifFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mybible.model.NoteItem
@@ -111,11 +109,8 @@ fun NoteReaderScreen(
                     modifier = Modifier.clickable(onClick = onBack)
                 )
                 Text(
-                    text = noteItem.title.ifBlank { "Untitled note" }.let {
-                        if (FontTestLab.noteTitleUppercase) it.uppercase() else it
-                    },
+                    text = noteItem.title.ifBlank { "Untitled note" }.uppercase(),
                     fontSize = 17.sp,
-                    fontWeight = if (FontTestLab.noteTitleBold) FontWeight.Bold else FontWeight.Normal,
                     fontFamily = WorkSansFontFamily,
                     color = MaterialTheme.colorScheme.tertiary,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -195,9 +190,9 @@ fun NoteReaderScreen(
                     text = noteItem.text,
                     onMentionClick = { b, c, v -> onOpenVerseMention?.invoke(b, c, v) },
                     style = androidx.compose.ui.text.TextStyle(
-                        fontFamily = notoSerifOrTestFontFamily,
-                        fontSize = com.example.mybible.ui.theme.FontTestLab.readerFontSizeSp.sp,
-                        lineHeight = (com.example.mybible.ui.theme.FontTestLab.readerFontSizeSp * com.example.mybible.ui.theme.FontTestLab.readerLineHeightMultiplier).sp,
+                        fontFamily = NotoSerifFontFamily,
+                        fontSize = 19.sp,
+                        lineHeight = 34.39.sp, // 19sp * 1.81x, tuned via the Notes Font Lab
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 )

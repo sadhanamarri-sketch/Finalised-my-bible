@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.sp
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.components.BackTopBar
-import com.example.mybible.ui.theme.literataOrTestFontFamily
+import com.example.mybible.ui.theme.LiterataFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
 
 /**
@@ -127,7 +127,7 @@ fun CrossReferenceScreen(
                         Text(
                             text = verse.text,
                             fontSize = 17.sp,
-                            fontFamily = literataOrTestFontFamily,
+                            fontFamily = LiterataFontFamily,
                             lineHeight = 24.sp,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -231,7 +231,7 @@ fun CrossReferenceScreen(
                                         Text(
                                             text = item.previewText,
                                             fontSize = 15.sp,
-                                            fontFamily = literataOrTestFontFamily,
+                                            fontFamily = LiterataFontFamily,
                                             lineHeight = 21.sp,
                                             color = MaterialTheme.colorScheme.onSurface
                                         )

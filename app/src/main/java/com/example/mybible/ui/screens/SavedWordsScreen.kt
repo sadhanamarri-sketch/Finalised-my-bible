@@ -32,7 +32,7 @@ import com.example.mybible.model.SavedWordLanguage
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.components.BackTopBar
 import com.example.mybible.ui.theme.FrauncesFontFamily
-import com.example.mybible.ui.theme.literataOrTestFontFamily
+import com.example.mybible.ui.theme.LiterataFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
 import kotlinx.coroutines.delay
 
@@ -205,7 +205,7 @@ fun SavedWordsScreen(
                                     Text(
                                         text = saved.word,
                                         fontSize = 14.sp,
-                                        fontFamily = literataOrTestFontFamily,
+                                        fontFamily = LiterataFontFamily,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
@@ -213,7 +213,7 @@ fun SavedWordsScreen(
                                     Text(
                                         text = saved.transliteration,
                                         fontSize = 13.5.sp,
-                                        fontFamily = literataOrTestFontFamily,
+                                        fontFamily = LiterataFontFamily,
                                         fontStyle = FontStyle.Italic,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         modifier = Modifier.padding(top = 2.dp)
@@ -223,7 +223,7 @@ fun SavedWordsScreen(
                                 Text(
                                     text = translation,
                                     fontSize = 19.sp,
-                                    fontFamily = literataOrTestFontFamily,
+                                    fontFamily = LiterataFontFamily,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.tertiary,
                                     modifier = Modifier.padding(top = if (isForeign) 4.dp else 0.dp)

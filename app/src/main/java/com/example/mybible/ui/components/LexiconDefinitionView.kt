@@ -36,7 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mybible.data.LexiconDefinitionFormatter
 import com.example.mybible.data.ScriptureRefResolver
-import com.example.mybible.ui.theme.literataOrTestFontFamily
+import com.example.mybible.ui.theme.LiterataFontFamily
 
 private const val REF_ANNOTATION_TAG = "lexiconVerseRef"
 
@@ -206,7 +206,7 @@ fun LexiconDefinitionText(
                 Text(
                     text = if (scholarlyDetailsExpanded) "Hide scholarly details" else "Show scholarly details",
                     fontSize = 12.5.sp,
-                    fontFamily = literataOrTestFontFamily,
+                    fontFamily = LiterataFontFamily,
                     fontWeight = FontWeight.SemiBold,
                     color = refColor
                 )
@@ -227,7 +227,7 @@ fun LexiconDefinitionText(
                         text = line.text,
                         fontSize = 15.sp,
                         fontStyle = FontStyle.Italic,
-                        fontFamily = literataOrTestFontFamily,
+                        fontFamily = LiterataFontFamily,
                         color = bodyColor,
                         modifier = Modifier.padding(bottom = 10.dp)
                     )
@@ -238,7 +238,7 @@ fun LexiconDefinitionText(
                         text = line.text,
                         style = TextStyle(
                             fontSize = 14.5.sp,
-                            fontFamily = literataOrTestFontFamily,
+                            fontFamily = LiterataFontFamily,
                             fontStyle = FontStyle.Italic,
                             lineHeight = 21.sp,
                             color = bodyColor.copy(alpha = 0.85f)
@@ -257,7 +257,7 @@ fun LexiconDefinitionText(
                             Text(
                                 text = line.numeral,
                                 fontSize = 13.sp,
-                                fontFamily = literataOrTestFontFamily,
+                                fontFamily = LiterataFontFamily,
                                 letterSpacing = 1.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.tertiary,
@@ -265,7 +265,7 @@ fun LexiconDefinitionText(
                             )
                             RefText(
                                 text = line.body,
-                                style = TextStyle(fontSize = 16.sp, fontFamily = literataOrTestFontFamily, lineHeight = 23.sp, fontWeight = FontWeight.Medium, color = bodyColor),
+                                style = TextStyle(fontSize = 16.sp, fontFamily = LiterataFontFamily, lineHeight = 23.sp, fontWeight = FontWeight.Medium, color = bodyColor),
                                 refColor = refColor,
                                 onReferenceClick = onReferenceClick
                             )
@@ -278,14 +278,14 @@ fun LexiconDefinitionText(
                         Text(
                             text = "${line.number}.",
                             fontSize = 16.sp,
-                            fontFamily = literataOrTestFontFamily,
+                            fontFamily = LiterataFontFamily,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(end = 7.dp)
                         )
                         RefText(
                             text = line.body,
-                            style = TextStyle(fontSize = 16.sp, fontFamily = literataOrTestFontFamily, lineHeight = 23.sp, color = bodyColor),
+                            style = TextStyle(fontSize = 16.sp, fontFamily = LiterataFontFamily, lineHeight = 23.sp, color = bodyColor),
                             refColor = refColor,
                             onReferenceClick = onReferenceClick
                         )
@@ -297,14 +297,14 @@ fun LexiconDefinitionText(
                         Text(
                             text = "(${line.label})",
                             fontSize = 15.sp,
-                            fontFamily = literataOrTestFontFamily,
+                            fontFamily = LiterataFontFamily,
                             fontWeight = FontWeight.SemiBold,
                             color = bodyColor,
                             modifier = Modifier.padding(end = 6.dp)
                         )
                         RefText(
                             text = line.body,
-                            style = TextStyle(fontSize = 15.sp, fontFamily = literataOrTestFontFamily, lineHeight = 22.sp, color = bodyColor),
+                            style = TextStyle(fontSize = 15.sp, fontFamily = LiterataFontFamily, lineHeight = 22.sp, color = bodyColor),
                             refColor = refColor,
                             onReferenceClick = onReferenceClick
                         )
@@ -316,7 +316,7 @@ fun LexiconDefinitionText(
                         Text(
                             text = "SYNONYMS",
                             fontSize = 11.sp,
-                            fontFamily = literataOrTestFontFamily,
+                            fontFamily = LiterataFontFamily,
                             letterSpacing = 1.sp,
                             fontWeight = FontWeight.Bold,
                             color = labelColor
@@ -324,7 +324,7 @@ fun LexiconDefinitionText(
                         Spacer(Modifier.height(4.dp))
                         RefText(
                             text = line.body,
-                            style = TextStyle(fontSize = 14.sp, fontFamily = literataOrTestFontFamily, lineHeight = 20.sp, color = bodyColor.copy(alpha = 0.85f)),
+                            style = TextStyle(fontSize = 14.sp, fontFamily = LiterataFontFamily, lineHeight = 20.sp, color = bodyColor.copy(alpha = 0.85f)),
                             refColor = refColor,
                             onReferenceClick = onReferenceClick
                         )
@@ -335,7 +335,7 @@ fun LexiconDefinitionText(
                     if (idx > 0) Spacer(Modifier.height(8.dp))
                     RefText(
                         text = line.text,
-                        style = TextStyle(fontSize = 16.sp, fontFamily = literataOrTestFontFamily, lineHeight = 23.sp, color = bodyColor),
+                        style = TextStyle(fontSize = 16.sp, fontFamily = LiterataFontFamily, lineHeight = 23.sp, color = bodyColor),
                         refColor = refColor,
                         onReferenceClick = onReferenceClick
                     )

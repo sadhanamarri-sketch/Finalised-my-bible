@@ -38,7 +38,7 @@ import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.components.BackTopBar
 import com.example.mybible.ui.components.DsSwitch
-import com.example.mybible.ui.theme.literataOrTestFontFamily
+import com.example.mybible.ui.theme.LiterataFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
 
 @Composable
@@ -527,7 +527,7 @@ private fun SearchResultCard(
                 Text(
                     text = verse.text,
                     fontSize = 15.sp,
-                    fontFamily = literataOrTestFontFamily,
+                    fontFamily = LiterataFontFamily,
                     lineHeight = 21.sp,
                     color = MaterialTheme.colorScheme.onSurface
                 )

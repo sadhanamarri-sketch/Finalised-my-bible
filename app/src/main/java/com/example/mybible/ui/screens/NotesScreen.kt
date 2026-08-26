@@ -34,8 +34,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
-import com.example.mybible.ui.theme.FontTestLab
-import com.example.mybible.ui.theme.notoSerifOrTestFontFamily
+import com.example.mybible.ui.theme.NotoSerifFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -325,11 +324,8 @@ fun NotesScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = note.title.ifBlank { "Untitled note" }.let {
-                                        if (FontTestLab.noteTitleUppercase) it.uppercase() else it
-                                    },
+                                    text = note.title.ifBlank { "Untitled note" }.uppercase(),
                                     fontSize = 15.sp,
-                                    fontWeight = if (FontTestLab.noteTitleBold) FontWeight.Bold else FontWeight.Normal,
                                     fontFamily = WorkSansFontFamily,
                                     color = MaterialTheme.colorScheme.tertiary,
                                     modifier = Modifier.weight(1f)
@@ -395,9 +391,9 @@ fun NotesScreen(
                             // NoteReaderScreen's use of LinkifiedNoteText.
                             Text(
                                 text = note.text,
-                                fontFamily = notoSerifOrTestFontFamily,
-                                fontSize = com.example.mybible.ui.theme.FontTestLab.listPreviewFontSizeSp.sp,
-                                lineHeight = (com.example.mybible.ui.theme.FontTestLab.listPreviewFontSizeSp * com.example.mybible.ui.theme.FontTestLab.listPreviewLineHeightMultiplier).sp,
+                                fontFamily = NotoSerifFontFamily,
+                                fontSize = 18.sp,
+                                lineHeight = 32.94.sp, // 18sp * 1.83x, tuned via the Notes Font Lab
                                 letterSpacing = 0.sp,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 3,
