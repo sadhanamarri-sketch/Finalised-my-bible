@@ -526,9 +526,9 @@ private fun SearchResultCard(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = verse.text,
-                    fontSize = 15.sp,
+                    fontSize = 17.sp,
                     fontFamily = LiterataFontFamily,
-                    lineHeight = 21.sp,
+                    lineHeight = 24.sp,
                     color = MaterialTheme.colorScheme.onSurface
                 )
             }
