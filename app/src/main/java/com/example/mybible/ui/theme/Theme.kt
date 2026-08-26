@@ -132,7 +132,10 @@ private val ClassicDarkColorScheme = darkColorScheme(
     // moved on request from the original --accent (#E0836F) to this tone.
     primary = Color(0xFFE2694F),
     onPrimary = Color(0xFF1C1A17),         // --paper (dark text on the lighter coral accent)
-    primaryContainer = Color(0xFFA8503D),  // --accent-solid
+    // Was --accent-solid (#A8503D), tuned to the old #E0836F primary.
+    // Shifted to the same lightness/saturation ratio applied to the new
+    // primary's hue, keeping the same "deeper solid" relationship.
+    primaryContainer = Color(0xFF9E4532),
     onPrimaryContainer = Color(0xFFFFF3EC),
     secondary = Color(0xFF9BC2A0),         // no Capacitor equivalent — see doc above
     onSecondary = Color(0xFF15381F),
