@@ -34,7 +34,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
-import com.example.mybible.ui.theme.NotoSerifFontFamily
+import com.example.mybible.ui.theme.notoSerifOrTestFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -392,9 +392,9 @@ fun NotesScreen(
                             // NoteReaderScreen's use of LinkifiedNoteText.
                             Text(
                                 text = note.text,
-                                fontFamily = NotoSerifFontFamily,
-                                fontSize = 14.sp,
-                                lineHeight = 20.sp,
+                                fontFamily = notoSerifOrTestFontFamily,
+                                fontSize = com.example.mybible.ui.theme.FontTestLab.listPreviewFontSizeSp.sp,
+                                lineHeight = (com.example.mybible.ui.theme.FontTestLab.listPreviewFontSizeSp * com.example.mybible.ui.theme.FontTestLab.listPreviewLineHeightMultiplier).sp,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 3,
                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,

@@ -23,7 +23,7 @@ import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.components.BackTopBar
 import com.example.mybible.ui.components.LexiconDefinitionText
-import com.example.mybible.ui.theme.LiterataFontFamily
+import com.example.mybible.ui.theme.literataOrTestFontFamily
 
 /**
  * Full-page Greek word lexicon lookup, replacing the old GreekWordSheet
@@ -232,7 +232,7 @@ private fun LexiconWordPageContent(
             Text(
                 text = gloss,
                 fontSize = 17.sp,
-                fontFamily = LiterataFontFamily,
+                fontFamily = literataOrTestFontFamily,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(top = 10.dp)
