@@ -432,15 +432,15 @@ fun NoteEditorScreen(
                     Text(
                         text = "Write your note\u2026",
                         fontFamily = NotoSerifFontFamily,
-                        fontSize = 18.sp,
+                        fontSize = 19.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
                     Text(
                         text = text,
                         fontFamily = NotoSerifFontFamily,
-                        fontSize = 18.sp,
-                        lineHeight = 27.sp,
+                        fontSize = 19.sp,
+                        lineHeight = 34.39.sp,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
@@ -560,8 +560,8 @@ private fun NoteTextFullScreenEditor(
                     onValueChange = { draft = it },
                     textStyle = androidx.compose.ui.text.TextStyle(
                         fontFamily = NotoSerifFontFamily,
-                        fontSize = 18.sp,
-                        lineHeight = 29.sp,
+                        fontSize = 19.sp,
+                        lineHeight = 34.39.sp,
                         color = MaterialTheme.colorScheme.onSurface
                     ),
                     cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
@@ -574,7 +574,7 @@ private fun NoteTextFullScreenEditor(
                     Text(
                         text = "Write your note\u2026",
                         fontFamily = NotoSerifFontFamily,
-                        fontSize = 18.sp,
+                        fontSize = 19.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
                     )
