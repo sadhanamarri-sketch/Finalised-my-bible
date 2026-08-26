@@ -329,8 +329,9 @@ fun VerseMentionPreviewSheet(
             Spacer(modifier = Modifier.height(10.dp))
             Text(
                 text = verseText ?: "Loading\u2026",
-                fontSize = 15.sp,
+                fontSize = 17.sp,
                 fontFamily = LiterataFontFamily,
+                lineHeight = 24.sp,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(18.dp))
