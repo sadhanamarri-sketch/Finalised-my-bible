@@ -154,6 +154,7 @@ fun CrossReferenceScreen(
                             text = "No cross references found for this verse",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontFamily = WorkSansFontFamily,
+                            letterSpacing = 0.sp,
                             fontSize = 14.sp
                         )
                     }

@@ -174,6 +174,7 @@ fun NotesScreen(
                         textStyle = TextStyle(
                             fontFamily = WorkSansFontFamily,
                             fontSize = 16.sp,
+                            letterSpacing = 0.sp,
                             color = MaterialTheme.colorScheme.onSurface
                         ),
                         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
@@ -185,6 +186,7 @@ fun NotesScreen(
                             text = "Search notes\u2026",
                             fontSize = 16.sp,
                             fontFamily = WorkSansFontFamily,
+                            letterSpacing = 0.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -327,6 +329,7 @@ fun NotesScreen(
                                     text = note.title.ifBlank { "Untitled note" }.uppercase(),
                                     fontSize = 15.sp,
                                     fontFamily = WorkSansFontFamily,
+                                    letterSpacing = 0.sp,
                                     color = MaterialTheme.colorScheme.tertiary,
                                     modifier = Modifier.weight(1f)
                                 )

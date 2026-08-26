@@ -122,12 +122,14 @@ fun TagsScreen(
                                 text = tag.name,
                                 fontSize = 16.5.sp,
                                 fontFamily = WorkSansFontFamily,
+                                letterSpacing = 0.sp,
                                 color = MaterialTheme.colorScheme.tertiary
                             )
                             Text(
                                 text = tag.description.ifBlank { "No description" },
                                 fontSize = 13.5.sp,
                                 fontFamily = WorkSansFontFamily,
+                                letterSpacing = 0.sp,
                                 fontStyle = if (tag.description.isBlank()) FontStyle.Italic else FontStyle.Normal,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 2,

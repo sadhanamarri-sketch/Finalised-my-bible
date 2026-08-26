@@ -254,7 +254,7 @@ fun SearchScreen(
                     // rather than a solid Material surface-tint fill.
                     AssistChip(
                         onClick = { viewModel.searchFromHistory(term) },
-                        label = { Text(term, fontSize = 13.sp, fontFamily = WorkSansFontFamily) },
+                        label = { Text(term, fontSize = 13.sp, fontFamily = WorkSansFontFamily, letterSpacing = 0.sp) },
                         leadingIcon = {
                             Icon(
                                 Icons.Default.History,
@@ -297,6 +297,7 @@ fun SearchScreen(
             },
             fontSize = 13.sp,
             fontFamily = WorkSansFontFamily,
+            letterSpacing = 0.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
@@ -317,6 +318,7 @@ fun SearchScreen(
                     text = "Case-sensitive",
                     fontSize = 13.sp,
                     fontFamily = WorkSansFontFamily,
+                    letterSpacing = 0.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.width(6.dp))
@@ -332,6 +334,7 @@ fun SearchScreen(
                     text = "Extensive search",
                     fontSize = 13.sp,
                     fontFamily = WorkSansFontFamily,
+                    letterSpacing = 0.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.width(6.dp))
@@ -383,6 +386,7 @@ fun SearchScreen(
                     text = if (searchQuery.isBlank()) "Type a keyword (e.g., 'love', 'faith') or a reference (e.g., 'John 3', 'John 3:16') to search" else "No matching verses found",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontFamily = WorkSansFontFamily,
+                    letterSpacing = 0.sp,
                     fontSize = 14.sp
                 )
             }
@@ -426,6 +430,7 @@ private fun SearchSuggestions(
                 text = "Showing results for “$correctedQuery”",
                 fontSize = 13.sp,
                 fontFamily = WorkSansFontFamily,
+                letterSpacing = 0.sp,
                 fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp)

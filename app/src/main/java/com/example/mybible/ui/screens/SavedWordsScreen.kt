@@ -118,7 +118,7 @@ fun SavedWordsScreen(
                         // that.
                         icon = {}
                     ) {
-                        Text(label, fontFamily = WorkSansFontFamily)
+                        Text(label, fontFamily = WorkSansFontFamily, letterSpacing = 0.sp)
                     }
                 }
             }
@@ -132,6 +132,7 @@ fun SavedWordsScreen(
                         text = "No saved words yet. Tap the star icon on a word's lookup (Greek, Hebrew, or English) to save it here.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontFamily = WorkSansFontFamily,
+                        letterSpacing = 0.sp,
                         fontSize = 14.sp,
                         textAlign = TextAlign.Center
                     )
@@ -145,6 +146,7 @@ fun SavedWordsScreen(
                         text = "No saved ${selectedLanguage.name.lowercase().replaceFirstChar { it.uppercase() }} words yet.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontFamily = WorkSansFontFamily,
+                        letterSpacing = 0.sp,
                         fontSize = 14.sp,
                         textAlign = TextAlign.Center
                     )
@@ -233,6 +235,7 @@ fun SavedWordsScreen(
                                         text = "${saved.sourceBook} ${saved.sourceChapter}:${saved.sourceVerse}",
                                         fontSize = 12.sp,
                                         fontFamily = WorkSansFontFamily,
+                                        letterSpacing = 0.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
@@ -260,7 +263,7 @@ fun SavedWordsScreen(
                                     onDismissRequest = { showMenu = false }
                                 ) {
                                     DropdownMenuItem(
-                                        text = { Text("Open in Reader", fontFamily = WorkSansFontFamily) },
+                                        text = { Text("Open in Reader", fontFamily = WorkSansFontFamily, letterSpacing = 0.sp) },
                                         leadingIcon = { Icon(Icons.Default.Book, contentDescription = null) },
                                         enabled = hasSourceVerse,
                                         onClick = {
@@ -269,7 +272,7 @@ fun SavedWordsScreen(
                                         }
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Delete", color = MaterialTheme.colorScheme.error, fontFamily = WorkSansFontFamily) },
+                                        text = { Text("Delete", color = MaterialTheme.colorScheme.error, fontFamily = WorkSansFontFamily, letterSpacing = 0.sp) },
                                         leadingIcon = {
                                             Icon(
                                                 Icons.Default.Delete,
@@ -298,7 +301,7 @@ fun SavedWordsScreen(
         AlertDialog(
             onDismissRequest = { wordPendingDelete = null },
             title = { Text("Remove “${deleteTarget.word}”?", fontFamily = FrauncesFontFamily) },
-            text = { Text("This can't be undone.", fontFamily = WorkSansFontFamily) },
+            text = { Text("This can't be undone.", fontFamily = WorkSansFontFamily, letterSpacing = 0.sp) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -306,11 +309,11 @@ fun SavedWordsScreen(
                         wordPendingDelete = null
                     }
                 ) {
-                    Text("Remove", color = MaterialTheme.colorScheme.error, fontFamily = WorkSansFontFamily)
+                    Text("Remove", color = MaterialTheme.colorScheme.error, fontFamily = WorkSansFontFamily, letterSpacing = 0.sp)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { wordPendingDelete = null }) { Text("Cancel", fontFamily = WorkSansFontFamily) }
+                TextButton(onClick = { wordPendingDelete = null }) { Text("Cancel", fontFamily = WorkSansFontFamily, letterSpacing = 0.sp) }
             }
         )
     }

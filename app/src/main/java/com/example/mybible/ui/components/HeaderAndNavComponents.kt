@@ -259,7 +259,7 @@ fun BookChapterPickerSheet(
                     onClick = onDismiss,
                     modifier = Modifier.testTag("picker_close")
                 ) {
-                    Text("Close", fontSize = 14.5.sp, fontFamily = WorkSansFontFamily, color = MaterialTheme.colorScheme.primary)
+                    Text("Close", fontSize = 14.5.sp, fontFamily = WorkSansFontFamily, letterSpacing = 0.sp, color = MaterialTheme.colorScheme.primary)
                 }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -309,6 +309,7 @@ internal fun BookListStep(
             text = "${BOOK_CHAPTER_COUNTS[book] ?: 1} ch",
             fontSize = 13.5.sp,
             fontFamily = WorkSansFontFamily,
+            letterSpacing = 0.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
@@ -347,6 +348,7 @@ internal fun BookListStep(
                     text = book,
                     fontSize = 17.sp,
                     fontFamily = WorkSansFontFamily,
+                    letterSpacing = 0.sp,
                     fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
                     color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
                 )
@@ -385,6 +387,7 @@ internal fun ChapterGridStep(
             text = "$chap",
             fontSize = 15.5.sp,
             fontFamily = WorkSansFontFamily,
+            letterSpacing = 0.sp,
             color = MaterialTheme.colorScheme.onBackground
         )
     }
@@ -398,6 +401,7 @@ internal fun ChapterGridStep(
             text = "\u2039 All books",
             fontSize = 14.5.sp,
             fontFamily = WorkSansFontFamily,
+            letterSpacing = 0.sp,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier
                 .clickable(onClick = onBack)
@@ -459,6 +463,7 @@ internal fun VerseGridStep(
             text = "$verse",
             fontSize = 15.5.sp,
             fontFamily = WorkSansFontFamily,
+            letterSpacing = 0.sp,
             color = MaterialTheme.colorScheme.onBackground
         )
     }
@@ -481,6 +486,7 @@ internal fun VerseGridStep(
             text = "\u2039 $bookName",
             fontSize = 14.5.sp,
             fontFamily = WorkSansFontFamily,
+            letterSpacing = 0.sp,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier
                 .clickable(onClick = onBack)
@@ -492,6 +498,7 @@ internal fun VerseGridStep(
                 text = "Start of chapter",
                 fontSize = 17.sp,
                 fontFamily = WorkSansFontFamily,
+                letterSpacing = 0.sp,
                 color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -506,6 +513,7 @@ internal fun VerseGridStep(
                 text = "Loading verses\u2026",
                 fontSize = 14.sp,
                 fontFamily = WorkSansFontFamily,
+                letterSpacing = 0.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp)
             )
@@ -513,6 +521,7 @@ internal fun VerseGridStep(
                 text = "Verse numbers need this chapter downloaded first \u2014 tap Start of chapter above.",
                 fontSize = 14.sp,
                 fontFamily = WorkSansFontFamily,
+                letterSpacing = 0.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp)
             )

@@ -178,6 +178,7 @@ fun EnglishDictionarySheet(
                     text = entry!!.phonetic!!,
                     fontSize = 14.sp,
                     fontFamily = WorkSansFontFamily,
+                    letterSpacing = 0.sp,
                     fontStyle = FontStyle.Italic,
                     color = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
@@ -192,6 +193,7 @@ fun EnglishDictionarySheet(
                     text = "Showing definition for \"${entry.resolvedFrom}\"",
                     fontSize = 13.sp,
                     fontFamily = WorkSansFontFamily,
+                    letterSpacing = 0.sp,
                     fontStyle = FontStyle.Italic,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
@@ -214,6 +216,7 @@ fun EnglishDictionarySheet(
                     text = "No definition found for '$word'.",
                     fontSize = 14.sp,
                     fontFamily = WorkSansFontFamily,
+                    letterSpacing = 0.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 16.dp)
                 )
@@ -275,7 +278,7 @@ fun EnglishDictionarySheet(
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Close", fontFamily = WorkSansFontFamily)
+                Text("Close", fontFamily = WorkSansFontFamily, letterSpacing = 0.sp)
             }
         }
     }
@@ -323,6 +326,7 @@ fun VerseMentionPreviewSheet(
                 text = "$book $chapter:$verse".uppercase(),
                 fontSize = 16.sp,
                 fontFamily = WorkSansFontFamily,
+                letterSpacing = 0.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.tertiary
             )
@@ -339,14 +343,14 @@ fun VerseMentionPreviewSheet(
                 onClick = onOpenInReader,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Open in Reader", fontFamily = WorkSansFontFamily)
+                Text("Open in Reader", fontFamily = WorkSansFontFamily, letterSpacing = 0.sp)
             }
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedButton(
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Close", fontFamily = WorkSansFontFamily)
+                Text("Close", fontFamily = WorkSansFontFamily, letterSpacing = 0.sp)
             }
         }
     }

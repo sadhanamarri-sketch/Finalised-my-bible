@@ -102,7 +102,7 @@ fun HighlightedVersesScreen(
                         FilterChip(
                             selected = selected,
                             onClick = { selectedColor = color },
-                            label = { Text(color, fontFamily = WorkSansFontFamily) },
+                            label = { Text(color, fontFamily = WorkSansFontFamily, letterSpacing = 0.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                                 // Classic Dark's primaryContainer (accent-solid,
@@ -133,6 +133,7 @@ fun HighlightedVersesScreen(
                     Text(
                         text = if (highlights.isEmpty()) "No highlighted verses" else "No verses for this color",
                         fontFamily = WorkSansFontFamily,
+                        letterSpacing = 0.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -200,6 +201,7 @@ private fun HighlightedVerseRow(
                     text = item.noteText.let { if (it.length > 90) it.take(89) + "…" else it },
                     fontSize = 13.sp,
                     fontFamily = WorkSansFontFamily,
+                    letterSpacing = 0.sp,
                     fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp)

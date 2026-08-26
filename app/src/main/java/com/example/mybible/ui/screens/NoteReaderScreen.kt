@@ -112,6 +112,7 @@ fun NoteReaderScreen(
                     text = noteItem.title.ifBlank { "Untitled note" }.uppercase(),
                     fontSize = 17.sp,
                     fontFamily = WorkSansFontFamily,
+                    letterSpacing = 0.sp,
                     color = MaterialTheme.colorScheme.tertiary,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     maxLines = 1,

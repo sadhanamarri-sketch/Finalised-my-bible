@@ -226,6 +226,7 @@ fun NoteEditorScreen(
                                 text = "${ref.book} ${ref.chapter}:${ref.verse}",
                                 fontSize = 13.5.sp,
                                 fontFamily = WorkSansFontFamily,
+                                letterSpacing = 0.sp,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier
                                     .clickable {
