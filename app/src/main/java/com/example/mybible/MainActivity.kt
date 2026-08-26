@@ -19,8 +19,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.mybible.model.SavedWordItem
 import com.example.mybible.model.SavedWordLanguage
@@ -389,6 +392,23 @@ class MainActivity : ComponentActivity() {
             }
 
             MyBibleTheme(themeMode = themeMode) {
+                // Status/navigation bar icons default to the system's own
+                // dark/light setting (via enableEdgeToEdge() above), not
+                // this app's own theme choice — so picking a light theme
+                // (Paper/Sepia/Light) while the phone itself is in system
+                // dark mode left white status bar icons invisible against
+                // the app's light background, and vice versa. Recompute
+                // icon color from the *actual* resolved background every
+                // time the theme changes instead.
+                val view = LocalView.current
+                val isLightBackground = MaterialTheme.colorScheme.background.luminance() > 0.5f
+                SideEffect {
+                    val window = (view.context as? android.app.Activity)?.window ?: return@SideEffect
+                    val insetsController = WindowCompat.getInsetsController(window, view)
+                    insetsController.isAppearanceLightStatusBars = isLightBackground
+                    insetsController.isAppearanceLightNavigationBars = isLightBackground
+                }
+
                 // No Scaffold topBar/bottomBar at the app level anymore.
                 // Reader supplies its own floating pill and owns the full
                 // screen edge-to-edge (see ReaderScreen) — there's no bar
