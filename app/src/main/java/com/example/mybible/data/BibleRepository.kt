@@ -855,7 +855,18 @@ class BibleRepository(private val context: Context) {
     // and short-circuits straight to that chapter/verse instead of doing a
     // text search — this is what powers the reference examples shown in the
     // search box's placeholder text.
-    suspend fun searchBible(query: String, caseSensitive: Boolean = false): SearchOutcome = withContext(Dispatchers.IO) {
+    // extensiveSearch is the opt-in "Extensive search" toggle (mutually
+    // exclusive with caseSensitive in the UI — see MainViewModel) that
+    // brings back typo-correction and root-word ("also try") suggestions.
+    // Both were dropped by default because they required building a
+    // dictionary of every distinct word in the KJV — a scan over all
+    // ~31,000 verses' text that made the first single-word search of a
+    // session noticeably slow for a feature most searches never needed.
+    // Making it opt-in means only someone who actually wants typo
+    // tolerance pays that cost, and getKjvWordIndex is itself now bucketed
+    // by word length (see its doc) so even the recurring per-miss cost of
+    // leaving this on is much smaller than the original implementation.
+    suspend fun searchBible(query: String, caseSensitive: Boolean = false, extensiveSearch: Boolean = false): SearchOutcome = withContext(Dispatchers.IO) {
         val q = query.trim()
         if (q.length < 2) return@withContext SearchOutcome()
 
@@ -871,21 +882,59 @@ class BibleRepository(private val context: Context) {
             return@withContext SearchOutcome(mainResults = legacyFallbackSearch(q, caseSensitive))
         }
 
-        // Typo-correction and root-word ("also try") suggestions used to
-        // live here, but both required building a dictionary of every
-        // distinct word in the KJV (getKjvWordSet, since removed) — a
-        // one-time scan over all ~31,000 verses' text that made the first
-        // single-word search of a session noticeably slow. Dropped
-        // entirely in favor of a plain, fast substring search: "love"
-        // already matches "loved"/"loving"/"loveth" as substrings with no
-        // extra lookup needed.
         val words = q.split(Regex("\\s+")).filter { it.isNotBlank() }
-        val mainResults = if (words.size > 1) {
-            searchCombination(words, caseSensitive)
-        } else {
-            searchAnyTerm(q, caseSensitive)
+        val isSingleWord = words.size == 1 && words[0].all { it.isLetter() }
+
+        // Case-sensitive mode is a precise/literal mode — deliberately
+        // skips typo-correction and root-word suggestions entirely rather
+        // than trying to make them case-aware, since both work by
+        // lowercasing whatever was typed. The UI already makes this and
+        // extensiveSearch mutually exclusive, but a multi-word phrase (or
+        // a query that isn't a single plain word) never had these
+        // enhancements either way regardless of the toggle.
+        if (!extensiveSearch || caseSensitive || !isSingleWord) {
+            val mainResults = if (words.size > 1) {
+                searchCombination(words, caseSensitive)
+            } else {
+                searchAnyTerm(q, caseSensitive)
+            }
+            return@withContext SearchOutcome(mainResults = mainResults)
         }
-        SearchOutcome(mainResults = mainResults)
+
+        val index = getKjvWordIndex()
+        val lowerQ = q.lowercase()
+        val corrected = correctTypo(lowerQ, index)
+        val effectiveWord = corrected ?: lowerQ
+
+        // Main results are a plain single-word search — substring matching
+        // on its own already surfaces most inflected forms for free
+        // ("love" matches "loved"/"loving"/"loveth" as substrings), so
+        // there's no need to OR in extra generated terms here. Root-word
+        // suggestions are offered as tappable chips instead (see
+        // SearchScreen) — tapping one runs a fresh search for that exact
+        // word rather than this search eagerly running (and displaying
+        // results for) every variant up front.
+        val mainResults = searchAnyTerm(effectiveWord, caseSensitive)
+        // Filtered against the same real-word dictionary used for typo-
+        // correction: stripToRoots generates candidates mechanically (e.g.
+        // "loved" -> "lov", dropping the "ed" without restoring the silent
+        // "e" it needs), and only some of them are real words — a chip
+        // offering "lov" as a suggestion looks broken in a way a discarded
+        // internal search term never would.
+        val variantSuggestions = (stripToRoots(effectiveWord) - effectiveWord).filter { it in index.allWords }
+
+        SearchOutcome(correctedQuery = corrected, mainResults = mainResults, variantSuggestions = variantSuggestions)
+    }
+
+    // Background warm-up for the "Extensive search" toggle — called the
+    // moment it's switched on (see MainViewModel.setSearchExtensiveSearch)
+    // so the index is often already built by the time the user actually
+    // runs a search, rather than that search itself paying the one-time
+    // cost. getKjvWordIndex's own mutex means a search that *does* arrive
+    // before this finishes just suspends until this same build completes,
+    // rather than starting a redundant second one.
+    suspend fun prefetchExtensiveSearchIndex() {
+        withContext(Dispatchers.IO) { getKjvWordIndex() }
     }
 
     // AND search across every word in a multi-word query — a verse must
@@ -976,6 +1025,124 @@ class BibleRepository(private val context: Context) {
             )
         }
         return results
+    }
+
+    // Same archaic-suffix-stripping rules as lookupWebsterStem (see its doc)
+    // — reused here to offer a searched word's root form(s) as tappable
+    // "Also try" suggestions in Search (see SearchScreen), rather than
+    // silently folding every generated surface form into the results.
+    // Backward (strip-a-suffix) only, deliberately: substring matching on
+    // the word as typed already surfaces its own forward inflections for
+    // free ("love" matches "loved"/"loving" as substrings), so there's
+    // nothing to gain from also generating those — only stripping down to
+    // a root the typed word doesn't already contain as a substring (e.g.
+    // "walked" -> "walk", which "walking"/"walketh" don't literally
+    // contain) adds real reach.
+    private fun stripToRoots(word: String): Set<String> {
+        val roots = mutableSetOf(word)
+        when {
+            word.endsWith("ies") && word.length > 4 -> roots += word.dropLast(3) + "y"
+            word.endsWith("ves") && word.length > 4 -> {
+                roots += word.dropLast(3) + "f"
+                roots += word.dropLast(3) + "fe"
+            }
+            word.endsWith("ches") || word.endsWith("shes") || word.endsWith("xes") || word.endsWith("sses") ->
+                roots += word.dropLast(2)
+        }
+        if (word.endsWith("s") && !word.endsWith("ss") && word.length > 2) roots += word.dropLast(1)
+        if (word.endsWith("eth") && word.length > 4) {
+            roots += word.dropLast(3)
+            roots += word.dropLast(2)
+        }
+        if (word.endsWith("est") && word.length > 4) {
+            roots += word.dropLast(3)
+            roots += word.dropLast(2)
+        }
+        if (word.endsWith("ed") && word.length > 3) {
+            roots += word.dropLast(2)
+            roots += word.dropLast(2) + "e" // silent-e restore: loved -> lov -> love
+        }
+        if (word.endsWith("ing") && word.length > 4) {
+            roots += word.dropLast(3)
+            roots += word.dropLast(3) + "e" // silent-e restore: loving -> lov -> love
+        }
+        return roots
+    }
+
+    // Typo-tolerance's reference dictionary — every distinct word that
+    // actually appears in the KJV text, bucketed by length so correctTypo
+    // only has to scan candidates within striking distance of the typed
+    // word's length instead of the whole ~12-15k word set on every miss
+    // (a real typo/rare word never matches the dictionary exactly, so this
+    // is the recurring cost paid on every such search while "Extensive
+    // search" stays on — see searchBible's doc). Built once from Room and
+    // cached for the rest of the process's lifetime (the text never
+    // changes at runtime, so there's nothing to invalidate this cache).
+    // Guarded by a mutex rather than just a nullable cache var: a search
+    // that arrives while prefetchExtensiveSearchIndex's background build
+    // is still running must wait for that same build rather than kicking
+    // off a redundant second scan over all verse text.
+    private data class WordIndex(val byLength: Map<Int, List<String>>, val allWords: Set<String>)
+
+    private val kjvWordIndexMutex = Mutex()
+    private var kjvWordIndexCache: WordIndex? = null
+
+    private suspend fun getKjvWordIndex(): WordIndex = kjvWordIndexMutex.withLock {
+        kjvWordIndexCache?.let { return@withLock it }
+        val words = mutableSetOf<String>()
+        val wordRegex = Regex("[A-Za-z]+")
+        for (text in bibleDao.getAllVerseTexts()) {
+            for (m in wordRegex.findAll(text)) words += m.value.lowercase()
+        }
+        val index = WordIndex(byLength = words.groupBy { it.length }, allWords = words)
+        kjvWordIndexCache = index
+        index
+    }
+
+    private fun levenshteinDistance(a: String, b: String): Int {
+        val dp = Array(a.length + 1) { IntArray(b.length + 1) }
+        for (i in 0..a.length) dp[i][0] = i
+        for (j in 0..b.length) dp[0][j] = j
+        for (i in 1..a.length) {
+            for (j in 1..b.length) {
+                dp[i][j] = if (a[i - 1] == b[j - 1]) {
+                    dp[i - 1][j - 1]
+                } else {
+                    1 + minOf(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1])
+                }
+            }
+        }
+        return dp[a.length][b.length]
+    }
+
+    // Returns a correction only when the typed word isn't itself a
+    // recognized KJV word AND a close-enough match exists — a shorter max
+    // edit distance for short words avoids "correcting" one legitimate
+    // short word into another (e.g. "cat" -> "car" is 1 edit but almost
+    // certainly not a typo). Returns null (no correction) rather than
+    // guessing when nothing is close enough — a modern/non-KJV word should
+    // just search as typed and come back empty, not get mangled into an
+    // unrelated KJV word. Only scans dictionary buckets whose word length
+    // is within maxDistance of the typed word's — a word outside that
+    // range can never be within edit distance anyway, so there's no need
+    // to run the full O(n*m) Levenshtein comparison against it (or even
+    // look at it at all, unlike the original flat-set version of this).
+    private fun correctTypo(word: String, index: WordIndex): String? {
+        if (word in index.allWords) return null
+        val maxDistance = if (word.length <= 4) 1 else 2
+        var best: String? = null
+        var bestDistance = Int.MAX_VALUE
+        for (len in (word.length - maxDistance)..(word.length + maxDistance)) {
+            val candidates = index.byLength[len] ?: continue
+            for (candidate in candidates) {
+                val distance = levenshteinDistance(word, candidate)
+                if (distance < bestDistance) {
+                    bestDistance = distance
+                    best = candidate
+                }
+            }
+        }
+        return if (best != null && bestDistance <= maxDistance) best else null
     }
 
     private data class ParsedReference(val book: String, val chapter: Int, val verse: Int?)

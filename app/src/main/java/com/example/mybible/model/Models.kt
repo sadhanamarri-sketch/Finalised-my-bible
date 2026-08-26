@@ -93,24 +93,35 @@ data class Verse(
     val hebrewWords: List<HebrewWord>? = null
 )
 
-// BibleRepository.searchBible's full result. Not @Serializable: search
+// BibleRepository.searchBible's full result. variantSuggestions (root-word
+// forms, e.g. "walk" for a search of "walked") are shown as tappable chips
+// rather than eagerly searched and displayed — tapping one runs a fresh
+// search for that exact word (see SearchScreen). Not @Serializable: search
 // results are always freshly computed, never cached to disk like Verse
-// sometimes is.
+// sometimes is. correctedQuery is null when the typed word was already
+// recognized (or wasn't a single plain word to begin with, case-sensitive
+// mode was on, or "Extensive search" is off), so the UI only shows a
+// "Showing results for…" note when a real correction happened.
 //
-// Two enhancements were tried here and dropped, both for the same reason —
-// speed. A Strong's-number-based "related words" feature (words sharing a
-// Strong's number with the searched word) worked for Greek (NT) but Hebrew
-// (OT) Strong's numbers frequently lump unrelated homonyms together,
-// surfacing garbage like a proper name as a "related" suggestion with no
-// reliable way to filter it out. Typo-correction plus root-word ("also
-// try") suggestion chips worked correctly, but required building an
-// in-memory dictionary of every distinct word in the KJV on first use — a
-// one-time scan over all verse text that made the first single-word search
-// of a session noticeably slow, for a feature most searches never needed
-// (a plain substring search already surfaces "loved"/"loving" for a search
-// of "love" with no lookup at all).
+// Both correctedQuery and variantSuggestions are only ever populated when
+// the opt-in "Extensive search" toggle is on (see MainViewModel/
+// SearchScreen) — they require building an in-memory dictionary of every
+// distinct word in the KJV, a scan over all verse text expensive enough
+// that it's not worth paying by default for a feature most searches never
+// need (a plain substring search already surfaces "loved"/"loving" for a
+// search of "love" with no lookup at all).
+//
+// A separate Strong's-number-based "related words" feature (words sharing
+// a Strong's number with the searched word) was tried and dropped for a
+// different reason — Hebrew (OT) Strong's numbers frequently lump
+// unrelated homonyms together, surfacing garbage like a proper name as a
+// "related" suggestion with no reliable way to filter it out. That's a
+// data-quality problem the Extensive search toggle doesn't fix, so it
+// stays permanently out of scope rather than being offered behind it.
 data class SearchOutcome(
-    val mainResults: List<Verse> = emptyList()
+    val correctedQuery: String? = null,
+    val mainResults: List<Verse> = emptyList(),
+    val variantSuggestions: List<String> = emptyList()
 )
 
 @Serializable

@@ -675,11 +675,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _searchResults = MutableStateFlow<List<Verse>>(emptyList())
     val searchResults: StateFlow<List<Verse>> = _searchResults.asStateFlow()
 
+    // Root-word suggestion chips (see BibleRepository.stripToRoots) and the
+    // typo-corrected query (null unless a correction actually applied) —
+    // both empty/null together with searchResults on a fresh/cleared query,
+    // and always empty/null while searchExtensiveSearch is off. Tapping a
+    // chip re-searches via searchFromHistory below rather than this driving
+    // its own eagerly-fetched results.
+    private val _searchVariantSuggestions = MutableStateFlow<List<String>>(emptyList())
+    val searchVariantSuggestions: StateFlow<List<String>> = _searchVariantSuggestions.asStateFlow()
+
+    private val _searchCorrectedQuery = MutableStateFlow<String?>(null)
+    val searchCorrectedQuery: StateFlow<String?> = _searchCorrectedQuery.asStateFlow()
+
     private val _isSearching = MutableStateFlow(false)
     val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
 
     private val _searchCaseSensitive = MutableStateFlow(false)
     val searchCaseSensitive: StateFlow<Boolean> = _searchCaseSensitive.asStateFlow()
+
+    // Opt-in typo-tolerance + "also try" suggestions — off by default (see
+    // BibleRepository.searchBible's doc for why), mutually exclusive with
+    // searchCaseSensitive since the two can't both apply to the same
+    // search (see setSearchCaseSensitive/setSearchExtensiveSearch, which
+    // each turn the other off).
+    private val _searchExtensiveSearch = MutableStateFlow(false)
+    val searchExtensiveSearch: StateFlow<Boolean> = _searchExtensiveSearch.asStateFlow()
 
     // Scroll position of the search results list, saved/restored across tab
     // switches since SearchScreen is fully disposed (not just hidden) when
@@ -2269,13 +2289,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setSearchCaseSensitive(enabled: Boolean) {
         _searchCaseSensitive.value = enabled
+        // Mutually exclusive with Extensive search — see
+        // BibleRepository.searchBible's doc for why case-sensitive mode
+        // can't also run the typo-correction/suggestion pipeline.
+        if (enabled) _searchExtensiveSearch.value = false
+        runSearch()
+    }
+
+    fun setSearchExtensiveSearch(enabled: Boolean) {
+        _searchExtensiveSearch.value = enabled
+        if (enabled) {
+            _searchCaseSensitive.value = false
+            // Background warm-up: builds the typo-tolerance dictionary now
+            // rather than waiting for the next search to pay that cost —
+            // see BibleRepository.prefetchExtensiveSearchIndex's doc.
+            viewModelScope.launch { repository.prefetchExtensiveSearchIndex() }
+        }
         runSearch()
     }
 
     private suspend fun performSearch(query: String) {
         _isSearching.value = true
-        val outcome = repository.searchBible(query, caseSensitive = _searchCaseSensitive.value)
+        val outcome = repository.searchBible(
+            query,
+            caseSensitive = _searchCaseSensitive.value,
+            extensiveSearch = _searchExtensiveSearch.value
+        )
         _searchResults.value = outcome.mainResults
+        _searchVariantSuggestions.value = outcome.variantSuggestions
+        _searchCorrectedQuery.value = outcome.correctedQuery
         _isSearching.value = false
     }
 
@@ -2285,6 +2327,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (query.trim().length < 2) {
             _isSearching.value = false
             _searchResults.value = emptyList()
+            _searchVariantSuggestions.value = emptyList()
+            _searchCorrectedQuery.value = null
             return
         }
         searchJob = viewModelScope.launch {
@@ -2332,6 +2376,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         searchJob?.cancel()
         _searchQuery.value = ""
         _searchResults.value = emptyList()
+        _searchVariantSuggestions.value = emptyList()
+        _searchCorrectedQuery.value = null
         _isSearching.value = false
     }
 
@@ -2347,6 +2393,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         searchJob?.cancel()
         _searchQuery.value = ""
         _searchResults.value = emptyList()
+        _searchVariantSuggestions.value = emptyList()
+        _searchCorrectedQuery.value = null
         _isSearching.value = false
         _searchLastTappedKey.value = null
         _searchSourceVerse.value = null
