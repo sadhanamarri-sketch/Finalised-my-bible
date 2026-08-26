@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
+
 package com.example.mybible.ui.theme
 
 import androidx.compose.ui.text.font.Font
