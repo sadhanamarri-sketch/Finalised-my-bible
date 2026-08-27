@@ -70,21 +70,24 @@ private fun com.example.mybible.model.NoteItem.matchesVerse(book: String, chapte
     return this.book == book && this.chapter == chapter && this.verse == verse
 }
 
-// Detour-banner identities beyond the four M3 ColorScheme roles already
-// spoken for (primary=Cross References, secondary=Search, tertiary=Lexicon,
-// error=Note) — Highlighted Verses and Studied need their own distinct
-// colors too, so each of the six banners reads as its own destination at a
-// glance. No per-theme tuning (unlike the M3 roles above): the banner
-// background is a low-alpha wash of this color composited over the current
-// background (see bannerContainerColor below), which self-adapts to
-// whichever of the 5 themes is active, and the "Return" button uses the
-// flat color directly with a computed (not hardcoded) contrasting label.
+// Detour-banner identities — one flat color per destination, all six built
+// the same way, so no banner reads as more "official" than another (this
+// replaces an earlier version that mixed theme-tuned M3 ColorScheme roles
+// for four of the six with flat colors for the other two). None of these
+// are per-theme tuned; instead each banner's background is a low-alpha wash
+// of its color composited over the current background (see
+// bannerContainerColor below), which self-adapts to whichever of the 5
+// themes is active, and the "Return" button uses the flat color directly
+// with a computed (not hardcoded) contrasting label.
+private val CrossReferencesBannerColor = Color(0xFFC97B63) // warm terracotta
+private val SearchBannerColor = Color(0xFF5B8A6E) // sage green
+private val LexiconBannerColor = Color(0xFFB08A3E) // gold/amber
+private val NoteBannerColor = Color(0xFF3F7D7A) // dusty teal
 private val HighlightedVersesBannerColor = Color(0xFF4C6FA5) // muted steel-blue
 private val StudiedBannerColor = Color(0xFF7D5BA6) // muted violet
 
-/** Same "subtle container + matching solid button" recipe as the four
- *  M3-role banners (return to search, etc.), reproduced for a color that
- *  has no ColorScheme container counterpart of its own. */
+/** Same "subtle container + matching solid button" recipe for all six
+ *  detour banners. */
 @Composable
 private fun bannerContainerColor(identity: Color): Color =
     identity.copy(alpha = 0.16f).compositeOver(MaterialTheme.colorScheme.background)
@@ -593,7 +596,7 @@ fun ReaderScreen(
             // same fixed top slot.
             if (readerPickMode == ReaderPickMode.NONE && crossReferenceReturnAvailable) {
                 Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer,
+                    color = bannerContainerColor(CrossReferencesBannerColor),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -612,7 +615,7 @@ fun ReaderScreen(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.CompareArrows,
                                 contentDescription = "Cross references",
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
@@ -620,14 +623,14 @@ fun ReaderScreen(
                                 text = "Return to cross references",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.weight(1f)
                             )
                             Button(
                                 onClick = { viewModel.returnToCrossReferences() },
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                    containerColor = CrossReferencesBannerColor,
+                                    contentColor = bannerOnButtonColor(CrossReferencesBannerColor)
                                 ),
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                                 modifier = Modifier.height(30.dp)
@@ -642,7 +645,7 @@ fun ReaderScreen(
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Dismiss",
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(16.dp)
                             )
                         }
@@ -657,7 +660,7 @@ fun ReaderScreen(
             // cross-reference banner above, same fixed top slot.
             if (readerPickMode == ReaderPickMode.NONE && !crossReferenceReturnAvailable && searchReturnAvailable) {
                 Surface(
-                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    color = bannerContainerColor(SearchBannerColor),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -676,7 +679,7 @@ fun ReaderScreen(
                             Icon(
                                 imageVector = Icons.Default.Search,
                                 contentDescription = "Search",
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
@@ -684,14 +687,14 @@ fun ReaderScreen(
                                 text = "Return to search results",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.weight(1f)
                             )
                             Button(
                                 onClick = { viewModel.returnToSearchResults() },
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.secondary,
-                                    contentColor = MaterialTheme.colorScheme.onSecondary
+                                    containerColor = SearchBannerColor,
+                                    contentColor = bannerOnButtonColor(SearchBannerColor)
                                 ),
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                                 modifier = Modifier.height(30.dp)
@@ -706,7 +709,7 @@ fun ReaderScreen(
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Dismiss",
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(16.dp)
                             )
                         }
@@ -722,7 +725,7 @@ fun ReaderScreen(
             // above, same fixed top slot.
             if (readerPickMode == ReaderPickMode.NONE && !crossReferenceReturnAvailable && !searchReturnAvailable && lexiconReturnTab != null) {
                 Surface(
-                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    color = bannerContainerColor(LexiconBannerColor),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -741,7 +744,7 @@ fun ReaderScreen(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.MenuBook,
                                 contentDescription = "Lexicon",
-                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
@@ -749,14 +752,14 @@ fun ReaderScreen(
                                 text = if (lexiconReturnTab == NavTab.HEBREW_WORD) "Return to Hebrew word" else "Return to Greek word",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.weight(1f)
                             )
                             Button(
                                 onClick = { viewModel.returnToLexicon() },
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.tertiary,
-                                    contentColor = MaterialTheme.colorScheme.onTertiary
+                                    containerColor = LexiconBannerColor,
+                                    contentColor = bannerOnButtonColor(LexiconBannerColor)
                                 ),
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                                 modifier = Modifier.height(30.dp)
@@ -771,7 +774,7 @@ fun ReaderScreen(
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Dismiss",
-                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(16.dp)
                             )
                         }
@@ -786,7 +789,7 @@ fun ReaderScreen(
             // reference/search/lexicon banners above, same fixed top slot.
             if (readerPickMode == ReaderPickMode.NONE && !crossReferenceReturnAvailable && !searchReturnAvailable && lexiconReturnTab == null && noteReturnItem != null) {
                 Surface(
-                    color = MaterialTheme.colorScheme.errorContainer,
+                    color = bannerContainerColor(NoteBannerColor),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -805,7 +808,7 @@ fun ReaderScreen(
                             Icon(
                                 imageVector = Icons.Default.EditNote,
                                 contentDescription = "Note",
-                                tint = MaterialTheme.colorScheme.onErrorContainer,
+                                tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
@@ -813,14 +816,14 @@ fun ReaderScreen(
                                 text = "Return to note",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.weight(1f)
                             )
                             Button(
                                 onClick = { viewModel.returnToNote() },
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.error,
-                                    contentColor = MaterialTheme.colorScheme.onError
+                                    containerColor = NoteBannerColor,
+                                    contentColor = bannerOnButtonColor(NoteBannerColor)
                                 ),
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                                 modifier = Modifier.height(30.dp)
@@ -835,7 +838,7 @@ fun ReaderScreen(
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Dismiss",
-                                tint = MaterialTheme.colorScheme.onErrorContainer,
+                                tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(16.dp)
                             )
                         }
