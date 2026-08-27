@@ -22,10 +22,14 @@ data class WidgetPalette(
     val buttonBackground: ColorProvider,
     val buttonText: ColorProvider,
     // Subtle 1dp card outline. Glance has no Modifier.border(), so this is
-    // consumed via the nested-Box trick in VerseOfDayWidget (outer box
+    // consumed via the nested-Box trick in ContinueReadingWidget (outer box
     // painted this color, inset by the border width, inner box holds the
     // real card content) rather than a real border modifier.
-    val cardBorder: ColorProvider
+    val cardBorder: ColorProvider,
+    // Muted/neutral tone for the quick-action cards' icon+label (deliberately
+    // dimmer than buttonText — those are secondary actions, not the pill's
+    // primary content). Ink at ~55% alpha, same per-theme ink base as text.
+    val mutedText: ColorProvider
 )
 
 object WidgetColors {
@@ -36,7 +40,8 @@ object WidgetColors {
         accent = ColorProvider(Color(0xFF6B5B3A)),
         buttonBackground = ColorProvider(Color(0xFFEDE6D6)),
         buttonText = ColorProvider(Color(0xFF2B2820)),
-        cardBorder = ColorProvider(Color(0x1F2B2820)) // ink @ ~12%
+        cardBorder = ColorProvider(Color(0x1F2B2820)), // ink @ ~12%
+        mutedText = ColorProvider(Color(0x8C2B2820)) // ink @ ~55%
     )
 
     private val SEPIA = WidgetPalette(
@@ -45,7 +50,8 @@ object WidgetColors {
         accent = ColorProvider(Color(0xFF8B5E34)),
         buttonBackground = ColorProvider(Color(0xFFE0D0AE)),
         buttonText = ColorProvider(Color(0xFF3B2F1E)),
-        cardBorder = ColorProvider(Color(0x1F3B2F1E)) // ink @ ~12%
+        cardBorder = ColorProvider(Color(0x1F3B2F1E)), // ink @ ~12%
+        mutedText = ColorProvider(Color(0x8C3B2F1E)) // ink @ ~55%
     )
 
     private val LIGHT = WidgetPalette(
@@ -54,7 +60,8 @@ object WidgetColors {
         accent = ColorProvider(Color(0xFF3F6FBF)),
         buttonBackground = ColorProvider(Color(0xFFEFEFEF)),
         buttonText = ColorProvider(Color(0xFF1C1C1E)),
-        cardBorder = ColorProvider(Color(0x1A1C1C1E)) // ink @ ~10%
+        cardBorder = ColorProvider(Color(0x1A1C1C1E)), // ink @ ~10%
+        mutedText = ColorProvider(Color(0x8C1C1C1E)) // ink @ ~55%
     )
 
     private val DARK = WidgetPalette(
@@ -63,7 +70,8 @@ object WidgetColors {
         accent = ColorProvider(Color(0xFFC9A86A)),
         buttonBackground = ColorProvider(Color(0xFF2C2C2E)),
         buttonText = ColorProvider(Color(0xFFE5E5E7)),
-        cardBorder = ColorProvider(Color(0x24E5E5E7)) // light ink @ ~14%, dark cards need a touch more to read
+        cardBorder = ColorProvider(Color(0x24E5E5E7)), // light ink @ ~14%, dark cards need a touch more to read
+        mutedText = ColorProvider(Color(0x99E5E5E7)) // light ink @ ~60%, a touch stronger than the light themes for the same reason
     )
 
     // Ported directly from the app's actual Classic Dark Compose theme
@@ -77,7 +85,8 @@ object WidgetColors {
         accent = ColorProvider(Color(0xFFE0836F)),           // --accent (coral)
         buttonBackground = ColorProvider(Color(0xFF262320)), // --paper-dim / --input-bg
         buttonText = ColorProvider(Color(0xFFEDE8DD)),        // --ink
-        cardBorder = ColorProvider(Color(0x26EDE8DD))        // ink @ ~15%
+        cardBorder = ColorProvider(Color(0x26EDE8DD)),        // ink @ ~15%
+        mutedText = ColorProvider(Color(0x99EDE8DD))          // ink @ ~60%
     )
 
     fun forCurrentTheme(context: Context): WidgetPalette {

@@ -34,23 +34,11 @@
 
         <!-- Legacy .widget.BibleWidgetProvider (plain RemoteViews) has been
              deleted outright, per user request, along with its layout/
-             drawable resources and app-side wiring — fully superseded by
-             VerseOfDayWidgetReceiver (Glance) below. -->
-        <receiver
-            android:name=".widget.VerseOfDayWidgetReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/verse_of_day_widget_info" />
-        </receiver>
-
-        <!-- Fixed 4x1 sibling widget: just the Continue Reading pill, picked
-             separately from the widget picker (see ContinueReadingWidget.kt
-             class doc for why this is a separate widget rather than a
-             resize target of VerseOfDayWidgetReceiver above). -->
+             drawable resources and app-side wiring. VerseOfDayWidgetReceiver
+             (Glance) was later deleted too, once ContinueReadingWidget's own
+             4x2 expanded state (pill + Highlighted/Studied/Notes/Search
+             cards) fully covered what it offered — this is now the app's
+             only home screen widget. -->
         <receiver
             android:name=".widget.ContinueReadingWidgetReceiver"
             android:exported="true">

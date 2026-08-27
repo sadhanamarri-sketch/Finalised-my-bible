@@ -43,8 +43,12 @@ import com.example.mybible.ui.NavTab
  * is a single row (4x1) holding just the "Continue Reading" pill — kept as
  * the sole focus at that size since it's meant to attract attention, not
  * compete with icons for it. Dragging it taller (roughly 4x2 and up)
- * reveals the Highlights / Studied / Notes / Search quick-action row below
- * the pill, mirroring [VerseOfDayWidget]'s 4x2 icon row.
+ * reveals a Highlighted / Studied / Notes / Search quick-action row below
+ * the pill; the pill itself keeps its exact 4x1 size rather than stretching,
+ * so the freed vertical space goes entirely to that row. This is now the
+ * app's only home screen widget — a separate fixed-4x2 "verse of the day"
+ * widget used to exist, but was deleted once this one's expanded state
+ * covered the same ground.
  *
  * sizeMode = SizeMode.Exact ties [LocalSize] to the widget's real, live
  * measured size and recomposes on every resize (Glance handles
@@ -90,13 +94,18 @@ private fun ContinueReadingContent(
             .cornerRadius(24.dp)
             .padding(10.dp)
     ) {
+        // Fixed at the pill's natural 4x1 height (94dp widget - 2x10dp
+        // padding) regardless of isExpanded, rather than stretching to fill
+        // the taller container — the whole point of the 4x2 redesign is
+        // that the pill stays exactly as it looks at 4x1, and the quick-
+        // action cards below claim 100% of the freed vertical space.
+        //
         // Outer box paints the border color; a 1dp inset reveals it as a
-        // ring around the inner pill (Glance has no Modifier.border()) —
-        // same trick used by the Continue Reading row on VerseOfDayWidget.
+        // ring around the inner pill (Glance has no Modifier.border()).
         Row(
             modifier = GlanceModifier
                 .fillMaxWidth()
-                .then(if (isExpanded) GlanceModifier.defaultWeight() else GlanceModifier.fillMaxHeight())
+                .height(74.dp)
                 .background(palette.cardBorder)
                 .cornerRadius(19.dp)
                 .padding(1.dp)
@@ -149,34 +158,35 @@ private fun ContinueReadingContent(
             Spacer(modifier = GlanceModifier.height(10.dp))
 
             Row(
-                modifier = GlanceModifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalAlignment = Alignment.CenterVertically
+                modifier = GlanceModifier.fillMaxWidth().defaultWeight()
             ) {
-                QuickActionButton(
+                QuickActionCard(
                     iconRes = R.drawable.ic_widget_highlight,
-                    contentDescription = "Highlights",
+                    label = "Highlighted",
                     tab = NavTab.HIGHLIGHTS,
                     palette = palette,
                     modifier = GlanceModifier.defaultWeight()
                 )
-                QuickActionButton(
+                Spacer(modifier = GlanceModifier.width(8.dp))
+                QuickActionCard(
                     iconRes = R.drawable.ic_widget_check,
-                    contentDescription = "Studied",
+                    label = "Studied",
                     tab = NavTab.STUDIED,
                     palette = palette,
                     modifier = GlanceModifier.defaultWeight()
                 )
-                QuickActionButton(
+                Spacer(modifier = GlanceModifier.width(8.dp))
+                QuickActionCard(
                     iconRes = R.drawable.ic_widget_notes,
-                    contentDescription = "Notes",
+                    label = "Notes",
                     tab = NavTab.NOTES,
                     palette = palette,
                     modifier = GlanceModifier.defaultWeight()
                 )
-                QuickActionButton(
+                Spacer(modifier = GlanceModifier.width(8.dp))
+                QuickActionCard(
                     iconRes = R.drawable.ic_widget_search,
-                    contentDescription = "Search",
+                    label = "Search",
                     tab = NavTab.SEARCH,
                     palette = palette,
                     modifier = GlanceModifier.defaultWeight()
@@ -187,54 +197,60 @@ private fun ContinueReadingContent(
 }
 
 /**
- * Quick-action circular icon button for the expanded (4x2+) layout. Same
- * bordered-circle look as VerseOfDayWidget's QuickActionButton, sized down
- * slightly (44dp vs 52dp) since this widget's pill above already claims a
- * chunk of the vertical space a fresh 4x2 drag grants.
+ * Quick-action card for the expanded (4x2+) layout — a rectangular, rounded
+ * card (same "border ring + filled background" recipe as the pill above,
+ * just squarer) rather than the small circular icon buttons this replaced,
+ * so the four cards actually claim the vertical space the pill gives up by
+ * no longer stretching. Icon and label intentionally share the same muted
+ * tone: these are secondary shortcuts, not meant to compete with the pill's
+ * accent-colored chapter reference for attention.
  */
 @Composable
-private fun QuickActionButton(
+private fun QuickActionCard(
     iconRes: Int,
-    contentDescription: String,
+    label: String,
     tab: NavTab,
     palette: WidgetPalette,
     modifier: GlanceModifier = GlanceModifier
 ) {
     val context = LocalContext.current
-    Row(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
+    Column(
+        modifier = modifier
+            .fillMaxHeight()
+            .background(palette.cardBorder)
+            .cornerRadius(20.dp)
+            .padding(1.dp)
     ) {
-        Row(
+        Column(
             modifier = GlanceModifier
-                .size(44.dp)
-                .background(palette.cardBorder)
-                .cornerRadius(22.dp)
-                .padding(1.dp),
+                .fillMaxSize()
+                .background(palette.buttonBackground)
+                .cornerRadius(19.dp)
+                .clickable(
+                    actionStartActivity(
+                        Intent(context, MainActivity::class.java)
+                            .putExtra(WidgetActionKeys.EXTRA_OPEN_TAB, tab.name)
+                    )
+                ),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = GlanceModifier
-                    .fillMaxSize()
-                    .background(palette.buttonBackground)
-                    .cornerRadius(21.dp)
-                    .clickable(
-                        actionStartActivity(
-                            Intent(context, MainActivity::class.java)
-                                .putExtra(WidgetActionKeys.EXTRA_OPEN_TAB, tab.name)
-                        )
-                    ),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Image(
-                    provider = ImageProvider(iconRes),
-                    contentDescription = contentDescription,
-                    colorFilter = ColorFilter.tint(palette.buttonText),
-                    modifier = GlanceModifier.size(20.dp)
-                )
-            }
+            Image(
+                provider = ImageProvider(iconRes),
+                contentDescription = label,
+                colorFilter = ColorFilter.tint(palette.mutedText),
+                modifier = GlanceModifier.size(28.dp)
+            )
+            Spacer(modifier = GlanceModifier.height(12.dp))
+            Text(
+                text = label,
+                style = TextStyle(
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 12.sp,
+                    color = palette.mutedText
+                ),
+                maxLines = 1
+            )
         }
     }
 }

@@ -181,7 +181,7 @@ class BibleRepository(private val context: Context) {
     fun saveLastPosition(book: String, chapter: Int) {
         prefs.edit().putString("last_book", book).putInt("last_chapter", chapter).apply()
         // Widget refresh: MainViewModel.loadChapter() (the only caller of
-        // this function) explicitly calls VerseOfDayWidget().updateAll()
+        // this function) explicitly calls ContinueReadingWidget().updateAll()
         // right after this, so the "Continue reading" widget row updates
         // immediately rather than waiting on its own periodic cycle. Not
         // done here because updateAll() is a suspend call and this

@@ -1076,7 +1076,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // last_chapter out of SharedPreferences (see saveLastPosition above)
     // each time Android calls its provideGlance(), but nothing was ever
     // asking Android to call that *now* — the manifest's updatePeriodMillis
-    // (see verse_of_day_widget_info.xml) is a 24-hour periodic refresh, so
+    // (see continue_reading_widget_info.xml) is a 24-hour periodic refresh, so
     // without this the widget only picked up a new chapter on its own
     // schedule, sometimes closer to a day later than "next time you switch
     // chapters." updateAll() asks Glance to re-run provideGlance()
@@ -1095,7 +1095,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun refreshContinueReadingWidget() {
         viewModelScope.launch(Dispatchers.Default) {
             try {
-                com.example.mybible.widget.VerseOfDayWidget().updateAll(appContext)
                 com.example.mybible.widget.ContinueReadingWidget().updateAll(appContext)
                 Log.d(
                     "ContinueReadingWidget",

@@ -228,15 +228,6 @@ class MainActivity : ComponentActivity() {
                 // destination. See MainViewModel.clearStaleReaderDetours's doc.
                 viewModel.clearStaleReaderDetours()
 
-                // VerseOfDayWidget (Glance) extras — see widget/WidgetActionKeys.kt.
-                val verseBook = intent.getStringExtra(WidgetActionKeys.EXTRA_VERSE_BOOK)
-                val verseChapter = intent.getIntExtra(WidgetActionKeys.EXTRA_VERSE_CHAPTER, -1)
-                if (!verseBook.isNullOrEmpty() && verseChapter != -1) {
-                    viewModel.loadChapter(verseBook, verseChapter)
-                    viewModel.selectTab(NavTab.READER)
-                    return@remember Unit
-                }
-
                 // Quick-action icon row on the widget (Highlights/Studied/
                 // Notes/Search) — jumps straight to that tab.
                 val openTabName = intent.getStringExtra(WidgetActionKeys.EXTRA_OPEN_TAB)
