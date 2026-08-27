@@ -224,9 +224,9 @@ fun SavedWordsScreen(
                                 val translation = if (isForeign) saved.gloss.ifBlank { saved.word } else saved.word
                                 Text(
                                     text = translation,
-                                    fontSize = 19.sp,
+                                    fontSize = 16.sp,
                                     fontFamily = LiterataFontFamily,
-                                    fontWeight = FontWeight.Bold,
+                                    fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.tertiary,
                                     modifier = Modifier.padding(top = if (isForeign) 4.dp else 0.dp)
                                 )
