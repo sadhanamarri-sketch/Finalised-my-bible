@@ -15,6 +15,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.CompareArrows
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,7 +25,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -65,6 +69,28 @@ private fun com.example.mybible.model.NoteItem.matchesVerse(book: String, chapte
     }
     return this.book == book && this.chapter == chapter && this.verse == verse
 }
+
+// Detour-banner identities beyond the four M3 ColorScheme roles already
+// spoken for (primary=Cross References, secondary=Search, tertiary=Lexicon,
+// error=Note) — Highlighted Verses and Studied need their own distinct
+// colors too, so each of the six banners reads as its own destination at a
+// glance. No per-theme tuning (unlike the M3 roles above): the banner
+// background is a low-alpha wash of this color composited over the current
+// background (see bannerContainerColor below), which self-adapts to
+// whichever of the 5 themes is active, and the "Return" button uses the
+// flat color directly with a computed (not hardcoded) contrasting label.
+private val HighlightedVersesBannerColor = Color(0xFF4C6FA5) // muted steel-blue
+private val StudiedBannerColor = Color(0xFF7D5BA6) // muted violet
+
+/** Same "subtle container + matching solid button" recipe as the four
+ *  M3-role banners (return to search, etc.), reproduced for a color that
+ *  has no ColorScheme container counterpart of its own. */
+@Composable
+private fun bannerContainerColor(identity: Color): Color =
+    identity.copy(alpha = 0.16f).compositeOver(MaterialTheme.colorScheme.background)
+
+private fun bannerOnButtonColor(identity: Color): Color =
+    if (identity.luminance() < 0.5f) Color.White else Color.Black
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -584,7 +610,7 @@ fun ReaderScreen(
                                 .padding(end = 8.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.ArrowBack,
+                                imageVector = Icons.AutoMirrored.Filled.CompareArrows,
                                 contentDescription = "Cross references",
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.size(18.dp)
@@ -713,7 +739,7 @@ fun ReaderScreen(
                                 .padding(end = 8.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.ArrowBack,
+                                imageVector = Icons.AutoMirrored.Filled.MenuBook,
                                 contentDescription = "Lexicon",
                                 tint = MaterialTheme.colorScheme.onTertiaryContainer,
                                 modifier = Modifier.size(18.dp)
@@ -823,15 +849,12 @@ fun ReaderScreen(
             // back to, it's opened as its own destination, so both this
             // banner and system back land back on that list. Mutually
             // exclusive with the cross-reference/search/lexicon/note
-            // banners above, same fixed top slot. All 4 accent container
-            // roles (primary/secondary/tertiary/error) are already taken by
-            // those, so this uses the neutral surfaceContainerHigh instead,
-            // with the coral "Return" button matching the rest of the app's
-            // convention for the one interactive accent in an otherwise
-            // neutral row.
+            // banners above, same fixed top slot. Own color identity (see
+            // HighlightedVersesBannerColor) — same "subtle container +
+            // matching button" recipe as the four M3-role banners above.
             if (readerPickMode == ReaderPickMode.NONE && !crossReferenceReturnAvailable && !searchReturnAvailable && lexiconReturnTab == null && noteReturnItem == null && highlightsReturnAvailable) {
                 Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    color = bannerContainerColor(HighlightedVersesBannerColor),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -864,8 +887,8 @@ fun ReaderScreen(
                             Button(
                                 onClick = { viewModel.returnToHighlightedVerses() },
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                    containerColor = HighlightedVersesBannerColor,
+                                    contentColor = bannerOnButtonColor(HighlightedVersesBannerColor)
                                 ),
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                                 modifier = Modifier.height(30.dp)
@@ -893,12 +916,12 @@ fun ReaderScreen(
             // same reasoning as the highlighted-verses banner above
             // (Studied is its own destination too, no "origin verse" to
             // undo back to). Mutually exclusive with all 5 banners above,
-            // same fixed top slot. Same neutral surfaceContainerHigh
-            // treatment as the highlights banner — the two are never shown
-            // at once, so sharing that look isn't confusing in practice.
+            // same fixed top slot. Own color identity (see
+            // StudiedBannerColor), distinct from the highlights banner even
+            // though the two are never shown at once.
             if (readerPickMode == ReaderPickMode.NONE && !crossReferenceReturnAvailable && !searchReturnAvailable && lexiconReturnTab == null && noteReturnItem == null && !highlightsReturnAvailable && studiedReturnAvailable) {
                 Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    color = bannerContainerColor(StudiedBannerColor),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -931,8 +954,8 @@ fun ReaderScreen(
                             Button(
                                 onClick = { viewModel.returnToStudied() },
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                    containerColor = StudiedBannerColor,
+                                    contentColor = bannerOnButtonColor(StudiedBannerColor)
                                 ),
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                                 modifier = Modifier.height(30.dp)
