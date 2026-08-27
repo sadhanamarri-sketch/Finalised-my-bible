@@ -43,18 +43,16 @@ import com.example.mybible.ui.NavTab
  * is a single row (4x1) holding just the "Continue Reading" pill — kept as
  * the sole focus at that size since it's meant to attract attention, not
  * compete with icons for it. Dragging it taller (roughly 4x2 and up)
- * reveals a Highlighted / Studied / Notes / Search quick-action row below
- * the pill. That row is fixed at its designed 84dp height regardless of how
+ * reveals a Highlighted / Studied / Notes / Search quick-action row pinned
+ * to the bottom edge, fixed at its designed 84dp height regardless of how
  * tall the widget gets dragged — different launchers hand a "4x2" resize
- * very different real heights, and letting the cards stretch to fill
- * whatever's left produced tall, sparse-looking strips on launchers whose
- * 2-row height is well past this widget's own 188dp reference math (see
- * [ContinueReadingContent]'s cardsRowHeight/pillHeight comments). The pill
- * absorbs that extra space instead, growing past its 4x1 size rather than
- * leaving it as dead space or stretching the cards into it. This is now the
- * app's only home screen widget — a separate fixed-4x2 "verse of the day"
- * widget used to exist, but was deleted once this one's expanded state
- * covered the same ground.
+ * very different real heights. The pill fills the rest of the space above
+ * that row via a real layout weight (see [ContinueReadingContent]'s
+ * cardsRowHeight comment for why weight, not a LocalSize-computed height,
+ * is what makes this actually pin to the true bottom edge on every
+ * launcher). This is now the app's only home screen widget — a separate
+ * fixed-4x2 "verse of the day" widget used to exist, but was deleted once
+ * this one's expanded state covered the same ground.
  *
  * sizeMode = SizeMode.Exact ties [LocalSize] to the widget's real, live
  * measured size and recomposes on every resize (Glance handles
@@ -92,22 +90,25 @@ private fun ContinueReadingContent(
     // Measured on-device (see commit history): default 4x1 placement is
     // 416x94dp, resized to 4x2 is 416x188dp — 140dp sits with a healthy
     // ~46dp margin on both sides of that gap.
-    val totalSize = LocalSize.current
-    val isExpanded = totalSize.height >= 140.dp
+    val isExpanded = LocalSize.current.height >= 140.dp
     // Quick-action cards below are fixed at this height regardless of how
     // tall the widget gets dragged — 4x2's reference math (188dp widget,
     // minus 2x10dp outer padding, minus the pill's 74dp, minus a 10dp
     // spacer) works out to 84dp, which is what the design was previewed
-    // and approved at. Any extra height beyond the 4x2 reference goes to
-    // the pill (below), not to these cards, so they never stretch into
-    // the tall near-empty strips a plain fillMaxHeight produced when a
-    // launcher's actual row height made "4x2" taller than 188dp.
+    // and approved at.
     val cardsRowHeight = 84.dp
-    // Pill absorbs whatever vertical space the cards row doesn't need,
-    // rather than staying fixed itself — coerced to never shrink below its
-    // own 4x1 natural height (74dp) if a launcher ever hands this a height
-    // between the isExpanded threshold and the full 4x2 reference.
-    val pillHeight = (totalSize.height - 20.dp - 10.dp - cardsRowHeight).coerceAtLeast(74.dp)
+    // The pill takes the *rest* via defaultWeight() rather than a height
+    // computed from LocalSize — LocalSize reflects Glance's own notion of
+    // the widget's size (from appWidgetOptions), which isn't guaranteed to
+    // match what the launcher's host view actually renders at on every
+    // launcher. A previous version computed the pill's height from
+    // LocalSize arithmetic, and on-device that left a gap between the
+    // (correctly small) cards row and the widget's real bottom edge —
+    // proof the two didn't agree. Real layout weight, by contrast, is
+    // resolved against the actual measured RemoteViews container at
+    // render time, so it's guaranteed to fill the true leftover space and
+    // pin the fixed-height cards row to the true bottom edge, whatever
+    // that space really is.
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
@@ -120,7 +121,7 @@ private fun ContinueReadingContent(
         Row(
             modifier = GlanceModifier
                 .fillMaxWidth()
-                .then(if (isExpanded) GlanceModifier.height(pillHeight) else GlanceModifier.fillMaxHeight())
+                .then(if (isExpanded) GlanceModifier.defaultWeight() else GlanceModifier.fillMaxHeight())
                 .background(palette.cardBorder)
                 .cornerRadius(19.dp)
                 .padding(1.dp)
