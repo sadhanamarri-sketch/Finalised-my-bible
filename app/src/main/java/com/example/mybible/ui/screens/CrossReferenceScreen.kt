@@ -22,7 +22,6 @@ import androidx.compose.ui.unit.sp
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.components.BackTopBar
-import com.example.mybible.ui.theme.LiterataFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
 
 /**
@@ -126,9 +125,9 @@ fun CrossReferenceScreen(
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = verse.text,
-                            fontSize = 17.sp,
-                            fontFamily = LiterataFontFamily,
-                            lineHeight = 24.sp,
+                            fontSize = com.example.mybible.ui.theme.VerseCardFontLab.fontSizeSp.sp,
+                            fontFamily = com.example.mybible.ui.theme.verseCardFontFamily,
+                            lineHeight = (com.example.mybible.ui.theme.VerseCardFontLab.fontSizeSp * com.example.mybible.ui.theme.VerseCardFontLab.lineHeightMultiplier).sp,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -231,9 +230,9 @@ fun CrossReferenceScreen(
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(
                                             text = item.previewText,
-                                            fontSize = 17.sp,
-                                            fontFamily = LiterataFontFamily,
-                                            lineHeight = 24.sp,
+                                            fontSize = com.example.mybible.ui.theme.VerseCardFontLab.fontSizeSp.sp,
+                                            fontFamily = com.example.mybible.ui.theme.verseCardFontFamily,
+                                            lineHeight = (com.example.mybible.ui.theme.VerseCardFontLab.fontSizeSp * com.example.mybible.ui.theme.VerseCardFontLab.lineHeightMultiplier).sp,
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
                                     }

@@ -27,7 +27,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mybible.model.ThemeMode
 import com.example.mybible.ui.components.BackTopBar
-import com.example.mybible.ui.theme.LiterataFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
 
 data class HighlightedVerseItem(
@@ -191,9 +190,9 @@ private fun HighlightedVerseRow(
             // this already resolves to a near-white cream.
             Text(
                 text = item.text,
-                fontSize = 17.sp,
-                fontFamily = LiterataFontFamily,
-                lineHeight = 24.sp,
+                fontSize = com.example.mybible.ui.theme.VerseCardFontLab.fontSizeSp.sp,
+                fontFamily = com.example.mybible.ui.theme.verseCardFontFamily,
+                lineHeight = (com.example.mybible.ui.theme.VerseCardFontLab.fontSizeSp * com.example.mybible.ui.theme.VerseCardFontLab.lineHeightMultiplier).sp,
                 color = MaterialTheme.colorScheme.onSurface
             )
             if (!item.noteText.isNullOrBlank()) {

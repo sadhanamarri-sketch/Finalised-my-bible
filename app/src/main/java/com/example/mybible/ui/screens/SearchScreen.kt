@@ -38,7 +38,6 @@ import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.components.BackTopBar
 import com.example.mybible.ui.components.DsSwitch
-import com.example.mybible.ui.theme.LiterataFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
 
 @Composable
@@ -531,9 +530,9 @@ private fun SearchResultCard(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = verse.text,
-                    fontSize = 17.sp,
-                    fontFamily = LiterataFontFamily,
-                    lineHeight = 24.sp,
+                    fontSize = com.example.mybible.ui.theme.VerseCardFontLab.fontSizeSp.sp,
+                    fontFamily = com.example.mybible.ui.theme.verseCardFontFamily,
+                    lineHeight = (com.example.mybible.ui.theme.VerseCardFontLab.fontSizeSp * com.example.mybible.ui.theme.VerseCardFontLab.lineHeightMultiplier).sp,
                     color = MaterialTheme.colorScheme.onSurface
                 )
             }
