@@ -1566,6 +1566,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (_lexiconOpenedFromSavedWords.value) {
             _lexiconOpenedFromSavedWords.value = false
             openSavedWordsScreen()
+            // Search is only reactivated here as the tab underneath Saved
+            // Words (see this function's doc) — same "don't steal the
+            // keyboard from a screen the user isn't actually looking at"
+            // reasoning as returnToSearchResults().
+            _suppressNextSearchAutofocus.value = true
             selectTab(NavTab.SEARCH)
         } else {
             jumpToLexiconBaseVerse()
@@ -1648,6 +1653,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (_lexiconOpenedFromSavedWords.value) {
             _lexiconOpenedFromSavedWords.value = false
             openSavedWordsScreen()
+            // See closeGreekWordPage's matching comment.
+            _suppressNextSearchAutofocus.value = true
             selectTab(NavTab.SEARCH)
         } else {
             jumpToLexiconBaseVerse()
@@ -2194,6 +2201,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // returns to Search, not Reader.
     private val _showSavedWordsScreen = MutableStateFlow(false)
     val showSavedWordsScreen: StateFlow<Boolean> = _showSavedWordsScreen.asStateFlow()
+
+    // Segmented language filter (English/Greek/Hebrew) — held here rather
+    // than as SavedWordsScreen's own remember state because the screen is
+    // fully disposed (not just hidden) every time it closes to open a
+    // tapped word's lexicon/dictionary entry (openLexiconForSavedWord), the
+    // same disposal SearchScreen's own doc describes. A remember-scoped
+    // filter would silently reset to English on every such round trip —
+    // e.g. tap a Greek word, back out of its lexicon page, and land back
+    // on the English tab despite never touching the filter.
+    private val _savedWordsLanguageFilter = MutableStateFlow(SavedWordLanguage.ENGLISH)
+    val savedWordsLanguageFilter: StateFlow<SavedWordLanguage> = _savedWordsLanguageFilter.asStateFlow()
+
+    fun setSavedWordsLanguageFilter(language: SavedWordLanguage) {
+        _savedWordsLanguageFilter.value = language
+    }
 
     fun openSavedWordsScreen() { _showSavedWordsScreen.value = true }
     fun closeSavedWordsScreen() { _showSavedWordsScreen.value = false }

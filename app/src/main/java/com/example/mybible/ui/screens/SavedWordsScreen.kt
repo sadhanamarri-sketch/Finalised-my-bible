@@ -56,7 +56,7 @@ fun SavedWordsScreen(
     modifier: Modifier = Modifier
 ) {
     val savedWords by viewModel.savedWords.collectAsState(initial = emptyList())
-    var selectedLanguage by remember { mutableStateOf(SavedWordLanguage.ENGLISH) }
+    val selectedLanguage by viewModel.savedWordsLanguageFilter.collectAsState()
     var wordPendingDelete by remember { mutableStateOf<SavedWordItem?>(null) }
     val filteredWords = savedWords.filter { it.language == selectedLanguage }
     val lastTappedKey by viewModel.savedWordsLastTappedKey.collectAsState()
@@ -110,7 +110,7 @@ fun SavedWordsScreen(
                 languages.forEachIndexed { index, (language, label) ->
                     SegmentedButton(
                         selected = selectedLanguage == language,
-                        onClick = { selectedLanguage = language },
+                        onClick = { viewModel.setSavedWordsLanguageFilter(language) },
                         shape = SegmentedButtonDefaults.itemShape(index = index, count = languages.size),
                         // The selected segment already has its own
                         // fill/border treatment — the default checkmark
