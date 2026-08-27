@@ -118,16 +118,16 @@ fun CrossReferenceScreen(
                             text = "${verse.book.uppercase()} ${verse.chapter}:${verse.number}",
                             fontSize = 13.sp,
                             fontFamily = WorkSansFontFamily,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             letterSpacing = 0.5.sp,
                             color = MaterialTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = verse.text,
-                            fontSize = com.example.mybible.ui.theme.VerseCardFontLab.fontSizeSp.sp,
-                            fontFamily = com.example.mybible.ui.theme.verseCardFontFamily,
-                            lineHeight = (com.example.mybible.ui.theme.VerseCardFontLab.fontSizeSp * com.example.mybible.ui.theme.VerseCardFontLab.lineHeightMultiplier).sp,
+                            fontSize = 17.sp,
+                            fontFamily = com.example.mybible.ui.theme.SourceSerif4FontFamily,
+                            lineHeight = 29.07.sp,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -216,7 +216,7 @@ fun CrossReferenceScreen(
                                                 text = "${item.targetBook} ${item.targetChapter}:${item.targetVerse}".uppercase(),
                                                 fontSize = 13.sp,
                                                 fontFamily = WorkSansFontFamily,
-                                                fontWeight = FontWeight.Bold,
+                                                fontWeight = FontWeight.SemiBold,
                                                 letterSpacing = 0.5.sp,
                                                 color = MaterialTheme.colorScheme.tertiary
                                             )
@@ -230,9 +230,9 @@ fun CrossReferenceScreen(
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(
                                             text = item.previewText,
-                                            fontSize = com.example.mybible.ui.theme.VerseCardFontLab.fontSizeSp.sp,
-                                            fontFamily = com.example.mybible.ui.theme.verseCardFontFamily,
-                                            lineHeight = (com.example.mybible.ui.theme.VerseCardFontLab.fontSizeSp * com.example.mybible.ui.theme.VerseCardFontLab.lineHeightMultiplier).sp,
+                                            fontSize = 17.sp,
+                                            fontFamily = com.example.mybible.ui.theme.SourceSerif4FontFamily,
+                                            lineHeight = 29.07.sp,
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
                                     }

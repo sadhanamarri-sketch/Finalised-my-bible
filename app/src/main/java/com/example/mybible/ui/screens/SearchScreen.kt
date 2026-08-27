@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
@@ -515,9 +516,10 @@ private fun SearchResultCard(
                 ) {
                     Text(
                         text = "${verse.book} ${verse.chapter}:${verse.number}".uppercase(),
-                        fontSize = 12.5.sp,
+                        fontSize = 13.sp,
                         fontFamily = com.example.mybible.ui.theme.WorkSansFontFamily,
-                        letterSpacing = 1.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.5.sp,
                         color = MaterialTheme.colorScheme.tertiary
                     )
                     Icon(
@@ -530,9 +532,9 @@ private fun SearchResultCard(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = verse.text,
-                    fontSize = com.example.mybible.ui.theme.VerseCardFontLab.fontSizeSp.sp,
-                    fontFamily = com.example.mybible.ui.theme.verseCardFontFamily,
-                    lineHeight = (com.example.mybible.ui.theme.VerseCardFontLab.fontSizeSp * com.example.mybible.ui.theme.VerseCardFontLab.lineHeightMultiplier).sp,
+                    fontSize = 17.sp,
+                    fontFamily = com.example.mybible.ui.theme.SourceSerif4FontFamily,
+                    lineHeight = 29.07.sp,
                     color = MaterialTheme.colorScheme.onSurface
                 )
             }

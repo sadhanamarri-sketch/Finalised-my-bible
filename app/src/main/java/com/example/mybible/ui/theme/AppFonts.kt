@@ -153,3 +153,13 @@ val NotoSerifFontFamily: FontFamily = FontFamily(
         variationSettings = FontVariation.Settings(FontVariation.weight(700))
     )
 )
+
+/**
+ * Verse-card body text (Search, Cross References, verse-mention preview,
+ * Highlighted Verses) — chosen via the Verse Card Font Lab A/B test.
+ * Single static Regular weight; Compose synthesizes bold if ever requested,
+ * same as EbGaramond/PlayfairDisplay above.
+ */
+val SourceSerif4FontFamily: FontFamily = FontFamily(
+    Font(R.font.source_serif_4_regular, FontWeight.Normal)
+)

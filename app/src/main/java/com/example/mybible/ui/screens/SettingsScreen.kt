@@ -45,7 +45,6 @@ import com.example.mybible.ui.theme.GelasioFontFamily
 import com.example.mybible.ui.theme.LoraFontFamily
 import com.example.mybible.ui.theme.MerriweatherFontFamily
 import com.example.mybible.ui.theme.PlayfairDisplayFontFamily
-import com.example.mybible.ui.theme.VerseCardFontLab
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -359,90 +358,6 @@ fun SettingsScreen(
         }
 
         HorizontalDivider(modifier = Modifier.padding(top = 22.dp), color = MaterialTheme.colorScheme.surfaceVariant)
-
-        // ---- Verse Card Font Lab (testing) ----
-        // Temporary: see ui/theme/VerseCardFontLab.kt. Not persisted —
-        // resets on app restart by design. One shared choice drives all
-        // four surfaces at once (Search, Cross References, verse-mention
-        // preview, Highlighted Verses) since they're kept in sync.
-        DsSectionLabel("Verse Card Font Lab (testing)")
-        Text(
-            text = "Not saved — resets when you restart the app. Applies to Search, Cross References, the verse-mention preview, and Highlighted Verses cards together.",
-            fontSize = 12.5.sp,
-            fontFamily = FontFamily.SansSerif,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 10.dp)
-        )
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { VerseCardFontLab.selectedFontKey = null }
-                    .padding(vertical = 14.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Default (Literata)",
-                    fontSize = 16.sp,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                if (VerseCardFontLab.selectedFontKey == null) {
-                    Text("✓", fontSize = 16.sp, color = MaterialTheme.colorScheme.primary)
-                }
-            }
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-            VerseCardFontLab.testFonts.forEach { (key, family) ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { VerseCardFontLab.selectedFontKey = key }
-                        .padding(vertical = 14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(text = key, fontFamily = family, fontSize = 19.sp, color = MaterialTheme.colorScheme.onSurface)
-                    if (VerseCardFontLab.selectedFontKey == key) {
-                        Text("✓", fontSize = 17.sp, color = MaterialTheme.colorScheme.primary)
-                    }
-                }
-                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "Font size",
-            fontSize = 13.sp,
-            fontFamily = FontFamily.SansSerif,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 6.dp)
-        )
-        DsSizeAdjustRow(
-            valueLabel = "${VerseCardFontLab.fontSizeSp.toInt()}px",
-            onDecrease = { VerseCardFontLab.fontSizeSp = (VerseCardFontLab.fontSizeSp - 1f).coerceAtLeast(12f) },
-            onIncrease = { VerseCardFontLab.fontSizeSp = (VerseCardFontLab.fontSizeSp + 1f).coerceAtMost(28f) }
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = "Line spacing",
-            fontSize = 13.sp,
-            fontFamily = FontFamily.SansSerif,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 6.dp)
-        )
-        DsSizeAdjustRow(
-            valueLabel = "%.2fx".format(VerseCardFontLab.lineHeightMultiplier),
-            onDecrease = { VerseCardFontLab.lineHeightMultiplier = (VerseCardFontLab.lineHeightMultiplier - 0.1f).coerceAtLeast(1f) },
-            onIncrease = { VerseCardFontLab.lineHeightMultiplier = (VerseCardFontLab.lineHeightMultiplier + 0.1f).coerceAtMost(2.5f) },
-            decreaseGlyph = "−",
-            increaseGlyph = "+",
-            decreaseGlyphSize = 18.sp,
-            increaseGlyphSize = 18.sp
-        )
-
-        HorizontalDivider(modifier = Modifier.padding(top = 18.dp), color = MaterialTheme.colorScheme.surfaceVariant)
 
         // ---- Focus mode ----
         DsSectionLabel("Focus mode")

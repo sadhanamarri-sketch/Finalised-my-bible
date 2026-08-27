@@ -173,15 +173,15 @@ private fun HighlightedVerseRow(
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(bottom = 4.dp)
             )
-            // Reference — matches DsSectionLabel's gold heading style
-            // (Settings/Search): 12.5sp, 1.5sp letter-spacing, Work Sans,
-            // tertiary — now bold, by request.
+            // Reference — matches the reference-label treatment shared
+            // with Search and Cross References: 13sp, 0.5sp letter-
+            // spacing, Work Sans, semibold.
             Text(
                 text = "${item.book} ${item.chapter}:${item.verse}".uppercase(),
-                fontSize = 12.5.sp,
-                letterSpacing = 1.5.sp,
+                fontSize = 13.sp,
+                letterSpacing = 0.5.sp,
                 fontFamily = WorkSansFontFamily,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.padding(bottom = 6.dp)
             )
@@ -190,9 +190,9 @@ private fun HighlightedVerseRow(
             // this already resolves to a near-white cream.
             Text(
                 text = item.text,
-                fontSize = com.example.mybible.ui.theme.VerseCardFontLab.fontSizeSp.sp,
-                fontFamily = com.example.mybible.ui.theme.verseCardFontFamily,
-                lineHeight = (com.example.mybible.ui.theme.VerseCardFontLab.fontSizeSp * com.example.mybible.ui.theme.VerseCardFontLab.lineHeightMultiplier).sp,
+                fontSize = 17.sp,
+                fontFamily = com.example.mybible.ui.theme.SourceSerif4FontFamily,
+                lineHeight = 29.07.sp,
                 color = MaterialTheme.colorScheme.onSurface
             )
             if (!item.noteText.isNullOrBlank()) {
