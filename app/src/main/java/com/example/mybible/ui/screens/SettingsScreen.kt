@@ -539,7 +539,7 @@ fun SettingsScreen(
         // ---- Backup & sync ----
         DsSectionLabel("Backup & sync")
         Text(
-            text = "Notes, tags, highlights, and completed verses",
+            text = "Notes, tags, highlights, completed verses, and saved words",
             fontSize = 13.5.sp,
             fontFamily = FontFamily.SansSerif,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

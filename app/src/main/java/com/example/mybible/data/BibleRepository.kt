@@ -347,6 +347,7 @@ class BibleRepository(private val context: Context) {
     private fun highlightTombstoneKey(book: String, chapter: Int, verse: Int) = "highlight:$book:$chapter:$verse"
     private fun completedTombstoneKey(book: String, chapter: Int, verse: Int) = "completed:$book:$chapter:$verse"
     private fun tagTombstoneKey(name: String) = "tag:${name.lowercase(Locale.US)}"
+    private fun savedWordTombstoneKey(dedupeKey: String) = "savedword:$dedupeKey"
 
     private val _completedVersesFlow = MutableStateFlow<List<CompletedVerseItem>>(loadCompletedFromPrefs())
     val allCompletedVerses: Flow<List<CompletedVerseItem>> = _completedVersesFlow.asStateFlow()
@@ -764,6 +765,7 @@ class BibleRepository(private val context: Context) {
         val key = item.dedupeKey()
         if (current.any { it.dedupeKey() == key }) {
             current.removeAll { it.dedupeKey() == key }
+            recordTombstone(savedWordTombstoneKey(key))
         } else {
             current.add(0, item.copy(id = System.currentTimeMillis()))
         }
@@ -772,6 +774,7 @@ class BibleRepository(private val context: Context) {
 
     suspend fun deleteSavedWord(id: Long) {
         val current = _savedWordsFlow.value.toMutableList()
+        current.find { it.id == id }?.let { recordTombstone(savedWordTombstoneKey(it.dedupeKey())) }
         current.removeAll { it.id == id }
         saveSavedWordsToPrefs(current)
     }
@@ -1555,9 +1558,9 @@ class BibleRepository(private val context: Context) {
         }
 
     /** Snapshots everything backup-worthy (notes, tags, completed verses,
-     * highlights) into the shared [BackupData] envelope. Used for both the
-     * local SAF export and the Google Drive appdata upload, so the two
-     * paths can never drift out of sync with each other. */
+     * highlights, saved words) into the shared [BackupData] envelope. Used
+     * for both the local SAF export and the Google Drive appdata upload,
+     * so the two paths can never drift out of sync with each other. */
     suspend fun exportBackupJson(): String = withContext(Dispatchers.IO) {
         val data = BackupData(
             exportedAt = backupTimestampFormat.format(Date()),
@@ -1570,6 +1573,7 @@ class BibleRepository(private val context: Context) {
             completed = _completedVersesFlow.value,
             highlights = _highlightsFlow.value,
             highlightColorDefs = resolvedHighlightColorDefs(_highlightColorLabelOverridesFlow.value),
+            savedWords = _savedWordsFlow.value,
             tombstones = SyncTombstones(_tombstonesFlow.value)
         )
         json.encodeToString(data)
@@ -1584,7 +1588,8 @@ class BibleRepository(private val context: Context) {
         val tagsAdded: Int,
         val completedAdded: Int,
         val highlightsAdded: Int,
-        val colorsRelabeled: Int
+        val colorsRelabeled: Int,
+        val savedWordsAdded: Int
     )
 
     /** Restores from a backup produced by [exportBackupJson] (this device,
@@ -1628,6 +1633,11 @@ class BibleRepository(private val context: Context) {
      *    see model/HighlightColors.kt); a tombstoned hex is skipped. On a
      *    matching, non-tombstoned hex the backup's label wins, so a custom
      *    rename made elsewhere and restored here actually takes effect.
+     *  - saved words: unioned by dedupeKey (see SavedWordItem's doc); a
+     *    tombstoned key (unsaved or deleted since) is skipped. No
+     *    per-item timestamp to compare on a non-tombstoned collision —
+     *    unlike the others above, a saved word is never edited in place,
+     *    only saved/unsaved, so identity alone is enough.
      */
     suspend fun importFromBackup(jsonText: String): ImportResult = withContext(Dispatchers.IO) {
         val data = json.decodeFromString<BackupData>(jsonText)
@@ -1760,13 +1770,34 @@ class BibleRepository(private val context: Context) {
         }
         saveHighlightColorLabelOverridesToPrefs(mergedOverrides)
 
+        // Saved words: unioned by dedupeKey (see SavedWordItem's doc) — no
+        // updatedAt to compare on a collision since a saved word is never
+        // edited in place, only saved/unsaved, so there's nothing to merge
+        // beyond identity. A tombstoned key (explicitly unsaved or deleted
+        // since) is skipped, same "deliberate delete isn't resurrected by
+        // an old backup" rule every other collection above follows.
+        val existingSavedWords = _savedWordsFlow.value
+        val existingSavedWordKeys = existingSavedWords.map { it.dedupeKey() }.toHashSet()
+        var savedWordsAdded = 0
+        val mergedSavedWords = existingSavedWords.toMutableList()
+        for (incoming in data.savedWords) {
+            val key = incoming.dedupeKey()
+            if (key in existingSavedWordKeys) continue
+            if (tombstones.containsKey(savedWordTombstoneKey(key))) continue
+            mergedSavedWords.add(incoming)
+            existingSavedWordKeys.add(key)
+            savedWordsAdded++
+        }
+        saveSavedWordsToPrefs(mergedSavedWords)
+
         ImportResult(
             notesAdded = notesAdded,
             notesUpdated = notesUpdated,
             tagsAdded = tagsAdded,
             completedAdded = completedAdded,
             highlightsAdded = highlightsAdded,
-            colorsRelabeled = colorsRelabeled
+            colorsRelabeled = colorsRelabeled,
+            savedWordsAdded = savedWordsAdded
         )
     }
 

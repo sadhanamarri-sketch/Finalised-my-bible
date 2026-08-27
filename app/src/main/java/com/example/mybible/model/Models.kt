@@ -53,9 +53,9 @@ enum class SavedWordLanguage { GREEK, HEBREW, ENGLISH }
 // A word bookmarked from a Greek/Hebrew interlinear lookup or an English
 // dictionary lookup (see BibleRepository.toggleSavedWord) — a personal
 // glossary the user builds up over time, browsed from Search (see
-// SavedWordsScreen), the same way Tags are managed from Notes. Local-only
-// for now: not part of BackupData, so saved words don't survive a
-// backup/restore yet.
+// SavedWordsScreen), the same way Tags are managed from Notes. Part of
+// BackupData (see exportBackupJson/importFromBackup), merged by dedupeKey
+// the same tombstone-aware way as every other collection there.
 //
 // dedupeKey identifies "the same word" for toggling save/unsave: language
 // plus the word text and transliteration, lowercased. Not Strong's number
@@ -256,5 +256,8 @@ data class BackupData(
     // still decode fine — kotlinx.serialization fills in the default for
     // any field missing from the JSON instead of failing to parse.
     val highlightColorDefs: List<HighlightColorDef> = emptyList(),
+    // Same "defaults to empty for older backups" reasoning as
+    // highlightColorDefs above — added after saved words existed.
+    val savedWords: List<SavedWordItem> = emptyList(),
     val tombstones: SyncTombstones = SyncTombstones()
 )

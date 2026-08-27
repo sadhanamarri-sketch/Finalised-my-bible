@@ -2599,7 +2599,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _backupStatusMessage.value = "Restored: ${result.notesAdded} new notes, " +
                     "${result.notesUpdated} updated, ${result.highlightsAdded} new highlights, " +
                     "${result.completedAdded} new completed verses, ${result.tagsAdded} new tags, " +
-                    "${result.colorsRelabeled} colors relabeled"
+                    "${result.savedWordsAdded} new saved words, ${result.colorsRelabeled} colors relabeled"
             } catch (e: Exception) {
                 _backupStatusMessage.value = "Couldn't read that backup file"
             }
@@ -2688,7 +2688,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         _lastDriveRestoreAt.value = now
                         _backupStatusMessage.value = "Restored from Drive: ${importResult.notesAdded} new notes, " +
                             "${importResult.notesUpdated} updated, ${importResult.highlightsAdded} new highlights, " +
-                            "${importResult.colorsRelabeled} colors relabeled"
+                            "${importResult.savedWordsAdded} new saved words, ${importResult.colorsRelabeled} colors relabeled"
                     } catch (e: Exception) {
                         _backupStatusMessage.value = "Couldn't read the Drive backup"
                     }
