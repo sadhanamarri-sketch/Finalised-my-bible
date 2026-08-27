@@ -44,8 +44,14 @@ import com.example.mybible.ui.NavTab
  * the sole focus at that size since it's meant to attract attention, not
  * compete with icons for it. Dragging it taller (roughly 4x2 and up)
  * reveals a Highlighted / Studied / Notes / Search quick-action row below
- * the pill; the pill itself keeps its exact 4x1 size rather than stretching,
- * so the freed vertical space goes entirely to that row. This is now the
+ * the pill. That row is fixed at its designed 84dp height regardless of how
+ * tall the widget gets dragged — different launchers hand a "4x2" resize
+ * very different real heights, and letting the cards stretch to fill
+ * whatever's left produced tall, sparse-looking strips on launchers whose
+ * 2-row height is well past this widget's own 188dp reference math (see
+ * [ContinueReadingContent]'s cardsRowHeight/pillHeight comments). The pill
+ * absorbs that extra space instead, growing past its 4x1 size rather than
+ * leaving it as dead space or stretching the cards into it. This is now the
  * app's only home screen widget — a separate fixed-4x2 "verse of the day"
  * widget used to exist, but was deleted once this one's expanded state
  * covered the same ground.
@@ -86,7 +92,22 @@ private fun ContinueReadingContent(
     // Measured on-device (see commit history): default 4x1 placement is
     // 416x94dp, resized to 4x2 is 416x188dp — 140dp sits with a healthy
     // ~46dp margin on both sides of that gap.
-    val isExpanded = LocalSize.current.height >= 140.dp
+    val totalSize = LocalSize.current
+    val isExpanded = totalSize.height >= 140.dp
+    // Quick-action cards below are fixed at this height regardless of how
+    // tall the widget gets dragged — 4x2's reference math (188dp widget,
+    // minus 2x10dp outer padding, minus the pill's 74dp, minus a 10dp
+    // spacer) works out to 84dp, which is what the design was previewed
+    // and approved at. Any extra height beyond the 4x2 reference goes to
+    // the pill (below), not to these cards, so they never stretch into
+    // the tall near-empty strips a plain fillMaxHeight produced when a
+    // launcher's actual row height made "4x2" taller than 188dp.
+    val cardsRowHeight = 84.dp
+    // Pill absorbs whatever vertical space the cards row doesn't need,
+    // rather than staying fixed itself — coerced to never shrink below its
+    // own 4x1 natural height (74dp) if a launcher ever hands this a height
+    // between the isExpanded threshold and the full 4x2 reference.
+    val pillHeight = (totalSize.height - 20.dp - 10.dp - cardsRowHeight).coerceAtLeast(74.dp)
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
@@ -94,18 +115,12 @@ private fun ContinueReadingContent(
             .cornerRadius(24.dp)
             .padding(10.dp)
     ) {
-        // Fixed at the pill's natural 4x1 height (94dp widget - 2x10dp
-        // padding) regardless of isExpanded, rather than stretching to fill
-        // the taller container — the whole point of the 4x2 redesign is
-        // that the pill stays exactly as it looks at 4x1, and the quick-
-        // action cards below claim 100% of the freed vertical space.
-        //
         // Outer box paints the border color; a 1dp inset reveals it as a
         // ring around the inner pill (Glance has no Modifier.border()).
         Row(
             modifier = GlanceModifier
                 .fillMaxWidth()
-                .height(74.dp)
+                .then(if (isExpanded) GlanceModifier.height(pillHeight) else GlanceModifier.fillMaxHeight())
                 .background(palette.cardBorder)
                 .cornerRadius(19.dp)
                 .padding(1.dp)
@@ -158,7 +173,7 @@ private fun ContinueReadingContent(
             Spacer(modifier = GlanceModifier.height(10.dp))
 
             Row(
-                modifier = GlanceModifier.fillMaxWidth().defaultWeight()
+                modifier = GlanceModifier.fillMaxWidth().height(cardsRowHeight)
             ) {
                 QuickActionCard(
                     iconRes = R.drawable.ic_widget_highlight,
