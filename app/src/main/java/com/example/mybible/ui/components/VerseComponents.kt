@@ -651,7 +651,7 @@ fun VerseActionToolbar(
                             )
                             Text(
                                 text = notePreviewLine(note),
-                                fontSize = 13.sp,
+                                fontSize = 15.sp,
                                 fontFamily = LiterataFontFamily,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
