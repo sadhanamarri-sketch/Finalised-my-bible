@@ -896,7 +896,7 @@ fun LinkifiedNoteText(
         androidx.compose.ui.text.buildAnnotatedString {
             append(annotated)
             annotated.getStringAnnotations(com.example.mybible.data.VERSE_MENTION_TAG, 0, annotated.length)
-                .forEach { addStyle(SpanStyle(color = linkColor), it.start, it.end) }
+                .forEach { addStyle(SpanStyle(color = linkColor, fontWeight = FontWeight.SemiBold), it.start, it.end) }
         }
     }
     ClickableText(

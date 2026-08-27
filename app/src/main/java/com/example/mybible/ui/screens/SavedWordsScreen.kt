@@ -233,9 +233,10 @@ fun SavedWordsScreen(
                                 if (hasSourceVerse) {
                                     Text(
                                         text = "${saved.sourceBook} ${saved.sourceChapter}:${saved.sourceVerse}",
-                                        fontSize = 12.sp,
+                                        fontSize = 13.sp,
                                         fontFamily = WorkSansFontFamily,
-                                        letterSpacing = 0.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        letterSpacing = 0.5.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,

@@ -324,10 +324,10 @@ fun VerseMentionPreviewSheet(
         Column(modifier = Modifier.padding(20.dp)) {
             Text(
                 text = "$book $chapter:$verse".uppercase(),
-                fontSize = 16.sp,
+                fontSize = 13.sp,
                 fontFamily = WorkSansFontFamily,
-                letterSpacing = 0.sp,
-                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.5.sp,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.tertiary
             )
             Spacer(modifier = Modifier.height(10.dp))
