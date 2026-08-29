@@ -257,6 +257,24 @@ fun ReaderScreen(
     // key a same-chapter xref tap wouldn't re-scroll or re-focus at all.
     LaunchedEffect(currentBook, currentChapter, verses, focusedVerseNumber, focusedVerseBlurEnabled, focusedVersePinToTop, readerAnchor) {
         if (verses.isEmpty()) return@LaunchedEffect
+        // Guard against a stale `verses` list from before a tab switch —
+        // e.g. returning from a Greek/Hebrew lexicon citation tears down
+        // and remounts Reader, and loadChapter() updates currentBook/
+        // currentChapter synchronously while the *previous* chapter's
+        // verses can still be sitting in this shared ViewModel flow until
+        // the new chapter's query resolves. Without this check, this
+        // effect ran its full landing logic against the wrong chapter's
+        // verse list: the indexOfFirst lookup for the target verse
+        // correctly found nothing in an unrelated chapter, fell into the
+        // "not found" branch below, and left the reader unblurred at item
+        // 0 — worse, that branch never syncs xrefFocusLandedIndex/Offset,
+        // so the "scrolled away" watcher's very first real sample (once
+        // the correct chapter *did* load) saw a mismatch and cleared
+        // focusedVerseNumber before this effect got a chance to retry with
+        // the right data. `verses` is already a key of this effect, so it
+        // reruns the moment the correct list lands — simply waiting here
+        // is enough; there's nothing useful to do with a mismatched list.
+        if (verses.first().book != currentBook || verses.first().chapter != currentChapter) return@LaunchedEffect
         val chapterKey = currentBook to currentChapter
         val isNewChapter = chapterKey != lastFocusEffectChapterKey
         lastFocusEffectChapterKey = chapterKey
