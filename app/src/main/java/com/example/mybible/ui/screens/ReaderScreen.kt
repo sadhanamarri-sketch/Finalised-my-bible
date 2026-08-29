@@ -1,5 +1,6 @@
 package com.example.mybible.ui.screens
 
+import android.util.Log
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -256,7 +257,19 @@ fun ReaderScreen(
     // values, which a MutableStateFlow drops as a no-op), so without this
     // key a same-chapter xref tap wouldn't re-scroll or re-focus at all.
     LaunchedEffect(currentBook, currentChapter, verses, focusedVerseNumber, focusedVerseBlurEnabled, focusedVersePinToTop, readerAnchor) {
-        if (verses.isEmpty()) return@LaunchedEffect
+        // TEMPORARY diagnostic logging — see the "Open in Reader from a
+        // lexicon citation lands unblurred at top" bug thread. Remove once
+        // the actual root cause is confirmed via Logcat from a real device.
+        Log.d(
+            "ReaderFocusDebug",
+            "effect run: currentBook=$currentBook currentChapter=$currentChapter " +
+                "focusedVerseNumber=$focusedVerseNumber verses.size=${verses.size} " +
+                "firstVerse=${verses.firstOrNull()?.let { "${it.book}/${it.chapter}/${it.number}" }}"
+        )
+        if (verses.isEmpty()) {
+            Log.d("ReaderFocusDebug", "bail: verses is empty")
+            return@LaunchedEffect
+        }
         // Guard against a stale `verses` list from before a tab switch —
         // e.g. returning from a Greek/Hebrew lexicon citation tears down
         // and remounts Reader, and loadChapter() updates currentBook/
@@ -274,7 +287,15 @@ fun ReaderScreen(
         // the right data. `verses` is already a key of this effect, so it
         // reruns the moment the correct list lands — simply waiting here
         // is enough; there's nothing useful to do with a mismatched list.
-        if (verses.first().book != currentBook || verses.first().chapter != currentChapter) return@LaunchedEffect
+        if (verses.first().book != currentBook || verses.first().chapter != currentChapter) {
+            Log.d(
+                "ReaderFocusDebug",
+                "bail: verses mismatch currentBook/Chapter — " +
+                    "versesBook=${verses.first().book} versesChapter=${verses.first().chapter} " +
+                    "currentBook=$currentBook currentChapter=$currentChapter"
+            )
+            return@LaunchedEffect
+        }
         val chapterKey = currentBook to currentChapter
         val isNewChapter = chapterKey != lastFocusEffectChapterKey
         lastFocusEffectChapterKey = chapterKey
@@ -317,9 +338,11 @@ fun ReaderScreen(
                 xrefFocusLandedIndex = listState.firstVisibleItemIndex
                 xrefFocusLandedOffset = listState.firstVisibleItemScrollOffset
                 xrefFocusActive = focusedVerseBlurEnabled
+                Log.d("ReaderFocusDebug", "branch=FOUND target=$targetVerseNumber idx=$idx landedIndex=$xrefFocusLandedIndex landedOffset=$xrefFocusLandedOffset xrefFocusActive=$xrefFocusActive")
             } else {
                 listState.scrollToItem(0)
                 xrefFocusActive = false
+                Log.d("ReaderFocusDebug", "branch=NOT_FOUND target=$targetVerseNumber not present in verses (available numbers=${verses.map { it.number }})")
             }
         } else if (isNewChapter) {
             // No explicit jump target — this is either the very first
@@ -339,8 +362,10 @@ fun ReaderScreen(
             if (anchorIdx >= 0) {
                 listState.scrollToItem(anchorIdx + 1)
                 viewModel.consumeReaderAnchor()
+                Log.d("ReaderFocusDebug", "branch=ANCHOR_MATCH anchor=$anchor anchorIdx=$anchorIdx")
             } else {
                 listState.scrollToItem(0)
+                Log.d("ReaderFocusDebug", "branch=NO_TARGET_NEW_CHAPTER_NO_ANCHOR anchor=$anchor")
             }
             xrefFocusActive = false
         } else {
@@ -349,6 +374,7 @@ fun ReaderScreen(
             // landed verse), not a fresh chapter open, so leave the scroll
             // position exactly where the reader already is.
             xrefFocusActive = false
+            Log.d("ReaderFocusDebug", "branch=SAME_CHAPTER_NO_TARGET (leaving scroll position as-is)")
         }
     }
 
@@ -382,9 +408,11 @@ fun ReaderScreen(
     // real tab switch/backgrounding, never from the reader just scrolling.
     LaunchedEffect(focusedVerseNumber, xrefFocusLandedIndex, xrefFocusLandedOffset) {
         if (focusedVerseNumber == null) return@LaunchedEffect
+        Log.d("ReaderFocusDebug", "watcher (re)started: focusedVerseNumber=$focusedVerseNumber xrefFocusLandedIndex=$xrefFocusLandedIndex xrefFocusLandedOffset=$xrefFocusLandedOffset currentActual=${listState.firstVisibleItemIndex}/${listState.firstVisibleItemScrollOffset}")
         snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
             .collect { (idx, offset) ->
                 if (idx != xrefFocusLandedIndex || kotlin.math.abs(offset - xrefFocusLandedOffset) > 4) {
+                    Log.d("ReaderFocusDebug", "watcher CLEARING focus: sampled=$idx/$offset landed=$xrefFocusLandedIndex/$xrefFocusLandedOffset")
                     xrefFocusActive = false
                     viewModel.clearVerseFocus()
                 }
