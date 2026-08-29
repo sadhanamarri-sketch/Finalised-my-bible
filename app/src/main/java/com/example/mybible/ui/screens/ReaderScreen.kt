@@ -435,6 +435,25 @@ fun ReaderScreen(
     // real tab switch/backgrounding, never from the reader just scrolling.
     LaunchedEffect(focusedVerseNumber, xrefFocusLandedIndex, xrefFocusLandedOffset) {
         if (focusedVerseNumber == null) return@LaunchedEffect
+        // xrefFocusLandedIndex's declared default is the -1 sentinel — real
+        // on-device logging (see debugLog's "ReaderFocusDebug" tag) confirmed
+        // this stays -1 across a jump that arrives via a tab remount (e.g. a
+        // Greek/Hebrew lexicon citation's "Open in Reader"): Reader's whole
+        // composition, including this remembered state, is torn down and
+        // rebuilt fresh, so this watcher restarts (its key, focusedVerseNumber,
+        // just changed) *before* the main effect above has had a chance to
+        // find the new chapter's verses and land for real. Without this
+        // check, the watcher took its first sample against that -1/0
+        // sentinel, treated the mismatch as "user scrolled away", and cleared
+        // focusedVerseNumber immediately — before the correct chapter's data
+        // even arrived to retry, permanently losing the jump target and
+        // leaving the reader stuck unblurred at the top of the chapter. A
+        // real landing always sets a non-negative index (see the FOUND
+        // branch above), which reruns this effect with real values.
+        if (xrefFocusLandedIndex < 0) {
+            debugLog("watcher: skipping, not landed yet (xrefFocusLandedIndex=$xrefFocusLandedIndex)")
+            return@LaunchedEffect
+        }
         debugLog("watcher (re)started: focusedVerseNumber=$focusedVerseNumber xrefFocusLandedIndex=$xrefFocusLandedIndex xrefFocusLandedOffset=$xrefFocusLandedOffset currentActual=${listState.firstVisibleItemIndex}/${listState.firstVisibleItemScrollOffset}")
         snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
             .collect { (idx, offset) ->
