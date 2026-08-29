@@ -21,7 +21,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -43,6 +45,7 @@ import com.example.mybible.ui.components.formatMinutesLabel
 import com.example.mybible.ui.theme.EbGaramondFontFamily
 import com.example.mybible.ui.theme.GelasioFontFamily
 import com.example.mybible.ui.theme.LoraFontFamily
+import kotlinx.coroutines.launch
 import com.example.mybible.ui.theme.MerriweatherFontFamily
 import com.example.mybible.ui.theme.PlayfairDisplayFontFamily
 import java.text.SimpleDateFormat
@@ -130,6 +133,12 @@ fun SettingsScreen(
         }
     }
     val snackbarHostState = remember { SnackbarHostState() }
+    // TEMPORARY — for the "Open in Reader from lexicon citation" bug
+    // investigation on a device with no computer to pull adb logcat from.
+    // Remove alongside ReaderScreen.kt's ReaderFocusDebugLog/debugLog once
+    // the root cause is confirmed.
+    val clipboardManager = LocalClipboardManager.current
+    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(backupStatusMessage) {
         val message = backupStatusMessage
@@ -670,6 +679,38 @@ fun SettingsScreen(
             text = "Show app tour",
             onClick = onShowTour,
             modifier = Modifier.testTag("settings_start_tour_button")
+        )
+
+        HorizontalDivider(modifier = Modifier.padding(top = 22.dp), color = MaterialTheme.colorScheme.surfaceVariant)
+
+        // ---- TEMPORARY debug section ----
+        // Copies ReaderFocusDebugLog's buffered breadcrumbs to the
+        // clipboard so they can be pasted back for the "Open in Reader
+        // from lexicon citation" bug investigation without needing a
+        // computer for adb logcat. Remove this whole section, plus
+        // ReaderScreen.kt's ReaderFocusDebugLog/debugLog, once the root
+        // cause is confirmed.
+        DsSectionLabel("Debug (temporary)")
+        Text(
+            text = "Reproduce the \"Open in Reader\" bug, then copy the log below and paste it into chat.",
+            fontSize = 13.5.sp,
+            fontFamily = FontFamily.SansSerif,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 14.dp)
+        )
+        DsOutlineAccentButton(
+            text = "Copy Reader debug log",
+            onClick = {
+                val snapshot = ReaderFocusDebugLog.snapshot()
+                clipboardManager.setText(AnnotatedString(snapshot))
+                val lineCount = if (snapshot.isEmpty()) 0 else snapshot.count { it == '\n' } + 1
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar(
+                        if (snapshot.isEmpty()) "Nothing logged yet" else "Copied $lineCount log lines"
+                    )
+                }
+            },
+            modifier = Modifier.testTag("settings_copy_reader_debug_log_button")
         )
 
         Spacer(modifier = Modifier.height(40.dp))

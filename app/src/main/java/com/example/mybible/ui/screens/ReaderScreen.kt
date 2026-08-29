@@ -59,6 +59,35 @@ import com.example.mybible.ui.components.VerseCard
 import com.example.mybible.ui.components.PickModeBanner
 import com.example.mybible.ui.components.BIBLE_BOOKS
 
+// TEMPORARY in-memory ring buffer for the "Open in Reader from a lexicon
+// citation lands unblurred at chapter top" bug investigation — the device
+// reproducing this has no computer to pull `adb logcat` from, so these
+// breadcrumbs are also copyable straight from the app itself (see
+// SettingsScreen's "Copy Reader Debug Log" button) instead of only going
+// to Logcat. Remove alongside every debugLog() call once the root cause
+// is confirmed.
+object ReaderFocusDebugLog {
+    private const val MAX_LINES = 200
+    private val lines = ArrayDeque<String>()
+
+    @Synchronized
+    fun add(line: String) {
+        lines.addLast(line)
+        while (lines.size > MAX_LINES) lines.removeFirst()
+    }
+
+    @Synchronized
+    fun snapshot(): String = lines.joinToString("\n")
+
+    @Synchronized
+    fun clear() = lines.clear()
+}
+
+private fun debugLog(message: String) {
+    Log.d("ReaderFocusDebug", message)
+    ReaderFocusDebugLog.add(message)
+}
+
 // Notes attached to an exact verse — checks every entry in `refs`, not just
 // the legacy single book/chapter/verse fields. A note picked with multiple
 // references (see MainViewModel's picking mode) attaches to *all* of them,
@@ -260,14 +289,13 @@ fun ReaderScreen(
         // TEMPORARY diagnostic logging — see the "Open in Reader from a
         // lexicon citation lands unblurred at top" bug thread. Remove once
         // the actual root cause is confirmed via Logcat from a real device.
-        Log.d(
-            "ReaderFocusDebug",
+        debugLog(
             "effect run: currentBook=$currentBook currentChapter=$currentChapter " +
                 "focusedVerseNumber=$focusedVerseNumber verses.size=${verses.size} " +
                 "firstVerse=${verses.firstOrNull()?.let { "${it.book}/${it.chapter}/${it.number}" }}"
         )
         if (verses.isEmpty()) {
-            Log.d("ReaderFocusDebug", "bail: verses is empty")
+            debugLog("bail: verses is empty")
             return@LaunchedEffect
         }
         // Guard against a stale `verses` list from before a tab switch —
@@ -288,8 +316,7 @@ fun ReaderScreen(
         // reruns the moment the correct list lands — simply waiting here
         // is enough; there's nothing useful to do with a mismatched list.
         if (verses.first().book != currentBook || verses.first().chapter != currentChapter) {
-            Log.d(
-                "ReaderFocusDebug",
+            debugLog(
                 "bail: verses mismatch currentBook/Chapter — " +
                     "versesBook=${verses.first().book} versesChapter=${verses.first().chapter} " +
                     "currentBook=$currentBook currentChapter=$currentChapter"
@@ -338,11 +365,11 @@ fun ReaderScreen(
                 xrefFocusLandedIndex = listState.firstVisibleItemIndex
                 xrefFocusLandedOffset = listState.firstVisibleItemScrollOffset
                 xrefFocusActive = focusedVerseBlurEnabled
-                Log.d("ReaderFocusDebug", "branch=FOUND target=$targetVerseNumber idx=$idx landedIndex=$xrefFocusLandedIndex landedOffset=$xrefFocusLandedOffset xrefFocusActive=$xrefFocusActive")
+                debugLog("branch=FOUND target=$targetVerseNumber idx=$idx landedIndex=$xrefFocusLandedIndex landedOffset=$xrefFocusLandedOffset xrefFocusActive=$xrefFocusActive")
             } else {
                 listState.scrollToItem(0)
                 xrefFocusActive = false
-                Log.d("ReaderFocusDebug", "branch=NOT_FOUND target=$targetVerseNumber not present in verses (available numbers=${verses.map { it.number }})")
+                debugLog("branch=NOT_FOUND target=$targetVerseNumber not present in verses (available numbers=${verses.map { it.number }})")
             }
         } else if (isNewChapter) {
             // No explicit jump target — this is either the very first
@@ -362,10 +389,10 @@ fun ReaderScreen(
             if (anchorIdx >= 0) {
                 listState.scrollToItem(anchorIdx + 1)
                 viewModel.consumeReaderAnchor()
-                Log.d("ReaderFocusDebug", "branch=ANCHOR_MATCH anchor=$anchor anchorIdx=$anchorIdx")
+                debugLog("branch=ANCHOR_MATCH anchor=$anchor anchorIdx=$anchorIdx")
             } else {
                 listState.scrollToItem(0)
-                Log.d("ReaderFocusDebug", "branch=NO_TARGET_NEW_CHAPTER_NO_ANCHOR anchor=$anchor")
+                debugLog("branch=NO_TARGET_NEW_CHAPTER_NO_ANCHOR anchor=$anchor")
             }
             xrefFocusActive = false
         } else {
@@ -374,7 +401,7 @@ fun ReaderScreen(
             // landed verse), not a fresh chapter open, so leave the scroll
             // position exactly where the reader already is.
             xrefFocusActive = false
-            Log.d("ReaderFocusDebug", "branch=SAME_CHAPTER_NO_TARGET (leaving scroll position as-is)")
+            debugLog("branch=SAME_CHAPTER_NO_TARGET (leaving scroll position as-is)")
         }
     }
 
@@ -408,11 +435,11 @@ fun ReaderScreen(
     // real tab switch/backgrounding, never from the reader just scrolling.
     LaunchedEffect(focusedVerseNumber, xrefFocusLandedIndex, xrefFocusLandedOffset) {
         if (focusedVerseNumber == null) return@LaunchedEffect
-        Log.d("ReaderFocusDebug", "watcher (re)started: focusedVerseNumber=$focusedVerseNumber xrefFocusLandedIndex=$xrefFocusLandedIndex xrefFocusLandedOffset=$xrefFocusLandedOffset currentActual=${listState.firstVisibleItemIndex}/${listState.firstVisibleItemScrollOffset}")
+        debugLog("watcher (re)started: focusedVerseNumber=$focusedVerseNumber xrefFocusLandedIndex=$xrefFocusLandedIndex xrefFocusLandedOffset=$xrefFocusLandedOffset currentActual=${listState.firstVisibleItemIndex}/${listState.firstVisibleItemScrollOffset}")
         snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
             .collect { (idx, offset) ->
                 if (idx != xrefFocusLandedIndex || kotlin.math.abs(offset - xrefFocusLandedOffset) > 4) {
-                    Log.d("ReaderFocusDebug", "watcher CLEARING focus: sampled=$idx/$offset landed=$xrefFocusLandedIndex/$xrefFocusLandedOffset")
+                    debugLog("watcher CLEARING focus: sampled=$idx/$offset landed=$xrefFocusLandedIndex/$xrefFocusLandedOffset")
                     xrefFocusActive = false
                     viewModel.clearVerseFocus()
                 }
