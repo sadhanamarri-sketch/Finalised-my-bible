@@ -294,8 +294,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _studiedReturnAvailable.value = true
     }
 
+    // Restores currentBook/currentChapter to wherever Studied's detour
+    // actually started before switching tabs — not just cosmetic: leaving
+    // them pointed at whatever verse the detour jumped to in Reader meant
+    // isDetourActive() went false the instant this ran (studiedReturnAvailable
+    // is what it was gating on), so closing the app right after tapping
+    // Return persisted *that* verse's chapter as the resume position
+    // instead of the chapter genuinely being read. Doesn't consume
+    // _studiedSourceVerse — backToStudiedSourceVerse still needs it for a
+    // full exit from Studied later.
     fun returnToStudied() {
         _studiedReturnAvailable.value = false
+        _studiedSourceVerse.value?.let { jumpToVerse(it.book, it.chapter, it.verse) }
         selectTab(NavTab.STUDIED)
     }
 
@@ -369,8 +379,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // See returnToStudied's doc for why this restores currentBook/
+    // currentChapter first — same isDetourActive()/persisted-resume-
+    // position bug, same fix. Doesn't consume _highlightsSourceVerse —
+    // backToHighlightsSourceVerse still needs it for a full exit later.
     fun returnToHighlightedVerses() {
         _highlightsReturnAvailable.value = false
+        _highlightsSourceVerse.value?.let { jumpToVerse(it.book, it.chapter, it.verse) }
         selectTab(NavTab.HIGHLIGHTS)
     }
 
@@ -545,9 +560,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _lexiconReturnTab.value = tab
     }
 
+    // See returnToStudied's doc for why this restores currentBook/
+    // currentChapter first — same isDetourActive()/persisted-resume-
+    // position bug (confirmed via the "Open in Reader from a lexicon
+    // citation" investigation's on-device logging: closing the app right
+    // after tapping Return persisted the *cited* chapter as the resume
+    // position instead of wherever the lexicon lookup actually started).
+    // Doesn't consume _lexiconBaseVerse — closeGreekWordPage/
+    // closeHebrewWordPage's jumpToLexiconBaseVerse still needs it for a
+    // full exit from the lexicon page later.
     fun returnToLexicon() {
         val tab = _lexiconReturnTab.value ?: return
         _lexiconReturnTab.value = null
+        _lexiconBaseVerse.value?.let { jumpToVerse(it.book, it.chapter, it.number) }
         selectTab(tab)
     }
 
@@ -596,10 +621,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // See returnToStudied's doc for why this restores currentBook/
+    // currentChapter first — same isDetourActive()/persisted-resume-
+    // position bug, same fix. Doesn't consume _notesSourceVerse —
+    // backToNotesSourceVerse still needs it for a full exit from Notes
+    // later (see its own doc for why a note-mention chain can nest several
+    // steps deep before that happens).
     fun returnToNote() {
         val note = _noteReturnItem.value ?: return
         _noteReturnItem.value = null
         val originTab = _noteReaderOriginTab.value
+        _notesSourceVerse.value?.let { jumpToVerse(it.book, it.chapter, it.verse) }
         openNoteReader(note, originTab)
         selectTab(originTab)
     }
@@ -1722,8 +1754,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // returnToSearchResults(). This is the banner's own Return button;
     // system back does something different — see
     // backToCrossReferenceSourceVerse below.
+    // See returnToStudied's doc (MainViewModel.kt) for why this restores
+    // currentBook/currentChapter first — same isDetourActive()/persisted-
+    // resume-position bug, same fix. Doesn't consume _crossReferenceSourceVerse
+    // — backToCrossReferenceSourceVerse/endCrossReferenceSession still need
+    // it for a full exit from the cross-reference session later.
     fun returnToCrossReferences() {
         _crossReferenceReturnAvailable.value = false
+        _crossReferenceSourceVerse.value?.let { jumpToVerse(it.book, it.chapter, it.number) }
         selectTab(NavTab.CROSS_REFERENCES)
     }
 
@@ -2469,9 +2507,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _suppressNextSearchAutofocus.value = false
     }
 
+    // See returnToStudied's doc (MainViewModel.kt) for why this restores
+    // currentBook/currentChapter first — same isDetourActive()/persisted-
+    // resume-position bug, same fix. Doesn't consume _searchSourceVerse —
+    // the system-back "undo the whole search detour" path still needs it
+    // for a full exit from Search later.
     fun returnToSearchResults() {
         _searchReturnAvailable.value = false
         _suppressNextSearchAutofocus.value = true
+        _searchSourceVerse.value?.let { jumpToVerse(it.book, it.chapter, it.verse) }
         selectTab(NavTab.SEARCH)
     }
 
