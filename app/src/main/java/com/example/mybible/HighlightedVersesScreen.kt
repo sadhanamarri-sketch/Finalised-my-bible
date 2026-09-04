@@ -94,7 +94,7 @@ fun HighlightedVersesScreen(
                 .background(MaterialTheme.colorScheme.background)
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, top = 10.dp),
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 listOf(false, true).forEach { onlyCurrent ->
