@@ -605,6 +605,7 @@ class MainActivity : ComponentActivity() {
                         if (note != null) {
                             NoteReaderScreen(
                                 noteItem = note,
+                                themeMode = themeMode,
                                 onBack = { viewModel.closeNoteReader() },
                                 // Matches Capacitor's nrEditPage.onclick:
                                 // closeNoteReader(); closeNotesList();
@@ -656,8 +657,9 @@ class MainActivity : ComponentActivity() {
                         if (editing != null) {
                             NoteEditorScreen(
                                 noteItem = editing,
-                                onSave = { title, text, noteDate, refs, tags ->
-                                    viewModel.saveNote(title, text, noteDate, refs, tags)
+                                themeMode = themeMode,
+                                onSave = { title, text, noteDate, refs, tags, richText ->
+                                    viewModel.saveNote(title, text, noteDate, refs, tags, richText)
                                 },
                                 onCancel = { viewModel.closeNoteEditor() },
                                 onDelete = {

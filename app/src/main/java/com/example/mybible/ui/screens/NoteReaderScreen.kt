@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,8 +27,11 @@ import com.example.mybible.ui.theme.NotoSerifFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.mybible.model.NoteDocument
 import com.example.mybible.model.NoteItem
+import com.example.mybible.model.ThemeMode
 import com.example.mybible.ui.components.LinkifiedNoteText
+import com.example.mybible.ui.richtext.RichNoteBodyView
 
 /**
  * Full-page note reader — ported to match Capacitor's #noteReaderSheet
@@ -67,6 +71,7 @@ import com.example.mybible.ui.components.LinkifiedNoteText
 @Composable
 fun NoteReaderScreen(
     noteItem: NoteItem,
+    themeMode: ThemeMode,
     onBack: () -> Unit,
     onEdit: (() -> Unit)? = null,
     // Tapping a reference in the ref line — or a verse mention inside the
@@ -187,16 +192,31 @@ fun NoteReaderScreen(
                     )
                 }
 
-                LinkifiedNoteText(
-                    text = noteItem.text,
-                    onMentionClick = { b, c, v -> onOpenVerseMention?.invoke(b, c, v) },
-                    style = androidx.compose.ui.text.TextStyle(
-                        fontFamily = NotoSerifFontFamily,
-                        fontSize = 19.sp,
-                        lineHeight = 34.39.sp, // 19sp * 1.81x, tuned via the Notes Font Lab
-                        color = MaterialTheme.colorScheme.onSurface
+                // A note only carries richText once it's been opened in the
+                // rich text editor at least once (see model/RichText.kt) —
+                // every note saved before that existed, and any note never
+                // reopened there since, falls straight back to the original
+                // plain LinkifiedNoteText path with no behavior change.
+                val richDocument = remember(noteItem.richText) { NoteDocument.fromJsonOrNull(noteItem.richText) }
+                if (richDocument != null) {
+                    RichNoteBodyView(
+                        document = richDocument,
+                        themeMode = themeMode,
+                        onMentionClick = { b, c, v -> onOpenVerseMention?.invoke(b, c, v) },
+                        baseFontSizeSp = 19f
                     )
-                )
+                } else {
+                    LinkifiedNoteText(
+                        text = noteItem.text,
+                        onMentionClick = { b, c, v -> onOpenVerseMention?.invoke(b, c, v) },
+                        style = androidx.compose.ui.text.TextStyle(
+                            fontFamily = NotoSerifFontFamily,
+                            fontSize = 19.sp,
+                            lineHeight = 34.39.sp, // 19sp * 1.81x, tuned via the Notes Font Lab
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    )
+                }
             }
         }
     }

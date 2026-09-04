@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -23,8 +22,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
@@ -35,16 +32,19 @@ import com.example.mybible.ui.theme.WorkSansFontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.mybible.model.NoteDocument
 import com.example.mybible.model.NoteItem
 import com.example.mybible.model.NoteReference
+import com.example.mybible.model.ThemeMode
 import com.example.mybible.ui.components.BackTopBar
 import com.example.mybible.ui.components.DateField
 import com.example.mybible.ui.components.NeSectionLabel
 import com.example.mybible.ui.components.NeTextField
+import com.example.mybible.ui.richtext.RichDocumentHolder
+import com.example.mybible.ui.richtext.RichNoteBodyEditor
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlinx.coroutines.delay
 
 // Compose's Modifier.border() has no dashed-stroke option, so this draws
 // one manually — matches Capacitor's #neAddRef (`border:1px dashed
@@ -81,7 +81,8 @@ private fun Modifier.dashedBorder(
 @Composable
 fun NoteEditorScreen(
     noteItem: NoteItem,
-    onSave: (String, String, String, List<NoteReference>, List<String>) -> Unit,
+    themeMode: ThemeMode,
+    onSave: (String, String, String, List<NoteReference>, List<String>, String) -> Unit,
     onCancel: () -> Unit,
     // Matches Capacitor's #neDelete, shown only when editing an existing
     // note (draftNote.id != null). Deletes and closes the editor.
@@ -110,6 +111,7 @@ fun NoteEditorScreen(
 ) {
     var title by remember { mutableStateOf(noteItem.title) }
     var text by remember { mutableStateOf(noteItem.text) }
+    var richTextJson by remember { mutableStateOf(noteItem.richText) }
     var noteDate by remember {
         mutableStateOf(
             noteItem.noteDate.ifBlank {
@@ -169,7 +171,7 @@ fun NoteEditorScreen(
                 backContentDescription = "Cancel",
                 actions = {
                     TextButton(
-                        onClick = { onSave(title, text, noteDate, refs, tags) },
+                        onClick = { onSave(title, text, noteDate, refs, tags, richTextJson) },
                         enabled = text.isNotBlank()
                     ) {
                         Text("Save", fontWeight = FontWeight.SemiBold)
@@ -274,7 +276,8 @@ fun NoteEditorScreen(
                                 text = text,
                                 noteDate = noteDate,
                                 refs = refs,
-                                tags = tags
+                                tags = tags,
+                                richText = richTextJson
                             )
                         )
                     }
@@ -486,10 +489,13 @@ fun NoteEditorScreen(
         if (showFullTextEditor) {
             NoteTextFullScreenEditor(
                 initialText = text,
+                initialRichTextJson = richTextJson,
+                themeMode = themeMode,
                 noteTitle = title,
                 onCancel = { showFullTextEditor = false },
-                onDone = { newText ->
+                onDone = { newText, newRichTextJson ->
                     text = newText
+                    richTextJson = newRichTextJson
                     showFullTextEditor = false
                 }
             )
@@ -518,27 +524,27 @@ fun NoteEditorScreen(
     }
 }
 
-// Dedicated distraction-free writer for the note body — matches
-// Capacitor's #noteTextEditor overlay (Cancel / "Note" / Done header +
-// a full-bleed textarea, autofocused ~50ms after opening). Edits here are
-// local to `draft`; Cancel discards them, Done copies `draft` back up to
-// the caller's `text` state.
+// Dedicated distraction-free writer for the note body — matches Capacitor's
+// #noteTextEditor overlay's Cancel / "Note" / Done header, but the body
+// itself is now the full rich text editor (see ui/richtext/RichTextEditor.kt)
+// rather than a plain textarea. Edits live in `holder` for the lifetime of
+// this composable; Cancel discards it, Done reads a snapshot back up to the
+// caller as both a plain-text rendition and the richText JSON to persist.
 @Composable
 private fun NoteTextFullScreenEditor(
     initialText: String,
+    initialRichTextJson: String,
+    themeMode: ThemeMode,
     // Shown in the header in place of the static "Note" label, so it's
     // clear which note this full-bleed writer belongs to — falls back to
     // "Note" for an untitled note, matching Capacitor's plain header when
     // draftNote.title is empty.
     noteTitle: String = "",
     onCancel: () -> Unit,
-    onDone: (String) -> Unit
+    onDone: (text: String, richTextJson: String) -> Unit
 ) {
-    var draft by remember { mutableStateOf(initialText) }
-    val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) {
-        delay(50)
-        focusRequester.requestFocus()
+    val holder = remember(initialRichTextJson, initialText) {
+        RichDocumentHolder(NoteDocument.fromJsonOrNull(initialRichTextJson) ?: NoteDocument.fromPlainText(initialText))
     }
     // Hardware/gesture back cancels — matches Capacitor's back-button
     // handling, which routes #noteTextEditor through closeNoteTextEditor()
@@ -571,42 +577,19 @@ private fun NoteTextFullScreenEditor(
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false).padding(horizontal = 8.dp)
                 )
-                TextButton(onClick = { onDone(draft) }) {
+                TextButton(onClick = {
+                    val doc = holder.snapshot()
+                    onDone(doc.toPlainText(), doc.toJson())
+                }) {
                     Text("Done", fontWeight = FontWeight.Bold)
                 }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            // Matches Capacitor's #nteTextarea exactly: no border, no
-            // background box — just text on the page. OutlinedTextField
-            // always draws its outline (that's the whole point of it),
-            // which is why this was showing a boxed/outlined rectangle
-            // instead of a plain full-bleed writing surface.
-            Box(modifier = Modifier.fillMaxSize().weight(1f)) {
-                BasicTextField(
-                    value = draft,
-                    onValueChange = { draft = it },
-                    textStyle = androidx.compose.ui.text.TextStyle(
-                        fontFamily = NotoSerifFontFamily,
-                        fontSize = 19.sp,
-                        lineHeight = 34.39.sp,
-                        color = MaterialTheme.colorScheme.onSurface
-                    ),
-                    cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .focusRequester(focusRequester)
-                        .padding(horizontal = 20.dp, vertical = 16.dp)
-                )
-                if (draft.isEmpty()) {
-                    Text(
-                        text = "Write your note\u2026",
-                        fontFamily = NotoSerifFontFamily,
-                        fontSize = 19.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
-                    )
-                }
-            }
+            RichNoteBodyEditor(
+                holder = holder,
+                themeMode = themeMode,
+                modifier = Modifier.fillMaxSize().weight(1f)
+            )
         }
     }
 }

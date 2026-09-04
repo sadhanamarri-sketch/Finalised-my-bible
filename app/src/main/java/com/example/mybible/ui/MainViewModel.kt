@@ -2160,7 +2160,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun todayDateString(): String = studyDateFormat.format(Date())
 
-    fun saveNote(title: String, text: String, noteDate: String, refs: List<NoteReference>, tags: List<String>) {
+    fun saveNote(title: String, text: String, noteDate: String, refs: List<NoteReference>, tags: List<String>, richText: String = "") {
         val note = _noteToEdit.value ?: return
         viewModelScope.launch {
             val resolvedRefs = refs.map { ref -> repository.resolveNoteReference(ref) }
@@ -2170,7 +2170,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 text = text,
                 noteDate = noteDate,
                 refs = resolvedRefs,
-                tags = tags
+                tags = tags,
+                richText = richText
             )
             closeNoteEditor()
             _selectedVerse.value = null

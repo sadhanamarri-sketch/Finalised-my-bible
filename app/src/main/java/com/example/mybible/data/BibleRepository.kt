@@ -785,7 +785,8 @@ class BibleRepository(private val context: Context) {
         text: String,
         noteDate: String,
         refs: List<NoteReference>,
-        tags: List<String>
+        tags: List<String>,
+        richText: String = ""
     ) {
         val current = _notesFlow.value.toMutableList()
         val now = System.currentTimeMillis()
@@ -808,7 +809,8 @@ class BibleRepository(private val context: Context) {
             verseText = primary?.verseText ?: "",
             tags = tags.map { it.trim() }.filter { it.isNotBlank() }.distinct(),
             createdAt = if (existingIndex >= 0) current[existingIndex].createdAt else now,
-            updatedAt = now
+            updatedAt = now,
+            richText = richText
         )
         if (existingIndex >= 0) {
             current[existingIndex] = newNote

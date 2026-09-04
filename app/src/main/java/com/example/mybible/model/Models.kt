@@ -159,7 +159,15 @@ data class NoteItem(
     val refs: List<NoteReference> = emptyList(),
     val tags: List<String> = emptyList(),
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    // JSON-encoded NoteDocument (see model/RichText.kt) carrying this note's
+    // formatting — heading levels, bold/italic/underline, highlight,
+    // blockquote, lists, indent, alignment. Blank for every note saved
+    // before the rich text editor existed, and for any note never reopened
+    // in it since; `text` above stays the plain-text rendition either way
+    // (kept in sync on every save) so old code paths — list previews,
+    // search, backup — never need to know richText exists.
+    val richText: String = ""
 )
 
 @Serializable
