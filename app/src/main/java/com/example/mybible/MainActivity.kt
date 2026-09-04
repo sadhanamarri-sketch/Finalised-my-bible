@@ -437,9 +437,13 @@ class MainActivity : ComponentActivity() {
                             NavTab.HEBREW_WORD -> HebrewWordScreen(viewModel = viewModel)
                             NavTab.HIGHLIGHTS -> {
                                 val highlightedItems by viewModel.highlightedVerseItems.collectAsState()
+                                val currentBook by viewModel.currentBook.collectAsState()
+                                val currentChapter by viewModel.currentChapter.collectAsState()
                                 HighlightedVersesScreen(
                                     highlights = highlightedItems,
                                     themeMode = themeMode,
+                                    currentBook = currentBook,
+                                    currentChapter = currentChapter,
                                     onOpenVerse = { viewModel.openHighlightedVerse(it) },
                                     onClose = {
                                         viewModel.backToHighlightsSourceVerse()

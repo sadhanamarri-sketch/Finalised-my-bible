@@ -57,16 +57,25 @@ data class HighlightedVerseItem(
 fun HighlightedVersesScreen(
     highlights: List<HighlightedVerseItem>,
     themeMode: ThemeMode,
+    currentBook: String,
+    currentChapter: Int,
     onOpenVerse: (HighlightedVerseItem) -> Unit,
     onClose: () -> Unit
 ) {
     var selectedColor by remember { mutableStateOf("All") }
+    // Live, not frozen: reads currentBook/currentChapter straight from the
+    // Reader's own state, so if the user leaves (e.g. a detour to a
+    // different-chapter highlight, or just switching tabs and changing
+    // chapters) and comes back, this reflects wherever they actually are
+    // now rather than wherever they were when this screen first opened.
+    var showCurrentChapterOnly by remember { mutableStateOf(false) }
     val colors = remember(highlights) {
         listOf("All") + highlights.map { it.colorName }.filter { it.isNotBlank() }.distinct().sorted()
     }
-    val filtered = remember(highlights, selectedColor) {
-        if (selectedColor == "All") highlights
-        else highlights.filter { it.colorName == selectedColor }
+    val filtered = remember(highlights, selectedColor, showCurrentChapterOnly, currentBook, currentChapter) {
+        highlights
+            .filter { selectedColor == "All" || it.colorName == selectedColor }
+            .filter { !showCurrentChapterOnly || (it.book == currentBook && it.chapter == currentChapter) }
     }
 
     Scaffold(
@@ -84,6 +93,39 @@ fun HighlightedVersesScreen(
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
         ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, top = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf(false, true).forEach { onlyCurrent ->
+                    val selected = showCurrentChapterOnly == onlyCurrent
+                    FilterChip(
+                        selected = selected,
+                        onClick = { showCurrentChapterOnly = onlyCurrent },
+                        label = {
+                            Text(
+                                if (onlyCurrent) "This Chapter" else "All",
+                                fontFamily = WorkSansFontFamily,
+                                letterSpacing = 0.sp
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            selectedLabelColor = if (themeMode == ThemeMode.CLASSIC_DARK) {
+                                Color.Black
+                            } else {
+                                MaterialTheme.colorScheme.tertiary
+                            }
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = selected,
+                            borderColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.35f),
+                            selectedBorderColor = MaterialTheme.colorScheme.tertiary
+                        )
+                    )
+                }
+            }
             if (colors.size > 1) {
                 // FlowRow, not Row: a plain Row doesn't wrap, so once there
                 // are enough color labels to overflow the screen width the
@@ -130,7 +172,11 @@ fun HighlightedVersesScreen(
             if (filtered.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
-                        text = if (highlights.isEmpty()) "No highlighted verses" else "No verses for this color",
+                        text = when {
+                            highlights.isEmpty() -> "No highlighted verses"
+                            showCurrentChapterOnly -> "No highlighted verses in this chapter"
+                            else -> "No verses for this color"
+                        },
                         fontFamily = WorkSansFontFamily,
                         letterSpacing = 0.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
