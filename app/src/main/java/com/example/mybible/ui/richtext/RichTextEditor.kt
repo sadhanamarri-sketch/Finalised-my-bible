@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.example.mybible.ui.richtext
 
 import androidx.compose.foundation.background
@@ -8,12 +10,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -27,6 +34,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,6 +79,7 @@ import com.example.mybible.model.splitStyleRangesAt
 import com.example.mybible.model.toggleStyleRange
 import com.example.mybible.ui.theme.NotoSerifFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
+import kotlinx.coroutines.launch
 
 // Per-block editable state: a "state holder" object (each field its own
 // mutableStateOf) rather than an immutable data class swapped out wholesale
@@ -93,6 +102,7 @@ internal class EditableBlock(val id: Long, initial: RichBlock) {
     // grab focus and place the cursor, then clears it.
     var pendingFocusCursor by mutableStateOf<Int?>(null)
     val focusRequester = FocusRequester()
+    val bringIntoViewRequester = BringIntoViewRequester()
 
     fun toRichBlock(): RichBlock = RichBlock(
         text = fieldValue.text,
@@ -252,8 +262,9 @@ private fun mergeWithPrevious(holder: RichDocumentHolder, index: Int) {
     prev.pendingFocusCursor = offset
 }
 
-// Full replacement for the note body's old single-BasicTextField writer:
-// a formatting toolbar pinned above a scrollable column of per-block rows.
+// Full replacement for the note body's old single-BasicTextField writer: a
+// scrollable column of per-block rows with a formatting toolbar docked at
+// the bottom, directly above the keyboard, only while it's up.
 @Composable
 internal fun RichNoteBodyEditor(
     holder: RichDocumentHolder,
@@ -264,21 +275,19 @@ internal fun RichNoteBodyEditor(
     var activeBlockId by remember { mutableStateOf(holder.blocks.first().id) }
     val accentColor = MaterialTheme.colorScheme.primary
     val (highlightBg, highlightInk) = highlightColors(themeMode)
+    // Toolbar lives at the bottom of this same imePadding()'d column, not
+    // the top — that's what puts it directly above the keyboard instead of
+    // eating into the content area above it, and lets it collapse away
+    // entirely (via isImeVisible) once the keyboard is dismissed rather
+    // than permanently reserving space.
+    val imeVisible = WindowInsets.isImeVisible
 
     LaunchedEffect(Unit) {
         val first = holder.blocks.first()
         first.pendingFocusCursor = first.fieldValue.text.length
     }
 
-    Column(modifier = modifier.fillMaxSize()) {
-        FormattingToolbar(
-            holder = holder,
-            activeBlockId = activeBlockId,
-            accentColor = accentColor,
-            highlightBg = highlightBg,
-            baseFontSizeSp = baseFontSizeSp,
-            modifier = Modifier.fillMaxWidth()
-        )
+    Column(modifier = modifier.fillMaxSize().imePadding()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -301,6 +310,16 @@ internal fun RichNoteBodyEditor(
                 }
             }
         }
+        if (imeVisible) {
+            FormattingToolbar(
+                holder = holder,
+                activeBlockId = activeBlockId,
+                accentColor = accentColor,
+                highlightBg = highlightBg,
+                baseFontSizeSp = baseFontSizeSp,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }
 
@@ -315,11 +334,14 @@ private fun BlockRow(
     baseFontSizeSp: Float,
     onFocused: () -> Unit
 ) {
+    val coroutineScope = rememberCoroutineScope()
+
     LaunchedEffect(block.pendingFocusCursor) {
         val pos = block.pendingFocusCursor ?: return@LaunchedEffect
         block.focusRequester.requestFocus()
         block.fieldValue = block.fieldValue.copy(selection = TextRange(pos.coerceIn(0, block.fieldValue.text.length)))
         block.pendingFocusCursor = null
+        block.bringIntoViewRequester.bringIntoView()
     }
 
     val fontFamily = if (block.style == RichBlockStyle.HEADING_3) WorkSansFontFamily else NotoSerifFontFamily
@@ -410,7 +432,13 @@ private fun BlockRow(
                 modifier = Modifier
                     .weight(1f)
                     .focusRequester(block.focusRequester)
-                    .onFocusChanged { if (it.isFocused) onFocused() }
+                    .bringIntoViewRequester(block.bringIntoViewRequester)
+                    .onFocusChanged {
+                        if (it.isFocused) {
+                            onFocused()
+                            coroutineScope.launch { block.bringIntoViewRequester.bringIntoView() }
+                        }
+                    }
                     .onPreviewKeyEvent { event ->
                         if (event.type == KeyEventType.KeyDown && event.key == Key.Backspace &&
                             block.fieldValue.selection.collapsed && block.fieldValue.selection.start == 0
