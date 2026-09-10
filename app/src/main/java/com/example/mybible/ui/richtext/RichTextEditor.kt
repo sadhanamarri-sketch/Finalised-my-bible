@@ -296,7 +296,14 @@ internal fun RichNoteBodyEditor(
                 .fillMaxWidth()
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp)
+                // Extra bottom clearance (vs. the 16dp everywhere else):
+                // the toolbar now docks directly beneath this column, and
+                // Android's cursor-drag handle — a system overlay, drawn
+                // above everything regardless of this layout — renders
+                // below wherever the cursor sits. With no gap, placing the
+                // cursor on the last line puts that handle right on top of
+                // the toolbar's buttons.
+                .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 44.dp)
         ) {
             holder.blocks.forEachIndexed { index, block ->
                 key(block.id) {
