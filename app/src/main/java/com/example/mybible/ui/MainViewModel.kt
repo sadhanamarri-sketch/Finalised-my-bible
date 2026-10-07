@@ -83,6 +83,12 @@ private const val POSITION_SAVE_DEBOUNCE_MS = 1500L
 // was never explicitly dismissed.
 private const val DETOUR_SETTLE_MS = 300_000L
 
+// How long a tab change takes on screen: MainActivity's AnimatedContent
+// uses the default transition (the old tab fades out over 90 ms, the new
+// one is in by about 310 ms). Work that would show on the outgoing tab
+// waits this long — see returnToVerseScroll.
+private const val TAB_CHANGE_MS = 400L
+
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = BibleRepository(application)
@@ -410,15 +416,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _verseScrollSourceVerse = MutableStateFlow<ReaderScrollAnchor?>(null)
 
+    // Set between "Return" and the Reader being put back where it was (see returnToVerseScroll).
+    private var verseScrollReaderRestore: Job? = null
+
     fun openVerseScroll() {
         selectTab(NavTab.VERSE_SCROLL)
     }
 
     fun closeVerseScroll() {
+        if (verseScrollReaderRestore != null) restoreReaderAfterVerseScroll()
         selectTab(NavTab.READER)
     }
 
     fun readFromVerseScroll(book: String, chapter: Int, verse: Int) {
+        // Back in the Reader before it was put back: still the same detour, from the same place.
+        verseScrollReaderRestore?.cancel()
+        verseScrollReaderRestore = null
         captureReaderSourceVerseIfNeeded(_verseScrollSourceVerse)
         _verseScrollReturnAvailable.value = true
         jumpToVerse(book, chapter, verse)
@@ -429,12 +442,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // The banner's Return button and system back alike — unlike Search's
     // results list, there's nothing else to go back to.
+    //
+    // The Reader is put back where it was only once it has faded out: done
+    // first, as before, the chapter it goes back to flashed up while the
+    // Reader was still on its way off screen (the tab change is animated,
+    // see MainActivity's AnimatedContent). Until then the detour stays
+    // open, so nothing saves the verse that was only glanced at as the
+    // reading position in between.
     fun returnToVerseScroll() {
+        selectTab(NavTab.VERSE_SCROLL)
+        verseScrollReaderRestore?.cancel()
+        verseScrollReaderRestore = viewModelScope.launch {
+            delay(TAB_CHANGE_MS)
+            restoreReaderAfterVerseScroll()
+        }
+    }
+
+    private fun restoreReaderAfterVerseScroll() {
+        verseScrollReaderRestore?.cancel()
+        verseScrollReaderRestore = null
         val source = _verseScrollSourceVerse.value
         _verseScrollSourceVerse.value = null
         _verseScrollReturnAvailable.value = false
         if (source != null) jumpToVerse(source.book, source.chapter, source.verse, focusVerse = false)
-        selectTab(NavTab.VERSE_SCROLL)
     }
 
     fun dismissVerseScrollReturnBanner() {
@@ -1523,6 +1553,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _studiedReturnAvailable.value = false
         _verseScrollReturnAvailable.value = false
         _verseScrollSourceVerse.value = null
+        verseScrollReaderRestore?.cancel()
+        verseScrollReaderRestore = null
         // Also clear the source-verse-to-restore-on-exit tracking for
         // search/highlights/studied/notes — otherwise a stale one left over
         // from before backgrounding (see this function's own doc) would
