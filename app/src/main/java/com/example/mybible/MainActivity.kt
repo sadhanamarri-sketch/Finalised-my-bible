@@ -12,6 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -40,6 +41,10 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+// To and from Verse Scroll, tabs dissolve: the new one fades in over the old
+// over this long (see the tab AnimatedContent below).
+private const val VERSE_SCROLL_DISSOLVE_MS = 300
 
 class MainActivity : ComponentActivity() {
 
@@ -435,6 +440,20 @@ class MainActivity : ComponentActivity() {
                     if (initialRestoreComplete) {
                     AnimatedContent(
                         targetState = activeTab,
+                        transitionSpec = {
+                            if (initialState == NavTab.VERSE_SCROLL || targetState == NavTab.VERSE_SCROLL) {
+                                // Verse Scroll is a full-screen photo: it dissolves in over the
+                                // tab it came from (and that tab back over it), the old one
+                                // staying put underneath until the new one is all the way in.
+                                // The usual fade out, pause and zoom in from 92% made it jump.
+                                fadeIn(tween(VERSE_SCROLL_DISSOLVE_MS)) togetherWith
+                                    fadeOut(snap(delayMillis = VERSE_SCROLL_DISSOLVE_MS))
+                            } else {
+                                // Compose's default for AnimatedContent.
+                                (fadeIn(tween(220, delayMillis = 90)) + scaleIn(tween(220, delayMillis = 90), initialScale = 0.92f)) togetherWith
+                                    fadeOut(tween(90))
+                            }
+                        },
                         label = "TabTransition"
                     ) { tab ->
                         when (tab) {
