@@ -1,5 +1,5 @@
-"""The 100 scenes Verse Scroll ships: kind, palette and seed. Seeds fix each painting, so keep them
-as they are unless a scene should change."""
+"""The scenes Verse Scroll ships: kind, palette and seed. Seeds fix each painting, so keep them as
+they are unless a scene should change."""
 SAMPLES = [
     ('ridges', 'dawn', 11), ('ridges', 'dusk', 12), ('ridges', 'mist', 13),
     ('hills', 'pasture', 21), ('hills', 'golden', 22),
@@ -41,7 +41,11 @@ def all_scenes():
     return out
 
 
-SCENES = all_scenes()
+# Kinds still painted (and still taking their seeds, so the scenes after them keep theirs) but not
+# shipped. Olive groves were left out after review.
+LEFT_OUT = {'olives'}
+
+SCENES = [s for s in all_scenes() if s[0] not in LEFT_OUT]
 
 if __name__ == '__main__':
     from collections import Counter

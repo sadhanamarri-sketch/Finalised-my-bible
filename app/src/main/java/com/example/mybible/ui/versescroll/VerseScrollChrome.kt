@@ -553,6 +553,7 @@ internal fun VerseScrollSettingsSheet(
     reduceMotion: Boolean,
     doubleTapColor: String,
     showTelugu: Boolean,
+    sceneCount: Int,
     onPaintedScenes: (Boolean) -> Unit,
     onMotion: (Boolean) -> Unit,
     onDoubleTapColor: (String) -> Unit,
@@ -583,9 +584,10 @@ internal fun VerseScrollSettingsSheet(
                 OptionPill("Plain", !paintedScenes, colors) { onPaintedScenes(false) }
             }
             SettingNote(
-                "100 painted scenes, each dimmed as much as it needs for the verse to stay easy to read. A verse " +
-                    "about the sea, the night, snow, olives, harvest, peace, a shepherd or mountains gets a matching " +
-                    "scene. Check-ins stay plain, as a pause.",
+                (if (sceneCount > 0) "$sceneCount painted scenes" else "Painted scenes") +
+                    ", each dimmed as much as it needs for the verse to stay easy to read. A verse about the sea, " +
+                    "the night, snow, harvest, peace, a shepherd or mountains gets a matching scene. Check-ins " +
+                    "stay plain, as a pause.",
                 colors
             )
             SettingGroup("Motion", colors) {

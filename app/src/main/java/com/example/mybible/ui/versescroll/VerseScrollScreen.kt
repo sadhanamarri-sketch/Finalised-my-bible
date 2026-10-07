@@ -562,6 +562,7 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
             reduceMotion = reduceMotion,
             doubleTapColor = controller.doubleTapColor,
             showTelugu = controller.showTelugu,
+            sceneCount = controller.sceneCount,
             onPaintedScenes = controller::updatePaintedScenes,
             onMotion = controller::updateMotion,
             onDoubleTapColor = controller::updateDoubleTapColor,

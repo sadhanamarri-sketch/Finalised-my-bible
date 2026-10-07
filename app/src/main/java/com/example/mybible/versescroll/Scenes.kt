@@ -6,7 +6,7 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 
 /**
- * One of Verse Scroll's 100 painted backgrounds (assets/verse_scroll/scenes/<id>.webp), as listed in
+ * One of Verse Scroll's painted backgrounds (assets/verse_scroll/scenes/<id>.webp), as listed in
  * assets/verse_scroll/scenes.json. The paintings were drawn with code, and each one's dimming was
  * measured: [kd] is how much it's darkened under the text in the dark themes, [kl] how much it's
  * lightened in the light ones, so the verse always stands out by at least 4.5:1 and the context lines
@@ -65,7 +65,6 @@ object SceneMatcher {
     private val WORDS: List<Pair<Set<String>, Regex>> = listOf(
         setOf("night", "moon") to Regex("\\b(night|stars?|moon|darkness)\\b"),
         setOf("snow") to Regex("\\b(snow|wool|winter|frost|hail|cold)\\b"),
-        setOf("olives") to Regex("\\b(olive|olives|oil|anoint\\w*)\\b"),
         setOf("wheat") to Regex("\\b(wheat|corn|grain|harvest|reap\\w*|sheaves|sow|sowed|soweth|seed|bread)\\b"),
         setOf("lake") to Regex("\\b(still|quiet|quietness|rest|peace|calm)\\b"),
         setOf("sea") to Regex("\\b(sea|seas|waters?|waves|floods?|rivers?|ships?)\\b"),

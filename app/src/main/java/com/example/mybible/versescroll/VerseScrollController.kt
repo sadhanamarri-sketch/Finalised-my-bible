@@ -95,6 +95,9 @@ class VerseScrollController(
 
     fun scene(id: String?): SceneSpec? = id?.let { sceneById[it] }
 
+    /** How many painted scenes there are (0 until the catalog has loaded). */
+    val sceneCount: Int get() = scenes.size
+
     private suspend fun ensureLoaded() = loadLock.withLock {
         if (discover != null) return@withLock
         withContext(Dispatchers.IO) {
