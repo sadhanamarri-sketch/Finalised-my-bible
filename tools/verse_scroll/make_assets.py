@@ -10,7 +10,6 @@ APP_ASSETS_DIR is app/src/main/assets/verse_scroll.
 import html
 import json
 import os
-import random
 import re
 import shutil
 import sys
@@ -75,20 +74,27 @@ def score(k):
     return inbound_votes.get(k, 0) + 2 * inbound.get(k, 0)
 
 
-# Discover: the most widely referenced verses (score = votes pointing at a verse + 2 per link), weighted so the
-# best known come up most, plus a sample of less familiar but still well-linked ones at a lower weight.
-cands = [k for k in inbound if k.split('.')[0] in NAME and k in texts and 6 <= words(k) <= 55]
+# Discover: every verse other verses link to, scored by how widely it's referenced (votes pointing at it + 2 per
+# link). The best known are the familiar tier, dealt two cards in three; the rest come up the other third, the
+# better linked sooner. Long verses are in (the card cuts them short with "…" when they run out of room); short
+# ones only when they're a whole sentence ("Jesus wept."), so lists of names and other fragments stay out.
+FAMILIAR = 2000
+
+
+def whole_sentence(k):
+    return re.search(r'[.?!][’”)\]]*$', texts[k].replace('¶', '').strip()) is not None
+
+
+cands = [k for k in inbound if k.split('.')[0] in NAME and k in texts and (words(k) >= 6 or whole_sentence(k))]
 cands.sort(key=lambda k: (-score(k), k))
-random.seed(7)
-top = cands[:1000]
-deep = random.sample(cands[1000:5000], 600)
-rows = [(k, score(k) ** 0.6) for k in top] + [(k, score(k) ** 0.6 * 0.6) for k in deep]
+rows = [(k, score(k) ** 0.6, 1 if i < FAMILIAR else 2) for i, k in enumerate(cands)]
 os.makedirs(out_dir, exist_ok=True)
 with open(os.path.join(out_dir, 'discover.tsv'), 'w', encoding='utf-8') as f:
-    f.write('# book\tchapter\tverse\tweight  (Verse Scroll Discover pool, see tools/verse_scroll/make_assets.py)\n')
-    for k, w in rows:
+    f.write('# book\tchapter\tverse\tweight\ttier (1 familiar, 2 the rest)  '
+            '(Verse Scroll Discover pool, see tools/verse_scroll/make_assets.py)\n')
+    for k, w, tier in rows:
         b, c, v = k.split('.')
-        f.write(f'{NAME[b]}\t{c}\t{v}\t{w:.2f}\n')
+        f.write(f'{NAME[b]}\t{c}\t{v}\t{w:.2f}\t{tier}\n')
 
 # ---- scenes: the dimming each needs, where its moving touches go, and the pictures ----
 veils = json.load(open(veils_path))
@@ -102,4 +108,4 @@ for kind, pal, seed in SCENES:
     catalog.append(entry)
     shutil.copyfile(os.path.join(scenes_dir, sid + '.webp'), os.path.join(out_dir, 'scenes', sid + '.webp'))
 json.dump({'scenes': catalog}, open(os.path.join(out_dir, 'scenes.json'), 'w'), separators=(',', ':'))
-print(len(rows), 'Discover verses;', len(catalog), 'scenes')
+print(len(rows), 'Discover verses (', FAMILIAR, 'familiar );', len(catalog), 'scenes')

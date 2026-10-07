@@ -403,7 +403,7 @@ class VerseScrollController(
     /**
      * A verse's links worth suggesting, strongest first: each to one verse, or to a short passage when
      * the link names 2 or 3 verses that together stay short. Leaves out links back to the verse itself,
-     * repeats, and very long verses.
+     * and repeats.
      */
     private suspend fun resolveLinks(ref: VerseRef): List<Link> {
         val out = mutableListOf<Link>()
@@ -414,8 +414,7 @@ class VerseScrollController(
             if (first == ref || !seen.add(first.key)) continue
             val span = row.toVerseEnd - row.toVerse + 1
             val found = verseTexts(first.book, first.chapter, first.verse, first.verse + (span - 1).coerceIn(0, MAX_PASSAGE - 1))
-            val firstText = found[first.verse] ?: continue
-            if (wordCount(firstText) > MAX_LINKED_VERSE_WORDS) continue
+            if (found[first.verse] == null) continue
             val passage = (0 until span).map { found[first.verse + it] }
             val isPassage = span in 2..MAX_PASSAGE && passage.all { it != null } &&
                 passage.sumOf { wordCount(it!!) } <= MAX_PASSAGE_WORDS
@@ -437,18 +436,15 @@ class VerseScrollController(
     /** The card content for [count] verses from [ref], or null if any of them isn't in the database yet. */
     suspend fun loadContent(ref: VerseRef, count: Int): VerseCardContent? {
         val last = ref.verse + count - 1
-        val rows = repository.getVerseRange(ref.book, ref.chapter, ref.verse - 1, last + 1).associateBy { it.number }
+        val rows = repository.getVerseRange(ref.book, ref.chapter, ref.verse, last).associateBy { it.number }
         val lines = (ref.verse..last).map { n ->
             val row = rows[n] ?: return null
             VerseLine(n, cleanVerseText(row.text), row.teluguText?.trim()?.takeIf { it.isNotEmpty() })
         }
         if (lines.any { it.text.isEmpty() }) return null
-        fun context(n: Int) = rows[n]?.let { VerseLine(n, cleanVerseText(it.text), null) }?.takeIf { it.text.isNotEmpty() }
         return VerseCardContent(
             ref = ref,
             lines = lines,
-            before = context(ref.verse - 1),
-            after = context(last + 1),
             linkCount = repository.countCrossReferencesFrom(ref.book, ref.chapter, ref.verse)
         )
     }
@@ -505,8 +501,7 @@ class VerseScrollController(
         private const val KEY_MOTION = "motion"
         private const val KEY_COLOR = "double_tap_color"
         private const val KEY_TELUGU = "show_telugu"
-        // "_2" since the hint learned about tapping: it shows once more to people who saw the first one.
-        private const val KEY_HINT_SEEN = "hint_seen_2"
+        private const val KEY_HINT_SEEN = "hint_seen"
         private const val KEY_COUNT_DATE = "count_date"
         private const val KEY_COUNT = "count"
         private const val KEY_RECENT = "recent"
@@ -517,9 +512,6 @@ class VerseScrollController(
         // A link naming a few verses is shown as that passage when it's this short; otherwise its first verse.
         private const val MAX_PASSAGE = 3
         private const val MAX_PASSAGE_WORDS = 90
-
-        // Links to verses longer than this aren't suggested: too much to take in mid-scroll.
-        private const val MAX_LINKED_VERSE_WORDS = 70
 
         private const val CARDS_AHEAD = 4
         private const val CARDS_PER_BATCH = 6

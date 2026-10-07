@@ -134,8 +134,8 @@ private fun noteRefs(note: NoteItem): List<VerseRef> =
 /**
  * Verse Scroll: one verse at a time, full screen, swiping up for the next — a calmer thing to scroll
  * than a social feed. Discover deals widely referenced verses from across the Bible over painted,
- * gently moving scenes; a tap unfolds the verses either side, double-tap highlights, long-press opens
- * the full verse sheet, and the bottom bar adds a note, reads the verse in context, or shows its links.
+ * gently moving scenes; double-tap highlights, long-press opens the full verse sheet, and the bottom
+ * bar adds a note, reads the verse in context, or shows its links.
  */
 @Composable
 fun VerseScrollScreen(viewModel: MainViewModel) {
@@ -174,10 +174,6 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
     var settingsOpen by remember { mutableStateOf(false) }
     val feedAlpha = remember { Animatable(1f) }
     val sweeps = remember { mutableStateMapOf<Long, Int>() }
-    // The card whose verses either side a tap has unfolded; it folds again once another card settles.
-    var openUid by remember { mutableStateOf<Long?>(null) }
-    // Whether the touch that's under way closed the color box: that tap doesn't unfold anything too.
-    var pressClosedPicker by remember { mutableStateOf(false) }
 
     fun showToast(message: String, action: String? = null, onAction: (() -> Unit)? = null) {
         toast = VsToast(System.nanoTime(), message, action, onAction)
@@ -293,10 +289,6 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
             LaunchedEffect(pagerState) {
                 snapshotFlow { pagerState.isScrollInProgress }.collect { scrolling -> if (scrolling) hidePicker() }
             }
-            // Every card starts with its verse alone.
-            LaunchedEffect(pagerState) {
-                snapshotFlow { pagerState.settledPage }.collect { openUid = null }
-            }
             VerticalPager(
                 state = pagerState,
                 beyondViewportPageCount = 1,
@@ -329,14 +321,7 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                             colorLabel = ::labelOf,
                             notePreview = firstNote?.let(::notePreview),
                             sweepToken = sweeps[card.uid] ?: 0,
-                            revealed = openUid == card.uid,
-                            onPress = {
-                                pressClosedPicker = pickerIndex >= 0
-                                hidePicker()
-                            },
-                            onTap = {
-                                if (!pressClosedPicker) openUid = if (openUid == card.uid) null else card.uid
-                            },
+                            onPress = { hidePicker() },
                             onDoubleTap = { doubleTap(page, card) },
                             onLongPress = {
                                 hidePicker()

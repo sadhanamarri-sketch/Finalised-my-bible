@@ -10,12 +10,10 @@ data class VerseRef(val book: String, val chapter: Int, val verse: Int) {
 /** One verse of a card, with its Telugu translation when the app has it. */
 data class VerseLine(val number: Int, val text: String, val telugu: String?)
 
-/** What a verse card shows: the verse (or a short passage), the verses either side, and its link count. */
+/** What a verse card shows: the verse (or a short passage) and its link count. */
 data class VerseCardContent(
     val ref: VerseRef,
     val lines: List<VerseLine>,
-    val before: VerseLine?,
-    val after: VerseLine?,
     val linkCount: Int
 ) {
     val refs: List<VerseRef> get() = lines.map { VerseRef(ref.book, ref.chapter, it.number) }
@@ -63,12 +61,16 @@ fun labelOf(refs: List<VerseRef>): String =
 
 const val CHECK_IN_EVERY = 20
 
-/** Verses longer than this get the easier-reading treatment: a soft panel, bigger text, no context lines. */
+/** Verses longer than this get the easier-reading treatment: a soft panel behind them, no moving touches. */
 const val LONG_VERSE_WORDS = 40
 
-data class DiscoverEntry(val ref: VerseRef, val weight: Double)
+/** One of Discover's verses. [familiar] marks the best known, dealt two cards in three. */
+data class DiscoverEntry(val ref: VerseRef, val weight: Double, val familiar: Boolean = true)
 
-/** Reads assets/verse_scroll/discover.tsv: book, chapter, verse and weight per line, "#" for comments. */
+/**
+ * Reads assets/verse_scroll/discover.tsv: book, chapter, verse, weight and tier (1 familiar, 2 the rest)
+ * per line, "#" for comments.
+ */
 fun parseDiscoverPool(tsv: String): List<DiscoverEntry> =
     tsv.lineSequence()
         .filter { it.isNotBlank() && !it.startsWith("#") }
@@ -78,53 +80,74 @@ fun parseDiscoverPool(tsv: String): List<DiscoverEntry> =
             val chapter = p[1].toIntOrNull() ?: return@mapNotNull null
             val verse = p[2].toIntOrNull() ?: return@mapNotNull null
             val weight = p[3].toDoubleOrNull() ?: return@mapNotNull null
-            DiscoverEntry(VerseRef(p[0], chapter, verse), weight)
+            DiscoverEntry(VerseRef(p[0], chapter, verse), weight, familiar = p.getOrNull(4)?.trim() != "2")
         }
         .toList()
 
 /**
- * Discover's supply of verses: widely referenced verses from across the Bible, the best known coming up
- * most often. Each verse is used once per round through the pool, and never again until [recentLimit]
- * other verses have been shown (the recent list is kept between visits by the caller).
+ * Discover's supply of verses: every verse other verses link to, bar fragments. Two cards in three
+ * ([familiarShare]) come from the best known, the rest from everything else; within each, the better
+ * linked come up sooner. Each verse is used once per round through its tier, and never again until
+ * [recentLimit] other verses have been shown (the recent list is kept between visits by the caller).
  */
 class DiscoverPool(
-    private val entries: List<DiscoverEntry>,
+    entries: List<DiscoverEntry>,
     private val random: Random = Random.Default,
-    private val recentLimit: Int = 400
+    private val recentLimit: Int = 400,
+    private val familiarShare: Double = 2.0 / 3
 ) {
-    private val pool = mutableListOf<DiscoverEntry>()
+    private val familiar = Tier(entries.filter { it.familiar })
+    private val others = Tier(entries.filterNot { it.familiar })
     private val recent = ArrayDeque<String>()
 
-    val isEmpty: Boolean get() = entries.isEmpty()
+    val isEmpty: Boolean get() = familiar.isEmpty && others.isEmpty
 
     fun restoreRecent(keys: List<String>) {
         recent.clear()
         keys.takeLast(recentLimit).forEach { recent.addLast(it) }
-        pool.clear()
+        familiar.clear()
+        others.clear()
     }
 
     fun recentKeys(): List<String> = recent.toList()
 
     fun next(): VerseRef? {
-        if (entries.isEmpty()) return null
-        if (pool.isEmpty()) refill()
-        val total = pool.sumOf { it.weight }
-        var r = random.nextDouble() * total
-        var i = 0
-        while (i < pool.size - 1) {
-            r -= pool[i].weight
-            if (r <= 0) break
-            i++
+        val tier = when {
+            others.isEmpty -> familiar
+            familiar.isEmpty -> others
+            random.nextDouble() < familiarShare -> familiar
+            else -> others
         }
-        val picked = pool.removeAt(i)
+        val picked = tier.next(random) { recent.toHashSet() } ?: return null
         recent.addLast(picked.ref.key)
         while (recent.size > recentLimit) recent.removeFirst()
         return picked.ref
     }
 
-    private fun refill() {
-        val avoid = recent.toHashSet()
-        pool.addAll(entries.filter { it.ref.key !in avoid })
-        if (pool.isEmpty()) pool.addAll(entries)
+    /** One tier's verses, and what's left of them this round. */
+    private class Tier(private val entries: List<DiscoverEntry>) {
+        private val pool = mutableListOf<DiscoverEntry>()
+
+        val isEmpty: Boolean get() = entries.isEmpty()
+
+        fun clear() = pool.clear()
+
+        fun next(random: Random, recent: () -> Set<String>): DiscoverEntry? {
+            if (entries.isEmpty()) return null
+            if (pool.isEmpty()) {
+                val avoid = recent()
+                pool.addAll(entries.filter { it.ref.key !in avoid })
+                if (pool.isEmpty()) pool.addAll(entries)
+            }
+            val total = pool.sumOf { it.weight }
+            var r = random.nextDouble() * total
+            var i = 0
+            while (i < pool.size - 1) {
+                r -= pool[i].weight
+                if (r <= 0) break
+                i++
+            }
+            return pool.removeAt(i)
+        }
     }
 }

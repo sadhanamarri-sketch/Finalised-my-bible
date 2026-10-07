@@ -26,9 +26,25 @@ class VerseScrollLogicTest {
 
     @Test
     fun readsTheDiscoverPool() {
-        val pool = parseDiscoverPool("# book\tchapter\tverse\tweight\nIsaiah\t41\t10\t65.45\n1 Peter\t2\t9\t57.11\n\nbroken line\n")
-        assertEquals(listOf(VerseRef("Isaiah", 41, 10), VerseRef("1 Peter", 2, 9)), pool.map { it.ref })
+        val pool = parseDiscoverPool(
+            "# book\tchapter\tverse\tweight\ttier\nIsaiah\t41\t10\t65.45\t1\n1 Peter\t2\t9\t57.11\t2\nJohn\t3\t16\t50\n\nbroken line\n"
+        )
+        assertEquals(listOf(VerseRef("Isaiah", 41, 10), VerseRef("1 Peter", 2, 9), VerseRef("John", 3, 16)), pool.map { it.ref })
         assertEquals(65.45, pool[0].weight, 1e-9)
+        // Tier 2 is "the rest"; a line without a tier counts as familiar.
+        assertEquals(listOf(true, false, true), pool.map { it.familiar })
+    }
+
+    @Test
+    fun discoverDealsTwoFamiliarVersesToOneOther() {
+        val familiar = (1..100).map { DiscoverEntry(VerseRef("Psalms", 1, it), 1.0, familiar = true) }
+        val others = (1..1000).map { DiscoverEntry(VerseRef("Job", 1, it), 1.0, familiar = false) }
+        val pool = DiscoverPool(familiar + others, Random(11), recentLimit = 20)
+        val dealt = (1..3000).map { pool.next()!! }
+        val share = dealt.count { it.book == "Psalms" } / 3000.0
+        assertEquals(2.0 / 3, share, 0.03)
+        // Each tier still goes all the way round before repeating a verse.
+        assertEquals(100, dealt.filter { it.book == "Psalms" }.take(100).toSet().size)
     }
 
     @Test
@@ -104,8 +120,6 @@ class VerseScrollLogicTest {
                 VerseLine(29, "He giveth power to the faint;", null),
                 VerseLine(30, "Even the youths shall faint and be weary,", null)
             ),
-            before = null,
-            after = null,
             linkCount = 3
         )
         assertEquals("Isaiah 40:29–30", content.label)
