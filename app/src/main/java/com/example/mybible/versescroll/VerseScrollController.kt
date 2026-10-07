@@ -505,7 +505,8 @@ class VerseScrollController(
         private const val KEY_MOTION = "motion"
         private const val KEY_COLOR = "double_tap_color"
         private const val KEY_TELUGU = "show_telugu"
-        private const val KEY_HINT_SEEN = "hint_seen"
+        // "_2" since the hint learned about tapping: it shows once more to people who saw the first one.
+        private const val KEY_HINT_SEEN = "hint_seen_2"
         private const val KEY_COUNT_DATE = "count_date"
         private const val KEY_COUNT = "count"
         private const val KEY_RECENT = "recent"

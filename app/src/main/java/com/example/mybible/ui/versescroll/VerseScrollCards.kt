@@ -2,6 +2,7 @@ package com.example.mybible.ui.versescroll
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -40,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -53,6 +55,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
@@ -91,6 +94,12 @@ import kotlin.math.roundToInt
 private val CardTopPadding = 74.dp
 private val InThreadTopPadding = 112.dp
 private val CardBottomPadding = 122.dp
+
+// The space between the parts of the verse stack (eyebrow, verse, reference, note, the verses either side).
+private val STACK_GAP = 14.dp
+
+// How long the verses either side take to unfold, and fold away again.
+private const val REVEAL_MS = 360
 
 /** The part of the Bible a book belongs to, shown above each verse. */
 internal fun genreOf(book: String): String {
@@ -145,8 +154,9 @@ private val BurstEasing = CubicBezierEasing(0f, 0f, 0.58f, 1f)
 private data class Burst(val id: Long, val at: Offset, val color: Color)
 
 /**
- * One verse card: the painted scene (or the plain theme background), and the verse with the verses
- * either side of it, sized to fit. Double-tap highlights, long-press opens the full verse sheet.
+ * One verse card: the painted scene (or the plain theme background), and the verse, sized to fit.
+ * A tap unfolds the verses either side of it ([revealed]); double-tap highlights, long-press opens
+ * the full verse sheet.
  *
  * @param highlightHex the highlight color of a verse, if it has one.
  * @param sweepToken goes up each time this card's highlight should sweep in (again).
@@ -166,7 +176,9 @@ internal fun VerseCardPage(
     colorLabel: (String) -> String,
     notePreview: String?,
     sweepToken: Int,
+    revealed: Boolean,
     onPress: () -> Unit,
+    onTap: () -> Unit,
     onDoubleTap: () -> String?,
     onLongPress: () -> Unit,
     onLinkedFrom: () -> Unit = {}
@@ -183,8 +195,14 @@ internal fun VerseCardPage(
             sweep.animateTo(1f, tween(650, easing = SweepEasing))
         }
     }
+    val reveal = remember(card.uid) { Animatable(if (revealed) 1f else 0f) }
+    LaunchedEffect(revealed, reduceMotion) {
+        val target = if (revealed) 1f else 0f
+        if (reduceMotion) reveal.snapTo(target) else reveal.animateTo(target, tween(REVEAL_MS, easing = FastOutSlowInEasing))
+    }
     val bursts = remember { mutableStateListOf<Burst>() }
     val currentOnPress by rememberUpdatedState(onPress)
+    val currentOnTap by rememberUpdatedState(onTap)
     val currentOnDoubleTap by rememberUpdatedState(onDoubleTap)
     val currentOnLongPress by rememberUpdatedState(onLongPress)
 
@@ -210,6 +228,8 @@ internal fun VerseCardPage(
                 .pointerInput(card.uid) {
                     detectTapGestures(
                         onPress = { currentOnPress() },
+                        // Comes once the double-tap window has passed without a second tap.
+                        onTap = { currentOnTap() },
                         onDoubleTap = { at ->
                             val hex = currentOnDoubleTap()
                             if (hex != null && !reduceMotion) bursts += Burst(System.nanoTime(), at, hexToColor(hex))
@@ -243,7 +263,8 @@ internal fun VerseCardPage(
                 highlightHex = highlightHex,
                 colorLabel = colorLabel,
                 notePreview = notePreview,
-                sweep = { sweep.value }
+                sweep = { sweep.value },
+                reveal = { reveal.value }
             )
         }
         bursts.forEach { burst ->
@@ -274,7 +295,8 @@ private fun VerseStack(
     highlightHex: (VerseRef) -> String?,
     colorLabel: (String) -> String,
     notePreview: String?,
-    sweep: () -> Float
+    sweep: () -> Float,
+    reveal: () -> Float
 ) {
     val words = lines.sumOf { line -> line.text.split(' ').count { it.isNotBlank() } }
     val telugu = if (showTelugu) lines.mapNotNull { it.telugu }.joinToString(" ") else ""
@@ -282,86 +304,98 @@ private fun VerseStack(
     // The chip next to the reference names the color once the whole card is highlighted in it.
     val allColor = hexes.firstOrNull()?.takeIf { first -> hexes.all { it == first } }
 
-    FitToHeight(base = baseVerseSize(words, long, showTelugu), min = 18f, step = 1.5f) { size ->
+    FitToHeight(
+        base = baseVerseSize(words, long, showTelugu),
+        min = 18f,
+        openMin = 15f,
+        step = 1.5f,
+        canOpen = before != null || after != null,
+        fitKey = listOf(lines, before, after, telugu, notePreview, allColor != null),
+        reveal = reveal
+    ) { size, open, contextLines ->
         Column(
-            verticalArrangement = Arrangement.spacedBy(14.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .then(if (long && onScene) Modifier.readingPanel(colors.dark) else Modifier)
         ) {
             eyebrow()
-            // A long verse keeps the card to itself: no lines from the verses around it.
-            if (!long && before != null) ContextLine(before, colors, onScene)
-            Column(verticalArrangement = Arrangement.spacedBy((size * 0.35f).dp)) {
-                lines.forEachIndexed { i, line ->
-                    VerseText(
-                        line = line,
-                        showNumber = lines.size > 1,
-                        size = size,
-                        long = long,
-                        colors = colors,
-                        onScene = onScene,
-                        band = hexes[i]?.let { bandColor(it, colors.dark, onScene) },
-                        sweep = sweep
+            // The verses either side stay out of sight until a tap unfolds them.
+            if (open > 0f && before != null) ContextVerse(before, above = true, size, open, contextLines, colors, onScene)
+            Column(
+                verticalArrangement = Arrangement.spacedBy(STACK_GAP),
+                modifier = Modifier.padding(top = STACK_GAP)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy((size * 0.35f).dp)) {
+                    lines.forEachIndexed { i, line ->
+                        VerseText(
+                            line = line,
+                            showNumber = lines.size > 1,
+                            size = size,
+                            long = long,
+                            colors = colors,
+                            onScene = onScene,
+                            band = hexes[i]?.let { bandColor(it, colors.dark, onScene) },
+                            sweep = sweep
+                        )
+                    }
+                }
+                if (telugu.isNotEmpty()) {
+                    Text(
+                        text = telugu,
+                        color = colors.soft,
+                        fontSize = 15.sp,
+                        lineHeight = 1.65.em,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
-            }
-            if (telugu.isNotEmpty()) {
-                Text(
-                    text = telugu,
-                    color = colors.soft,
-                    fontSize = 15.sp,
-                    lineHeight = 1.65.em,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = label.uppercase(),
-                    color = colors.gold,
-                    fontFamily = WorkSansFontFamily,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 12.5.sp,
-                    letterSpacing = 0.12.em
-                )
-                if (allColor != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = colorLabel(allColor).uppercase(),
-                        color = Color(0xFF2C221E),
+                        text = label.uppercase(),
+                        color = colors.gold,
                         fontFamily = WorkSansFontFamily,
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 10.sp,
-                        letterSpacing = 0.1.em,
-                        modifier = Modifier
-                            .padding(start = 10.dp)
-                            .clip(CircleShape)
-                            .background(hexToColor(allColor))
-                            .padding(start = 9.dp, end = 9.dp, top = 5.dp, bottom = 4.dp)
+                        fontSize = 12.5.sp,
+                        letterSpacing = 0.12.em
                     )
+                    if (allColor != null) {
+                        Text(
+                            text = colorLabel(allColor).uppercase(),
+                            color = Color(0xFF2C221E),
+                            fontFamily = WorkSansFontFamily,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 10.sp,
+                            letterSpacing = 0.1.em,
+                            modifier = Modifier
+                                .padding(start = 10.dp)
+                                .clip(CircleShape)
+                                .background(hexToColor(allColor))
+                                .padding(start = 9.dp, end = 9.dp, top = 5.dp, bottom = 4.dp)
+                        )
+                    }
+                }
+                if (notePreview != null) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Icon(
+                            VerseScrollIcons.Note,
+                            contentDescription = "Note",
+                            tint = colors.soft,
+                            modifier = Modifier
+                                .padding(top = 2.dp)
+                                .size(15.dp)
+                        )
+                        Text(
+                            text = notePreview,
+                            color = colors.soft,
+                            fontFamily = GelasioFontFamily,
+                            fontStyle = FontStyle.Italic,
+                            fontSize = 14.sp,
+                            lineHeight = 1.4.em
+                        )
+                    }
                 }
             }
-            if (notePreview != null) {
-                Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                    Icon(
-                        VerseScrollIcons.Note,
-                        contentDescription = "Note",
-                        tint = colors.soft,
-                        modifier = Modifier
-                            .padding(top = 2.dp)
-                            .size(15.dp)
-                    )
-                    Text(
-                        text = notePreview,
-                        color = colors.soft,
-                        fontFamily = GelasioFontFamily,
-                        fontStyle = FontStyle.Italic,
-                        fontSize = 14.sp,
-                        lineHeight = 1.4.em
-                    )
-                }
-            }
-            if (!long && after != null) ContextLine(after, colors, onScene)
+            if (open > 0f && after != null) ContextVerse(after, above = false, size, open, contextLines, colors, onScene)
         }
     }
 }
@@ -424,27 +458,63 @@ private fun LinkedFromEyebrow(from: LinkedFrom, colors: VsColors, onClick: () ->
     }
 }
 
-/** The verse just before or after, small and dimmed, cut to two lines: a hint of where the verse sits. */
+/** The size of the verses either side, next to the card's verse at [size]: smaller, and readable. */
+private fun contextSize(size: Float): Float = (size * 0.58f).coerceIn(14f, 17.5f)
+
+/**
+ * The verse just before or after, in full, dimmed, once a tap has unfolded it. As [open] goes from 0
+ * to 1 it takes its space (and the gap that comes with it) and fades in, sliding out from the card's
+ * verse. [maxLines] is only ever short of everything when a long passage can't fit any other way.
+ */
 @Composable
-private fun ContextLine(line: VerseLine, colors: VsColors, onScene: Boolean) {
+private fun ContextVerse(
+    line: VerseLine,
+    above: Boolean,
+    size: Float,
+    open: Float,
+    maxLines: Int,
+    colors: VsColors,
+    onScene: Boolean
+) {
+    val density = LocalDensity.current
     val number = SpanStyle(
         fontFamily = WorkSansFontFamily,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 9.5.sp,
+        fontSize = 0.68.em,
         baselineShift = BaselineShift(0.5f),
         color = colors.soft
     )
+    val shadow = if (!onScene) null else with(density) {
+        if (colors.dark) Shadow(Color.Black.copy(alpha = 0.35f), Offset(0f, 1.dp.toPx()), 12.dp.toPx())
+        else Shadow(Color.White.copy(alpha = 0.6f), Offset(0f, 1.dp.toPx()), 10.dp.toPx())
+    }
     Text(
         text = buildAnnotatedString {
             withStyle(number) { append("${line.number} ") }
             append(line.text)
         },
-        color = colors.soft.copy(alpha = colors.soft.alpha * (if (onScene) 1f else 0.8f)),
-        fontFamily = GelasioFontFamily,
-        fontSize = 13.5.sp,
-        lineHeight = 1.45.em,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis
+        style = TextStyle(
+            color = colors.soft.copy(alpha = colors.soft.alpha * (if (onScene) 1f else 0.8f)),
+            fontFamily = GelasioFontFamily,
+            fontSize = contextSize(size).sp,
+            lineHeight = 1.5.em,
+            shadow = shadow
+        ),
+        maxLines = maxLines,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier
+            .clipToBounds()
+            .layout { measurable, constraints ->
+                val gap = STACK_GAP.roundToPx()
+                val text = measurable.measure(constraints)
+                val full = text.height + gap
+                val shown = (full * open).roundToInt()
+                layout(text.width, shown) {
+                    // Above the verse it rises out of it; below, it drops out of the lines above it.
+                    val y = if (above) shown - full + gap else gap
+                    text.placeWithLayer(0, y) { alpha = open * open }
+                }
+            }
     )
 }
 
@@ -595,24 +665,80 @@ private fun normalCdf(z: Float): Float {
 /**
  * Lays [content] out at the largest text size from [base] down to [min] (in [step]s) that fits the
  * height available, centered vertically — the way the design preview shrinks a long verse to fit.
+ *
+ * [reveal] (0 to 1) unfolds the verses either side. Both ends are fitted up front, the open one down
+ * to [openMin] (and, failing that, with the verses either side cut short); in between, the size eases
+ * from one to the other, so the verse settles smoothly instead of jumping a step at a time. The fit is
+ * kept until [fitKey] (everything that changes the stack's height) or the space changes.
  */
 @Composable
-private fun FitToHeight(base: Float, min: Float, step: Float, content: @Composable (Float) -> Unit) {
+private fun FitToHeight(
+    base: Float,
+    min: Float,
+    openMin: Float,
+    step: Float,
+    canOpen: Boolean,
+    fitKey: Any,
+    reveal: () -> Float,
+    content: @Composable (size: Float, open: Float, contextLines: Int) -> Unit
+) {
+    val fitted = remember { FittedSizes() }
     SubcomposeLayout(Modifier.fillMaxSize()) { constraints ->
         val loose = Constraints(maxWidth = constraints.maxWidth)
-        var size = base
-        var attempt = 0
-        val first = base
-        var placeable = subcompose(attempt) { content(first) }.first().measure(loose)
-        while (placeable.height > constraints.maxHeight && size > min && attempt < 16) {
-            size = maxOf(min, size - step)
-            attempt++
-            val tryingSize = size
-            placeable = subcompose(attempt) { content(tryingSize) }.first().measure(loose)
+        fun fits(slot: String, size: Float, open: Float, lines: Int): Boolean =
+            subcompose(slot) { content(size, open, lines) }.first().measure(loose).height <= constraints.maxHeight
+
+        val space = FitSpace(fitKey, constraints.maxWidth, constraints.maxHeight, density, fontScale)
+        if (fitted.space != space) {
+            var closed = base
+            var attempt = 0
+            while (!fits("closed$attempt", closed, 0f, Int.MAX_VALUE) && closed > min && attempt < 16) {
+                closed = maxOf(min, closed - step)
+                attempt++
+            }
+            var open = closed
+            var lines = Int.MAX_VALUE
+            if (canOpen) {
+                attempt = 0
+                while (!fits("open$attempt", open, 1f, lines) && attempt < 24) {
+                    when {
+                        open > openMin -> open = maxOf(openMin, open - step)
+                        lines > 2 -> lines = if (lines == Int.MAX_VALUE) 6 else lines - 2
+                        else -> break
+                    }
+                    attempt++
+                }
+            }
+            fitted.set(space, closed, open, lines)
         }
+        // Read here, while measuring, so unfolding re-lays out the stack without recomposing the card.
+        val r = reveal()
+        val size = fitted.closed + (fitted.open - fitted.closed) * r
+        val placeable = subcompose("shown") { content(size, r, fitted.lines) }.first().measure(loose)
         layout(constraints.maxWidth, constraints.maxHeight) {
             placeable.place(0, ((constraints.maxHeight - placeable.height) / 2).coerceAtLeast(0))
         }
+    }
+}
+
+private data class FitSpace(val key: Any, val width: Int, val height: Int, val density: Float, val fontScale: Float)
+
+/** What [FitToHeight] last fitted, and for what. */
+private class FittedSizes {
+    var space: FitSpace? = null
+        private set
+    var closed = 0f
+        private set
+    var open = 0f
+        private set
+    var lines = Int.MAX_VALUE
+        private set
+
+    fun set(space: FitSpace, closed: Float, open: Float, lines: Int) {
+        this.space = space
+        this.closed = closed
+        this.open = open
+        this.lines = lines
     }
 }
 

@@ -495,7 +495,7 @@ internal fun BoxScope.ToastBar(toast: VsToast, colors: VsColors, onDismiss: () -
     }
 }
 
-/** Shown once: how to highlight, with rings pulsing where a thumb would tap. */
+/** Shown once: how to highlight and unfold a verse, with rings pulsing where a thumb would tap. */
 @Composable
 internal fun BoxScope.FirstTimeHint(colors: VsColors, reduceMotion: Boolean, onDismiss: () -> Unit) {
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -531,7 +531,7 @@ internal fun BoxScope.FirstTimeHint(colors: VsColors, reduceMotion: Boolean, onD
             fontSize = 15.sp
         )
         Text(
-            text = "Pick another color from the box that pops up, or long-press for a note. Swipe up for the next verse.",
+            text = "Pick another color from the box that pops up, or long-press for a note. Tap once to see the verses around it, and swipe up for the next verse.",
             color = colors.soft,
             fontFamily = WorkSansFontFamily,
             fontSize = 13.sp,
