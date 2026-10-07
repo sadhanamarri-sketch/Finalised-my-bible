@@ -70,7 +70,7 @@ private fun com.example.mybible.model.NoteItem.matchesVerse(book: String, chapte
     return this.book == book && this.chapter == chapter && this.verse == verse
 }
 
-// Detour-banner identities — one flat color per destination, all six built
+// Detour-banner identities — one flat color per destination, all seven built
 // the same way, so no banner reads as more "official" than another (this
 // replaces an earlier version that mixed theme-tuned M3 ColorScheme roles
 // for four of the six with flat colors for the other two). None of these
@@ -85,8 +85,9 @@ private val LexiconBannerColor = Color(0xFFB08A3E) // gold/amber
 private val NoteBannerColor = Color(0xFF3F7D7A) // dusty teal
 private val HighlightedVersesBannerColor = Color(0xFF4C6FA5) // muted steel-blue
 private val StudiedBannerColor = Color(0xFF7D5BA6) // muted violet
+private val VerseScrollBannerColor = Color(0xFF9C5878) // muted plum
 
-/** Same "subtle container + matching solid button" recipe for all six
+/** Same "subtle container + matching solid button" recipe for all seven
  *  detour banners. */
 @Composable
 private fun bannerContainerColor(identity: Color): Color =
@@ -129,6 +130,7 @@ fun ReaderScreen(
     val noteReturnItem by viewModel.noteReturnItem.collectAsState()
     val highlightsReturnAvailable by viewModel.highlightsReturnAvailable.collectAsState()
     val studiedReturnAvailable by viewModel.studiedReturnAvailable.collectAsState()
+    val verseScrollReturnAvailable by viewModel.verseScrollReturnAvailable.collectAsState()
     val readerAnchor by viewModel.readerAnchor.collectAsState()
 
     val completedVerses by viewModel.completedVerses.collectAsState(initial = emptyList())
@@ -485,7 +487,7 @@ fun ReaderScreen(
     // a cross-reference back-bar is showing, a sheet/menu is open, or a
     // verse is selected (selection already swaps the pill for the action
     // toolbar, but this also covers the moment the toolbar is dismissing).
-    val canHideBars = !crossReferenceReturnAvailable && !searchReturnAvailable && lexiconReturnTab == null && noteReturnItem == null && !highlightsReturnAvailable && !studiedReturnAvailable && !showReaderMenu && selectedVerse == null &&
+    val canHideBars = !crossReferenceReturnAvailable && !searchReturnAvailable && lexiconReturnTab == null && noteReturnItem == null && !highlightsReturnAvailable && !studiedReturnAvailable && !verseScrollReturnAvailable && !showReaderMenu && selectedVerse == null &&
         readerPickMode == ReaderPickMode.NONE &&
         readerPickMode == ReaderPickMode.NONE
 
@@ -1015,6 +1017,71 @@ fun ReaderScreen(
                 }
             }
 
+            // "Return to Verse Scroll" banner — shown after a Verse Scroll
+            // card's Read button (or a check-in's "Read <chapter>") opened
+            // the verse here. Return (and system back, see MainActivity) go
+            // back to the same card in the feed. Mutually exclusive with all
+            // 6 banners above, same fixed top slot. Own color identity (see
+            // VerseScrollBannerColor), same recipe as the others.
+            if (readerPickMode == ReaderPickMode.NONE && !crossReferenceReturnAvailable && !searchReturnAvailable && lexiconReturnTab == null && noteReturnItem == null && !highlightsReturnAvailable && !studiedReturnAvailable && verseScrollReturnAvailable) {
+                Surface(
+                    color = bannerContainerColor(VerseScrollBannerColor),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.SwipeUp,
+                                contentDescription = "Verse Scroll",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Return to Verse Scroll",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Button(
+                                onClick = { viewModel.returnToVerseScroll() },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = VerseScrollBannerColor,
+                                    contentColor = bannerOnButtonColor(VerseScrollBannerColor)
+                                ),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                modifier = Modifier.height(30.dp)
+                            ) {
+                                Text("Return", fontSize = 12.sp)
+                            }
+                        }
+                        IconButton(
+                            onClick = { viewModel.dismissVerseScrollReturnBanner() },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Dismiss",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
             if (isLoading && verses.isEmpty()) {
                 // Only the very first load (nothing to show yet) gets the
                 // spinner. Every subsequent chapter change also flips
@@ -1444,7 +1511,7 @@ fun ReaderScreen(
                         )
                     }
 
-                    // --- Menu: Notes / Studied / Search ---
+                    // --- Menu: Notes / Studied / Search / Highlighted Verses / Verse Scroll ---
                     Box {
                         IconButton(
                             onClick = { showReaderMenu = true },
@@ -1452,7 +1519,7 @@ fun ReaderScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Menu,
-                                contentDescription = "Notes, Studied, Search, Highlighted Verses",
+                                contentDescription = "Notes, Studied, Search, Highlighted Verses, Verse Scroll",
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
@@ -1490,6 +1557,15 @@ fun ReaderScreen(
                                 onClick = {
                                     showReaderMenu = false
                                     viewModel.selectTab(NavTab.HIGHLIGHTS)
+                                }
+                            )
+                            // One verse at a time, full screen — see VerseScrollScreen.
+                            DropdownMenuItem(
+                                text = { Text("Verse Scroll") },
+                                leadingIcon = { Icon(Icons.Default.SwipeUp, contentDescription = null) },
+                                onClick = {
+                                    showReaderMenu = false
+                                    viewModel.openVerseScroll()
                                 }
                             )
                         }
