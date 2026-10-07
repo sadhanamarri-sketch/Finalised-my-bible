@@ -1,5 +1,6 @@
 package com.example.mybible.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 
@@ -20,5 +21,11 @@ data class CrossReferenceEntity(
     val toBook: String,
     val toChapter: Int,
     val toVerse: Int,
-    val toVerseEnd: Int
+    val toVerseEnd: Int,
+    // How many openbible.info readers voted this link helpful: higher means a
+    // stronger link. Cross References lists the strongest first. Rows imported
+    // before this column existed read 0 until BibleDataInitializer re-imports
+    // them (see CROSS_REFERENCE_DATA_VERSION there).
+    @ColumnInfo(defaultValue = "0")
+    val votes: Int = 0
 )

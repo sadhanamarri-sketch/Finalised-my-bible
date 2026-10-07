@@ -107,9 +107,10 @@ interface BibleDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCrossReferences(refs: List<CrossReferenceEntity>)
 
+    // Strongest links (most votes) first. Ties keep the file's order.
     @Query(
         "SELECT * FROM cross_references WHERE fromBook = :book AND fromChapter = :chapter " +
-        "AND fromVerse = :verse"
+        "AND fromVerse = :verse ORDER BY votes DESC, rowid"
     )
     suspend fun getCrossReferences(book: String, chapter: Int, verse: Int): List<CrossReferenceEntity>
 

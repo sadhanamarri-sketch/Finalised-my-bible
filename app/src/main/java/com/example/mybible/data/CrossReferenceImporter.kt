@@ -11,8 +11,10 @@ import kotlinx.coroutines.withContext
  * replacing the 5-hardcoded-verses + 4-generic-fallback-refs placeholder.
  *
  * File format is tab-separated, one row per cross-reference, e.g.:
- * `Gen.1.1\tJhn.1.1-Jhn.1.3\t...` (line 0 is a header row). Parsing logic
- * ported verbatim from the Capacitor app's `parseXrefLine`/`loadXrefDataset`.
+ * `Gen.1.1\tJhn.1.1-Jhn.1.3\t59` (line 0 is a header row). The last column
+ * is the link's openbible.info vote count, kept as [CrossReferenceEntity.votes]
+ * so the strongest links can be listed first. Parsing logic ported verbatim
+ * from the Capacitor app's `parseXrefLine`/`loadXrefDataset`.
  */
 object CrossReferenceImporter {
 
@@ -24,7 +26,8 @@ object CrossReferenceImporter {
 
     private data class ParsedRef(
         val fromBook: String, val fromChapter: Int, val fromVerse: Int,
-        val toBook: String, val toChapter: Int, val toVerse: Int, val toVerseEnd: Int
+        val toBook: String, val toChapter: Int, val toVerse: Int, val toVerseEnd: Int,
+        val votes: Int
     )
 
     private fun parseLine(line: String): ParsedRef? {
@@ -52,7 +55,8 @@ object CrossReferenceImporter {
             toBook = toBook,
             toChapter = sm.groupValues[2].toIntOrNull() ?: return null,
             toVerse = sm.groupValues[3].toIntOrNull() ?: return null,
-            toVerseEnd = toVerseEnd
+            toVerseEnd = toVerseEnd,
+            votes = parts.getOrNull(2)?.trim()?.toIntOrNull() ?: 0
         )
     }
 
@@ -80,7 +84,8 @@ object CrossReferenceImporter {
                     toBook = ref.toBook,
                     toChapter = ref.toChapter,
                     toVerse = ref.toVerse,
-                    toVerseEnd = ref.toVerseEnd
+                    toVerseEnd = ref.toVerseEnd,
+                    votes = ref.votes
                 )
             )
             if (batch.size >= BATCH_SIZE) {

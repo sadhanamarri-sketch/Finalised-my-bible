@@ -41,6 +41,15 @@ private const val HEBREW_BOOK_COUNT = 39
 private const val CROSS_REFERENCE_THRESHOLD = 150_000
 
 /**
+ * Bump this whenever cross-reference rows need importing again on devices
+ * that already have a full set (same idea as [TELUGU_DATA_VERSION]). History:
+ *  1 - original import
+ *  2 - rows keep their vote counts, so the strongest links list first
+ */
+private const val CROSS_REFERENCE_DATA_VERSION = 2
+private const val CROSS_REFERENCE_DATA_VERSION_KEY = "cross_reference_data_version"
+
+/**
  * Bump this whenever the bundled `assets/telugu` JSON data changes (new
  * source text, corrections, etc.) so [BibleDataInitializer] re-imports it
  * even on devices that already have a full verse count from an older
@@ -227,21 +236,30 @@ class BibleDataInitializer private constructor(
     }
 
     private suspend fun maybeImportCrossReferences() {
-        if (dao.countCrossReferences() >= CROSS_REFERENCE_THRESHOLD) return
+        val prefs = context.getSharedPreferences("my_bible_prefs", Context.MODE_PRIVATE)
+        val haveRows = dao.countCrossReferences() >= CROSS_REFERENCE_THRESHOLD
+        if (haveRows && prefs.getInt(CROSS_REFERENCE_DATA_VERSION_KEY, 0) >= CROSS_REFERENCE_DATA_VERSION) return
         if (xrefAttemptedThisSession) return
         xrefAttemptedThisSession = true
 
+        // With rows already there, this refreshes them in place: inserts
+        // REPLACE each row, so cross references keep working meanwhile and a
+        // failed download simply retries on the next launch.
+        val label = if (haveRows) "Updating cross references (one-time)" else "Loading cross references (one-time)"
         // total = -1: row count isn't known ahead of a full parse, so the
         // banner shows an indeterminate bar instead of a fraction.
-        _progress.value = ImportProgress("Loading cross references (one-time)", "Downloading\u2026", 0, -1)
+        _progress.value = ImportProgress(label, "Downloading\u2026", 0, -1)
         try {
-            CrossReferenceImporter.importInto(dao) { linesImported ->
+            val imported = CrossReferenceImporter.importInto(dao) { linesImported ->
                 _progress.value = ImportProgress(
-                    "Loading cross references (one-time)",
+                    label,
                     "$linesImported imported so far\u2026",
                     linesImported,
                     -1
                 )
+            }
+            if (imported) {
+                prefs.edit().putInt(CROSS_REFERENCE_DATA_VERSION_KEY, CROSS_REFERENCE_DATA_VERSION).apply()
             }
         } catch (e: Exception) {
             e.printStackTrace()
