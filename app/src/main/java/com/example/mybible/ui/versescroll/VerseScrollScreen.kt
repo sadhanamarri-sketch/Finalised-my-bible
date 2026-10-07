@@ -82,8 +82,8 @@ internal data class VsColors(
     val toastAction: Color
 ) {
     /**
-     * Over a painted scene the quieter text is the main ink at 80%, and the gold is brighter (darker in
-     * light themes) — the colors the scenes' dimming was measured against.
+     * Over a photo the quieter text is the main ink at 80%, and the gold is brighter (darker in light
+     * themes) — the colors the photos' dimming was measured against.
      */
     fun onScene(): VsColors = copy(
         soft = ink.copy(alpha = 0.8f),
@@ -133,8 +133,8 @@ private fun noteRefs(note: NoteItem): List<VerseRef> =
 
 /**
  * Verse Scroll: one verse at a time, full screen, swiping up for the next — a calmer thing to scroll
- * than a social feed. Discover deals widely referenced verses from across the Bible over painted,
- * gently moving scenes; double-tap highlights, long-press opens the full verse sheet, and the bottom
+ * than a social feed. Discover deals widely referenced verses from across the Bible over slowly drifting
+ * nature photos; double-tap highlights, long-press opens the full verse sheet, and the bottom
  * bar adds a note, reads the verse in context, or shows its links.
  */
 @Composable
@@ -145,7 +145,7 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
     val notes by viewModel.notes.collectAsState(initial = emptyList())
     val colors = verseScrollColors()
     val reduceMotion = rememberReduceMotion()
-    val scenes = controller.paintedScenes
+    val scenes = controller.backgroundPhotos
     val motion = scenes && controller.motion && !reduceMotion
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
@@ -557,13 +557,13 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
         VerseScrollSettingsSheet(
             colors = colors,
             defs = colorDefs,
-            paintedScenes = controller.paintedScenes,
+            photos = controller.backgroundPhotos,
             motion = controller.motion,
             reduceMotion = reduceMotion,
             doubleTapColor = controller.doubleTapColor,
             showTelugu = controller.showTelugu,
             sceneCount = controller.sceneCount,
-            onPaintedScenes = controller::updatePaintedScenes,
+            onPhotos = controller::updateBackgroundPhotos,
             onMotion = controller::updateMotion,
             onDoubleTapColor = controller::updateDoubleTapColor,
             onShowTelugu = controller::updateShowTelugu,

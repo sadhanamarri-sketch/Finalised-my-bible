@@ -135,7 +135,7 @@ private val BurstEasing = CubicBezierEasing(0f, 0f, 0.58f, 1f)
 private data class Burst(val id: Long, val at: Offset, val color: Color)
 
 /**
- * One verse card: the painted scene (or the plain theme background), and the verse, at the same size
+ * One verse card: the background photo (or the plain theme background), and the verse, at the same size
  * as every other (cut short with "…" if it runs out of room). Double-tap highlights, long-press opens
  * the full verse sheet.
  *
@@ -191,8 +191,7 @@ internal fun VerseCardPage(
                 image = image,
                 dark = colors.dark,
                 motion = motion,
-                running = isCurrent,
-                effects = !long
+                running = isCurrent
             )
         }
         Box(

@@ -71,9 +71,6 @@ val PlayfairDisplayFontFamily: FontFamily = FontFamily(
  */
 val GelasioFontFamily: FontFamily = FontFamily(
     Font(R.font.gelasio_regular, FontWeight.Normal),
-    // Medium: Verse Scroll's long verses, a touch heavier so a dense paragraph reads easily over a
-    // painted background. A static instance of the official Gelasio variable font at weight 500.
-    Font(R.font.gelasio_medium, FontWeight.Medium),
     Font(R.font.gelasio_bold, FontWeight.Bold)
 )
 // Georgia itself is proprietary (Microsoft/Monotype) and its license

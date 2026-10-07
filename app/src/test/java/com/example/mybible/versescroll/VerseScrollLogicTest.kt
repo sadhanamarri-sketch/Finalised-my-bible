@@ -72,12 +72,11 @@ class VerseScrollLogicTest {
     }
 
     private val scenes = listOf(
-        SceneSpec("sea-dusk-31", 0.4f, 0.4f, kind = "sea", horizon = 0.5f, sun = listOf(0.5f, 0.4f), glint = "#ffeedd"),
-        SceneSpec("sea-teal-1105", 0.4f, 0.4f, kind = "sea", horizon = 0.5f, sun = listOf(0.5f, 0.4f), glint = "#ffeedd"),
-        SceneSpec("night-night-41", 0.4f, 0.4f, kind = "night"),
-        SceneSpec("moon-night-42", 0.4f, 0.4f, kind = "moon", moon = listOf(0.3f, 0.2f, 0.1f)),
-        SceneSpec("hills-golden-22", 0.4f, 0.4f, kind = "hills", mist = listOf(0.6f, 0.7f), haze = "#ffffff"),
-        SceneSpec("abstract-ember-81", 0.4f, 0.4f, kind = "abstract", blobs = listOf("#c0607a", "#f29a70"))
+        SceneSpec("sea-1507525428034", 0.4f, 0.4f, kind = "sea"),
+        SceneSpec("sea-1505142468610", 0.4f, 0.4f, kind = "sea"),
+        SceneSpec("night-1519681393784", 0.4f, 0.4f, kind = "night"),
+        SceneSpec("hills-1470071459604", 0.4f, 0.4f, kind = "hills"),
+        SceneSpec("light-1490682143684", 0.4f, 0.4f, kind = "light")
     )
 
     @Test
@@ -85,7 +84,7 @@ class VerseScrollLogicTest {
         val sea = SceneMatcher.pick(scenes, "They that go down to the sea in ships", "Psalms 107:23", previousType = null)
         assertEquals("sea", sea.type)
         val night = SceneMatcher.pick(scenes, "The moon and stars to rule by night", "Psalms 136:9", previousType = null)
-        assertTrue(night.type == "night" || night.type == "moon")
+        assertEquals("night", night.type)
         // The same verse always gets the same scene.
         assertEquals(sea, SceneMatcher.pick(scenes, "They that go down to the sea in ships", "Psalms 107:23", null))
     }
@@ -94,22 +93,6 @@ class VerseScrollLogicTest {
     fun neverTheSameKindTwiceInARow() {
         val pick = SceneMatcher.pick(scenes, "the sea roared", "Psalms 98:7", previousType = "sea")
         assertNotEquals("sea", pick.type)
-    }
-
-    @Test
-    fun eachKindGetsItsMovingTouch() {
-        val seed = fnv1a("Isaiah 41:10")
-        assertEquals(12, sceneEffects(scenes[0], seed).count { it is SceneFx.Glint })
-        assertTrue(sceneEffects(scenes[2], seed).all { it is SceneFx.Twinkle })
-        // Stars stay off the moon.
-        val moon = scenes[3].moon!!
-        sceneEffects(scenes[3], seed).filterIsInstance<SceneFx.Twinkle>().forEach {
-            assertTrue(kotlin.math.hypot(it.x - moon[0], (it.y - moon[1]) / 0.46f) >= moon[2])
-        }
-        assertEquals(2, sceneEffects(scenes[4], seed).count { it is SceneFx.Mist })
-        assertEquals(2, sceneEffects(scenes[5], seed).count { it is SceneFx.Blob })
-        // Same verse, same motion.
-        assertEquals(sceneEffects(scenes[0], seed), sceneEffects(scenes[0], seed))
     }
 
     @Test

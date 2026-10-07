@@ -1,10 +1,10 @@
 """Writes Verse Scroll's bundled data into the app: the Discover verse pool, and the scene catalog (each
-scene's measured dimming and where its moving touches go) with the pictures themselves.
+photo's measured dimming and what it shows) with the photos themselves.
 
-    python3 make_assets.py KJV_OSIS_XML CROSS_REFERENCES_TXT SCENES_DIR VEILS_JSON APP_ASSETS_DIR
+    python3 make_assets.py KJV_OSIS_XML CROSS_REFERENCES_TXT PHOTOS_DIR VEILS_JSON APP_ASSETS_DIR
 
 KJV_OSIS_XML and CROSS_REFERENCES_TXT are the files the app itself downloads (see KjvImporter and
-CrossReferenceImporter); SCENES_DIR comes from render_scenes.py and VEILS_JSON from fit_veils.py.
+CrossReferenceImporter); PHOTOS_DIR comes from fetch_photos.py and VEILS_JSON from fit_veils.py.
 APP_ASSETS_DIR is app/src/main/assets/verse_scroll.
 """
 import html
@@ -13,9 +13,6 @@ import os
 import re
 import shutil
 import sys
-
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from scene_list import SCENES  # noqa: E402
 
 osis_path, xref_path, scenes_dir, veils_path, out_dir = sys.argv[1:6]
 
@@ -96,16 +93,22 @@ with open(os.path.join(out_dir, 'discover.tsv'), 'w', encoding='utf-8') as f:
         b, c, v = k.split('.')
         f.write(f'{NAME[b]}\t{c}\t{v}\t{w:.2f}\t{tier}\n')
 
-# ---- scenes: the dimming each needs, where its moving touches go, and the pictures ----
+# ---- scenes: the photos (photos.tsv), how much each is dimmed, and what each shows ----
+here = os.path.dirname(os.path.abspath(__file__))
+photos = [line.rstrip('\n').split('\t') for line in open(os.path.join(here, 'photos.tsv'), encoding='utf-8')
+          if line.strip() and not line.startswith('#')]
 veils = json.load(open(veils_path))
-meta = json.load(open(os.path.join(scenes_dir, 'meta.json')))
 catalog = []
-os.makedirs(os.path.join(out_dir, 'scenes'), exist_ok=True)
-for kind, pal, seed in SCENES:
-    sid = f'{kind}-{pal}-{seed}'
-    entry = {'id': sid, 'kd': veils[sid]['kd'], 'kl': veils[sid]['kl']}
-    entry.update({k: v for k, v in meta[sid].items() if k != 'layout' and v is not None})
-    catalog.append(entry)
-    shutil.copyfile(os.path.join(scenes_dir, sid + '.webp'), os.path.join(out_dir, 'scenes', sid + '.webp'))
+scenes_out = os.path.join(out_dir, 'scenes')
+os.makedirs(scenes_out, exist_ok=True)
+for kind, photo in photos:
+    sid = f"{kind}-{photo.split('-')[0]}"
+    catalog.append({'id': sid, 'kd': veils[sid]['kd'], 'kl': veils[sid]['kl'], 'kind': kind})
+    shutil.copyfile(os.path.join(scenes_dir, sid + '.webp'), os.path.join(scenes_out, sid + '.webp'))
+# Anything else in there is from an earlier set.
+keep = {e['id'] + '.webp' for e in catalog}
+for name in os.listdir(scenes_out):
+    if name not in keep:
+        os.remove(os.path.join(scenes_out, name))
 json.dump({'scenes': catalog}, open(os.path.join(out_dir, 'scenes.json'), 'w'), separators=(',', ':'))
 print(len(rows), 'Discover verses (', FAMILIAR, 'familiar );', len(catalog), 'scenes')

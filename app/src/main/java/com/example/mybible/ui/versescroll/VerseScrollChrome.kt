@@ -548,13 +548,13 @@ internal fun BoxScope.FirstTimeHint(colors: VsColors, reduceMotion: Boolean, onD
 internal fun VerseScrollSettingsSheet(
     colors: VsColors,
     defs: List<HighlightColorDef>,
-    paintedScenes: Boolean,
+    photos: Boolean,
     motion: Boolean,
     reduceMotion: Boolean,
     doubleTapColor: String,
     showTelugu: Boolean,
     sceneCount: Int,
-    onPaintedScenes: (Boolean) -> Unit,
+    onPhotos: (Boolean) -> Unit,
     onMotion: (Boolean) -> Unit,
     onDoubleTapColor: (String) -> Unit,
     onShowTelugu: (Boolean) -> Unit,
@@ -580,14 +580,14 @@ internal fun VerseScrollSettingsSheet(
                 fontSize = 18.sp
             )
             SettingGroup("Backgrounds", colors) {
-                OptionPill("Painted scenes", paintedScenes, colors) { onPaintedScenes(true) }
-                OptionPill("Plain", !paintedScenes, colors) { onPaintedScenes(false) }
+                OptionPill("Nature photos", photos, colors) { onPhotos(true) }
+                OptionPill("Plain", !photos, colors) { onPhotos(false) }
             }
             SettingNote(
-                (if (sceneCount > 0) "$sceneCount painted scenes" else "Painted scenes") +
-                    ", each dimmed as much as it needs for the verse to stay easy to read. A verse about the sea, " +
-                    "the night, snow, harvest, peace, a shepherd or mountains gets a matching scene. Check-ins " +
-                    "stay plain, as a pause.",
+                (if (sceneCount > 0) "$sceneCount nature photos" else "Nature photos") +
+                    " from Unsplash, each dimmed as much as it needs for the verse to stay easy to read. A verse " +
+                    "about the sea, the night, snow, harvest, peace, a shepherd or mountains gets a matching photo. " +
+                    "Check-ins stay plain, as a pause.",
                 colors
             )
             SettingGroup("Motion", colors) {
@@ -595,9 +595,8 @@ internal fun VerseScrollSettingsSheet(
                 OptionPill("Off", !motion, colors) { onMotion(false) }
             }
             SettingNote(
-                if (reduceMotion) "Your phone is set to reduce motion, so scenes stay still."
-                else "Scenes drift and zoom very slowly, with a small moving touch of their own. Only the verse on " +
-                    "screen moves.",
+                if (reduceMotion) "Your phone is set to reduce motion, so photos stay still."
+                else "Photos drift and zoom very slowly. Only the one on screen moves.",
                 colors
             )
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {

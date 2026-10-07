@@ -40,11 +40,11 @@ class VerseScrollController(
 
     // ---- settings ----
 
-    /** Painted scenes behind each verse, or the plain theme background. */
-    var paintedScenes by mutableStateOf(prefs.getBoolean(KEY_SCENES, true))
+    /** A nature photo behind each verse, or the plain theme background. */
+    var backgroundPhotos by mutableStateOf(prefs.getBoolean(KEY_SCENES, true))
         private set
 
-    /** The slow drift and zoom plus each scene's small moving touch (never when the phone asks for less motion). */
+    /** The photos' slow drift and zoom (never when the phone asks for less motion). */
     var motion by mutableStateOf(prefs.getBoolean(KEY_MOTION, true))
         private set
 
@@ -60,8 +60,8 @@ class VerseScrollController(
     var hintSeen by mutableStateOf(prefs.getBoolean(KEY_HINT_SEEN, false))
         private set
 
-    fun updatePaintedScenes(on: Boolean) {
-        paintedScenes = on
+    fun updateBackgroundPhotos(on: Boolean) {
+        backgroundPhotos = on
         prefs.edit().putBoolean(KEY_SCENES, on).apply()
     }
 
@@ -95,7 +95,7 @@ class VerseScrollController(
 
     fun scene(id: String?): SceneSpec? = id?.let { sceneById[it] }
 
-    /** How many painted scenes there are (0 until the catalog has loaded). */
+    /** How many background photos there are (0 until the catalog has loaded). */
     val sceneCount: Int get() = scenes.size
 
     private suspend fun ensureLoaded() = loadLock.withLock {
@@ -470,7 +470,7 @@ class VerseScrollController(
     // ---- scene pictures ----
 
     // Decoded pictures for the cards around the one on screen. Hardware bitmaps live in graphics memory,
-    // not the app's heap, so a handful of full-screen paintings costs the app nothing it needs.
+    // not the app's heap, so a handful of full-screen photos costs the app nothing it needs.
     private val images = LruCache<String, ImageBitmap>(5)
 
     /** Tests that draw the screen in software (which can't draw hardware bitmaps) switch this. */
@@ -497,6 +497,7 @@ class VerseScrollController(
 
     companion object {
         private const val PREFS_NAME = "verse_scroll"
+        // Named for the painted scenes the photos replaced; kept so the setting carries over.
         private const val KEY_SCENES = "painted_scenes"
         private const val KEY_MOTION = "motion"
         private const val KEY_COLOR = "double_tap_color"
