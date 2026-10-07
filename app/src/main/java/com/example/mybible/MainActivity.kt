@@ -34,6 +34,7 @@ import com.example.mybible.ui.TourMode
 import com.example.mybible.ui.components.*
 import com.example.mybible.ui.screens.*
 import com.example.mybible.ui.theme.MyBibleTheme
+import com.example.mybible.ui.versescroll.VerseScrollScreen
 import com.example.mybible.widget.WidgetActionKeys
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -294,6 +295,12 @@ class MainActivity : ComponentActivity() {
                     NavTab.HIGHLIGHTS -> viewModel.backToHighlightsSourceVerse()
                     NavTab.STUDIED -> viewModel.backToStudiedSourceVerse()
                     NavTab.NOTES -> viewModel.backToNotesSourceVerse()
+                    // Opened from Verse Scroll's links button: back goes
+                    // there, not to the Reader.
+                    NavTab.CROSS_REFERENCES -> if (!viewModel.crossReferencesOpenedFromReader) {
+                        viewModel.closeCrossReferences()
+                        return@BackHandler
+                    }
                     else -> {}
                 }
                 viewModel.selectTab(NavTab.READER)
@@ -337,9 +344,10 @@ class MainActivity : ComponentActivity() {
             val noteReturnItem by viewModel.noteReturnItem.collectAsState()
             val highlightsReturnAvailable by viewModel.highlightsReturnAvailable.collectAsState()
             val studiedReturnAvailable by viewModel.studiedReturnAvailable.collectAsState()
+            val verseScrollReturnAvailable by viewModel.verseScrollReturnAvailable.collectAsState()
             BackHandler(
                 enabled = activeTab == NavTab.READER &&
-                    (crossReferenceReturnAvailable || searchReturnAvailable || lexiconReturnTab != null || noteReturnItem != null || highlightsReturnAvailable || studiedReturnAvailable)
+                    (crossReferenceReturnAvailable || searchReturnAvailable || lexiconReturnTab != null || noteReturnItem != null || highlightsReturnAvailable || studiedReturnAvailable || verseScrollReturnAvailable)
             ) {
                 when {
                     crossReferenceReturnAvailable -> viewModel.backToCrossReferenceSourceVerse()
@@ -347,7 +355,9 @@ class MainActivity : ComponentActivity() {
                     lexiconReturnTab != null -> viewModel.backToLexiconOriginVerse()
                     noteReturnItem != null -> viewModel.returnToNote()
                     highlightsReturnAvailable -> viewModel.returnToHighlightedVerses()
-                    else -> viewModel.returnToStudied()
+                    studiedReturnAvailable -> viewModel.returnToStudied()
+                    // "Read" from a Verse Scroll card: back returns to the feed.
+                    else -> viewModel.returnToVerseScroll()
                 }
             }
 
@@ -435,6 +445,7 @@ class MainActivity : ComponentActivity() {
                             NavTab.CROSS_REFERENCES -> CrossReferenceScreen(viewModel = viewModel)
                             NavTab.GREEK_WORD -> GreekWordScreen(viewModel = viewModel)
                             NavTab.HEBREW_WORD -> HebrewWordScreen(viewModel = viewModel)
+                            NavTab.VERSE_SCROLL -> VerseScrollScreen(viewModel = viewModel)
                             NavTab.HIGHLIGHTS -> {
                                 val highlightedItems by viewModel.highlightedVerseItems.collectAsState()
                                 val currentBook by viewModel.currentBook.collectAsState()

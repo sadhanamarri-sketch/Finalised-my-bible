@@ -20,6 +20,7 @@ import com.example.mybible.data.DriveSyncWorker
 import com.example.mybible.reminders.ReminderFrequency
 import com.example.mybible.reminders.ReminderScheduler
 import com.example.mybible.reminders.ReminderTheme
+import com.example.mybible.versescroll.VerseScrollController
 import com.example.mybible.data.resolveBookName
 import com.example.mybible.data.LexiconLookupResult
 import com.example.mybible.model.*
@@ -42,7 +43,7 @@ import java.util.Date
 import java.util.Locale
 
 enum class NavTab {
-    READER, STUDIED, NOTES, SEARCH, SETTINGS, HIGHLIGHTS, CROSS_REFERENCES, GREEK_WORD, HEBREW_WORD
+    READER, STUDIED, NOTES, SEARCH, SETTINGS, HIGHLIGHTS, CROSS_REFERENCES, GREEK_WORD, HEBREW_WORD, VERSE_SCROLL
 }
 
 // Mirrors Capacitor's pickingMode (notes) and selectMode (studied) — a
@@ -391,6 +392,62 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun dismissHighlightsReturnBanner() {
         _highlightsReturnAvailable.value = false
+    }
+
+    // ---- Verse Scroll ----
+
+    // The feed, its settings and today's count — kept here rather than in
+    // the screen so a trip to the Reader ("Read") and back lands on the
+    // same card.
+    val verseScroll = VerseScrollController(application, repository, viewModelScope)
+
+    // Same detour pattern as Highlights/Studied above: "Read" on a Verse
+    // Scroll card opens that verse in the Reader with a "Return to Verse
+    // Scroll" banner, and Reader's own position from before is restored on
+    // the way back so a glance at a verse never becomes the saved place.
+    private val _verseScrollReturnAvailable = MutableStateFlow(false)
+    val verseScrollReturnAvailable: StateFlow<Boolean> = _verseScrollReturnAvailable.asStateFlow()
+
+    private val _verseScrollSourceVerse = MutableStateFlow<ReaderScrollAnchor?>(null)
+
+    fun openVerseScroll() {
+        selectTab(NavTab.VERSE_SCROLL)
+    }
+
+    fun closeVerseScroll() {
+        selectTab(NavTab.READER)
+    }
+
+    fun readFromVerseScroll(book: String, chapter: Int, verse: Int) {
+        captureReaderSourceVerseIfNeeded(_verseScrollSourceVerse)
+        _verseScrollReturnAvailable.value = true
+        jumpToVerse(book, chapter, verse)
+        // Same reasoning as openHighlightedVerse — blur would hide the very verse you came to read.
+        _isBlurModeEnabled.value = false
+        selectTab(NavTab.READER)
+    }
+
+    // The banner's Return button and system back alike — unlike Search's
+    // results list, there's nothing else to go back to.
+    fun returnToVerseScroll() {
+        val source = _verseScrollSourceVerse.value
+        _verseScrollSourceVerse.value = null
+        _verseScrollReturnAvailable.value = false
+        if (source != null) jumpToVerse(source.book, source.chapter, source.verse, focusVerse = false)
+        selectTab(NavTab.VERSE_SCROLL)
+    }
+
+    fun dismissVerseScrollReturnBanner() {
+        _verseScrollReturnAvailable.value = false
+        _verseScrollSourceVerse.value = null
+    }
+
+    // Undo for removing a highlight in Verse Scroll — restores the exact
+    // item, quick-note link included, not just the color.
+    fun restoreHighlight(item: HighlightItem) {
+        viewModelScope.launch {
+            repository.setHighlight(item.book, item.chapter, item.verse, item.colorHex, noteId = item.noteId)
+        }
     }
 
     // Interactive UI overlays & actions
@@ -1026,7 +1083,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _lexiconReturnTab.value != null ||
             _noteReturnItem.value != null ||
             _highlightsReturnAvailable.value ||
-            _studiedReturnAvailable.value
+            _studiedReturnAvailable.value ||
+            _verseScrollReturnAvailable.value
 
     // What actually gates every position save (durable onStop save,
     // debounced scroll save, and per-chapter-navigation save alike) — not
@@ -1463,6 +1521,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _noteReturnItem.value = null
         _highlightsReturnAvailable.value = false
         _studiedReturnAvailable.value = false
+        _verseScrollReturnAvailable.value = false
+        _verseScrollSourceVerse.value = null
         // Also clear the source-verse-to-restore-on-exit tracking for
         // search/highlights/studied/notes — otherwise a stale one left over
         // from before backgrounding (see this function's own doc) would
@@ -1729,12 +1789,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         jumpToLexiconBaseVerse()
     }
 
+    // Which screen Cross References was opened from: Reader (a verse's
+    // cross-reference marker) or Verse Scroll (its links button). Leaving
+    // the page goes back there, and so does backing all the way out of a
+    // reference followed from it.
+    private var crossReferenceOrigin = NavTab.READER
+
+    // Reader's own position when Cross References was opened from somewhere
+    // else — the source verse then isn't a place the Reader ever was, so
+    // the detour restores this instead (see returnToCrossReferences and
+    // backToCrossReferenceSourceVerse).
+    private val _crossReferenceReaderAnchor = MutableStateFlow<ReaderScrollAnchor?>(null)
+
+    val crossReferencesOpenedFromReader: Boolean get() = crossReferenceOrigin == NavTab.READER
+
     // Opens CrossReferenceScreen for this verse — same shape as a search:
     // fetch the list, land on the page. Remember the verse the xrefs were
     // opened *from*, independent of _selectedVerse — the dagger marker
     // (onCrossReferenceMarkerClick) opens xrefs without ever selecting the
     // verse.
-    fun openCrossReferences(verse: Verse) {
+    fun openCrossReferences(verse: Verse, origin: NavTab = NavTab.READER) {
+        crossReferenceOrigin = origin
+        _crossReferenceReaderAnchor.value = null
+        if (origin != NavTab.READER) captureReaderSourceVerseIfNeeded(_crossReferenceReaderAnchor)
         _crossReferenceSourceVerse.value = verse
         // Reset to "loading" (null) rather than leaving a previous verse's
         // list on screen — otherwise re-opening for a different verse
@@ -1761,8 +1838,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // it for a full exit from the cross-reference session later.
     fun returnToCrossReferences() {
         _crossReferenceReturnAvailable.value = false
-        _crossReferenceSourceVerse.value?.let { jumpToVerse(it.book, it.chapter, it.number) }
+        val anchor = _crossReferenceReaderAnchor.value
+        if (anchor != null) jumpToVerse(anchor.book, anchor.chapter, anchor.verse, focusVerse = false)
+        else _crossReferenceSourceVerse.value?.let { jumpToVerse(it.book, it.chapter, it.number) }
         selectTab(NavTab.CROSS_REFERENCES)
+    }
+
+    // The page's own back arrow, and system back on it.
+    fun closeCrossReferences() {
+        val origin = crossReferenceOrigin
+        endCrossReferenceSession()
+        selectTab(origin)
     }
 
     // System back while Reader shows the "Return to cross references"
@@ -1776,9 +1862,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // there's no list left to come back to once you've backed out past it.
     fun backToCrossReferenceSourceVerse() {
         val source = _crossReferenceSourceVerse.value
+        val origin = crossReferenceOrigin
+        val anchor = _crossReferenceReaderAnchor.value
         _crossReferenceReturnAvailable.value = false
         endCrossReferenceSession()
-        if (source != null) {
+        if (origin != NavTab.READER) {
+            // Opened from Verse Scroll: back out of the whole detour to it,
+            // with the Reader left where it was before.
+            if (anchor != null) jumpToVerse(anchor.book, anchor.chapter, anchor.verse, focusVerse = false)
+            selectTab(origin)
+        } else if (source != null) {
             jumpToVerse(source.book, source.chapter, source.number)
             _isBlurModeEnabled.value = false
         }
@@ -1797,6 +1890,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // CrossReferenceScreen via its own back button, or dismisses the
     // "Return to cross references" banner.
     fun endCrossReferenceSession() {
+        crossReferenceOrigin = NavTab.READER
+        _crossReferenceReaderAnchor.value = null
         _crossReferenceList.value = null
         _crossReferenceSourceVerse.value = null
         _crossReferenceScrollIndex.value = 0

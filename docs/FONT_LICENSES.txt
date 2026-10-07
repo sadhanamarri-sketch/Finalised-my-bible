@@ -4,9 +4,10 @@ All fonts in this directory are licensed under the SIL Open Font License
   - GFS Porson (Greek Font Society) — eb_garamond_regular.otf
   - DejaVu Serif (DejaVu fonts team) — merriweather_regular.ttf / _bold.ttf
   - GFS Baskerville (Greek Font Society) — playfair_display_regular.otf
-  - Caladea (Google/Huerta Tipográfica) — gelasio_regular.ttf / _bold.ttf
+  - Gelasio (The Gelasio Project Authors) — gelasio_regular.ttf / _medium.ttf / _bold.ttf
+    (_medium is a static weight-500 instance of the official variable font)
 
-The garamond/merriweather/playfair/gelasio files are open-license stand-ins,
+The garamond/merriweather/playfair files are open-license stand-ins,
 not the exact named Google Fonts (see AppFonts.kt for why, and how to swap
 in the authentic files later — just replace the .ttf under the same
 filename and rebuild).

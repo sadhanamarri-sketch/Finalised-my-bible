@@ -15,8 +15,8 @@ object WidgetActionKeys {
     val ContinueReading = ActionParameters.Key<Boolean>("widget_continue_reading")
 
     // Value is a NavTab enum name (e.g. "HIGHLIGHTS", "STUDIED", "NOTES",
-    // "SEARCH") — used by the quick-access icon row on the home screen
-    // widget to jump straight to that tab.
+    // "SEARCH", "VERSE_SCROLL") — used by the quick-access icon row on the
+    // home screen widget to jump straight to that tab.
     val OpenTab = ActionParameters.Key<String>("widget_open_tab")
 
     // Plain Intent extra names (same string values as the ActionParameters

@@ -20,7 +20,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mybible.ui.MainViewModel
-import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.components.BackTopBar
 import com.example.mybible.ui.theme.WorkSansFontFamily
 
@@ -83,10 +82,8 @@ fun CrossReferenceScreen(
         topBar = {
             BackTopBar(
                 title = "Cross References",
-                onBack = {
-                    viewModel.endCrossReferenceSession()
-                    viewModel.selectTab(NavTab.READER)
-                }
+                // Back to whichever screen opened this page (Reader, or Verse Scroll's links button).
+                onBack = { viewModel.closeCrossReferences() }
             )
         },
         modifier = modifier

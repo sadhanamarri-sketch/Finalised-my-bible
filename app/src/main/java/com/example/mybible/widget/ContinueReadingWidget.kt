@@ -43,7 +43,7 @@ import com.example.mybible.ui.NavTab
  * is a single row (4x1) holding just the "Continue Reading" pill — kept as
  * the sole focus at that size since it's meant to attract attention, not
  * compete with icons for it. Dragging it taller (roughly 4x2 and up)
- * reveals a Highlighted / Studied / Notes / Search quick-action row pinned
+ * reveals a Highlighted / Studied / Notes / Search / Verse Scroll quick-action row pinned
  * to the bottom edge, fixed at its designed 84dp height regardless of how
  * tall the widget gets dragged — different launchers hand a "4x2" resize
  * very different real heights. The pill fills the rest of the space above
@@ -204,6 +204,16 @@ private fun ContinueReadingContent(
                     iconRes = R.drawable.ic_widget_search,
                     label = "Search",
                     tab = NavTab.SEARCH,
+                    palette = palette,
+                    modifier = GlanceModifier.defaultWeight()
+                )
+                Spacer(modifier = GlanceModifier.width(8.dp))
+                // Straight into Verse Scroll's feed — the "instead of a social
+                // app" shortcut.
+                QuickActionCard(
+                    iconRes = R.drawable.ic_widget_scroll,
+                    label = "Verse Scroll",
+                    tab = NavTab.VERSE_SCROLL,
                     palette = palette,
                     modifier = GlanceModifier.defaultWeight()
                 )

@@ -649,6 +649,19 @@ class BibleRepository(private val context: Context) {
         bibleDao.getVerseText(bookName, chapter, verse)
     }
 
+    // Verse Scroll's card content: the verses first..last of one chapter
+    // (Room only, like getVerseText — the feed just skips a verse that isn't
+    // there yet rather than going to the network for it).
+    suspend fun getVerseRange(bookName: String, chapter: Int, first: Int, last: Int): List<VerseEntity> =
+        withContext(Dispatchers.IO) {
+            bibleDao.getVerseRange(bookName, chapter, first, last)
+        }
+
+    suspend fun countCrossReferencesFrom(bookName: String, chapter: Int, verse: Int): Int =
+        withContext(Dispatchers.IO) {
+            bibleDao.countCrossReferencesFrom(bookName, chapter, verse)
+        }
+
     // Real interlinear Greek (STEPBible TAGNT), imported by GreekImporter.
     // Returns null for OT books (Hebrew, not Greek) and for any verse not
     // yet in Room — no fake/placeholder Greek is generated.
@@ -744,8 +757,11 @@ class BibleRepository(private val context: Context) {
 
     suspend fun setHighlight(book: String, chapter: Int, verse: Int, colorHex: String, noteId: Long? = null) {
         val current = _highlightsFlow.value.toMutableList()
+        val existing = current.find { it.book == book && it.chapter == chapter && it.verse == verse }
         current.removeAll { it.book == book && it.chapter == chapter && it.verse == verse }
-        current.add(HighlightItem(book, chapter, verse, colorHex, noteId = noteId))
+        // A color change keeps the highlight's quick note linked (see
+        // HighlightItem.noteId) — only an explicit noteId replaces it.
+        current.add(HighlightItem(book, chapter, verse, colorHex, noteId = noteId ?: existing?.noteId))
         saveHighlightsToPrefs(current)
     }
 

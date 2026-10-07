@@ -46,6 +46,14 @@ interface BibleDao {
     @Query("SELECT text FROM verses WHERE book = :book AND chapter = :chapter AND number = :verse LIMIT 1")
     suspend fun getVerseText(book: String, chapter: Int, verse: Int): String?
 
+    // A few consecutive verses of one chapter — Verse Scroll's card for a
+    // verse (or short passage) plus the verse either side of it.
+    @Query(
+        "SELECT * FROM verses WHERE book = :book AND chapter = :chapter " +
+        "AND number BETWEEN :first AND :last ORDER BY number"
+    )
+    suspend fun getVerseRange(book: String, chapter: Int, first: Int, last: Int): List<VerseEntity>
+
     // "Extensive search" (opt-in typo-tolerance) builds an in-memory
     // dictionary of every word that actually appears in the KJV from this
     // once, then caches it — see BibleRepository.getKjvWordIndex. Only
@@ -124,6 +132,14 @@ interface BibleDao {
 
     @Query("SELECT COUNT(*) FROM cross_references")
     suspend fun countCrossReferences(): Int
+
+    // How many verses this one links to — the "N links" count on Verse
+    // Scroll's bottom bar. Indexed, like getCrossReferences above.
+    @Query(
+        "SELECT COUNT(*) FROM cross_references WHERE fromBook = :book AND fromChapter = :chapter " +
+        "AND fromVerse = :verse"
+    )
+    suspend fun countCrossReferencesFrom(book: String, chapter: Int, verse: Int): Int
 
     // ---- Greek lexicon (TBESG) ----
 
