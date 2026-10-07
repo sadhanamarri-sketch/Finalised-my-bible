@@ -83,10 +83,10 @@ private const val POSITION_SAVE_DEBOUNCE_MS = 1500L
 // was never explicitly dismissed.
 private const val DETOUR_SETTLE_MS = 300_000L
 
-// How long a tab change takes on screen: MainActivity's AnimatedContent
-// uses the default transition (the old tab fades out over 90 ms, the new
-// one is in by about 310 ms). Work that would show on the outgoing tab
-// waits this long — see returnToVerseScroll.
+// How long a tab change takes on screen (MainActivity's AnimatedContent:
+// the old tab is gone by 90 ms, or 300 ms to and from Verse Scroll, and the
+// new one in by about 310 ms). Work that would show on the outgoing tab
+// waits this long — see leaveReaderThenRestore.
 private const val TAB_CHANGE_MS = 400L
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -288,6 +288,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _studiedSourceVerse = MutableStateFlow<ReaderScrollAnchor?>(null)
 
     private fun captureReaderSourceVerseIfNeeded(existing: MutableStateFlow<ReaderScrollAnchor?>) {
+        finishReaderRestore()
         if (existing.value != null) return
         val anchor = _readerAnchor.value
         val sourceVerseNumber = anchor?.takeIf {
@@ -296,24 +297,61 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         existing.value = ReaderScrollAnchor(_currentBook.value, _currentChapter.value, sourceVerseNumber)
     }
 
+    // A "Return" from a detour in the Reader that's still waiting to put the
+    // Reader back where it was (see leaveReaderThenRestore), and the timer
+    // that will.
+    private var readerRestore: (() -> Unit)? = null
+    private var readerRestoreJob: Job? = null
+
+    // Every detour's "Return" (banner button or system back): leaves the
+    // Reader for [tab], and puts the Reader back where it was ([restore],
+    // which also closes the detour) only once it's off screen. Done first,
+    // as these used to, the chapter it goes back to flashed up while the
+    // Reader was still fading out (tab changes are animated, see
+    // MainActivity's AnimatedContent). Until [restore] runs the detour stays
+    // open, so nothing saves the verse that was only glanced at as the
+    // reading position; anything that changes tabs, moves the Reader, or
+    // notes where it is in the meantime runs [restore] first.
+    private fun leaveReaderThenRestore(tab: NavTab, restore: () -> Unit) {
+        selectTab(tab)
+        readerRestore = restore
+        readerRestoreJob = viewModelScope.launch {
+            delay(TAB_CHANGE_MS)
+            readerRestoreJob = null
+            finishReaderRestore()
+        }
+    }
+
+    // Puts the Reader back now if a Return is still waiting to.
+    private fun finishReaderRestore() {
+        val restore = readerRestore ?: return
+        readerRestore = null
+        readerRestoreJob?.cancel()
+        readerRestoreJob = null
+        restore()
+    }
+
     fun markStudiedNavigation() {
         captureReaderSourceVerseIfNeeded(_studiedSourceVerse)
         _studiedReturnAvailable.value = true
     }
 
     // Restores currentBook/currentChapter to wherever Studied's detour
-    // actually started before switching tabs — not just cosmetic: leaving
-    // them pointed at whatever verse the detour jumped to in Reader meant
-    // isDetourActive() went false the instant this ran (studiedReturnAvailable
-    // is what it was gating on), so closing the app right after tapping
-    // Return persisted *that* verse's chapter as the resume position
-    // instead of the chapter genuinely being read. Doesn't consume
+    // actually started (once the Reader is off screen, see
+    // leaveReaderThenRestore, with the detour kept open until then) — not
+    // just cosmetic: leaving them pointed at whatever verse the detour
+    // jumped to in Reader meant isDetourActive() went false the instant
+    // this ran (studiedReturnAvailable is what it was gating on), so closing
+    // the app right after tapping Return persisted *that* verse's chapter
+    // as the resume position instead of the chapter genuinely being read.
+    // Doesn't consume
     // _studiedSourceVerse — backToStudiedSourceVerse still needs it for a
     // full exit from Studied later.
     fun returnToStudied() {
-        _studiedReturnAvailable.value = false
-        _studiedSourceVerse.value?.let { jumpToVerse(it.book, it.chapter, it.verse) }
-        selectTab(NavTab.STUDIED)
+        leaveReaderThenRestore(NavTab.STUDIED) {
+            _studiedReturnAvailable.value = false
+            _studiedSourceVerse.value?.let { jumpToVerse(it.book, it.chapter, it.verse) }
+        }
     }
 
     fun dismissStudiedReturnBanner() {
@@ -387,13 +425,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // See returnToStudied's doc for why this restores currentBook/
-    // currentChapter first — same isDetourActive()/persisted-resume-
+    // currentChapter — same isDetourActive()/persisted-resume-
     // position bug, same fix. Doesn't consume _highlightsSourceVerse —
     // backToHighlightsSourceVerse still needs it for a full exit later.
     fun returnToHighlightedVerses() {
-        _highlightsReturnAvailable.value = false
-        _highlightsSourceVerse.value?.let { jumpToVerse(it.book, it.chapter, it.verse) }
-        selectTab(NavTab.HIGHLIGHTS)
+        leaveReaderThenRestore(NavTab.HIGHLIGHTS) {
+            _highlightsReturnAvailable.value = false
+            _highlightsSourceVerse.value?.let { jumpToVerse(it.book, it.chapter, it.verse) }
+        }
     }
 
     fun dismissHighlightsReturnBanner() {
@@ -416,22 +455,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _verseScrollSourceVerse = MutableStateFlow<ReaderScrollAnchor?>(null)
 
-    // Set between "Return" and the Reader being put back where it was (see returnToVerseScroll).
-    private var verseScrollReaderRestore: Job? = null
-
     fun openVerseScroll() {
         selectTab(NavTab.VERSE_SCROLL)
     }
 
     fun closeVerseScroll() {
-        if (verseScrollReaderRestore != null) restoreReaderAfterVerseScroll()
         selectTab(NavTab.READER)
     }
 
     fun readFromVerseScroll(book: String, chapter: Int, verse: Int) {
-        // Back in the Reader before it was put back: still the same detour, from the same place.
-        verseScrollReaderRestore?.cancel()
-        verseScrollReaderRestore = null
         captureReaderSourceVerseIfNeeded(_verseScrollSourceVerse)
         _verseScrollReturnAvailable.value = true
         jumpToVerse(book, chapter, verse)
@@ -442,29 +474,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // The banner's Return button and system back alike — unlike Search's
     // results list, there's nothing else to go back to.
-    //
-    // The Reader is put back where it was only once it has faded out: done
-    // first, as before, the chapter it goes back to flashed up while the
-    // Reader was still on its way off screen (the tab change is animated,
-    // see MainActivity's AnimatedContent). Until then the detour stays
-    // open, so nothing saves the verse that was only glanced at as the
-    // reading position in between.
     fun returnToVerseScroll() {
-        selectTab(NavTab.VERSE_SCROLL)
-        verseScrollReaderRestore?.cancel()
-        verseScrollReaderRestore = viewModelScope.launch {
-            delay(TAB_CHANGE_MS)
-            restoreReaderAfterVerseScroll()
+        leaveReaderThenRestore(NavTab.VERSE_SCROLL) {
+            val source = _verseScrollSourceVerse.value
+            _verseScrollSourceVerse.value = null
+            _verseScrollReturnAvailable.value = false
+            if (source != null) jumpToVerse(source.book, source.chapter, source.verse, focusVerse = false)
         }
-    }
-
-    private fun restoreReaderAfterVerseScroll() {
-        verseScrollReaderRestore?.cancel()
-        verseScrollReaderRestore = null
-        val source = _verseScrollSourceVerse.value
-        _verseScrollSourceVerse.value = null
-        _verseScrollReturnAvailable.value = false
-        if (source != null) jumpToVerse(source.book, source.chapter, source.verse, focusVerse = false)
     }
 
     fun dismissVerseScrollReturnBanner() {
@@ -648,7 +664,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // See returnToStudied's doc for why this restores currentBook/
-    // currentChapter first — same isDetourActive()/persisted-resume-
+    // currentChapter — same isDetourActive()/persisted-resume-
     // position bug (confirmed via the "Open in Reader from a lexicon
     // citation" investigation's on-device logging: closing the app right
     // after tapping Return persisted the *cited* chapter as the resume
@@ -658,9 +674,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // full exit from the lexicon page later.
     fun returnToLexicon() {
         val tab = _lexiconReturnTab.value ?: return
-        _lexiconReturnTab.value = null
-        _lexiconBaseVerse.value?.let { jumpToVerse(it.book, it.chapter, it.number) }
-        selectTab(tab)
+        leaveReaderThenRestore(tab) {
+            _lexiconReturnTab.value = null
+            _lexiconBaseVerse.value?.let { jumpToVerse(it.book, it.chapter, it.number) }
+        }
     }
 
     fun dismissLexiconReturnBanner() {
@@ -709,18 +726,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // See returnToStudied's doc for why this restores currentBook/
-    // currentChapter first — same isDetourActive()/persisted-resume-
+    // currentChapter — same isDetourActive()/persisted-resume-
     // position bug, same fix. Doesn't consume _notesSourceVerse —
     // backToNotesSourceVerse still needs it for a full exit from Notes
     // later (see its own doc for why a note-mention chain can nest several
     // steps deep before that happens).
     fun returnToNote() {
         val note = _noteReturnItem.value ?: return
-        _noteReturnItem.value = null
         val originTab = _noteReaderOriginTab.value
-        _notesSourceVerse.value?.let { jumpToVerse(it.book, it.chapter, it.verse) }
         openNoteReader(note, originTab)
-        selectTab(originTab)
+        leaveReaderThenRestore(originTab) {
+            _noteReturnItem.value = null
+            _notesSourceVerse.value?.let { jumpToVerse(it.book, it.chapter, it.verse) }
+        }
     }
 
     fun dismissNoteReturnBanner() {
@@ -1025,6 +1043,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectTab(tab: NavTab) {
+        finishReaderRestore()
         _activeTab.value = tab
     }
 
@@ -1245,6 +1264,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // a chapter to review it — pass focusVerse = false there so the whole
     // chapter reads normally instead of blurring around one cell.
     fun jumpToVerse(book: String, chapter: Int, verse: Int, focusVerse: Boolean = true) {
+        finishReaderRestore()
         _focusedVerseNumber.value = verse
         _focusedVerseBlurEnabled.value = focusVerse
         _focusedVersePinToTop.value = false
@@ -1553,8 +1573,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _studiedReturnAvailable.value = false
         _verseScrollReturnAvailable.value = false
         _verseScrollSourceVerse.value = null
-        verseScrollReaderRestore?.cancel()
-        verseScrollReaderRestore = null
+        readerRestore = null
+        readerRestoreJob?.cancel()
+        readerRestoreJob = null
         // Also clear the source-verse-to-restore-on-exit tracking for
         // search/highlights/studied/notes — otherwise a stale one left over
         // from before backgrounding (see this function's own doc) would
@@ -1864,16 +1885,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // system back does something different — see
     // backToCrossReferenceSourceVerse below.
     // See returnToStudied's doc (MainViewModel.kt) for why this restores
-    // currentBook/currentChapter first — same isDetourActive()/persisted-
+    // currentBook/currentChapter — same isDetourActive()/persisted-
     // resume-position bug, same fix. Doesn't consume _crossReferenceSourceVerse
     // — backToCrossReferenceSourceVerse/endCrossReferenceSession still need
     // it for a full exit from the cross-reference session later.
     fun returnToCrossReferences() {
-        _crossReferenceReturnAvailable.value = false
-        val anchor = _crossReferenceReaderAnchor.value
-        if (anchor != null) jumpToVerse(anchor.book, anchor.chapter, anchor.verse, focusVerse = false)
-        else _crossReferenceSourceVerse.value?.let { jumpToVerse(it.book, it.chapter, it.number) }
-        selectTab(NavTab.CROSS_REFERENCES)
+        leaveReaderThenRestore(NavTab.CROSS_REFERENCES) {
+            _crossReferenceReturnAvailable.value = false
+            val anchor = _crossReferenceReaderAnchor.value
+            if (anchor != null) jumpToVerse(anchor.book, anchor.chapter, anchor.verse, focusVerse = false)
+            else _crossReferenceSourceVerse.value?.let { jumpToVerse(it.book, it.chapter, it.number) }
+        }
     }
 
     // The page's own back arrow, and system back on it.
@@ -2636,15 +2658,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // See returnToStudied's doc (MainViewModel.kt) for why this restores
-    // currentBook/currentChapter first — same isDetourActive()/persisted-
+    // currentBook/currentChapter — same isDetourActive()/persisted-
     // resume-position bug, same fix. Doesn't consume _searchSourceVerse —
     // the system-back "undo the whole search detour" path still needs it
     // for a full exit from Search later.
     fun returnToSearchResults() {
-        _searchReturnAvailable.value = false
         _suppressNextSearchAutofocus.value = true
-        _searchSourceVerse.value?.let { jumpToVerse(it.book, it.chapter, it.verse) }
-        selectTab(NavTab.SEARCH)
+        leaveReaderThenRestore(NavTab.SEARCH) {
+            _searchReturnAvailable.value = false
+            _searchSourceVerse.value?.let { jumpToVerse(it.book, it.chapter, it.verse) }
+        }
     }
 
     // System back while Reader shows the "Return to search results" banner
