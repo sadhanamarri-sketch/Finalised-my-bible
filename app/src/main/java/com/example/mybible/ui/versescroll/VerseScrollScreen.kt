@@ -3,6 +3,7 @@ package com.example.mybible.ui.versescroll
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -38,6 +39,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -49,15 +52,16 @@ import androidx.compose.ui.unit.sp
 import com.example.mybible.model.HIGHLIGHT_COLOR_DEFS
 import com.example.mybible.model.HighlightItem
 import com.example.mybible.model.NoteItem
-import com.example.mybible.model.ThemeMode
 import com.example.mybible.model.Verse
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.components.VerseActionToolbar
 import com.example.mybible.ui.theme.WorkSansFontFamily
 import com.example.mybible.versescroll.CheckInFeedCard
+import com.example.mybible.versescroll.FeedMode
 import com.example.mybible.versescroll.VerseFeedCard
 import com.example.mybible.versescroll.VerseRef
+import com.example.mybible.versescroll.VerseScrollController
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -88,9 +92,10 @@ internal data class VsColors(
 }
 
 @Composable
-private fun verseScrollColors(themeMode: ThemeMode): VsColors {
+private fun verseScrollColors(): VsColors {
     val cs = MaterialTheme.colorScheme
-    val dark = themeMode == ThemeMode.DARK || themeMode == ThemeMode.CLASSIC_DARK
+    // Dark or light from the theme's own background, the same test MainActivity uses for the status bar.
+    val dark = cs.background.luminance() < 0.5f
     return VsColors(
         dark = dark,
         bg = cs.background,
@@ -135,11 +140,10 @@ private fun noteRefs(note: NoteItem): List<VerseRef> =
 @Composable
 fun VerseScrollScreen(viewModel: MainViewModel) {
     val controller = viewModel.verseScroll
-    val themeMode by viewModel.themeMode.collectAsState()
     val highlights by viewModel.highlights.collectAsState(initial = emptyList())
     val colorDefs by viewModel.highlightColorDefs.collectAsState(initial = HIGHLIGHT_COLOR_DEFS)
     val notes by viewModel.notes.collectAsState(initial = emptyList())
-    val colors = verseScrollColors(themeMode)
+    val colors = verseScrollColors()
     val reduceMotion = rememberReduceMotion()
     val scenes = controller.paintedScenes
     val motion = scenes && controller.motion && !reduceMotion
@@ -166,7 +170,9 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
     var pickerMillis by remember { mutableLongStateOf(PICKER_MS) }
     var toast by remember { mutableStateOf<VsToast?>(null) }
     var sheetCard by remember { mutableStateOf<VerseFeedCard?>(null) }
+    var linksCard by remember { mutableStateOf<Pair<Int, VerseFeedCard>?>(null) }
     var settingsOpen by remember { mutableStateOf(false) }
+    val feedAlpha = remember { Animatable(1f) }
     val sweeps = remember { mutableStateMapOf<Long, Int>() }
 
     fun showToast(message: String, action: String? = null, onAction: (() -> Unit)? = null) {
@@ -246,6 +252,33 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
         val cards = controller.cards
         key(controller.feedId) {
             val pagerState = rememberPagerState(initialPage = controller.currentIndex) { cards.size }
+            // The controller asks to move on after following a link or leaving a Rabbit hole.
+            val request = controller.scrollRequest
+            LaunchedEffect(request) {
+                if (request == null) return@LaunchedEffect
+                if (request.index < cards.size) pagerState.animateScrollToPage(request.index)
+                controller.consumeScrollRequest()
+            }
+
+            // Leaving a Rabbit hole: a quick fade when it jumps back to where the hole started.
+            fun leave(toRoot: Boolean, message: (String?) -> String) {
+                scope.launch {
+                    hidePicker()
+                    val rootLabel = controller.rabbitHoleRoot(pagerState.settledPage)?.content?.label
+                    val jumps = toRoot && rootLabel != null
+                    if (jumps && !reduceMotion) feedAlpha.animateTo(0f, tween(160))
+                    val target = controller.leaveRabbitHole(toRoot)
+                    if (target != null) {
+                        pagerState.scrollToPage(target)
+                        showToast(message(rootLabel))
+                    }
+                    if (feedAlpha.value < 1f) feedAlpha.animateTo(1f, tween(160))
+                }
+            }
+            // The first back press leaves a Rabbit hole; the next leaves Verse Scroll.
+            BackHandler(enabled = controller.mode == FeedMode.RABBIT_HOLE && pickerIndex < 0) {
+                leave(toRoot = true) { root -> if (root != null) "Out of the Rabbit hole \u00b7 back at $root" else "Out of the Rabbit hole" }
+            }
             // Also re-checked as cards arrive: the first ones load after the pager has already settled on page 0.
             LaunchedEffect(pagerState) {
                 snapshotFlow { pagerState.settledPage to cards.size }.collect { (page, size) ->
@@ -261,7 +294,9 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                 beyondViewportPageCount = 1,
                 flingBehavior = PagerDefaults.flingBehavior(state = pagerState, pagerSnapDistance = PagerSnapDistance.atMost(1)),
                 key = { page -> cards.getOrNull(page)?.uid ?: page.toLong() },
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = feedAlpha.value }
             ) { page ->
                 when (val card = cards.getOrNull(page)) {
                     is VerseFeedCard -> {
@@ -292,11 +327,17 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                                 hidePicker()
                                 toast = null
                                 sheetCard = card
+                            },
+                            onLinkedFrom = {
+                                val from = card.from?.ref
+                                val source = (page - 1 downTo 0).firstOrNull { (cards[it] as? VerseFeedCard)?.content?.ref == from }
+                                if (source != null) scope.launch { pagerState.animateScrollToPage(source) }
                             }
                         )
                     }
                     is CheckInFeedCard -> {
                         val last = cards.subList(0, page).lastOrNull { it is VerseFeedCard } as VerseFeedCard?
+                        val root = card.rootIndex?.takeIf { controller.isInRabbitHole(card) }
                         CheckInPage(
                             colors = colors,
                             versesToday = controller.versesToday,
@@ -306,7 +347,12 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                             onRead = {
                                 last?.content?.ref?.let { viewModel.readFromVerseScroll(it.book, it.chapter, it.verse) }
                             },
-                            onKeepGoing = { scope.launch { pagerState.animateScrollToPage(page + 1) } }
+                            onKeepGoing = { scope.launch { pagerState.animateScrollToPage(page + 1) } },
+                            rabbitHoleFrom = root?.let { (cards.getOrNull(it) as? VerseFeedCard)?.content?.label },
+                            rabbitHoleDepth = root?.let { r -> cards.subList(r + 1, page).count { it is VerseFeedCard } } ?: 0,
+                            onBackToDiscover = {
+                                if (controller.leaveRabbitHole(toRoot = false, advance = true) != null) showToast("Back to Discover")
+                            }
                         )
                     }
                     null -> Box(Modifier.fillMaxSize())
@@ -327,10 +373,36 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
             val verseCard = current as? VerseFeedCard
             val picking = pickerIndex >= 0 && pickerIndex == pagerState.settledPage
 
+            val inRabbitHole = controller.mode == FeedMode.RABBIT_HOLE
             VerseScrollTopBar(
                 colors = colors,
                 scenes = scenes && verseCard != null,
-                onBack = { viewModel.closeVerseScroll() },
+                rabbitHole = inRabbitHole,
+                backTo = controller.rabbitHoleRoot(pagerState.settledPage)?.content?.label,
+                onBack = {
+                    if (inRabbitHole) {
+                        leave(toRoot = true) { root -> if (root != null) "Out of the Rabbit hole \u00b7 back at $root" else "Out of the Rabbit hole" }
+                    } else {
+                        viewModel.closeVerseScroll()
+                    }
+                },
+                onDiscover = {
+                    if (inRabbitHole) leave(toRoot = false) { "Discover \u00b7 widely-referenced verses from across the Bible" }
+                },
+                onRabbitHole = {
+                    if (!inRabbitHole) {
+                        val index = controller.verseIndexAtOrBefore(pagerState.settledPage)
+                        val from = index?.let { cards[it] as? VerseFeedCard }
+                        if (index != null && from != null) {
+                            hidePicker()
+                            controller.followFrom(index, link = null, advance = false)
+                            showToast("Rabbit hole \u00b7 your next swipes follow links from ${from.content.label}")
+                        }
+                    }
+                },
+                onBackTo = {
+                    leave(toRoot = true) { root -> if (root != null) "Out of the Rabbit hole \u00b7 back at $root" else "Out of the Rabbit hole" }
+                },
                 onSettings = {
                     hidePicker()
                     settingsOpen = true
@@ -357,7 +429,8 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                     },
                     onLinks = {
                         hidePicker()
-                        viewModel.openCrossReferences(asVerse(verseCard), origin = NavTab.VERSE_SCROLL)
+                        toast = null
+                        linksCard = pagerState.settledPage to verseCard
                     }
                 )
             }
@@ -448,6 +521,35 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                 )
             },
             highlightHasLinkedNote = highlight?.noteId != null
+        )
+    }
+
+    linksCard?.let { (index, card) ->
+        val previews by produceState<List<VerseScrollController.LinkPreview>?>(null, card.uid) {
+            value = controller.linkPreviews(card)
+        }
+        LinksSheet(
+            colors = colors,
+            label = card.content.label,
+            total = card.content.linkCount,
+            previews = previews,
+            highlightHex = { highlightByKey[it.key]?.colorHex },
+            colorLabel = ::labelOf,
+            onPick = { preview ->
+                linksCard = null
+                controller.followFrom(index, preview.link, advance = true)
+                showToast("Rabbit hole from ${card.content.label}")
+            },
+            onFollow = {
+                linksCard = null
+                controller.followFrom(index, link = null, advance = true)
+                showToast("Rabbit hole \u00b7 following links from ${card.content.label}")
+            },
+            onSeeAll = {
+                linksCard = null
+                viewModel.openCrossReferences(asVerse(card), origin = NavTab.VERSE_SCROLL)
+            },
+            onDismiss = { linksCard = null }
         )
     }
 

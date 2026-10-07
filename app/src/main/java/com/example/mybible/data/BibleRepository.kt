@@ -3,6 +3,7 @@ package com.example.mybible.data
 import android.content.Context
 import com.example.mybible.data.local.AppDatabase
 import com.example.mybible.data.local.BibleDao
+import com.example.mybible.data.local.CrossReferenceEntity
 import com.example.mybible.data.local.VerseEntity
 import com.example.mybible.model.*
 import com.example.mybible.ui.components.BIBLE_BOOKS
@@ -655,6 +656,13 @@ class BibleRepository(private val context: Context) {
     suspend fun getVerseRange(bookName: String, chapter: Int, first: Int, last: Int): List<VerseEntity> =
         withContext(Dispatchers.IO) {
             bibleDao.getVerseRange(bookName, chapter, first, last)
+        }
+
+    // Every cross-reference row from a verse, strongest first — Verse Scroll's
+    // Links sheet and Rabbit hole pick from these.
+    suspend fun getCrossReferenceRows(bookName: String, chapter: Int, verse: Int): List<CrossReferenceEntity> =
+        withContext(Dispatchers.IO) {
+            bibleDao.getCrossReferences(bookName, chapter, verse)
         }
 
     suspend fun countCrossReferencesFrom(bookName: String, chapter: Int, verse: Int): Int =

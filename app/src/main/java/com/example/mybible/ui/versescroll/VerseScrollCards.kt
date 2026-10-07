@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,6 +49,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.SubcomposeLayout
@@ -64,9 +66,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.LineHeightStyle
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -75,6 +80,7 @@ import com.example.mybible.ui.theme.FrauncesFontFamily
 import com.example.mybible.ui.theme.GelasioFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
 import com.example.mybible.versescroll.LONG_VERSE_WORDS
+import com.example.mybible.versescroll.LinkedFrom
 import com.example.mybible.versescroll.SceneSpec
 import com.example.mybible.versescroll.VerseFeedCard
 import com.example.mybible.versescroll.VerseLine
@@ -83,6 +89,7 @@ import kotlin.math.roundToInt
 
 // Where on the card the text may sit: clear of the top bar and of the bottom bar and its counter.
 private val CardTopPadding = 74.dp
+private val InThreadTopPadding = 112.dp
 private val CardBottomPadding = 122.dp
 
 /** The part of the Bible a book belongs to, shown above each verse. */
@@ -161,7 +168,8 @@ internal fun VerseCardPage(
     sweepToken: Int,
     onPress: () -> Unit,
     onDoubleTap: () -> String?,
-    onLongPress: () -> Unit
+    onLongPress: () -> Unit,
+    onLinkedFrom: () -> Unit = {}
 ) {
     val content = card.content
     val long = content.wordCount > LONG_VERSE_WORDS
@@ -212,13 +220,20 @@ internal fun VerseCardPage(
                         }
                     )
                 }
-                .padding(cardPadding())
+                // Cards inside a Rabbit hole leave room for the "Back to …" button under the top bar.
+                .padding(cardPadding(top = if (card.from != null) InThreadTopPadding else CardTopPadding))
         ) {
             VerseStack(
+                eyebrow = {
+                    when {
+                        card.from != null -> LinkedFromEyebrow(card.from, c, onLinkedFrom)
+                        card.newThread -> IconEyebrow(VerseScrollIcons.Spark, "New thread", c)
+                        else -> Eyebrow(genreOf(content.ref.book), c)
+                    }
+                },
                 lines = content.lines,
                 before = content.before,
                 after = content.after,
-                book = content.ref.book,
                 label = content.label,
                 refs = content.refs,
                 long = long,
@@ -238,18 +253,18 @@ internal fun VerseCardPage(
 }
 
 @Composable
-private fun cardPadding(): PaddingValues {
-    val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+private fun cardPadding(top: Dp = CardTopPadding): PaddingValues {
+    val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    return PaddingValues(start = 24.dp, end = 24.dp, top = CardTopPadding + top, bottom = CardBottomPadding + bottom)
+    return PaddingValues(start = 24.dp, end = 24.dp, top = top + statusBar, bottom = CardBottomPadding + bottom)
 }
 
 @Composable
 private fun VerseStack(
+    eyebrow: @Composable () -> Unit,
     lines: List<VerseLine>,
     before: VerseLine?,
     after: VerseLine?,
-    book: String,
     label: String,
     refs: List<VerseRef>,
     long: Boolean,
@@ -274,7 +289,7 @@ private fun VerseStack(
                 .fillMaxWidth()
                 .then(if (long && onScene) Modifier.readingPanel(colors.dark) else Modifier)
         ) {
-            Eyebrow(genreOf(book), colors)
+            eyebrow()
             // A long verse keeps the card to itself: no lines from the verses around it.
             if (!long && before != null) ContextLine(before, colors, onScene)
             Column(verticalArrangement = Arrangement.spacedBy((size * 0.35f).dp)) {
@@ -362,6 +377,51 @@ private fun Eyebrow(text: String, colors: VsColors) {
         lineHeight = 1.3.em,
         letterSpacing = 0.14.em
     )
+}
+
+@Composable
+private fun IconEyebrow(icon: ImageVector, text: String, colors: VsColors) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Icon(icon, contentDescription = null, tint = colors.gold, modifier = Modifier.size(13.dp))
+        Eyebrow(text, colors)
+    }
+}
+
+/** "Linked from Isaiah 41:10 · 2 of 3" on a Rabbit hole card; tapping the verse goes back to it. */
+@Composable
+private fun LinkedFromEyebrow(from: LinkedFrom, colors: VsColors, onClick: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier
+                .clip(RoundedCornerShape(4.dp))
+                .clickable(role = Role.Button, onClickLabel = "Go back to ${from.label}", onClick = onClick)
+                .padding(vertical = 8.dp)
+        ) {
+            Icon(VerseScrollIcons.Links, contentDescription = null, tint = colors.gold, modifier = Modifier.size(13.dp))
+            Text(
+                text = "Linked from ${from.label}".uppercase(),
+                color = colors.gold,
+                fontFamily = WorkSansFontFamily,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 10.5.sp,
+                lineHeight = 1.3.em,
+                letterSpacing = 0.14.em,
+                textDecoration = TextDecoration.Underline
+            )
+        }
+        if (from.of > 1) {
+            Text(
+                text = "\u00b7 ${from.nth} of ${from.of}".uppercase(),
+                color = colors.soft,
+                fontFamily = WorkSansFontFamily,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 10.5.sp,
+                letterSpacing = 0.14.em
+            )
+        }
+    }
 }
 
 /** The verse just before or after, small and dimmed, cut to two lines: a hint of where the verse sits. */
@@ -588,7 +648,10 @@ internal fun CheckInPage(
     lastVerse: VerseRef?,
     lastVerseLabel: String?,
     onRead: () -> Unit,
-    onKeepGoing: () -> Unit
+    onKeepGoing: () -> Unit,
+    rabbitHoleFrom: String? = null,
+    rabbitHoleDepth: Int = 0,
+    onBackToDiscover: () -> Unit = {}
 ) {
     Box(
         Modifier
@@ -608,6 +671,9 @@ internal fun CheckInPage(
                 lineHeight = 1.15.em
             )
             val text = buildString {
+                if (rabbitHoleFrom != null) {
+                    append("You're $rabbitHoleDepth verse${if (rabbitHoleDepth == 1) "" else "s"} into a Rabbit hole from $rabbitHoleFrom. ")
+                }
                 if (highlighted > 0) append("You highlighted $highlighted along the way. ")
                 append(
                     if (lastVerseLabel != null) "Want to slow down and read the chapter $lastVerseLabel comes from?"
@@ -630,7 +696,10 @@ internal fun CheckInPage(
                 if (lastVerse != null) {
                     PillButton("Read ${lastVerse.book} ${lastVerse.chapter}", primary = true, colors = colors, onClick = onRead)
                 }
-                PillButton("Keep scrolling", primary = false, colors = colors, onClick = onKeepGoing)
+                if (rabbitHoleFrom != null) {
+                    PillButton("Back to Discover", primary = false, colors = colors, onClick = onBackToDiscover)
+                }
+                PillButton(if (rabbitHoleFrom != null) "Keep going" else "Keep scrolling", primary = false, colors = colors, onClick = onKeepGoing)
             }
         }
     }
@@ -645,6 +714,7 @@ internal fun PillButton(label: String, primary: Boolean, colors: VsColors, onCli
         fontFamily = WorkSansFontFamily,
         fontWeight = FontWeight.SemiBold,
         fontSize = 14.sp,
+        textAlign = TextAlign.Center,
         modifier = modifier
             .clip(CircleShape)
             .then(

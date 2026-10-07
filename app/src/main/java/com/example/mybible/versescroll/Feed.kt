@@ -22,9 +22,7 @@ data class VerseCardContent(
     val wordCount: Int get() = lines.sumOf { line -> line.text.split(' ').count { it.isNotBlank() } }
 
     /** "Isaiah 41:10", or "Isaiah 40:29–31" for a passage. */
-    val label: String
-        get() = if (lines.size > 1) "${ref.book} ${ref.chapter}:${lines.first().number}–${lines.last().number}"
-        else ref.key
+    val label: String get() = labelOf(refs)
 }
 
 sealed interface FeedCard {
@@ -35,11 +33,33 @@ sealed interface FeedCard {
 data class VerseFeedCard(
     override val uid: Long,
     val content: VerseCardContent,
-    val sceneId: String?
+    val sceneId: String?,
+    /** On a Rabbit hole: which thread, and the index of the card it started from. */
+    val threadId: Int? = null,
+    val rootIndex: Int? = null,
+    /** On a Rabbit hole: the verse this one is linked from. */
+    val from: LinkedFrom? = null,
+    /** The first card of a fresh thread, started because the last one ran out of links to follow. */
+    val newThread: Boolean = false
 ) : FeedCard
 
-/** A pause every [CHECK_IN_EVERY] verses: how far you've come, and an offer to read a chapter slowly. */
-data class CheckInFeedCard(override val uid: Long) : FeedCard
+/** "Linked from Isaiah 41:10 · 2 of 3". */
+data class LinkedFrom(val ref: VerseRef, val label: String, val nth: Int, val of: Int)
+
+/**
+ * A pause every [CHECK_IN_EVERY] verses: how far you've come, and an offer to read a chapter slowly.
+ * Inside a Rabbit hole it also offers the way back to Discover.
+ */
+data class CheckInFeedCard(override val uid: Long, val threadId: Int? = null, val rootIndex: Int? = null) : FeedCard
+
+enum class FeedMode { DISCOVER, RABBIT_HOLE }
+
+/** Asks the screen to move to a card (after following a link, or on leaving a Rabbit hole). */
+data class ScrollRequest(val index: Int, val id: Long)
+
+/** A label for a verse or short passage: "Isaiah 41:10", "Isaiah 40:29–31". */
+fun labelOf(refs: List<VerseRef>): String =
+    if (refs.size > 1) "${refs.first().key}\u2013${refs.last().verse}" else refs.first().key
 
 const val CHECK_IN_EVERY = 20
 

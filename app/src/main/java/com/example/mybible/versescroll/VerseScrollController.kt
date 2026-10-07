@@ -133,6 +133,21 @@ class VerseScrollController(
         private set
     private val highlightedKeys = HashSet<String>()
 
+    /** Discover, or following links down a Rabbit hole. */
+    var mode by mutableStateOf(FeedMode.DISCOVER)
+        private set
+
+    /** A card the screen should move to; it calls [consumeScrollRequest] once it has. */
+    var scrollRequest by mutableStateOf<ScrollRequest?>(null)
+        private set
+
+    fun consumeScrollRequest() {
+        scrollRequest = null
+    }
+
+    private var thread: Thread? = null
+    private var scrollIds = 0L
+
     private var nextUid = 1L
     private var sinceCheckIn = 0
     private var lastSceneType: String? = null
@@ -159,6 +174,9 @@ class VerseScrollController(
         generating?.cancel()
         feedId++
         cards.clear()
+        mode = FeedMode.DISCOVER
+        thread = null
+        scrollRequest = null
         currentIndex = 0
         sinceCheckIn = 0
         lastSceneType = null
@@ -184,22 +202,42 @@ class VerseScrollController(
         highlightedThisVisit = highlightedKeys.size
     }
 
-    private fun generateMore(count: Int = CARDS_PER_BATCH) {
+    // [afterFirst] runs once the first new card is in place (e.g. to move on to it).
+    private fun generateMore(count: Int = CARDS_PER_BATCH, afterFirst: (() -> Unit)? = null) {
         if (generating?.isActive == true) return
         generating = scope.launch {
             ensureLoaded()
-            repeat(count) {
+            repeat(count) { i ->
                 val card = nextCard() ?: return@launch
                 cards.add(card)
+                if (i == 0) afterFirst?.invoke()
             }
         }
     }
 
     private suspend fun nextCard(): FeedCard? {
+        val inThread = thread.takeIf { mode == FeedMode.RABBIT_HOLE }
         if (sinceCheckIn >= CHECK_IN_EVERY) {
             sinceCheckIn = 0
-            return CheckInFeedCard(nextUid++)
+            return CheckInFeedCard(nextUid++, inThread?.id, inThread?.rootIndex)
         }
+        if (inThread != null) {
+            val step = rabbitHole.next(inThread, cards.size)
+            val content = step?.let { loadContent(it.link.ref, it.link.count) }
+            if (step != null && content != null) {
+                sinceCheckIn++
+                return VerseFeedCard(
+                    nextUid++, content, pickScene(content), inThread.id, inThread.rootIndex,
+                    LinkedFrom(step.from, labelOf(step.fromRefs), step.nth, step.of)
+                )
+            }
+            // Nothing left anywhere on this thread: a fresh one from a Discover verse.
+            return startNewThread()
+        }
+        return discoverCard()
+    }
+
+    private suspend fun discoverCard(newThread: Boolean = false): VerseFeedCard? {
         val pool = discover ?: return null
         // A verse that isn't in the database yet (the Bible text still downloading) is skipped.
         repeat(MAX_SKIPS) {
@@ -207,11 +245,183 @@ class VerseScrollController(
             val content = loadContent(ref, 1) ?: return@repeat
             sinceCheckIn++
             waitingForBibleText = false
-            return VerseFeedCard(nextUid++, content, pickScene(content))
+            return VerseFeedCard(nextUid++, content, pickScene(content), newThread = newThread)
         }
         if (cards.none { it is VerseFeedCard }) waitingForBibleText = true
         return null
     }
+
+    private suspend fun startNewThread(): FeedCard? {
+        val card = discoverCard(newThread = true) ?: return null
+        val index = cards.size
+        val started = rabbitHole.start(index, card.content.refs, seenKeys())
+        thread = started
+        return card.copy(threadId = started.id, rootIndex = index)
+    }
+
+    private fun seenKeys(): List<String> =
+        cards.flatMap { (it as? VerseFeedCard)?.content?.refs.orEmpty() }.map { it.key }
+
+    // Drops every card after [index] (ones not yet seen), e.g. to change where the feed goes next.
+    private fun truncateAfter(index: Int) {
+        while (cards.size > index + 1) cards.removeAt(cards.lastIndex)
+        sinceCheckIn = cards.asReversed().takeWhile { it is VerseFeedCard }.size
+    }
+
+    // ---- the Rabbit hole ----
+
+    private val rabbitHole by lazy { RabbitHole(linkSource) }
+
+    /**
+     * Goes down a Rabbit hole from the card at [index]: with [link], that verse comes next; without,
+     * the verse's own strongest links do. [advance] moves on to the next card as soon as it's ready.
+     */
+    fun followFrom(index: Int, link: Link?, advance: Boolean) {
+        val card = cards.getOrNull(index) as? VerseFeedCard ?: return
+        generating?.cancel()
+        generating = scope.launch {
+            ensureLoaded()
+            val upto = maxOf(index, currentIndex)
+            truncateAfter(upto)
+            var current = thread
+            if (current == null || card.threadId != current.id) {
+                current = rabbitHole.start(index, card.content.refs, seenKeys())
+                thread = current
+                cards[index] = card.copy(threadId = current.id, rootIndex = index)
+            } else {
+                rabbitHole.restartFrom(current, upto, card.content.ref)
+            }
+            mode = FeedMode.RABBIT_HOLE
+            if (link != null) {
+                val content = loadContent(link.ref, link.count)
+                if (content != null) {
+                    val step = rabbitHole.take(current, link, card.content.ref, cards.size)
+                    sinceCheckIn++
+                    cards.add(
+                        VerseFeedCard(
+                            nextUid++, content, pickScene(content), current.id, current.rootIndex,
+                            LinkedFrom(step.from, labelOf(step.fromRefs), step.nth, step.of)
+                        )
+                    )
+                    rabbitHole.continueFrom(current, link.ref)
+                }
+            }
+            // The next card first, so the screen can move to it straight away; then a few more after it.
+            if (cards.size == upto + 1) nextCard()?.let { cards.add(it) }
+            if (advance && cards.size > upto + 1) scrollRequest = ScrollRequest(upto + 1, ++scrollIds)
+            repeat(CARDS_PER_BATCH - 1) {
+                val next = nextCard() ?: return@launch
+                cards.add(next)
+            }
+        }
+    }
+
+    /**
+     * Leaves the Rabbit hole: back to the verse it started from ([toRoot]: the "Back to …" button and
+     * the back gesture), or right where you are (the Discover tab, a check-in's button). Discover takes
+     * over from that card on. Returns the card to show, or null when not in a Rabbit hole. With
+     * [advance], moves on to the first Discover card once it's ready.
+     */
+    fun leaveRabbitHole(toRoot: Boolean, advance: Boolean = false): Int? {
+        if (mode != FeedMode.RABBIT_HOLE) return null
+        val root = rootIndexOf(cards.getOrNull(currentIndex))?.takeIf { it <= currentIndex && it < cards.size }
+        val target = if (toRoot && root != null) root else currentIndex
+        generating?.cancel()
+        mode = FeedMode.DISCOVER
+        truncateAfter(target)
+        currentIndex = target
+        generateMore(afterFirst = { if (advance) scrollRequest = ScrollRequest(target + 1, ++scrollIds) })
+        return target
+    }
+
+    private fun rootIndexOf(card: FeedCard?): Int? = when (card) {
+        is VerseFeedCard -> card.rootIndex
+        is CheckInFeedCard -> card.rootIndex
+        else -> null
+    }
+
+    /** The verse the Rabbit hole on screen started from, while the verse card at [index] is past it. */
+    fun rabbitHoleRoot(index: Int): VerseFeedCard? {
+        if (mode != FeedMode.RABBIT_HOLE) return null
+        val root = (cards.getOrNull(index) as? VerseFeedCard)?.rootIndex?.takeIf { it < index } ?: return null
+        return cards.getOrNull(root) as? VerseFeedCard
+    }
+
+    /** Whether a check-in card belongs to the Rabbit hole being followed (and so offers the way out). */
+    fun isInRabbitHole(card: CheckInFeedCard): Boolean =
+        mode == FeedMode.RABBIT_HOLE && card.threadId != null && card.threadId == thread?.id
+
+    /** The nearest verse card at or before [index]. */
+    fun verseIndexAtOrBefore(index: Int): Int? =
+        (minOf(index, cards.lastIndex) downTo 0).firstOrNull { cards[it] is VerseFeedCard }
+
+    data class LinkPreview(val link: Link, val content: VerseCardContent, val seen: Boolean)
+
+    /** A verse's strongest links for its Links sheet, with their text and whether they've been shown already. */
+    suspend fun linkPreviews(card: VerseFeedCard): List<LinkPreview> {
+        val seen = cards.take(currentIndex + 1)
+            .flatMap { (it as? VerseFeedCard)?.content?.refs.orEmpty() }
+            .mapTo(HashSet()) { it.key }
+        return linkSource.links(card.content.ref).take(LINKS_SHOWN).mapNotNull { link ->
+            loadContent(link.ref, link.count)?.let { LinkPreview(link, it, link.ref.key in seen) }
+        }
+    }
+
+    // Verse texts, link lists and word sets are looked up over and over while a thread picks its way
+    // along, so they're kept for a while.
+    private val verseTextCache = LruCache<String, String>(2000)
+    private val linkCache = LruCache<String, List<Link>>(300)
+    private val wordCache = LruCache<String, Set<String>>(1000)
+
+    private suspend fun verseTexts(book: String, chapter: Int, first: Int, last: Int): Map<Int, String> {
+        val cached = (first..last).associateWith { verseTextCache.get(VerseRef(book, chapter, it).key) }
+        if (cached.values.all { it != null }) return cached.mapValues { it.value!! }
+        val rows = repository.getVerseRange(book, chapter, first, last)
+        return rows.associate { row ->
+            val text = cleanVerseText(row.text)
+            verseTextCache.put(VerseRef(book, chapter, row.number).key, text)
+            row.number to text
+        }
+    }
+
+    private val linkSource = object : LinkSource {
+        override suspend fun links(ref: VerseRef): List<Link> =
+            linkCache.get(ref.key) ?: resolveLinks(ref).also { linkCache.put(ref.key, it) }
+
+        override suspend fun words(refs: List<VerseRef>): Set<String> {
+            val key = refs.joinToString("|") { it.key }
+            wordCache.get(key)?.let { return it }
+            val first = refs.first()
+            val text = verseTexts(first.book, first.chapter, first.verse, refs.last().verse).values.joinToString(" ")
+            return RabbitHole.wordsOf(text).also { wordCache.put(key, it) }
+        }
+    }
+
+    /**
+     * A verse's links worth suggesting, strongest first: each to one verse, or to a short passage when
+     * the link names 2 or 3 verses that together stay short. Leaves out links back to the verse itself,
+     * repeats, and very long verses.
+     */
+    private suspend fun resolveLinks(ref: VerseRef): List<Link> {
+        val out = mutableListOf<Link>()
+        val seen = HashSet<String>()
+        for (row in repository.getCrossReferenceRows(ref.book, ref.chapter, ref.verse)) {
+            if (row.votes < MIN_SUGGESTED_VOTES) break
+            val first = VerseRef(row.toBook, row.toChapter, row.toVerse)
+            if (first == ref || !seen.add(first.key)) continue
+            val span = row.toVerseEnd - row.toVerse + 1
+            val found = verseTexts(first.book, first.chapter, first.verse, first.verse + (span - 1).coerceIn(0, MAX_PASSAGE - 1))
+            val firstText = found[first.verse] ?: continue
+            if (wordCount(firstText) > MAX_LINKED_VERSE_WORDS) continue
+            val passage = (0 until span).map { found[first.verse + it] }
+            val isPassage = span in 2..MAX_PASSAGE && passage.all { it != null } &&
+                passage.sumOf { wordCount(it!!) } <= MAX_PASSAGE_WORDS
+            out.add(Link(first, row.votes, if (isPassage) span else 1))
+        }
+        return out
+    }
+
+    private fun wordCount(text: String) = text.split(' ').count { it.isNotBlank() }
 
     private fun pickScene(content: VerseCardContent): String? {
         if (scenes.isEmpty()) return null
@@ -299,6 +509,13 @@ class VerseScrollController(
 
         /** Sunshine, the lightest of the twelve highlight colors. */
         const val DEFAULT_COLOR = "#F1F1B1"
+
+        // A link naming a few verses is shown as that passage when it's this short; otherwise its first verse.
+        private const val MAX_PASSAGE = 3
+        private const val MAX_PASSAGE_WORDS = 90
+
+        // Links to verses longer than this aren't suggested: too much to take in mid-scroll.
+        private const val MAX_LINKED_VERSE_WORDS = 70
 
         private const val CARDS_AHEAD = 4
         private const val CARDS_PER_BATCH = 6
