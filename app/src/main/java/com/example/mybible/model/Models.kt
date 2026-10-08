@@ -142,7 +142,9 @@ data class SearchOutcome(
     /** For a search typed in Greek or Hebrew, or by Strong's number: the words it found. */
     val originalWords: List<OriginalWordCard> = emptyList(),
     /** What the hits past [exactCount] are. */
-    val relatedKind: RelatedKind = RelatedKind.SAME_MEANING
+    val relatedKind: RelatedKind = RelatedKind.SAME_MEANING,
+    /** A sentence on why they're here, under their heading: which Hebrew word a Greek one stands for. */
+    val relatedNote: String? = null
 ) {
     val relatedCount: Int get() = hits.size - exactCount
 }
@@ -151,8 +153,27 @@ enum class RelatedKind {
     /** Verses that say it in other words: King James wording, the same Greek or Hebrew word. */
     SAME_MEANING,
     /** A search in Telugu: verses with a word only inside a longer one (యేసు in క్రీస్తుయేసు). */
-    INSIDE_LONGER_WORDS
+    INSIDE_LONGER_WORDS,
+    /** A search for a Greek word: the Old Testament verses with the Hebrew word it stands for. */
+    OLD_TESTAMENT,
+    /** A search for a Hebrew word: the New Testament verses with the Greek word for it. */
+    NEW_TESTAMENT
 }
+
+/**
+ * What the Greek and Hebrew word pages' "Find every verse with this word" will find: the search it
+ * runs (the word's Strong's number, G26), its verses, and the other Testament's verses with the
+ * word in its language (35 in the Old Testament with אַהֲבָה, ahavah).
+ */
+data class WordSearchPreview(
+    val query: String,
+    val verseCount: Int,
+    val otherVerseCount: Int = 0,
+    /** "Old Testament" or "New Testament". */
+    val otherTestament: String = "",
+    /** The other Testament's words for it: "אַהֲבָה (ahavah)". */
+    val otherWords: List<String> = emptyList()
+)
 
 /** A Greek or Hebrew word a search names (ἀγάπη, "agape", G26), shown above its verses. */
 data class OriginalWordCard(

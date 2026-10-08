@@ -44,17 +44,32 @@ class OriginalWord(
 class OriginalMatch(val word: OriginalWord, val byMeaning: Boolean)
 
 /**
+ * A word of the other Testament's language that's the same word as another: agapē (Greek, G0026)
+ * and ahavah (Hebrew, H0160), from greek_hebrew.tsv.
+ */
+class Counterpart(val number: String, val kinship: Kinship) {
+    enum class Kinship {
+        /** The Septuagint, the Greek Old Testament, translates the Hebrew with the Greek. */
+        SEPTUAGINT,
+        /** The Greek word comes from the Hebrew one: amēn, Messias, Dabid. */
+        ORIGIN
+    }
+}
+
+/**
  * Search's bundled word data in app/src/main/assets/search, written by
  * tools/search/make_search_data.py: the King James word forms, today's words with their King
- * James wording, and the Greek and Hebrew words with their meanings, renderings, verses and the
- * forms they take in the text.
+ * James wording, the Greek and Hebrew words with their meanings, renderings, verses and the
+ * forms they take in the text, and which Greek word is which Hebrew one.
  */
 class SearchLexicon private constructor(
     families: List<List<String>>,
     private val modern: List<Pair<List<String>, List<List<String>>>>,
     private val originals: List<OriginalWord>,
     // original_forms.tsv's text, read the first time a search is typed in Greek or Hebrew.
-    private val originalForms: () -> String
+    private val originalForms: () -> String,
+    // greek_hebrew.tsv's text, read the first time a search names a Greek or Hebrew word.
+    private val greekHebrew: () -> String
 ) {
     private val familiesOf = HashMap<String, MutableList<List<String>>>()
     private val byHead = HashMap<String, MutableList<OriginalWord>>()
@@ -192,6 +207,32 @@ class SearchLexicon private constructor(
     /** Every spelling those two know, for suggesting one: the words' own, then their forms. */
     fun originalSpellings(): Sequence<String> = byLemma.keys.asSequence() + numbersBySpelling.keys.asSequence()
 
+    // Each Greek word's Hebrew ones and each Hebrew word's Greek ones, Septuagint links first.
+    private val counterparts: Map<String, List<Counterpart>> by lazy {
+        val out = HashMap<String, MutableList<Counterpart>>()
+        fun link(from: String, to: String, kinship: Counterpart.Kinship) {
+            val list = out.getOrPut(from) { ArrayList(1) }
+            if (list.none { it.number == to }) list += Counterpart(to, kinship)
+        }
+        for (line in dataLines(greekHebrew())) {
+            val cols = line.split('\t')
+            val greek = cols[0]
+            for ((col, kinship) in listOf(1 to Counterpart.Kinship.SEPTUAGINT, 2 to Counterpart.Kinship.ORIGIN)) {
+                for (hebrew in cols.getOrNull(col).orEmpty().split(' ').filter { it.isNotEmpty() }) {
+                    link(greek, hebrew, kinship)
+                    link(hebrew, greek, kinship)
+                }
+            }
+        }
+        out
+    }
+
+    /**
+     * The words of the other Testament's language the word numbered [number] is: agapē is ahavah
+     * in the Septuagint; ahavah is agapē and philia; amēn comes from amen.
+     */
+    fun counterpartsOf(number: String): List<Counterpart> = counterparts[number].orEmpty()
+
     // A gloss in today's spelling or words, with the King James one: favor → favour.
     private fun kingJamesWordsOf(heads: Set<String>, inBible: (String) -> Boolean): Set<String> {
         val out = HashSet(heads)
@@ -213,13 +254,23 @@ class SearchLexicon private constructor(
         const val MODERN_KJV = "modern_kjv.tsv"
         const val ORIGINAL_WORDS = "original_words.tsv"
         const val ORIGINAL_FORMS = "original_forms.tsv"
+        const val GREEK_HEBREW = "greek_hebrew.tsv"
 
         fun load(open: (String) -> InputStream): SearchLexicon {
             fun read(name: String) = open(name).bufferedReader().use { it.readText() }
-            return parse(read(WORD_FORMS), read(MODERN_KJV), read(ORIGINAL_WORDS), originalForms = { read(ORIGINAL_FORMS) })
+            return parse(
+                read(WORD_FORMS), read(MODERN_KJV), read(ORIGINAL_WORDS),
+                originalForms = { read(ORIGINAL_FORMS) }, greekHebrew = { read(GREEK_HEBREW) }
+            )
         }
 
-        fun parse(wordForms: String, modernKjv: String, originalWords: String, originalForms: () -> String = { "" }): SearchLexicon {
+        fun parse(
+            wordForms: String,
+            modernKjv: String,
+            originalWords: String,
+            originalForms: () -> String = { "" },
+            greekHebrew: () -> String = { "" }
+        ): SearchLexicon {
             val families = dataLines(wordForms).map { it.split(' ') }.filter { it.size > 1 }
             val modern = dataLines(modernKjv).mapNotNull { line ->
                 val tab = line.indexOf('\t')
@@ -228,7 +279,7 @@ class SearchLexicon private constructor(
                 line.substring(0, tab).split('|').map { it.split(' ') to kjv }
             }.flatten()
             val originals = dataLines(originalWords).mapNotNull(::parseOriginal)
-            return SearchLexicon(families, modern, originals, originalForms)
+            return SearchLexicon(families, modern, originals, originalForms, greekHebrew)
         }
 
         private fun dataLines(text: String) = text.lineSequence().filter { it.isNotBlank() && !it.startsWith("#") }.toList()

@@ -1,5 +1,6 @@
 package com.example.mybible.search
 
+import com.example.mybible.model.RelatedKind
 import com.example.mybible.model.SearchHit
 import com.example.mybible.model.SearchOutcome
 import org.junit.Assert.assertEquals
@@ -15,6 +16,8 @@ class OriginalSearchTest {
 
     private fun SearchHit.ref() = "${verse.book} ${verse.chapter}:${verse.number}"
     private fun SearchOutcome.refs() = hits.map { it.ref() }
+    private fun SearchOutcome.exact() = hits.take(exactCount).map { it.ref() }
+    private fun SearchOutcome.related() = hits.drop(exactCount).map { it.ref() }
     private fun SearchOutcome.hit(ref: String) = hits.first { it.ref() == ref }
     private fun SearchHit.marked() = highlights.map { text.substring(it) }
     private fun SearchOutcome.numbers() = originalWords.map { it.number }
@@ -51,7 +54,7 @@ class OriginalSearchTest {
         val beginning = search.search("בְּרֵאשִׁית")
         assertEquals(listOf("H7225"), beginning.numbers())
         assertEquals(listOf("beginning"), beginning.hit("Genesis 1:1").marked())
-        assertEquals(listOf("Genesis 1:1", "Genesis 1:17"), search.search("אלהים").refs())
+        assertEquals(listOf("Genesis 1:1", "Genesis 1:17"), search.search("אלהים").exact())
         // Without its points, אהבה is love the noun (ahavah) or the verb (ahav), the word itself
         // first; pointed אַהֲבָה is the noun alone.
         val unpointed = search.search("אהבה")
@@ -107,6 +110,45 @@ class OriginalSearchTest {
         // English words stay English: love is in the King James, ego is today's word for pride.
         assertTrue(search.search("love").originalWords.isEmpty())
         assertTrue(search.search("ego").originalWords.isEmpty())
+    }
+
+    @Test
+    fun theOtherTestamentInItsLanguage() {
+        // agapaō "loved" in John 3:16 and "loveth" in 1 John 4:8; then the Old Testament verses
+        // with ahav, which the Septuagint translates with agapaō.
+        val loved = search.search("ἠγάπησεν")
+        assertEquals(listOf("John 3:16", "1 John 4:8"), loved.exact())
+        assertEquals(listOf("Leviticus 19:18", "Judges 16:15"), loved.related())
+        assertEquals(RelatedKind.OLD_TESTAMENT, loved.relatedKind)
+        assertEquals("Where the Hebrew has אָהֵב (ahav), which the Septuagint, the Greek Old Testament, translates with ἀγαπάω.", loved.relatedNote)
+        assertEquals(listOf("Hebrew ahav, meaning “to love”"), loved.hit("Leviticus 19:18").reasons)
+        assertEquals(listOf("love"), loved.hit("Leviticus 19:18").marked())
+        val ahav = loved.sources.single()
+        assertEquals("Hebrew ahav" to 2, ahav.label to ahav.count)
+
+        // Switched off: the New Testament only.
+        val off = search.search("ἠγάπησεν", disabled = ahav.ids.toSet())
+        assertEquals(listOf("John 3:16", "1 John 4:8"), off.refs())
+        assertFalse(off.sources.single().enabled)
+
+        // And the other way: ahav, then the New Testament's agapaō.
+        val hebrew = search.search("H157")
+        assertEquals(listOf("Leviticus 19:18", "Judges 16:15"), hebrew.exact())
+        assertEquals(listOf("John 3:16", "1 John 4:8"), hebrew.related())
+        assertEquals(RelatedKind.NEW_TESTAMENT, hebrew.relatedKind)
+    }
+
+    @Test
+    fun whatFindingEveryVerseWithAWordFinds() {
+        // As the Reader's interlinear tags agapaō.
+        val preview = search.preview("G0025")!!
+        assertEquals("G25", preview.query)
+        assertEquals(2, preview.verseCount)
+        assertEquals(2, preview.otherVerseCount)
+        assertEquals("Old Testament", preview.otherTestament)
+        assertEquals(listOf("אָהֵב (ahav)"), preview.otherWords)
+        assertEquals("H7225", search.preview("H7225G")!!.query)
+        assertNull(search.preview("G99999"))
     }
 
     @Test

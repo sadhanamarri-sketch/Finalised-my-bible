@@ -71,6 +71,22 @@ class SearchLexiconTest {
     }
 
     @Test
+    fun theSameWordInTheOtherLanguage() {
+        fun of(number: String) = lexicon.counterpartsOf(number).map { it.number to it.kinship }
+        // The Septuagint translates ahavah with agapē, chesed with eleos, YHWH with kurios.
+        assertEquals(listOf("H0160" to Counterpart.Kinship.SEPTUAGINT), of("G0026"))
+        assertEquals(listOf("H2617" to Counterpart.Kinship.SEPTUAGINT), of("G1656"))
+        assertEquals("H3068", of("G2962").first().first)
+        // The other way round: ahav is agapaō and phileō.
+        assertEquals(setOf("G0025", "G5368"), lexicon.counterpartsOf("H0157").map { it.number }.toSet())
+        // aphiēmi stands for many verbs; only salach, forgive, is translated alike in the King James.
+        assertEquals(listOf("H5545"), lexicon.counterpartsOf("G0863").map { it.number })
+        // Messias comes from mashiach.
+        assertEquals(listOf("H4899" to Counterpart.Kinship.ORIGIN), of("G3323"))
+        assertTrue(lexicon.counterpartsOf("G0907").isEmpty()) // baptizō
+    }
+
+    @Test
     fun glossHeadsAreTheSingleWordsAGlossMeans() {
         assertEquals(setOf("worry"), glossHeads("to worry"))
         assertEquals(setOf("hope", "expect"), glossHeads("to hope/expect"))

@@ -1,14 +1,19 @@
 package com.example.mybible.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
@@ -19,11 +24,13 @@ import com.example.mybible.data.LexiconLookupResult
 import com.example.mybible.data.MorphologyParser
 import com.example.mybible.model.SavedWordItem
 import com.example.mybible.model.SavedWordLanguage
+import com.example.mybible.model.WordSearchPreview
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.components.BackTopBar
 import com.example.mybible.ui.components.LexiconDefinitionText
 import com.example.mybible.ui.theme.LiterataFontFamily
+import com.example.mybible.ui.theme.WorkSansFontFamily
 
 /**
  * Full-page Greek word lexicon lookup, replacing the old GreekWordSheet
@@ -43,6 +50,7 @@ fun GreekWordScreen(
     val lexiconResult by viewModel.lexiconResult.collectAsState()
     val isLoading by viewModel.isLoadingLexicon.collectAsState()
     val savedScrollPosition by viewModel.greekWordScrollPosition.collectAsState()
+    val searchPreview by viewModel.wordSearchPreview.collectAsState()
     val scrollState = rememberScrollState(initial = savedScrollPosition)
     val savedWords by viewModel.savedWords.collectAsState(initial = emptyList())
     val isSaved = greekWord?.let { w ->
@@ -95,6 +103,8 @@ fun GreekWordScreen(
             onReferenceClick = { book, chapter, verse ->
                 viewModel.openVerseMentionPreview(book, chapter, verse, NavTab.GREEK_WORD)
             },
+            searchPreview = searchPreview,
+            onFindEveryVerse = viewModel::findEveryVerseWithWord,
             modifier = Modifier.padding(padding)
         )
     }
@@ -119,6 +129,7 @@ fun HebrewWordScreen(
     val lexiconResult by viewModel.hebrewLexiconResult.collectAsState()
     val isLoading by viewModel.isLoadingHebrewLexicon.collectAsState()
     val savedScrollPosition by viewModel.hebrewWordScrollPosition.collectAsState()
+    val searchPreview by viewModel.wordSearchPreview.collectAsState()
     val scrollState = rememberScrollState(initial = savedScrollPosition)
     val savedWords by viewModel.savedWords.collectAsState(initial = emptyList())
     val isSaved = hebrewWord?.let { w ->
@@ -165,6 +176,8 @@ fun HebrewWordScreen(
             onReferenceClick = { book, chapter, verse ->
                 viewModel.openVerseMentionPreview(book, chapter, verse, NavTab.HEBREW_WORD)
             },
+            searchPreview = searchPreview,
+            onFindEveryVerse = viewModel::findEveryVerseWithWord,
             modifier = Modifier.padding(padding)
         )
     }
@@ -186,6 +199,9 @@ private fun LexiconWordPageContent(
     isLoading: Boolean,
     scrollState: ScrollState,
     onReferenceClick: (book: String, chapter: Int, verse: Int) -> Unit,
+    // What "Find every verse with this word" finds (null: not known yet, or nothing), and running it.
+    searchPreview: WordSearchPreview?,
+    onFindEveryVerse: (query: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val foundEntry = (lexiconResult as? LexiconLookupResult.Found)?.entry
@@ -237,6 +253,10 @@ private fun LexiconWordPageContent(
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(top = 10.dp)
             )
+        }
+
+        searchPreview?.let { preview ->
+            FindEveryVerseButton(preview, onClick = { onFindEveryVerse(preview.query) })
         }
 
         if (!foundEntry?.lemma.isNullOrBlank()) {
@@ -309,5 +329,66 @@ private fun LexiconWordPageContent(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+    }
+}
+
+// Search for the word in both Testaments: its own verses, and the other Testament's with the word
+// in its language ("104 verses, and 35 in the Old Testament with אַהֲבָה (ahavah)").
+@Composable
+private fun FindEveryVerseButton(preview: WordSearchPreview, onClick: () -> Unit) {
+    fun verses(n: Int) = if (n == 1) "1 verse" else "$n verses"
+    val detail = buildString {
+        append(verses(preview.verseCount))
+        if (preview.otherVerseCount > 0) {
+            append(", and ${preview.otherVerseCount} in the ${preview.otherTestament} with ")
+            append(preview.otherWords.joinToString(" or "))
+        }
+    }
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 14.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Find every verse with this word",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = WorkSansFontFamily,
+                    letterSpacing = 0.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = detail,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                    fontFamily = WorkSansFontFamily,
+                    letterSpacing = 0.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
+        }
     }
 }

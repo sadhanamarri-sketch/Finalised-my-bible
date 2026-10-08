@@ -1,10 +1,12 @@
 package com.example.mybible.search
 
 import com.example.mybible.model.OriginalWordCard
+import com.example.mybible.model.RelatedKind
 import com.example.mybible.model.SearchHit
 import com.example.mybible.model.SearchOutcome
 import com.example.mybible.model.SearchSource
 import com.example.mybible.model.Verse
+import com.example.mybible.model.WordSearchPreview
 import java.text.Normalizer
 import java.util.BitSet
 
@@ -19,7 +21,8 @@ import java.util.BitSet
  *
  * Finds every verse the word is in, whatever the King James calls it there, marking the English
  * words that usually render it. A word's meanings are chips: aphiēmi's "forgive" can stay on and
- * "permit" go off.
+ * "permit" go off. Then the other Testament's verses with the same word in its language: for
+ * agapē, those with ahavah, which the Septuagint translates with agapē.
  */
 class OriginalSearch(private val index: BibleIndex, private val lexicon: SearchLexicon) {
 
@@ -47,6 +50,31 @@ class OriginalSearch(private val index: BibleIndex, private val lexicon: SearchL
         if (lexicon.kingJamesWording(words, index::contains) != null) return null
         val found = transliterated(key)
         return if (found.isEmpty()) null else outcome(listOf(found), disabled)
+    }
+
+    /**
+     * What "Find every verse with this word" finds for [strongs], a word's Strong's number as the
+     * Reader's interlinear tags it (G0026, H7225G): the search to run, the word's verses, and the
+     * other Testament's verses with the word in its language. Null for a number without verses.
+     */
+    fun preview(strongs: String): WordSearchPreview? {
+        val match = strongsTag.find(strongs.uppercase()) ?: return null
+        val number = match.groupValues[1] + match.groupValues[2].takeLast(4).padStart(4, '0')
+        val senses = lexicon.originalsNumbered(number)
+        val verses = BitSet(index.size).apply { senses.forEach { or(versesOf(it)) } }
+        if (verses.isEmpty) return null
+        val others = lexicon.counterpartsOf(number).map { lexicon.originalsNumbered(it.number) }
+            .filter { it.isNotEmpty() }
+            .map { group -> group to BitSet(index.size).apply { group.forEach { or(versesOf(it)) } } }
+            .filter { !it.second.isEmpty }
+        val otherVerses = BitSet(index.size).apply { others.forEach { or(it.second) } }
+        return WordSearchPreview(
+            query = displayNumber(number),
+            verseCount = verses.cardinality(),
+            otherVerseCount = otherVerses.cardinality(),
+            otherTestament = if (number.startsWith("G")) "Old Testament" else "New Testament",
+            otherWords = others.map { (group, _) -> "${group[0].lemma.substringBefore(',')} (${group[0].transliteration.substringBefore(',')})" }
+        )
     }
 
     // ---- what the query names ----
@@ -173,7 +201,82 @@ class OriginalSearch(private val index: BibleIndex, private val lexicon: SearchL
         val cards = groups.flatMap { group ->
             group.groupBy { it.number }.values.mapIndexed { i, senses -> card(senses, spellings, alternative = i > 0) }
         }.distinctBy { it.number }.take(MAX_WORD_CARDS)
-        return SearchOutcome(hits = hits, exactCount = hits.size, sources = sources, originalWords = cards)
+        val outcome = SearchOutcome(hits = hits, exactCount = hits.size, sources = sources, originalWords = cards)
+        // A search for one word also shows it in the other Testament, in the other language.
+        return if (groups.size == 1) withCounterparts(outcome, groups[0], disabled) else outcome
+    }
+
+    // One word of the other language that the word searched for is (see Counterpart), with each
+    // sense's verses.
+    private class Other(val counterpart: Counterpart, val senses: List<Pair<OriginalWord, BitSet>>) {
+        val word = senses[0].first
+        val verses = BitSet().apply { senses.forEach { or(it.second) } }
+        val id = COUNTERPART_PREFIX + counterpart.number
+        var label = "${word.language} ${word.transliteration.substringBefore(',')}"
+    }
+
+    /**
+     * [outcome] with, after its verses, those of the other Testament with the same word in its
+     * language: for agapē, the Old Testament's ahavah (the Septuagint translates ahavah with
+     * agapē); for chesed, the New Testament's eleos. Each is a chip, and a line says how they're
+     * the same word. Only for the likelier word the query can be.
+     */
+    private fun withCounterparts(outcome: SearchOutcome, group: List<OriginalWord>, disabled: Set<String>): SearchOutcome {
+        val word = group[0]
+        val searched = group.mapTo(HashSet()) { it.number }
+        val others = lexicon.counterpartsOf(word.number).filter { it.number !in searched }.mapNotNull { counterpart ->
+            val senses = lexicon.originalsNumbered(counterpart.number).map { it to versesOf(it) }
+            if (senses.all { it.second.isEmpty }) null else Other(counterpart, senses)
+        }
+        if (others.isEmpty()) return outcome
+        // davar "word" and davar "to speak" both stand for laleō's family: tell them apart.
+        for (same in others.groupBy { it.label }.values) if (same.size > 1) same.forEach { it.label += " · ${it.word.gloss}" }
+
+        val shown = BitSet(index.size).apply { others.filter { it.id !in disabled }.forEach { or(it.verses) } }
+        val spellings = HashMap<String, HashMap<String, Int>>()
+        val related = ArrayList<SearchHit>(shown.cardinality())
+        var id = shown.nextSetBit(0)
+        while (id >= 0) {
+            val here = others.filter { it.id !in disabled && it.verses.get(id) }
+            val reasons = here.map { other ->
+                val sense = other.senses.firstOrNull { it.second.get(id) }?.first ?: other.word
+                "${other.word.language} ${sense.transliteration.substringBefore(',')}, meaning “${sense.gloss}”"
+            }
+            val marked = here.flatMapTo(HashSet()) { other -> other.senses.flatMap { lexicon.markedFormsOf(it.first) } }
+            related += hit(id, marked, reasons, spellings)
+            id = shown.nextSetBit(id + 1)
+        }
+        val chips = others.map { SearchSource(listOf(it.id), it.label, it.verses.cardinality(), it.id !in disabled, index.countByBook(it.verses)) }
+        val greek = word.language == "Greek"
+        return outcome.copy(
+            hits = outcome.hits + related,
+            sources = outcome.sources + chips,
+            relatedKind = if (greek) RelatedKind.OLD_TESTAMENT else RelatedKind.NEW_TESTAMENT,
+            relatedNote = noteOn(word, others)
+        )
+    }
+
+    // "Where the Hebrew has אַהֲבָה (ahavah), which the Septuagint, the Greek Old Testament,
+    // translates with ἀγάπη." / "Where the Greek has ἔλεος (eleos), the Septuagint’s word for חֶסֶד."
+    private fun noteOn(word: OriginalWord, others: List<Other>): String {
+        val names = others.map { "${it.word.lemma.substringBefore(',')} (${it.word.transliteration.substringBefore(',')})" }
+        val listed = if (names.size == 1) names[0] else names.dropLast(1).joinToString(", ") + " or " + names.last()
+        val lemma = word.lemma.substringBefore(',')
+        val septuagint = others.all { it.counterpart.kinship == Counterpart.Kinship.SEPTUAGINT }
+        val origin = others.all { it.counterpart.kinship == Counterpart.Kinship.ORIGIN }
+        return if (word.language == "Greek") {
+            "Where the Hebrew has $listed, " + when {
+                septuagint -> "which the Septuagint, the Greek Old Testament, translates with $lemma."
+                origin -> "the word $lemma comes from."
+                else -> "the Hebrew behind $lemma."
+            }
+        } else {
+            "Where the Greek has $listed, " + when {
+                septuagint -> "the Septuagint’s word for $lemma."
+                origin -> "which comes from $lemma."
+                else -> "the Greek for $lemma."
+            }
+        }
     }
 
     private fun versesOf(word: OriginalWord): BitSet {
@@ -248,6 +351,8 @@ class OriginalSearch(private val index: BibleIndex, private val lexicon: SearchL
     companion object {
         /** Prefix of a Greek or Hebrew sense's chip id: "orig:G0863H", as in SmartSearch. */
         const val SOURCE_PREFIX = "orig:"
+        /** Prefix of the chip id of a word of the other Testament's language: "other:H0160". */
+        const val COUNTERPART_PREFIX = "other:"
         /** At most this many words get a card above the verses. */
         const val MAX_WORD_CARDS = 4
         /** A card names the King James words used in this % of the word's verses or more. */
@@ -256,6 +361,7 @@ class OriginalSearch(private val index: BibleIndex, private val lexicon: SearchL
         const val MAX_MEANING_CHIPS = 5
 
         private val strongsNumber = Regex("([GgHh])0*(\\d{1,5})([A-Za-z]?)")
+        private val strongsTag = Regex("([GH])(\\d{1,5})")
         private val separators = Regex("[\\s\\u05BE,.;:·]+")
         // ו and, ה the, ב in, כ as, ל to, מ from, ש that.
         private const val HEBREW_PREFIXES = "והבכלמש"

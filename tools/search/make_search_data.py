@@ -268,6 +268,10 @@ GLOSS_FIXES = {"recieve": "receive", "govenors": "governors", "neighours": "neig
                "transgresor": "transgressor", "prostatrate": "prostrate", "quano": "guano",
                "ungodlinessness": "ungodliness"}
 meaning, meaning_of_base = {}, {}
+# Abbott-Smith's note on each Greek word of the Hebrew words the Septuagint translates with it:
+# "[in LXX chiefly for חֶסֶד ;]", "[frequently in LXX, and nearly always for בְּרִית ;]" (see the
+# Septuagint links below).
+septuagint_note = {}
 for pattern in ("TBESG*", "TBESH*"):
     for path in glob.glob(os.path.join(step_dir, pattern)):
         for line in open(path, encoding="utf-8"):
@@ -285,6 +289,9 @@ for pattern in ("TBESG*", "TBESH*"):
             lemma = unicodedata.normalize("NFC", re.sub(r"\s*,\s*", ", ", cols[3].strip()))
             meaning[key] = (language, lemma, cols[4].strip().replace(".", ""), gloss)
             meaning_of_base.setdefault(base_of(key), meaning[key])
+            note = re.search(r"\[([^\]]*\bLXX\b[^\]]*)\]", cols[7]) if key[0] == "G" and len(cols) > 7 else None
+            if note:
+                septuagint_note.setdefault(key[:5], re.sub(r"<[^>]+>", " ", note.group(1)))
 
 
 def kjv_renderings(definition):
@@ -353,6 +360,8 @@ def attached(stem, ending):
 # Strong's own numbers have no senses, so every sense of a word starts from the word's renderings;
 # each sense's share is then counted over its own verses, which tells the senses apart.
 renderings_of = {}
+# A Greek word Strong's says is "of Hebrew origin (H4899)": Messias, amēn, sabbaton, Abraam.
+hebrew_origin = {}
 for name in ("strongs-greek-dictionary.js", "strongs-hebrew-dictionary.js"):
     text = open(os.path.join(strongs_dir, name), encoding="utf-8").read()
     start = text.index("{", text.index("Dictionary = "))
@@ -360,6 +369,11 @@ for name in ("strongs-greek-dictionary.js", "strongs-hebrew-dictionary.js"):
         k = dstrong(key)
         if k:
             renderings_of[base_of(k)] = kjv_renderings(entry.get("kjv_def", ""))
+        derivation = entry.get("derivation", "")
+        if k and k[0] == "G" and re.match(r"of (Hebrew|Chaldee) origin", derivation):
+            # Not the words it's only compared with: "of Chaldee origin (compare H06453)".
+            named = re.sub(r"compare [^;)]*", "", derivation)
+            hebrew_origin[k[:5]] = [dstrong(h)[:5] for h in re.findall(r"H\d+", named)]
 
 
 def encode_refs(refs):
@@ -404,6 +418,9 @@ def share_everywhere(rendering):
 
 
 rows = []
+# Each sense's verse count, renderings' shares and the renderings worth marking, for the
+# Septuagint links below.
+sense_info = {}
 for key in sorted(verses_of):
     language, lemma, translit, gloss = meaning.get(key) or meaning_of_base.get(base_of(key)) or (None,) * 4
     if translit is None:
@@ -412,12 +429,16 @@ for key in sorted(verses_of):
     if not vs:
         continue
     shares = []
+    info = sense_info[key] = (len(vs), {}, set())
     for r in sorted(renderings_of.get(base_of(key), ())):
         forms = forms_of(r)
         share = round(100 * sum(1 for v in vs if verse_words[v] & forms) / len(vs))
         if share >= 2:
             marked = share >= MARK_SHARE and share >= MARK_LIFT * share_everywhere(r)
             shares.append(f"{r}:{share}{'*' if marked else ''}")
+            info[1][r] = share
+            if marked:
+                info[2].add(r)
     rows.append(f"{key}\t{language}\t{lemma}\t{translit}\t{gloss}\t{len(vs)}\t{','.join(shares)}\t{encode_refs(vs)}")
 with open(os.path.join(out_dir, "original_words.tsv"), "w", encoding="utf-8") as f:
     f.write("# Sense-level Strong's number; language (G Greek, H Hebrew, A Aramaic); the word, its transliteration\n")
@@ -442,3 +463,123 @@ with open(os.path.join(out_dir, "original_forms.tsv"), "w", encoding="utf-8") as
     f.write("# lowercase, final letters as plain ones, Hebrew without its prefixes (make_search_data.py, script_key).\n")
     f.write("\n".join(form_rows) + "\n")
 print(f"{sum(len(r.split(' ')) for r in form_rows)} other spellings of {len(form_rows)} Greek and Hebrew words", file=sys.stderr)
+
+
+# ---- the Septuagint: which Hebrew word a Greek word stands for ----
+# The Septuagint, the Greek Old Testament the apostles quoted, translates the Hebrew with the
+# Greek words of the New: agapē for ahavah, eleos for chesed, kurios for YHWH. Abbott-Smith's
+# lexicon (TBESG) notes it for each word: "[in LXX chiefly for חֶסֶד ;]", "[in LXX for נשׂא, נוח
+# hi., נתן, סלח ni., עזב, etc. ;]". A search for a Greek word also shows the Old Testament verses
+# with the Hebrew word it stands for, and the other way round. Kept:
+# - the word the note names first, when it's the one the Greek is "chiefly" for (or the only
+#   one), if the King James translates them alike or its spelling names exactly one Hebrew word
+#   and that word isn't far commoner (pareimi, "be present", is in 24 verses; bo, "come", 2,350);
+# - from a plain list, or from references each with its Hebrew ("Ge 27:4 (אָהַב), Ge 27:27 (נָשַׁק)"),
+#   the words the King James translates alike (aphiēmi: salach "forgive", not natan "give").
+# "Alike": a rendering worth marking in both, in a tenth of the Greek word's verses and a quarter
+# of the Hebrew's. Which Hebrew word a spelling names: the one pointed exactly so, else among
+# those spelled so, one the King James translates like the Greek word, then the closest pointing.
+HEBREW_SPELLING = re.compile(r"[\u0590-\u05FF\uFB1D-\uFB4F]+")
+CHIEFLY = re.compile(r"\b(chiefly|very freq|freq\.|frequently|mostly|usually|commonly|generally|always)\b")
+POINTS = set(chr(c) for c in range(0x05B0, 0x05BD)) | {"\u05C1", "\u05C2", "\u05C7"}
+
+
+def pointed_key(text):
+    """Hebrew letters with their vowel points, without the accents: 'חֶ֫סֶד' -> 'חֶסֶד'."""
+    out = []
+    for c in unicodedata.normalize("NFD", text):
+        if "\u05D0" <= c <= "\u05EA":
+            out.append(c.translate(FINAL_LETTERS))
+        elif c in POINTS:
+            out.append(c)
+    return "".join(out)
+
+
+def distance(a, b):
+    previous = list(range(len(b) + 1))
+    for i in range(1, len(a) + 1):
+        current = [i] + [0] * len(b)
+        for j in range(1, len(b) + 1):
+            current[j] = min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (a[i - 1] != b[j - 1]))
+        previous = current
+    return previous[-1]
+
+
+word_info = {}  # number -> verses, {rendering: share over all its senses}, renderings worth marking
+for key, (count, shares, marked) in sense_info.items():
+    total, weighted, marks = word_info.get(key[:5], (0, {}, set()))
+    for r, share in shares.items():
+        weighted[r] = weighted.get(r, 0) + share * count
+    word_info[key[:5]] = (total + count, weighted, marks | marked)
+
+
+def alike(greek, hebrew, strict):
+    g, h = word_info[greek], word_info[hebrew]
+    common = g[2] & h[2]
+    if not strict:
+        return bool(common)
+    return any(g[1][r] >= 10 * g[0] and h[1][r] >= 25 * h[0] for r in common)
+
+
+hebrew_pointed, hebrew_unpointed, pointings = {}, {}, {}
+for key, (language, lemma, _, _) in meaning.items():
+    if language == "G" or key[:5] not in word_info:
+        continue
+    for part in lemma.split(","):
+        hebrew_pointed.setdefault(pointed_key(part), set()).add(key[:5])
+        hebrew_unpointed.setdefault(script_key(part), set()).add(key[:5])
+        pointings.setdefault(key[:5], set()).add(pointed_key(part))
+
+
+def hebrew_word(spelling, greek):
+    """The number of the Hebrew word spelling names in greek's note, and whether its pointing names it
+    alone. The note's pointing can slip: κάμηλος is "for גָּמַל", to wean, where camel is גָּמָל."""
+    pointed = pointed_key(spelling)
+    exact = (hebrew_pointed.get(pointed) if any(c in POINTS for c in spelling) else None) or set()
+    candidates = exact | hebrew_unpointed.get(script_key(spelling), set())
+    if not candidates:
+        return None, False
+    best = min(candidates, key=lambda n: (not alike(greek, n, True), not alike(greek, n, False), n not in exact,
+                                          min(distance(pointed, p) for p in pointings[n]), -word_info[n][0], n))
+    return best, exact == {best}
+
+
+septuagint = {}
+for greek, note in sorted(septuagint_note.items()):
+    if greek not in word_info:
+        continue
+    # "chiefly for X, also for Y", or references each with its Hebrew: "Ge 27:4, al. (אָהַב), Ge 27:27 (נָשַׁק)".
+    found = re.search(r"\bfor\b", note)
+    chiefly = found is not None and CHIEFLY.search(note[:found.end()]) is not None
+    named = []
+    for spelling in HEBREW_SPELLING.findall(note[found.start():] if found else note):
+        number, certain = hebrew_word(spelling, greek) if script_key(spelling) else (None, False)
+        if number and number not in [n for n, _ in named]:
+            named.append((number, certain))
+    if not named:
+        continue
+    if chiefly or len(named) == 1:
+        number, certain = named[0]
+        commoner = word_info[number][0] > 4 * word_info[greek][0] + 100
+        keep = [number] if alike(greek, number, True) or (certain and not commoner) else []
+    else:
+        keep = [n for n, _ in named if alike(greek, n, True)]
+    if keep:
+        septuagint[greek] = keep
+# The Hebrew word a Greek one comes from, when it's that word (amēn, Messias, Dabid), not a name
+# made of several (Bartimaios: bar, "son", and tame, "unclean"), with the same care for a far
+# commoner word (Melchi isn't melekh, "king").
+origins = {}
+for g, hs in hebrew_origin.items():
+    if len(hs) == 1 and g in word_info and hs[0] in word_info:
+        h = hs[0]
+        if alike(g, h, False) or word_info[h][0] <= 4 * word_info[g][0] + 100:
+            origins[g] = [h]
+with open(os.path.join(out_dir, "greek_hebrew.tsv"), "w", encoding="utf-8") as f:
+    f.write("# Greek word<TAB>the Hebrew words the Septuagint translates with it, from Abbott-Smith's notes in STEPBible's\n")
+    f.write("# TBESG (\"in LXX chiefly for ...\", kept as make_search_data.py's Septuagint section says)<TAB>the Hebrew\n")
+    f.write("# words it comes from, as Strong's says (\"of Hebrew origin (H4899)\").\n")
+    f.write("\n".join(f"{g}\t{' '.join(septuagint.get(g, []))}\t{' '.join(origins.get(g, []))}"
+                      for g in sorted(septuagint.keys() | origins.keys())) + "\n")
+print(f"{len(septuagint)} Greek words with the Hebrew they stand for in the Septuagint "
+      f"({len({h for hs in septuagint.values() for h in hs})} Hebrew words); {len(origins)} of Hebrew origin", file=sys.stderr)

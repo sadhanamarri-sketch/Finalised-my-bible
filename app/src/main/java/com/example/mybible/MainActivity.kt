@@ -310,7 +310,12 @@ class MainActivity : ComponentActivity() {
                 // of those tabs entirely restores wherever Reader actually
                 // was before, rather than wherever the last jump left it.
                 when (activeTab) {
-                    NavTab.SEARCH -> viewModel.backToSearchSourceVerse()
+                    // Back to the word page the search came from ("Find every verse with
+                    // this word"), else to the Reader by backToSearchSourceVerse, as above.
+                    NavTab.SEARCH -> {
+                        viewModel.leaveSearch()
+                        return@BackHandler
+                    }
                     NavTab.HIGHLIGHTS -> viewModel.backToHighlightsSourceVerse()
                     NavTab.STUDIED -> viewModel.backToStudiedSourceVerse()
                     NavTab.NOTES -> viewModel.backToNotesSourceVerse()

@@ -953,6 +953,15 @@ class BibleRepository(private val context: Context) {
         if (caseSensitive || outcome.originalWords.isNotEmpty()) outcome else outcome.copy(topics = engine.topics.find(q))
     }
 
+    /**
+     * What the Greek and Hebrew word pages' "Find every verse with this word" finds for the word's
+     * Strong's number: its verses, and the other Testament's with it (see OriginalSearch.preview).
+     * Null until Search's index can be built, or when the word has no verses.
+     */
+    suspend fun wordSearchPreview(strongs: String?): WordSearchPreview? = withContext(Dispatchers.Default) {
+        if (strongs.isNullOrBlank()) null else searchEngine()?.verses?.preview(strongs)
+    }
+
     /** A Nave's topic's page, for Search: its headings and verses (see TopicSearch.page). */
     suspend fun topicPage(id: Int): TopicPage? = withContext(Dispatchers.Default) {
         searchEngine()?.topics?.page(id)

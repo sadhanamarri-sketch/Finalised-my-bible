@@ -4,6 +4,7 @@ import com.example.mybible.model.SearchHit
 import com.example.mybible.model.SearchOutcome
 import com.example.mybible.model.SearchSource
 import com.example.mybible.model.Verse
+import com.example.mybible.model.WordSearchPreview
 import java.util.BitSet
 
 /**
@@ -26,6 +27,9 @@ class SmartSearch(private val index: BibleIndex, private val lexicon: SearchLexi
 
     private val inBible: (String) -> Boolean = index::contains
     private val originals = OriginalSearch(index, lexicon)
+
+    /** What a search for a Greek or Hebrew word finds, from its Strong's number (see OriginalSearch.preview). */
+    fun preview(strongs: String): WordSearchPreview? = originals.preview(strongs)
 
     fun search(query: String, caseSensitive: Boolean = false, disabled: Set<String> = emptySet()): SearchOutcome {
         originals.search(query, disabled)?.let { return it }

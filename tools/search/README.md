@@ -20,6 +20,11 @@ reads it:
 - `original_forms.tsv`: every other spelling of those words in the text, without accents, vowel
   points or Hebrew prefixes, so a search typed in Greek or Hebrew finds the word from any form of
   it (ἠγάπησεν: agapaō).
+- `greek_hebrew.tsv`: the Hebrew word each Greek word stands for, so a search for a Greek word
+  also shows the Old Testament verses with its Hebrew, and the other way round. From the
+  Septuagint, the Greek Old Testament, as Abbott-Smith's lexicon notes it ("in LXX chiefly for
+  חֶסֶד": eleos stands for chesed), keeping the links the King James agrees with; and from Strong's
+  "of Hebrew origin" (amēn, Messias, Dabid).
 - `topics.tsv`: Nave's Topical Bible, from `make_topics_data.py`: each topic's headings and
   subheadings, the verses under them, and its "see" links, resolved to the topic (or the heading)
   they name. References are checked against the KJV text, and consecutive verses become one passage.
@@ -46,8 +51,11 @@ python3 make_topics_data.py eng-kjv.osis.xml NavesTopicalDictionary.csv ../../ap
 - King James Version: public domain.
 - Greek and Hebrew words, senses, meanings, spellings and verses: STEPBible.org, Tyndale House
   Cambridge, CC BY 4.0. A few misspelled glosses are corrected (`GLOSS_FIXES`).
-- King James renderings: Strong's dictionaries as published by Open Scriptures, CC BY-SA. The
-  renderings column of `original_words.tsv` is derived from them and shared under the same license.
+- King James renderings and "of Hebrew origin": Strong's dictionaries as published by Open
+  Scriptures, CC BY-SA. The renderings column of `original_words.tsv` and the origins column of
+  `greek_hebrew.tsv` are derived from them and shared under the same license.
+- Septuagint equivalents: G. Abbott-Smith, *A Manual Greek Lexicon of the New Testament* (public
+  domain), in STEPBible's TBESG, CC BY 4.0.
 - Topics: Nave's Topical Bible (Orville J. Nave), public domain, as structured by BibleData
   (Brady Stephenson), CC BY 4.0.
 

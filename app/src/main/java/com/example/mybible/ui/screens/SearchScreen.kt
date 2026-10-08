@@ -63,7 +63,6 @@ import com.example.mybible.model.SearchSource
 import com.example.mybible.model.TopicCard
 import com.example.mybible.model.ThemeMode
 import com.example.mybible.ui.MainViewModel
-import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.components.BackTopBar
 import com.example.mybible.ui.components.DsSwitch
 import com.example.mybible.ui.components.NeSectionLabel
@@ -212,8 +211,7 @@ private fun SearchPage(
                     // a sheet opened from a still-composed screen closes).
                     keyboardController?.hide()
                     focusManager.clearFocus()
-                    viewModel.backToSearchSourceVerse()
-                    viewModel.selectTab(NavTab.READER)
+                    viewModel.leaveSearch()
                 },
                 actions = {
                     // Like Highlighted Verses' filter button: coral, with a dot, while a place is picked.
@@ -480,12 +478,28 @@ private fun SearchPage(
                 items(outcome.hits.subList(0, outcome.exactCount), key = { it.key() }) { card(it) }
                 if (outcome.relatedCount > 0 && !outcome.closeMatches) {
                     item(key = "related-heading") {
-                        ResultsHeading(
-                            when (outcome.relatedKind) {
-                                RelatedKind.SAME_MEANING -> "Same meaning, other words"
-                                RelatedKind.INSIDE_LONGER_WORDS -> "Inside longer words"
+                        Column {
+                            ResultsHeading(
+                                when (outcome.relatedKind) {
+                                    RelatedKind.SAME_MEANING -> "Same meaning, other words"
+                                    RelatedKind.INSIDE_LONGER_WORDS -> "Inside longer words"
+                                    RelatedKind.OLD_TESTAMENT -> "In the Old Testament"
+                                    RelatedKind.NEW_TESTAMENT -> "In the New Testament"
+                                }
+                            )
+                            // Which Hebrew word a Greek one stands for, and how we know.
+                            outcome.relatedNote?.let { note ->
+                                Text(
+                                    text = note,
+                                    fontSize = 13.sp,
+                                    lineHeight = 18.sp,
+                                    fontFamily = WorkSansFontFamily,
+                                    letterSpacing = 0.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
                             }
-                        )
+                        }
                     }
                 }
                 items(outcome.hits.subList(outcome.exactCount, outcome.hits.size), key = { it.key() }) { card(it) }
@@ -636,6 +650,8 @@ private fun countLine(outcome: SearchOutcome): String {
     val related = when (outcome.relatedKind) {
         RelatedKind.SAME_MEANING -> "with the same meaning"
         RelatedKind.INSIDE_LONGER_WORDS -> "inside longer words"
+        RelatedKind.OLD_TESTAMENT -> "in the Old Testament"
+        RelatedKind.NEW_TESTAMENT -> "in the New Testament"
     }
     return when {
         outcome.hits.isEmpty() -> "No verses found"
@@ -937,6 +953,7 @@ private fun SearchHelp() {
         Text(
             text = "Greek and Hebrew meanings: STEPBible.org, Tyndale House (CC BY 4.0). " +
                 "King James renderings: Strong’s, via Open Scriptures (CC BY-SA). " +
+                "Septuagint words: Abbott-Smith’s lexicon, via STEPBible. " +
                 "Topics: Nave’s Topical Bible, structured by BibleData (CC BY 4.0).",
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
             fontFamily = WorkSansFontFamily,

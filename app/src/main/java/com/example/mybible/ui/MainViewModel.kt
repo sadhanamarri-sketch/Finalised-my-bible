@@ -929,6 +929,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // (see SearchSource). Per search — a new query starts with everything on.
     private val _searchDisabledSources = MutableStateFlow<Set<String>>(emptySet())
 
+    // The Greek or Hebrew word page this search session started from ("Find every verse with
+    // this word"), which Search's back returns to instead of the Reader.
+    private val _searchFromWordPage = MutableStateFlow<NavTab?>(null)
+
     // Nave's topics opened from Search, the one on screen last: a topic's "see" links open more on
     // top, and back closes them one at a time. Kept through a trip to the Reader and back, like
     // the results under them; gone with the search session.
@@ -1761,6 +1765,38 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // GreekWordScreen/HebrewWordScreen is ever open at a time.
     private val _lexiconOpenedFromSavedWords = MutableStateFlow(false)
 
+    // What the open Greek or Hebrew word page's "Find every verse with this word" will find: its
+    // verses, and the other Testament's with the word in its language. Null while it's worked
+    // out, or when Search can't find the word.
+    private val _wordSearchPreview = MutableStateFlow<WordSearchPreview?>(null)
+    val wordSearchPreview: StateFlow<WordSearchPreview?> = _wordSearchPreview.asStateFlow()
+    private var wordSearchPreviewJob: Job? = null
+
+    private fun loadWordSearchPreview(strongs: String?) {
+        wordSearchPreviewJob?.cancel()
+        _wordSearchPreview.value = null
+        if (strongs.isNullOrBlank()) return
+        wordSearchPreviewJob = viewModelScope.launch { _wordSearchPreview.value = repository.wordSearchPreview(strongs) }
+    }
+
+    /**
+     * The word page's "Find every verse with this word": a new search for the word by its Strong's
+     * number, in both Testaments, whose back arrow returns to the page.
+     */
+    fun findEveryVerseWithWord(query: String) {
+        val wordPage = _activeTab.value.takeIf { it == NavTab.GREEK_WORD || it == NavTab.HEBREW_WORD } ?: return
+        // Not the search before, if one was open under the Reader's "Return to search results".
+        _searchReturnAvailable.value = false
+        endSearchSession()
+        _searchFromWordPage.value = wordPage
+        _searchQuery.value = query
+        addToSearchHistory(query)
+        // Results to read, not a keyboard.
+        _suppressNextSearchAutofocus.value = true
+        searchJob = viewModelScope.launch { performSearch(query) }
+        selectTab(NavTab.SEARCH)
+    }
+
     // Opens GreekWordScreen for this word — same "land on a full page,
     // fetch lazily" shape as CrossReferenceScreen/openCrossReferences.
     // Passing null instead clears the selection without switching tabs
@@ -1783,6 +1819,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _lexiconResult.value = result
             _isLoadingLexicon.value = false
         }
+        loadWordSearchPreview(greekWord.strongs)
         selectTab(NavTab.GREEK_WORD)
     }
 
@@ -1851,6 +1888,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _hebrewLexiconResult.value = result
             _isLoadingHebrewLexicon.value = false
         }
+        loadWordSearchPreview(hebrewWord.strongs)
         selectTab(NavTab.HEBREW_WORD)
     }
 
@@ -2759,6 +2797,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _searchOutcome.value = SearchOutcome()
         _searchDisabledSources.value = emptySet()
         _searchPlace.value = BiblePlace.WholeBible
+        _searchFromWordPage.value = null
         _topicStack.value = emptyList()
         _isSearching.value = false
         _searchLastTappedKey.value = null
@@ -2824,6 +2863,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         leaveReaderThenRestore(NavTab.SEARCH) {
             _searchReturnAvailable.value = false
             _searchSourceVerse.value?.let { jumpToVerse(it.book, it.chapter, it.verse) }
+        }
+    }
+
+    /**
+     * Search's back arrow and system back: back to the Greek or Hebrew word page the search came
+     * from, or else to the Reader, where it was before the search (see backToSearchSourceVerse).
+     */
+    fun leaveSearch() {
+        val wordPage = _searchFromWordPage.value
+        if (wordPage != null) {
+            _searchReturnAvailable.value = false
+            endSearchSession()
+            selectTab(wordPage)
+        } else {
+            backToSearchSourceVerse()
+            selectTab(NavTab.READER)
         }
     }
 
