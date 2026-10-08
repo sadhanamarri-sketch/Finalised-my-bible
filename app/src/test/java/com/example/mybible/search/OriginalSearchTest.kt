@@ -169,4 +169,43 @@ class OriginalSearchTest {
         assertTrue(hasOriginalLetter("λόγος") && hasOriginalLetter("אמר"))
         assertFalse(hasOriginalLetter("logos") || hasOriginalLetter("ప్రేమ"))
     }
+
+    // ---- a word's use, for its page ----
+
+    private fun ref(r: String) = TestBible.verses.first { "${it.book} ${it.chapter}:${it.number}" == r }
+        .let { BibleIndex.packRef(it.bookIndex, it.chapter, it.number) }
+
+    @Test
+    fun aWordsMeaningHereAmongItsOthers() {
+        // aphiēmi where it's "forgive", by its sense letter.
+        val study = search.study("G0863H", ref("Matthew 6:14"))!!
+        assertEquals("G863", study.query)
+        assertEquals("forgive", study.meaningHere)
+        assertEquals(listOf("forgive" to 2, "to release" to 1), study.meanings.map { it.label to it.count })
+        // Without a sense letter, by the verse.
+        assertEquals("to release", search.study("G0863", ref("Matthew 4:20"))!!.meaningHere)
+        // Search with the other meanings' chips off, and the Old Testament's words: this one's verses.
+        assertTrue("other:H5545" in study.meanings[0].offChips)
+        val forgive = search.search("G863", disabled = study.meanings[0].offChips)
+        assertEquals(listOf("Matthew 6:14", "John 20:23"), forgive.refs())
+        // One meaning: nothing to choose between.
+        val agape = search.study("G0026", ref("1 John 4:8"))!!
+        assertNull(agape.meaningHere)
+        assertTrue(agape.meanings.isEmpty())
+    }
+
+    @Test
+    fun howTheKingJamesTranslatesIt() {
+        assertEquals(listOf("love" to 75, "charity" to 23), search.study("G0026", null)!!.kingJames.map { it.label to it.count })
+        // Forms of a word are one word: love, loved.
+        assertEquals(listOf("love"), search.study("G0025", null)!!.kingJames.map { it.label })
+    }
+
+    @Test
+    fun theBooksItsIn() {
+        val study = search.study("G0863H", null)!!
+        assertEquals(listOf("Matthew" to 2, "John" to 1), study.books.map { it.label to it.count })
+        assertEquals(2, study.bookCount)
+        assertNull(search.study("G9999", null))
+    }
 }

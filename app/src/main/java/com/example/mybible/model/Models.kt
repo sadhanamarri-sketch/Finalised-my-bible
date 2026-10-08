@@ -175,6 +175,32 @@ data class WordSearchPreview(
     val otherWords: List<String> = emptyList()
 )
 
+/**
+ * How a Greek or Hebrew word is used, for its page: what it means in the verse the page was opened
+ * from, its meanings, the King James words for it and the books it's in most. From the same data as
+ * Search (see OriginalSearch.study).
+ */
+data class WordStudy(
+    /** The search for every verse with it: its Strong's number, G863. */
+    val query: String,
+    /** Its meaning in the verse its page was opened from, when it has several. */
+    val meaningHere: String? = null,
+    /** Its meanings, each with how many verses: the most used first. Empty when it has one. */
+    val meanings: List<WordUse> = emptyList(),
+    /** The King James words for it, each with the % of its verses that use it. */
+    val kingJames: List<WordUse> = emptyList(),
+    /** The books it's in most, each with how many verses. */
+    val books: List<WordUse> = emptyList(),
+    /** How many books it's in. */
+    val bookCount: Int = 0
+)
+
+/**
+ * A line of a [WordStudy]: a meaning, a King James word or a book, with how many (verses, or a %).
+ * For a meaning, [offChips] are the search's chips to switch off for its verses alone.
+ */
+data class WordUse(val label: String, val count: Int, val offChips: Set<String> = emptySet())
+
 /** A Greek or Hebrew word a search names (ἀγάπη, "agape", G26), shown above its verses. */
 data class OriginalWordCard(
     /** Greek, Hebrew or Aramaic. */

@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.mybible.data.HebrewMorphology
 import com.example.mybible.model.SavedWordItem
 import com.example.mybible.model.SavedWordLanguage
 import com.example.mybible.ui.MainViewModel
@@ -203,17 +204,23 @@ fun SavedWordsScreen(
                                 // the word itself is already the readable
                                 // form.
                                 val isForeign = saved.language != SavedWordLanguage.ENGLISH
-                                if (isForeign && saved.word.isNotBlank()) {
+                                // A Hebrew word is saved as the interlinear has it, in its parts
+                                // (בְּ/רֵאשִׁ֖ית, be./re.Shit, in/ beginning): shown whole.
+                                val hebrew = saved.language == SavedWordLanguage.HEBREW
+                                val native = if (hebrew) HebrewMorphology.cleanWord(saved.word) else saved.word
+                                val transliteration = if (hebrew) HebrewMorphology.cleanTransliteration(saved.transliteration) else saved.transliteration
+                                val gloss = if (hebrew) HebrewMorphology.cleanGloss(saved.gloss) else saved.gloss
+                                if (isForeign && native.isNotBlank()) {
                                     Text(
-                                        text = saved.word,
+                                        text = native,
                                         fontSize = 14.sp,
                                         fontFamily = LiterataFontFamily,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
-                                if (saved.transliteration.isNotBlank()) {
+                                if (transliteration.isNotBlank()) {
                                     Text(
-                                        text = saved.transliteration,
+                                        text = transliteration,
                                         fontSize = 13.5.sp,
                                         fontFamily = LiterataFontFamily,
                                         fontStyle = FontStyle.Italic,
@@ -221,7 +228,7 @@ fun SavedWordsScreen(
                                         modifier = Modifier.padding(top = 2.dp)
                                     )
                                 }
-                                val translation = if (isForeign) saved.gloss.ifBlank { saved.word } else saved.word
+                                val translation = if (isForeign) gloss.ifBlank { native } else saved.word
                                 Text(
                                     text = translation,
                                     fontSize = 16.sp,

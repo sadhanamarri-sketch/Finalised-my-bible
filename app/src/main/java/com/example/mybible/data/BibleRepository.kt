@@ -962,6 +962,17 @@ class BibleRepository(private val context: Context) {
         if (strongs.isNullOrBlank()) null else searchEngine()?.verses?.preview(strongs)
     }
 
+    /**
+     * How the Greek or Hebrew word with Strong's number [strongs] is used, for its page: its
+     * meaning in [verse] among its others, the King James words for it and the books it's in
+     * most (see OriginalSearch.study). Null until Search's index can be built.
+     */
+    suspend fun wordStudy(strongs: String?, verse: Verse?): WordStudy? = withContext(Dispatchers.Default) {
+        if (strongs.isNullOrBlank()) return@withContext null
+        val ref = verse?.let { v -> BIBLE_BOOKS.indexOf(v.book).takeIf { it >= 0 }?.let { BibleIndex.packRef(it, v.chapter, v.number) } }
+        searchEngine()?.verses?.study(strongs, ref)
+    }
+
     /** A Nave's topic's page, for Search: its headings and verses (see TopicSearch.page). */
     suspend fun topicPage(id: Int): TopicPage? = withContext(Dispatchers.Default) {
         searchEngine()?.topics?.page(id)

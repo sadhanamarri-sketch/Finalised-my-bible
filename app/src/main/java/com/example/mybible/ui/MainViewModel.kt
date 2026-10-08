@@ -1772,22 +1772,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val wordSearchPreview: StateFlow<WordSearchPreview?> = _wordSearchPreview.asStateFlow()
     private var wordSearchPreviewJob: Job? = null
 
-    private fun loadWordSearchPreview(strongs: String?) {
+    // How the open word page's word is used: its meaning in the verse it was tapped in among its
+    // others, the King James words for it and the books it's in most (see WordStudy).
+    private val _wordStudy = MutableStateFlow<WordStudy?>(null)
+    val wordStudy: StateFlow<WordStudy?> = _wordStudy.asStateFlow()
+
+    private fun loadWordSearchPreview(strongs: String?, verse: Verse?) {
         wordSearchPreviewJob?.cancel()
         _wordSearchPreview.value = null
+        _wordStudy.value = null
         if (strongs.isNullOrBlank()) return
-        wordSearchPreviewJob = viewModelScope.launch { _wordSearchPreview.value = repository.wordSearchPreview(strongs) }
+        wordSearchPreviewJob = viewModelScope.launch {
+            _wordSearchPreview.value = repository.wordSearchPreview(strongs)
+            _wordStudy.value = repository.wordStudy(strongs, verse)
+        }
     }
 
     /**
      * The word page's "Find every verse with this word": a new search for the word by its Strong's
-     * number, in both Testaments, whose back arrow returns to the page.
+     * number, in both Testaments, whose back arrow returns to the page. From the page's word
+     * study, the search is narrowed to one book ([place]), or to one meaning with the chips of
+     * the others ([offChips]) switched off.
      */
-    fun findEveryVerseWithWord(query: String) {
+    fun findEveryVerseWithWord(query: String, place: BiblePlace = BiblePlace.WholeBible, offChips: Set<String> = emptySet()) {
         val wordPage = _activeTab.value.takeIf { it == NavTab.GREEK_WORD || it == NavTab.HEBREW_WORD } ?: return
         // Not the search before, if one was open under the Reader's "Return to search results".
         _searchReturnAvailable.value = false
         endSearchSession()
+        _searchPlace.value = place
+        _searchDisabledSources.value = offChips
         _searchFromWordPage.value = wordPage
         _searchQuery.value = query
         addToSearchHistory(query)
@@ -1819,7 +1832,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _lexiconResult.value = result
             _isLoadingLexicon.value = false
         }
-        loadWordSearchPreview(greekWord.strongs)
+        loadWordSearchPreview(greekWord.strongs, baseVerse)
         selectTab(NavTab.GREEK_WORD)
     }
 
@@ -1888,7 +1901,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _hebrewLexiconResult.value = result
             _isLoadingHebrewLexicon.value = false
         }
-        loadWordSearchPreview(hebrewWord.strongs)
+        loadWordSearchPreview(hebrewWord.strongs, baseVerse)
         selectTab(NavTab.HEBREW_WORD)
     }
 

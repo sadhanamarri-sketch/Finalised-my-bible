@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 
@@ -45,6 +46,7 @@ import androidx.compose.foundation.text.ClickableText
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
+import com.example.mybible.data.HebrewMorphology
 import com.example.mybible.model.GreekWord
 import com.example.mybible.model.HebrewWord
 import com.example.mybible.model.HighlightColorDef
@@ -416,24 +418,29 @@ fun VerseCard(
                                             .clickable { onHebrewWordClick(hWord) }
                                             .padding(horizontal = 6.dp, vertical = 4.dp)
                                     ) {
+                                        // As written, without TAHOT's "/" between its parts.
                                         Text(
-                                            text = hWord.hebrew,
+                                            text = HebrewMorphology.cleanWord(hWord.hebrew),
                                             fontSize = hebrewFontSizeSp.sp,
                                             fontWeight = FontWeight.Normal,
                                             color = MaterialTheme.colorScheme.onSurface,
                                             fontFamily = FontFamily.Serif
                                         )
+                                        // English letters read left to right in this right-to-left
+                                        // row: 'ar·ba·'IM, not ar·ba·'IM'; <obj.>, not <.obj>.
                                         Text(
-                                            text = hWord.transliteration,
+                                            text = HebrewMorphology.cleanTransliteration(hWord.transliteration),
                                             fontSize = (hebrewFontSizeSp - 1).sp,
                                             fontStyle = FontStyle.Italic,
-                                            color = MaterialTheme.colorScheme.onSurface
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            style = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
                                         )
                                         Text(
-                                            text = hWord.englishGloss,
+                                            text = HebrewMorphology.cleanGloss(hWord.englishGloss),
                                             fontSize = (hebrewFontSizeSp - 1).sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.tertiary
+                                            color = MaterialTheme.colorScheme.tertiary,
+                                            style = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
                                         )
                                     }
                                 }

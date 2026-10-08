@@ -292,6 +292,10 @@ fun LexiconDefinitionText(
                     }
                 }
 
+                is LexiconDefinitionFormatter.Line.Outline -> {
+                    OutlineLine(line, first = idx == preambleCount, bodyColor = bodyColor, refColor = refColor, onReferenceClick = onReferenceClick)
+                }
+
                 is LexiconDefinitionFormatter.Line.SubSense -> {
                     Row(modifier = Modifier.padding(start = 22.dp, top = 7.dp)) {
                         Text(
@@ -340,6 +344,73 @@ fun LexiconDefinitionText(
                         onReferenceClick = onReferenceClick
                     )
                 }
+            }
+        }
+    }
+}
+
+// How far each level of an outline is indented from the one above it.
+private val OUTLINE_INDENT = 18.dp
+
+/**
+ * A line of a Hebrew entry's outline, indented to its level and numbered as outlines are: 1., a.,
+ * (1), (a). A verb's stem ("Qal", "Piel") heads its senses with what it means in a word or two
+ * ("Piel · intensive"); tapping it says more.
+ */
+@Composable
+private fun OutlineLine(
+    line: LexiconDefinitionFormatter.Line.Outline,
+    first: Boolean,
+    bodyColor: Color,
+    refColor: Color,
+    onReferenceClick: (book: String, chapter: Int, verse: Int) -> Unit
+) {
+    var explained by remember(line.text) { mutableStateOf(false) }
+    val top = when {
+        first -> 0.dp
+        line.depth == 1 -> 14.dp
+        line.depth == 2 -> 9.dp
+        else -> 5.dp
+    }
+    val (size, lineHeight) = when (line.depth) {
+        1 -> 16.sp to 23.sp
+        2 -> 15.5.sp to 22.sp
+        else -> 15.sp to 21.sp
+    }
+    Row(modifier = Modifier.padding(start = OUTLINE_INDENT * (line.depth - 1).coerceAtMost(4), top = top)) {
+        Text(
+            text = when (line.depth) {
+                1, 2 -> "${line.marker}."
+                else -> "(${line.marker})"
+            },
+            fontSize = size,
+            fontFamily = LiterataFontFamily,
+            fontWeight = if (line.depth == 1) FontWeight.Bold else FontWeight.SemiBold,
+            color = if (line.depth == 1) MaterialTheme.colorScheme.primary else bodyColor,
+            // On the line of the stem's name in its chip, or of the first line of the text.
+            modifier = Modifier
+                .alignByBaseline()
+                .padding(end = 7.dp)
+        )
+        Column(modifier = Modifier.weight(1f).alignByBaseline()) {
+            line.stem?.let { stem ->
+                GrammarTermChip(
+                    text = stem.label,
+                    hint = stem.hint,
+                    selected = explained,
+                    onClick = { explained = !explained },
+                    modifier = Modifier.padding(top = 1.dp)
+                )
+                if (explained) GrammarExplanation(stem, Modifier.padding(top = 6.dp))
+            }
+            if (line.body.isNotBlank()) {
+                RefText(
+                    text = line.body,
+                    style = TextStyle(fontSize = size, fontFamily = LiterataFontFamily, lineHeight = lineHeight, color = bodyColor),
+                    refColor = refColor,
+                    onReferenceClick = onReferenceClick,
+                    modifier = Modifier.padding(top = if (line.stem != null) 5.dp else 0.dp)
+                )
             }
         }
     }

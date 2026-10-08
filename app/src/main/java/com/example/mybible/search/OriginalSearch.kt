@@ -7,8 +7,11 @@ import com.example.mybible.model.SearchOutcome
 import com.example.mybible.model.SearchSource
 import com.example.mybible.model.Verse
 import com.example.mybible.model.WordSearchPreview
+import com.example.mybible.model.WordStudy
+import com.example.mybible.model.WordUse
 import java.text.Normalizer
 import java.util.BitSet
+import kotlin.math.roundToInt
 
 /**
  * A search for a word of the Bible's own languages, named by:
@@ -75,6 +78,81 @@ class OriginalSearch(private val index: BibleIndex, private val lexicon: SearchL
             otherTestament = if (number.startsWith("G")) "Old Testament" else "New Testament",
             otherWords = others.map { (group, _) -> "${group[0].lemma.substringBefore(',')} (${group[0].transliteration.substringBefore(',')})" }
         )
+    }
+
+    /**
+     * How the word with Strong's number [strongs] is used (see WordStudy): its meanings, the one
+     * it has where it was tapped (by the number's sense letter, G0863H, else by which meaning
+     * has the verse [verseRef], packed as BibleIndex.packRef does), the King James words for it
+     * and the books it's in most. Null for a number without verses.
+     */
+    fun study(strongs: String, verseRef: Int? = null): WordStudy? {
+        val match = strongsSense.find(strongs.uppercase()) ?: return null
+        val number = match.groupValues[1] + match.groupValues[2].takeLast(4).padStart(4, '0')
+        val senses = lexicon.originalsNumbered(number)
+        val versesBySense = senses.associateWith(::versesOf)
+        val verses = BitSet(index.size).apply { versesBySense.values.forEach { or(it) } }
+        if (verses.isEmpty) return null
+        val total = verses.cardinality()
+
+        // Its meanings as Search's chips have them: its senses by meaning.
+        val groups = senses.groupBy { it.gloss.lowercase() }.values
+            .map { group -> group to BitSet(index.size).apply { group.forEach { or(versesBySense.getValue(it)) } } }
+            .filter { !it.second.isEmpty }
+            .sortedByDescending { it.second.cardinality() }
+        // A meaning's verses alone: its other meanings' chips off, and the other Testament's words
+        // for it (salach, "forgive", is no word for aphiēmi's "permit").
+        val chips = senses.mapTo(HashSet()) { SOURCE_PREFIX + it.key } + lexicon.counterpartsOf(number).map { COUNTERPART_PREFIX + it.number }
+        val meanings = if (groups.size < 2) emptyList() else groups.map { (group, groupVerses) ->
+            WordUse(group[0].gloss, groupVerses.cardinality(), chips - group.map { SOURCE_PREFIX + it.key }.toSet())
+        }
+        val here = if (groups.size < 2) null else {
+            val tagged = senses.firstOrNull { it.key == number + match.groupValues[3] }
+            val id = verseRef?.let(index::idOf) ?: -1
+            (tagged ?: senses.filter { id >= 0 && versesBySense.getValue(it).get(id) }.distinctBy { it.gloss.lowercase() }.singleOrNull())?.gloss
+        }
+
+        // The King James words for it over all its senses, each sense counting for its share of
+        // the verses, and the forms of one word as one (love, loved).
+        val weighted = HashMap<String, Double>()
+        for ((sense, senseVerses) in versesBySense) {
+            for ((rendering, share) in sense.renderings) {
+                if (rendering in sense.marked) weighted.merge(rendering, share.toDouble() * senseVerses.cardinality(), Double::plus)
+            }
+        }
+        val renderings = ArrayList<Pair<String, Int>>()
+        val byShare = compareByDescending<Map.Entry<String, Double>> { it.value }.thenBy { it.key.length }.thenBy { it.key }
+        for ((rendering, sum) in weighted.entries.sortedWith(byShare)) {
+            val share = (sum / total).roundToInt().coerceAtMost(100)
+            if (share < MIN_CARD_SHARE || renderings.size == MAX_STUDY_RENDERINGS) break
+            if (renderings.none { (other, _) -> other in lexicon.formsOf(rendering) || rendering in lexicon.formsOf(other) }) renderings += rendering to share
+        }
+
+        val byBook = index.countByBook(verses)
+        return WordStudy(
+            query = displayNumber(number),
+            meaningHere = here,
+            meanings = meanings,
+            kingJames = renderings.map { (rendering, share) -> WordUse(spellingIn(rendering, verses), share) },
+            books = byBook.entries.sortedByDescending { it.value }.take(MAX_STUDY_BOOKS).map { WordUse(it.key, it.value) },
+            bookCount = byBook.size
+        )
+    }
+
+    // [word] as the text spells it in [verses]: LORD, Abraham; but lover, not the Lover a verse
+    // starts with.
+    private fun spellingIn(word: String, verses: BitSet): String {
+        val spellings = HashMap<String, Int>()
+        var id = verses.nextSetBit(0)
+        var looked = 0
+        while (id >= 0 && looked < 200) {
+            val text = index[id].text
+            forEachWord(text) { w, start, end -> if (w == word) spellings.merge(text.substring(start, end), 1, Int::plus) }
+            looked++
+            id = verses.nextSetBit(id + 1)
+        }
+        val most = spellings.maxByOrNull { it.value } ?: return word
+        return if ((spellings[word] ?: 0) * 3 >= most.value) word else most.key
     }
 
     // ---- what the query names ----
@@ -359,9 +437,14 @@ class OriginalSearch(private val index: BibleIndex, private val lexicon: SearchL
         const val MIN_CARD_SHARE = 5
         /** A word's meanings past this many share an "Other meanings" chip. */
         const val MAX_MEANING_CHIPS = 5
+        /** A word page names this many King James words for the word, at most. */
+        const val MAX_STUDY_RENDERINGS = 4
+        /** A word page names the books the word is in most, this many. */
+        const val MAX_STUDY_BOOKS = 5
 
         private val strongsNumber = Regex("([GgHh])0*(\\d{1,5})([A-Za-z]?)")
         private val strongsTag = Regex("([GH])(\\d{1,5})")
+        private val strongsSense = Regex("([GH])(\\d{1,5})([A-Z]?)")
         private val separators = Regex("[\\s\\u05BE,.;:·]+")
         // ו and, ה the, ב in, כ as, ל to, מ from, ש that.
         private const val HEBREW_PREFIXES = "והבכלמש"
