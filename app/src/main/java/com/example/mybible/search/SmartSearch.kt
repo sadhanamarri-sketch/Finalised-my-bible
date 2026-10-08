@@ -335,12 +335,13 @@ class SmartSearch(private val index: BibleIndex, private val lexicon: SearchLexi
         val out = ArrayList<SearchSource>()
         val allExact = required.map { it.exact }.reduce { a, b -> (a.clone() as BitSet).apply { and(b) } }
         val allLiteral = required.map { it.literal }.reduce { a, b -> (a.clone() as BitSet).apply { and(b) } }
-        val formsAdd = (allExact.clone() as BitSet).apply { andNot(allLiteral) }.cardinality()
-        if (formsAdd > 0) out += SearchSource(listOf(FORMS), "Word forms", formsAdd, FORMS !in disabled)
+        val formsAdd = (allExact.clone() as BitSet).apply { andNot(allLiteral) }
+        if (!formsAdd.isEmpty) out += SearchSource(listOf(FORMS), "Word forms", formsAdd.cardinality(), FORMS !in disabled, index.countByBook(formsAdd))
 
         val ordered = byId.values.sortedBy { it.rank }.filter { added.getValue(it.id).cardinality() > 0 }
         for (s in ordered.filter { it.kind == Kind.WORDING }) {
-            out += SearchSource(listOf(s.id), s.chip, added.getValue(s.id).cardinality(), s.id !in disabled)
+            val verses = added.getValue(s.id)
+            out += SearchSource(listOf(s.id), s.chip, verses.cardinality(), s.id !in disabled, index.countByBook(verses))
         }
         // Senses that read the same (chayil "strength" in Hebrew and in Aramaic) share a chip; two
         // with the same name but different meanings get the meaning added to tell them apart.
@@ -359,7 +360,7 @@ class SmartSearch(private val index: BibleIndex, private val lexicon: SearchLexi
 
     private fun originalsChip(sources: List<Source>, label: String, added: Map<String, BitSet>, disabled: Set<String>): SearchSource {
         val verses = BitSet().apply { sources.forEach { or(added.getValue(it.id)) } }
-        return SearchSource(sources.map { it.id }, label, verses.cardinality(), sources.all { it.id !in disabled })
+        return SearchSource(sources.map { it.id }, label, verses.cardinality(), sources.all { it.id !in disabled }, index.countByBook(verses))
     }
 
     // ---- nothing found ----

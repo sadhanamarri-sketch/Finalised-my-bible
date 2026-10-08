@@ -9,24 +9,11 @@ import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 /**
- * Where the Highlighted Verses page looks. ThisChapter and ThisBook follow
- * the Reader, so they always mean wherever you're reading now.
- */
-sealed interface HighlightPlace {
-    data object WholeBible : HighlightPlace
-    data object ThisChapter : HighlightPlace
-    data object ThisBook : HighlightPlace
-    data object OldTestament : HighlightPlace
-    data object NewTestament : HighlightPlace
-    data class Book(val name: String) : HighlightPlace
-}
-
-/**
  * What the Highlighted Verses page is narrowed to. Its order (newest first
  * or Bible order) is a saved preference instead, kept apart from this.
  */
 data class HighlightsFilter(
-    val place: HighlightPlace = HighlightPlace.WholeBible,
+    val place: BiblePlace = BiblePlace.WholeBible,
     // By color, not label: a label can be renamed while the filter is on.
     // Lowercase, like HighlightedVerseItem.colorHex.
     val colorHexes: Set<String> = emptySet(),
@@ -34,18 +21,7 @@ data class HighlightsFilter(
     val searchOpen: Boolean = false
 ) {
     /** A place or a color is picked — what the filter button's dot and the summary line show. */
-    val narrowed: Boolean get() = place != HighlightPlace.WholeBible || colorHexes.isNotEmpty()
-}
-
-private const val OLD_TESTAMENT_BOOKS = 39
-
-fun HighlightPlace.includes(item: HighlightedVerseItem, currentBook: String, currentChapter: Int): Boolean = when (this) {
-    HighlightPlace.WholeBible -> true
-    HighlightPlace.ThisChapter -> item.book == currentBook && item.chapter == currentChapter
-    HighlightPlace.ThisBook -> item.book == currentBook
-    HighlightPlace.OldTestament -> BIBLE_BOOKS.indexOf(item.book) in 0 until OLD_TESTAMENT_BOOKS
-    HighlightPlace.NewTestament -> BIBLE_BOOKS.indexOf(item.book) >= OLD_TESTAMENT_BOOKS
-    is HighlightPlace.Book -> item.book == name
+    val narrowed: Boolean get() = place != BiblePlace.WholeBible || colorHexes.isNotEmpty()
 }
 
 private val whitespace = Regex("\\s+")
@@ -64,7 +40,7 @@ private fun HighlightedVerseItem.hasAll(words: List<String>): Boolean {
  * would show.
  */
 fun List<HighlightedVerseItem>.filtered(
-    place: HighlightPlace,
+    place: BiblePlace,
     colorHexes: Set<String>,
     query: String,
     currentBook: String,
@@ -72,7 +48,7 @@ fun List<HighlightedVerseItem>.filtered(
 ): List<HighlightedVerseItem> {
     val words = query.lowercase().split(whitespace).filter { it.isNotEmpty() }
     return filter {
-        place.includes(it, currentBook, currentChapter) &&
+        place.includes(it.book, it.chapter, currentBook, currentChapter) &&
             (colorHexes.isEmpty() || it.colorHex in colorHexes) &&
             it.hasAll(words)
     }

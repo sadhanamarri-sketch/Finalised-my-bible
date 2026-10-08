@@ -26,9 +26,13 @@ class OriginalWord(
      * times likelier there than anywhere (logos: word, not say). See make_search_data.py.
      */
     val marked: Set<String>,
-    /** Its verses as book index * 65536 + chapter * 256 + verse. */
-    val verses: IntArray
+    // Its verses as original_words.tsv has them, read the first time they're needed: most
+    // searches need only a few words' verses, and all of them take a while to read.
+    private val encodedVerses: String
 ) {
+    /** Its verses as book index * 65536 + chapter * 256 + verse. */
+    val verses: IntArray by lazy(LazyThreadSafetyMode.PUBLICATION) { SearchLexicon.decodeRefs(encodedVerses) }
+
     /** Its Strong's number without the sense: G0863. */
     val number: String get() = key.substring(0, 5)
 
@@ -256,7 +260,7 @@ class SearchLexicon private constructor(
                 verseCount = cols[5].toIntOrNull() ?: return null,
                 renderings = renderings,
                 marked = marked,
-                verses = decodeRefs(cols[7])
+                encodedVerses = cols[7]
             )
         }
 

@@ -33,17 +33,17 @@ class HighlightFiltersTest {
 
     private fun List<HighlightedVerseItem>.keys() = map { it.key }
 
-    private fun shown(place: HighlightPlace = HighlightPlace.WholeBible, colors: Set<String> = emptySet(), query: String = "") =
+    private fun shown(place: BiblePlace = BiblePlace.WholeBible, colors: Set<String> = emptySet(), query: String = "") =
         all.filtered(place, colors, query, currentBook = "Romans", currentChapter = 8).keys()
 
     @Test
     fun placesFollowTheReaderAndSplitTheTestaments() {
         assertEquals(all.keys(), shown())
-        assertEquals(listOf(romans826.key, romans828.key), shown(HighlightPlace.ThisChapter))
-        assertEquals(listOf(romans826.key, romans828.key, romans122.key), shown(HighlightPlace.ThisBook))
-        assertEquals(listOf(psalm.key, isaiah.key), shown(HighlightPlace.OldTestament))
-        assertEquals(listOf(romans826.key, romans828.key, romans122.key, peter.key), shown(HighlightPlace.NewTestament))
-        assertEquals(listOf(peter.key), shown(HighlightPlace.Book("1 Peter")))
+        assertEquals(listOf(romans826.key, romans828.key), shown(BiblePlace.ThisChapter))
+        assertEquals(listOf(romans826.key, romans828.key, romans122.key), shown(BiblePlace.ThisBook))
+        assertEquals(listOf(psalm.key, isaiah.key), shown(BiblePlace.OldTestament))
+        assertEquals(listOf(romans826.key, romans828.key, romans122.key, peter.key), shown(BiblePlace.NewTestament))
+        assertEquals(listOf(peter.key), shown(BiblePlace.Book("1 Peter")))
     }
 
     @Test
@@ -53,7 +53,7 @@ class HighlightFiltersTest {
             listOf(psalm.key, isaiah.key, romans826.key, romans828.key, peter.key),
             shown(colors = setOf(prayer, promise))
         )
-        assertEquals(listOf(romans826.key, romans828.key), shown(HighlightPlace.ThisChapter, setOf(prayer, promise)))
+        assertEquals(listOf(romans826.key, romans828.key), shown(BiblePlace.ThisChapter, setOf(prayer, promise)))
     }
 
     @Test
@@ -63,7 +63,7 @@ class HighlightFiltersTest {
         assertEquals(listOf(romans826.key, romans828.key), shown(query = "romans 8:"))
         assertEquals(listOf(romans826.key, peter.key), shown(query = "prayer"))
         assertEquals(emptyList<String>(), shown(query = "shepherd prayer"))
-        assertEquals(listOf(isaiah.key), shown(HighlightPlace.OldTestament, setOf(promise), "fear"))
+        assertEquals(listOf(isaiah.key), shown(BiblePlace.OldTestament, setOf(promise), "fear"))
     }
 
     @Test

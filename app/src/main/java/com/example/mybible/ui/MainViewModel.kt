@@ -9,6 +9,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.viewModelScope
+import com.example.mybible.BiblePlace
 import com.example.mybible.HighlightedVerseItem
 import com.example.mybible.HighlightsFilter
 import com.example.mybible.StudyStats
@@ -27,6 +28,7 @@ import com.example.mybible.data.LexiconLookupResult
 import com.example.mybible.model.*
 import com.example.mybible.ui.components.BIBLE_BOOKS
 import com.example.mybible.ui.components.BOOK_CHAPTER_COUNTS
+import com.example.mybible.within
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -900,7 +902,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // the ones saying it in other words), the chips for what else it matched, and a spelling to
     // try when nothing was found. See BibleRepository.searchBible.
     private val _searchOutcome = MutableStateFlow(SearchOutcome())
-    val searchOutcome: StateFlow<SearchOutcome> = _searchOutcome.asStateFlow()
+
+    /** The search's results over the whole Bible: what the filter's choices count. */
+    val searchOutcomeAll: StateFlow<SearchOutcome> = _searchOutcome.asStateFlow()
+
+    // Where Search's results are narrowed to with its filter button: the whole Bible, a testament
+    // or a book. Kept from one search to the next until the search session ends.
+    private val _searchPlace = MutableStateFlow<BiblePlace>(BiblePlace.WholeBible)
+    val searchPlace: StateFlow<BiblePlace> = _searchPlace.asStateFlow()
+
+    fun setSearchPlace(place: BiblePlace) {
+        _searchPlace.value = place
+    }
+
+    /** The results shown: those in the filter's place (see SearchFilters). */
+    val searchOutcome: StateFlow<SearchOutcome> = combine(_searchOutcome, _searchPlace) { outcome, place -> outcome.within(place) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SearchOutcome())
 
     private val _isSearching = MutableStateFlow(false)
     val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
@@ -2741,6 +2758,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _searchQuery.value = ""
         _searchOutcome.value = SearchOutcome()
         _searchDisabledSources.value = emptySet()
+        _searchPlace.value = BiblePlace.WholeBible
         _topicStack.value = emptyList()
         _isSearching.value = false
         _searchLastTappedKey.value = null

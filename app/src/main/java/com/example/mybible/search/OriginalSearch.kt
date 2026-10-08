@@ -151,7 +151,7 @@ class OriginalSearch(private val index: BibleIndex, private val lexicon: SearchL
             fun chip(chipped: List<Meaning>, label: String): SearchSource {
                 val verses = BitSet(index.size).apply { chipped.forEach { or(it.verses) } }
                 others?.let { verses.and(it) }
-                return SearchSource(chipped.flatMap { it.ids }, label, verses.cardinality(), chipped.all(::on))
+                return SearchSource(chipped.flatMap { it.ids }, label, verses.cardinality(), chipped.all(::on), index.countByBook(verses))
             }
             val sorted = group.sortedByDescending { it.verses.cardinality() }
             if (sorted.size <= MAX_MEANING_CHIPS + 1) sorted.map { chip(listOf(it), it.label) } else {
@@ -169,7 +169,10 @@ class OriginalSearch(private val index: BibleIndex, private val lexicon: SearchL
             hits += hit(id, here.flatMapTo(HashSet()) { m -> m.senses.flatMap(lexicon::markedFormsOf) }, reasons, spellings)
             id = found.nextSetBit(id + 1)
         }
-        val cards = groups.flatten().groupBy { it.number }.values.take(MAX_WORD_CARDS).map { card(it, spellings) }
+        // Each word of the query: the likelier word it can be, then the others.
+        val cards = groups.flatMap { group ->
+            group.groupBy { it.number }.values.mapIndexed { i, senses -> card(senses, spellings, alternative = i > 0) }
+        }.distinctBy { it.number }.take(MAX_WORD_CARDS)
         return SearchOutcome(hits = hits, exactCount = hits.size, sources = sources, originalWords = cards)
     }
 
@@ -209,7 +212,7 @@ class OriginalSearch(private val index: BibleIndex, private val lexicon: SearchL
         return SearchHit(Verse(verse.book, verse.chapter, verse.number, text), text, highlights, reasons = reasons)
     }
 
-    private fun card(senses: List<OriginalWord>, spellings: Map<String, Map<String, Int>>): OriginalWordCard {
+    private fun card(senses: List<OriginalWord>, spellings: Map<String, Map<String, Int>>, alternative: Boolean): OriginalWordCard {
         val word = senses[0]
         val verses = senses.associateWith { versesOf(it).cardinality() }
         val total = BitSet().apply { senses.forEach { or(versesOf(it)) } }.cardinality()
@@ -237,7 +240,8 @@ class OriginalSearch(private val index: BibleIndex, private val lexicon: SearchL
             number = displayNumber(word.number),
             meanings = meanings,
             kingJames = kingJames,
-            verseCount = total
+            verseCount = total,
+            alternative = alternative
         )
     }
 
@@ -245,7 +249,7 @@ class OriginalSearch(private val index: BibleIndex, private val lexicon: SearchL
         /** Prefix of a Greek or Hebrew sense's chip id: "orig:G0863H", as in SmartSearch. */
         const val SOURCE_PREFIX = "orig:"
         /** At most this many words get a card above the verses. */
-        const val MAX_WORD_CARDS = 3
+        const val MAX_WORD_CARDS = 4
         /** A card names the King James words used in this % of the word's verses or more. */
         const val MIN_CARD_SHARE = 5
         /** A word's meanings past this many share an "Other meanings" chip. */

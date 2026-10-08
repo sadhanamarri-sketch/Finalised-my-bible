@@ -231,7 +231,7 @@ fun HighlightedVersesScreen(
                     text = summaryOf(filter, colorOptions, currentBook, currentChapter),
                     onOpen = { showFilterSheet = true },
                     onClear = {
-                        viewModel.updateHighlightsFilter { it.copy(place = HighlightPlace.WholeBible, colorHexes = emptySet()) }
+                        viewModel.updateHighlightsFilter { it.copy(place = BiblePlace.WholeBible, colorHexes = emptySet()) }
                     }
                 )
             }
@@ -283,15 +283,6 @@ fun HighlightedVersesScreen(
     }
 }
 
-private fun HighlightPlace.label(currentBook: String, currentChapter: Int): String = when (this) {
-    HighlightPlace.WholeBible -> "Whole Bible"
-    HighlightPlace.ThisChapter -> "$currentBook $currentChapter"
-    HighlightPlace.ThisBook -> currentBook
-    HighlightPlace.OldTestament -> "Old Testament"
-    HighlightPlace.NewTestament -> "New Testament"
-    is HighlightPlace.Book -> name
-}
-
 // Colors in use, plus any picked ones no longer in use (so they can still be
 // seen and unpicked), in the palette's order.
 private fun colorOptionsOf(highlights: List<HighlightedVerseItem>, picked: Set<String>): List<ColorOption> {
@@ -305,7 +296,7 @@ private fun colorOptionsOf(highlights: List<HighlightedVerseItem>, picked: Set<S
 
 private fun summaryOf(filter: HighlightsFilter, colors: List<ColorOption>, currentBook: String, currentChapter: Int): String {
     val parts = mutableListOf<String>()
-    if (filter.place != HighlightPlace.WholeBible) parts += filter.place.label(currentBook, currentChapter)
+    if (filter.place != BiblePlace.WholeBible) parts += filter.place.label(currentBook, currentChapter)
     val picked = colors.filter { it.hex in filter.colorHexes }.map { it.label }
     if (picked.isNotEmpty()) parts += picked.joinToString(", ")
     return parts.joinToString(" · ")
@@ -424,13 +415,18 @@ private fun HighlightSearchField(
     }
 }
 
-// Notes' active-filter line: what's on (tap to change it), and Clear.
+// Notes' active-filter line: what's on (tap to change it), and Clear. Search's too, inside its
+// own margins ([modifier]).
 @Composable
-private fun FilterSummary(text: String, onOpen: () -> Unit, onClear: () -> Unit) {
+internal fun FilterSummary(
+    text: String,
+    onOpen: () -> Unit,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp)
+) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .padding(start = 16.dp, end = 16.dp, top = 10.dp)
+        modifier = modifier
             .clip(RoundedCornerShape(8.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .clickable(onClick = onOpen)
@@ -487,7 +483,7 @@ private fun HighlightsFilterSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     // What a choice would show, with the other filters as they are.
-    fun count(place: HighlightPlace = filter.place, colors: Set<String> = filter.colorHexes) =
+    fun count(place: BiblePlace = filter.place, colors: Set<String> = filter.colorHexes) =
         highlights.filtered(place, colors, filter.query, currentBook, currentChapter).size
 
     ModalBottomSheet(
@@ -516,7 +512,7 @@ private fun HighlightsFilterSheet(
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier
-                            .clickable { onFilterChange { it.copy(place = HighlightPlace.WholeBible, colorHexes = emptySet()) } }
+                            .clickable { onFilterChange { it.copy(place = BiblePlace.WholeBible, colorHexes = emptySet()) } }
                             .padding(vertical = 6.dp)
                     )
                 }
@@ -528,11 +524,11 @@ private fun HighlightsFilterSheet(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 listOf(
-                    HighlightPlace.WholeBible,
-                    HighlightPlace.ThisChapter,
-                    HighlightPlace.ThisBook,
-                    HighlightPlace.OldTestament,
-                    HighlightPlace.NewTestament
+                    BiblePlace.WholeBible,
+                    BiblePlace.ThisChapter,
+                    BiblePlace.ThisBook,
+                    BiblePlace.OldTestament,
+                    BiblePlace.NewTestament
                 ).forEach { place ->
                     SheetChip(
                         text = place.label(currentBook, currentChapter),
@@ -545,7 +541,7 @@ private fun HighlightsFilterSheet(
                 // Any other book with highlights, from a menu.
                 Box {
                     var menuOpen by remember { mutableStateOf(false) }
-                    val chosen = filter.place as? HighlightPlace.Book
+                    val chosen = filter.place as? BiblePlace.Book
                     SheetChip(
                         text = chosen?.name ?: "Other book",
                         count = chosen?.let { count(place = it) },
@@ -560,7 +556,7 @@ private fun HighlightsFilterSheet(
                                 text = { Text(book, fontFamily = WorkSansFontFamily, letterSpacing = 0.sp) },
                                 trailingIcon = {
                                     Text(
-                                        text = "${count(place = HighlightPlace.Book(book))}",
+                                        text = "${count(place = BiblePlace.Book(book))}",
                                         fontFamily = WorkSansFontFamily,
                                         letterSpacing = 0.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -568,7 +564,7 @@ private fun HighlightsFilterSheet(
                                 },
                                 onClick = {
                                     menuOpen = false
-                                    onFilterChange { it.copy(place = HighlightPlace.Book(book)) }
+                                    onFilterChange { it.copy(place = BiblePlace.Book(book)) }
                                 }
                             )
                         }

@@ -12,12 +12,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -28,6 +31,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
@@ -47,7 +51,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.mybible.BiblePlace
+import com.example.mybible.FilterSummary
 import com.example.mybible.SheetChip
+import com.example.mybible.label
 import com.example.mybible.model.OriginalWordCard
 import com.example.mybible.model.RelatedKind
 import com.example.mybible.model.SearchHit
@@ -59,7 +66,11 @@ import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.components.BackTopBar
 import com.example.mybible.ui.components.DsSwitch
+import com.example.mybible.ui.components.NeSectionLabel
 import com.example.mybible.ui.theme.WorkSansFontFamily
+import com.example.mybible.versesByBook
+import com.example.mybible.within
+import kotlinx.coroutines.launch
 
 @Composable
 fun SearchScreen(
@@ -92,6 +103,10 @@ private fun SearchPage(
     val savedScrollOffset by viewModel.searchScrollOffset.collectAsState()
     val searchHistory by viewModel.searchHistory.collectAsState()
     val lastTappedKey by viewModel.searchLastTappedKey.collectAsState()
+    val place by viewModel.searchPlace.collectAsState()
+    val outcomeAll by viewModel.searchOutcomeAll.collectAsState()
+    val readerBook by viewModel.currentBook.collectAsState()
+    var showFilterSheet by remember { mutableStateOf(false) }
 
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = savedScrollIndex,
@@ -150,6 +165,15 @@ private fun SearchPage(
     // Search's index takes a moment to build the first time: start on it now, while the user types.
     LaunchedEffect(Unit) { viewModel.prepareSearch() }
 
+    // Another place in the filter is another list: from its top. (Not on coming back to the page.)
+    var shownPlace by remember { mutableStateOf(place) }
+    LaunchedEffect(place) {
+        if (place != shownPlace) {
+            shownPlace = place
+            listState.scrollToItem(0)
+        }
+    }
+
     LaunchedEffect(Unit) {
         if (suppressAutofocus) {
             viewModel.consumeSuppressSearchAutofocus()
@@ -192,6 +216,31 @@ private fun SearchPage(
                     viewModel.selectTab(NavTab.READER)
                 },
                 actions = {
+                    // Like Highlighted Verses' filter button: coral, with a dot, while a place is picked.
+                    val narrowed = place != BiblePlace.WholeBible
+                    IconButton(onClick = {
+                        keyboardController?.hide()
+                        focusManager.clearFocus()
+                        showFilterSheet = true
+                    }) {
+                        Box {
+                            Icon(
+                                Icons.Default.FilterList,
+                                contentDescription = if (narrowed) "Filter results, filter on" else "Filter results",
+                                tint = if (narrowed) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                            )
+                            if (narrowed) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .offset(x = 3.dp, y = (-3).dp)
+                                        .size(7.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary)
+                                )
+                            }
+                        }
+                    }
                     IconButton(onClick = {
                         keyboardController?.hide()
                         focusManager.clearFocus()
@@ -253,6 +302,15 @@ private fun SearchPage(
                 .focusRequester(searchFocusRequester)
                 .testTag("search_input_field")
         )
+
+        if (place != BiblePlace.WholeBible) {
+            FilterSummary(
+                text = place.label(readerBook, 0),
+                onOpen = { showFilterSheet = true },
+                onClear = { viewModel.setSearchPlace(BiblePlace.WholeBible) },
+                modifier = Modifier.padding(top = 10.dp)
+            )
+        }
 
         // Recent searches — only worth showing once there's nothing typed
         // and nothing already found; once results are on screen the
@@ -395,7 +453,11 @@ private fun SearchPage(
                 if (outcome.hits.isEmpty() && outcome.suggestion == null) {
                     item(key = "none") {
                         Text(
-                            text = if (outcome.sources.any { !it.enabled }) "Nothing left with these switched off" else "No matching verses found",
+                            text = when {
+                                outcomeAll.hits.isNotEmpty() -> "None in ${place.label(readerBook, 0)}"
+                                outcome.sources.any { !it.enabled } -> "Nothing left with these switched off"
+                                else -> "No matching verses found"
+                            },
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontFamily = WorkSansFontFamily,
                             letterSpacing = 0.sp,
@@ -431,10 +493,143 @@ private fun SearchPage(
         }
     }
     }
+
+    if (showFilterSheet) {
+        SearchFilterSheet(
+            all = outcomeAll,
+            place = place,
+            readerBook = readerBook,
+            themeMode = themeMode,
+            onPlaceChange = viewModel::setSearchPlace,
+            onDismiss = { showFilterSheet = false }
+        )
+    }
 }
 
 // Same "book:chapter:verse" as MainViewModel's searchLastTappedKey.
 private fun SearchHit.key() = "${verse.book}:${verse.chapter}:${verse.number}"
+
+// Shaped like Highlighted Verses' filter sheet: where to look, each choice with how many of the
+// results it has; changes apply as they're tapped, and the button closes the sheet.
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+private fun SearchFilterSheet(
+    all: SearchOutcome,
+    place: BiblePlace,
+    readerBook: String,
+    themeMode: ThemeMode,
+    onPlaceChange: (BiblePlace) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+    val byBook = remember(all) { all.versesByBook() }
+    fun count(choice: BiblePlace) = all.within(choice).hits.size
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Filter Results", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                if (place != BiblePlace.WholeBible) {
+                    Text(
+                        text = "Clear",
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .clickable { onPlaceChange(BiblePlace.WholeBible) }
+                            .padding(vertical = 6.dp)
+                    )
+                }
+            }
+
+            NeSectionLabel("Show")
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // The book being read, when the results have it, then any other book they have.
+                val reading = BiblePlace.Book(readerBook).takeIf { choice -> byBook.any { it.first == readerBook } || place == choice }
+                listOfNotNull(BiblePlace.WholeBible, BiblePlace.OldTestament, BiblePlace.NewTestament, reading).forEach { choice ->
+                    SheetChip(
+                        text = choice.label(readerBook, 0),
+                        count = count(choice),
+                        selected = place == choice,
+                        themeMode = themeMode,
+                        onClick = { onPlaceChange(choice) }
+                    )
+                }
+                Box {
+                    var menuOpen by remember { mutableStateOf(false) }
+                    val chosen = (place as? BiblePlace.Book)?.takeIf { it != reading }
+                    SheetChip(
+                        text = chosen?.name ?: "Other book",
+                        count = chosen?.let { count(it) },
+                        selected = chosen != null,
+                        themeMode = themeMode,
+                        trailing = Icons.Default.ArrowDropDown,
+                        onClick = { menuOpen = true }
+                    )
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        if (byBook.isEmpty()) {
+                            DropdownMenuItem(
+                                text = { Text("No verses found", fontFamily = WorkSansFontFamily, letterSpacing = 0.sp) },
+                                enabled = false,
+                                onClick = {}
+                            )
+                        }
+                        byBook.forEach { (book, n) ->
+                            DropdownMenuItem(
+                                text = { Text(book, fontFamily = WorkSansFontFamily, letterSpacing = 0.sp) },
+                                trailingIcon = {
+                                    Text(
+                                        text = "$n",
+                                        fontFamily = WorkSansFontFamily,
+                                        letterSpacing = 0.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                },
+                                onClick = {
+                                    menuOpen = false
+                                    onPlaceChange(BiblePlace.Book(book))
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+            val shown = count(place)
+            Button(
+                onClick = { scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() } },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    when (shown) {
+                        0 -> "No matching verses"
+                        1 -> "Show 1 verse"
+                        else -> "Show $shown verses"
+                    }
+                )
+            }
+        }
+    }
+}
 
 private fun countLine(outcome: SearchOutcome): String {
     fun verses(n: Int) = if (n == 1) "1 verse" else "$n verses"
@@ -558,7 +753,60 @@ private fun TopicCardRow(topic: TopicCard, onClick: () -> Unit) {
 @Composable
 private fun OriginalWordCards(words: List<OriginalWordCard>) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        for (word in words) OriginalWordCardView(word)
+        for (word in words) if (word.alternative) AlternativeWordCard(word) else OriginalWordCardView(word)
+    }
+}
+
+// Another word the same letters can be (חסד: chasad, "to be kind", after chesed): smaller, so
+// the likelier one and the verses stay in view.
+@Composable
+private fun AlternativeWordCard(word: OriginalWordCard) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Or ${word.language} · ${word.number}".uppercase(),
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = WorkSansFontFamily,
+                    letterSpacing = 0.5.sp,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = if (word.verseCount == 1) "1 verse" else "${word.verseCount} verses",
+                    fontSize = 12.sp,
+                    fontFamily = WorkSansFontFamily,
+                    letterSpacing = 0.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Row {
+                Text(
+                    text = word.word,
+                    fontSize = 18.sp,
+                    fontFamily = FontFamily.Serif,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.alignByBaseline()
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = word.transliteration + "  " + word.meanings.joinToString(" · ") { "“$it”" },
+                    fontSize = 13.5.sp,
+                    fontFamily = WorkSansFontFamily,
+                    letterSpacing = 0.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.alignByBaseline()
+                )
+            }
+        }
     }
 }
 

@@ -54,7 +54,9 @@ class OriginalSearchTest {
         assertEquals(listOf("Genesis 1:1", "Genesis 1:17"), search.search("אלהים").refs())
         // Without its points, אהבה is love the noun (ahavah) or the verb (ahav), the word itself
         // first; pointed אַהֲבָה is the noun alone.
-        assertEquals(listOf("H160", "H157"), search.search("אהבה").numbers())
+        val unpointed = search.search("אהבה")
+        assertEquals(listOf("H160", "H157"), unpointed.numbers())
+        assertEquals(listOf(false, true), unpointed.originalWords.map { it.alternative })
         assertEquals(listOf("H160"), search.search("אַהֲבָה").numbers())
     }
 
@@ -90,6 +92,8 @@ class OriginalSearchTest {
         val godIsLove = search.search("ἀγάπη θεός")
         assertEquals(listOf("1 John 4:8"), godIsLove.refs())
         assertEquals(listOf("G26", "G2316"), godIsLove.numbers())
+        // Two words of the query, each the word it is.
+        assertTrue(godIsLove.originalWords.none { it.alternative })
         // No word has two meanings here: nothing to switch off.
         assertTrue(godIsLove.sources.isEmpty())
     }

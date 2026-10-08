@@ -56,7 +56,10 @@ object TeluguSearch {
             }
         }
         val exact = inRow + atStart
-        val sources = if (inside.isEmpty()) emptyList() else listOf(SearchSource(listOf(INSIDE), "Inside longer words", inside.size, INSIDE !in disabled))
+        val sources = if (inside.isEmpty()) emptyList() else {
+            val byBook = inside.groupingBy { it.verse.book }.eachCount()
+            listOf(SearchSource(listOf(INSIDE), "Inside longer words", inside.size, INSIDE !in disabled, byBook))
+        }
         val hits = if (INSIDE in disabled) exact else exact + inside
         return SearchOutcome(hits = hits, exactCount = exact.size, sources = sources, relatedKind = RelatedKind.INSIDE_LONGER_WORDS)
     }

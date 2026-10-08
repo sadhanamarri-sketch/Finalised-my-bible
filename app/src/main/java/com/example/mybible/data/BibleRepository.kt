@@ -19,6 +19,8 @@ import com.example.mybible.search.hasLatinLetter
 import com.example.mybible.search.hasOriginalLetter
 import com.example.mybible.search.hasTeluguLetter
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -914,15 +916,18 @@ class BibleRepository(private val context: Context) {
     private suspend fun searchEngine(): SearchEngine? = searchEngineMutex.withLock {
         searchEngineCache?.let { return@withLock it }
         if (bibleDao.countAllVerses() < FULL_BIBLE_VERSE_THRESHOLD) return@withLock null
-        val bookIndex = BIBLE_BOOKS.withIndex().associate { (i, book) -> book to i }
-        val verses = bibleDao.getAllVerseTexts().mapNotNull { row ->
-            bookIndex[row.book]?.let { IndexedVerse(row.book, it, row.chapter, row.number, row.text) }
-        }
         val open = { name: String -> context.assets.open("search/$name") }
-        val lexicon = SearchLexicon.load(open)
-        val index = BibleIndex(verses)
-        SearchEngine(SmartSearch(index, lexicon), TopicSearch(TopicBook.load(open), lexicon, index))
-            .also { searchEngineCache = it }
+        coroutineScope {
+            // The word data and the topics are read while Room hands over the verses and they're indexed.
+            val lexicon = async(Dispatchers.Default) { SearchLexicon.load(open) }
+            val topics = async(Dispatchers.Default) { TopicBook.load(open) }
+            val bookIndex = BIBLE_BOOKS.withIndex().associate { (i, book) -> book to i }
+            val verses = bibleDao.getAllVerseTexts().mapNotNull { row ->
+                bookIndex[row.book]?.let { IndexedVerse(row.book, it, row.chapter, row.number, row.text) }
+            }
+            val index = BibleIndex(verses)
+            SearchEngine(SmartSearch(index, lexicon.await()), TopicSearch(topics.await(), lexicon.await(), index))
+        }.also { searchEngineCache = it }
     }
 
     // disabledSources: the ids of the chips switched off on the Search page (see SearchSource).

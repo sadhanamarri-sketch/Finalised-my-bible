@@ -48,6 +48,17 @@ class BibleIndex(verses: List<IndexedVerse>) {
     /** The verse at a packed reference (see [packRef]), or -1 when this Bible doesn't have it. */
     fun idOf(packedRef: Int): Int = idByRef[packedRef] ?: -1
 
+    /** How many of [ids] each book has. */
+    fun countByBook(ids: BitSet): Map<String, Int> {
+        val out = LinkedHashMap<String, Int>()
+        var id = ids.nextSetBit(0)
+        while (id >= 0) {
+            out.merge(verses[id].book, 1, Int::plus)
+            id = ids.nextSetBit(id + 1)
+        }
+        return out
+    }
+
     companion object {
         /** Book index * 65536 + chapter * 256 + verse, the form the bundled verse lists use. */
         fun packRef(bookIndex: Int, chapter: Int, verse: Int) = bookIndex * 65536 + chapter * 256 + verse

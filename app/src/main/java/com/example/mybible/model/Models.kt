@@ -119,7 +119,9 @@ data class SearchSource(
     val label: String,
     /** Verses it adds. */
     val count: Int,
-    val enabled: Boolean
+    val enabled: Boolean,
+    /** [count] by book, for counting them in one part of the Bible (see SearchFilters). */
+    val countByBook: Map<String, Int> = emptyMap()
 )
 
 /**
@@ -164,7 +166,9 @@ data class OriginalWordCard(
     val meanings: List<String>,
     /** The King James words most often found where it is: love, charity. */
     val kingJames: List<String>,
-    val verseCount: Int
+    val verseCount: Int,
+    /** Another word the same letters can be, after the likelier one (חסד: chasad after chesed). */
+    val alternative: Boolean = false
 )
 
 /** A Nave's Topical Bible topic a search found, as a card above the verses. */
