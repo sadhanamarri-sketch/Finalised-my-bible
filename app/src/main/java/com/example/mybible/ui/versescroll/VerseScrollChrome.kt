@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -57,6 +58,8 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.BaselineShift
+import androidx.compose.ui.text.style.Hyphens
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
@@ -303,8 +306,11 @@ private fun BarButton(
             fontWeight = FontWeight.Medium,
             fontSize = 11.sp,
             lineHeight = 1.15.em,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            textAlign = TextAlign.Center,
+            // The highlight's name can be two words: "Prayer request".
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            style = LocalTextStyle.current.copy(hyphens = Hyphens.Auto)
         )
     }
 }
@@ -418,8 +424,13 @@ private fun BoxItem(
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
             fontSize = 9.5.sp,
             letterSpacing = (-0.01).em,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            lineHeight = 1.15.em,
+            textAlign = TextAlign.Center,
+            // A name of two words, "Prayer request", on two lines rather than cut off, and a word
+            // too long for the line broken with a hyphen.
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            style = LocalTextStyle.current.copy(hyphens = Hyphens.Auto)
         )
     }
 }

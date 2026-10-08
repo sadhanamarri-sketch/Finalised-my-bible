@@ -35,6 +35,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.Hyphens
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
@@ -820,7 +821,9 @@ private fun HighlightSwatchItem(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
-            .width(48.dp)
+            // A longer name widens its swatch a little ("Encouragement") and takes a
+            // second line ("Prayer request") rather than being cut off.
+            .widthIn(min = 48.dp, max = 72.dp)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
     ) {
         Box(
@@ -851,9 +854,14 @@ private fun HighlightSwatchItem(
         Text(
             text = label,
             fontSize = 9.5.sp,
-            maxLines = 1,
+            lineHeight = 11.sp,
+            letterSpacing = 0.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            // A word too long for the line breaks with a hyphen.
+            style = LocalTextStyle.current.copy(hyphens = Hyphens.Auto)
         )
     }
 }
