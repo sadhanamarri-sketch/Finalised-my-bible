@@ -54,12 +54,10 @@ interface BibleDao {
     )
     suspend fun getVerseRange(book: String, chapter: Int, first: Int, last: Int): List<VerseEntity>
 
-    // "Extensive search" (opt-in typo-tolerance) builds an in-memory
-    // dictionary of every word that actually appears in the KJV from this
-    // once, then caches it — see BibleRepository.getKjvWordIndex. Only
-    // English text; typo-correction doesn't extend to Telugu.
-    @Query("SELECT text FROM verses")
-    suspend fun getAllVerseTexts(): List<String>
+    // Every verse's English, once per app run, for Search's in-memory index
+    // (see BibleRepository.searchEngine).
+    @Query("SELECT book, chapter, number, text FROM verses")
+    suspend fun getAllVerseTexts(): List<VerseTextRow>
 
     // ---- Greek interlinear (TAGNT) ----
 

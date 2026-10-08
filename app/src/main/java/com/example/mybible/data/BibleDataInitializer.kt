@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.asStateFlow
 
 /** A full, correctly-imported KJV has 31,102 verses; used as a "did this finish" check
  *  that self-heals even if a previous run was interrupted partway through. */
-private const val FULL_BIBLE_VERSE_THRESHOLD = 30_000
+internal const val FULL_BIBLE_VERSE_THRESHOLD = 30_000
 
 /** TAGNT covers ~138k Greek NT words once fully imported. */
 private const val GREEK_WORD_THRESHOLD = 100_000

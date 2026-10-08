@@ -480,7 +480,7 @@ class MainActivity : ComponentActivity() {
                             NavTab.READER -> ReaderScreen(viewModel = viewModel)
                             NavTab.STUDIED -> StudiedScreen(viewModel = viewModel)
                             NavTab.NOTES -> NotesScreen(viewModel = viewModel)
-                            NavTab.SEARCH -> SearchScreen(viewModel = viewModel)
+                            NavTab.SEARCH -> SearchScreen(viewModel = viewModel, themeMode = themeMode)
                             NavTab.CROSS_REFERENCES -> CrossReferenceScreen(viewModel = viewModel)
                             NavTab.GREEK_WORD -> GreekWordScreen(viewModel = viewModel)
                             NavTab.HEBREW_WORD -> HebrewWordScreen(viewModel = viewModel)

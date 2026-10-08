@@ -1,0 +1,19 @@
+# Pairs the suffix rules would join that are different words: "base form" per line.
+# A word alone on a line never gets word forms (names, mostly).
+fore forest
+earn earnest
+even evening
+fir first
+mid midst
+god gods
+good goods
+new news
+fair fairs
+sore sores
+anna annas
+juda judas
+jose joses
+hare hareth
+here heres
+pas
+pul

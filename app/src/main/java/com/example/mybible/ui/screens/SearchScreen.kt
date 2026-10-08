@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -29,12 +30,22 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.mybible.SheetChip
+import com.example.mybible.model.SearchHit
+import com.example.mybible.model.SearchOutcome
+import com.example.mybible.model.SearchSource
+import com.example.mybible.model.ThemeMode
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.components.BackTopBar
@@ -44,15 +55,13 @@ import com.example.mybible.ui.theme.WorkSansFontFamily
 @Composable
 fun SearchScreen(
     viewModel: MainViewModel,
+    themeMode: ThemeMode,
     modifier: Modifier = Modifier
 ) {
     val searchQuery by viewModel.searchQuery.collectAsState()
-    val searchResults by viewModel.searchResults.collectAsState()
-    val searchVariantSuggestions by viewModel.searchVariantSuggestions.collectAsState()
-    val searchCorrectedQuery by viewModel.searchCorrectedQuery.collectAsState()
+    val outcome by viewModel.searchOutcome.collectAsState()
     val isSearching by viewModel.isSearching.collectAsState()
     val caseSensitive by viewModel.searchCaseSensitive.collectAsState()
-    val extensiveSearch by viewModel.searchExtensiveSearch.collectAsState()
     val savedScrollIndex by viewModel.searchScrollIndex.collectAsState()
     val savedScrollOffset by viewModel.searchScrollOffset.collectAsState()
     val searchHistory by viewModel.searchHistory.collectAsState()
@@ -62,15 +71,6 @@ fun SearchScreen(
         initialFirstVisibleItemIndex = savedScrollIndex,
         initialFirstVisibleItemScrollOffset = savedScrollOffset
     )
-
-    // The "also try" suggestion chips live above the results list, not as
-    // a sticky header inside it — scrolling the results doesn't move them
-    // out of the way on its own. Tying their visibility to "are we back at
-    // the very top of the list" gives the list the full screen once the
-    // user scrolls into results, without needing a second scroll container.
-    val isScrolledToTop by remember {
-        derivedStateOf { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 }
-    }
 
     // Marks the last-tapped result with an accent bar on return, so the
     // user can spot which one they already visited — cleared on the first
@@ -120,6 +120,9 @@ fun SearchScreen(
             textFieldValue = TextFieldValue(text = searchQuery, selection = TextRange(searchQuery.length))
         }
     }
+
+    // Search's index takes a moment to build the first time: start on it now, while the user types.
+    LaunchedEffect(Unit) { viewModel.prepareSearch() }
 
     LaunchedEffect(Unit) {
         if (suppressAutofocus) {
@@ -228,7 +231,7 @@ fun SearchScreen(
         // Recent searches — only worth showing once there's nothing typed
         // and nothing already found; once results are on screen the
         // suggestions would just be clutter above them.
-        if (searchHistory.isNotEmpty() && searchQuery.isBlank() && searchResults.isEmpty()) {
+        if (searchHistory.isNotEmpty() && searchQuery.isBlank() && outcome.hits.isEmpty()) {
             Spacer(modifier = Modifier.height(10.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -297,8 +300,7 @@ fun SearchScreen(
             text = when {
                 isSearching -> " "
                 searchQuery.trim().length < 2 -> " "
-                searchResults.size == 1 -> "1 result"
-                else -> "${searchResults.size} results"
+                else -> countLine(outcome)
             },
             fontSize = 13.sp,
             fontFamily = WorkSansFontFamily,
@@ -308,72 +310,23 @@ fun SearchScreen(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // Case-sensitive and Extensive search are mutually exclusive (see
-        // MainViewModel.setSearchCaseSensitive/setSearchExtensiveSearch) —
-        // each one turning on disables and greys out the other, since a
-        // case-sensitive search can't also run the typo-correction/
-        // suggestion pipeline (see BibleRepository.searchBible's doc).
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "Case-sensitive",
-                    fontSize = 13.sp,
-                    fontFamily = WorkSansFontFamily,
-                    letterSpacing = 0.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                DsSwitch(
-                    checked = caseSensitive,
-                    onCheckedChange = { viewModel.setSearchCaseSensitive(it) },
-                    enabled = !extensiveSearch,
-                    modifier = Modifier.testTag("search_case_sensitive_toggle")
-                )
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "Extensive search",
-                    fontSize = 13.sp,
-                    fontFamily = WorkSansFontFamily,
-                    letterSpacing = 0.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                DsSwitch(
-                    checked = extensiveSearch,
-                    onCheckedChange = { viewModel.setSearchExtensiveSearch(it) },
-                    enabled = !caseSensitive,
-                    modifier = Modifier.testTag("search_extensive_toggle")
-                )
-            }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "Case-sensitive",
+                fontSize = 13.sp,
+                fontFamily = WorkSansFontFamily,
+                letterSpacing = 0.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            DsSwitch(
+                checked = caseSensitive,
+                onCheckedChange = { viewModel.setSearchCaseSensitive(it) },
+                modifier = Modifier.testTag("search_case_sensitive_toggle")
+            )
         }
 
         Spacer(modifier = Modifier.height(8.dp))
-
-        // Typo-correction note plus tappable "also try" word-form chips —
-        // tapping one runs a brand new search for that exact word (same as
-        // tapping a recent-search chip) rather than this screen eagerly
-        // searching and displaying results for every variant up front,
-        // which is what made a single search balloon into an unreadably
-        // long page. Only shown while scrolled to the very top of the
-        // results — once the user scrolls down to read, the chips step
-        // aside instead of eating space above every screenful of results.
-        AnimatedVisibility(
-            visible = isScrolledToTop && (searchCorrectedQuery != null || searchVariantSuggestions.isNotEmpty())
-        ) {
-            Column {
-                SearchSuggestions(
-                    correctedQuery = searchCorrectedQuery,
-                    variantSuggestions = searchVariantSuggestions,
-                    onSuggestionClick = { viewModel.searchFromHistory(it) }
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-            }
-        }
 
         if (isSearching) {
             Box(
@@ -382,19 +335,8 @@ fun SearchScreen(
             ) {
                 CircularProgressIndicator()
             }
-        } else if (searchResults.isEmpty()) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.fillMaxSize()
-            ) {
-                Text(
-                    text = if (searchQuery.isBlank()) "Type a keyword (e.g., 'love', 'faith') or a reference (e.g., 'John 3', 'John 3:16') to search" else "No matching verses found",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontFamily = WorkSansFontFamily,
-                    letterSpacing = 0.sp,
-                    fontSize = 14.sp
-                )
-            }
+        } else if (searchQuery.trim().length < 2) {
+            SearchHelp()
         } else {
             // Elevated Cards, not flat/hairline-divided rows — the one
             // place in this pass keeping Material's card-with-shadow look
@@ -405,83 +347,174 @@ fun SearchScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(searchResults) { verse ->
-                    val itemKey = "${verse.book}:${verse.chapter}:${verse.number}"
+                // Shown even when nothing is left on: it's how to turn things back on.
+                if (outcome.sources.isNotEmpty()) {
+                    item(key = "sources") {
+                        SourceChips(outcome.sources, themeMode, onToggle = { viewModel.toggleSearchSource(it) })
+                    }
+                }
+                outcome.suggestion?.let { suggestion ->
+                    item(key = "suggestion") {
+                        DidYouMean(suggestion, onClick = { viewModel.searchFromHistory(suggestion) })
+                    }
+                }
+                if (outcome.hits.isEmpty() && outcome.suggestion == null) {
+                    item(key = "none") {
+                        Text(
+                            text = if (outcome.sources.any { !it.enabled }) "Nothing left with these switched off" else "No matching verses found",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontFamily = WorkSansFontFamily,
+                            letterSpacing = 0.sp,
+                            fontSize = 14.sp,
+                            modifier = Modifier.padding(top = 24.dp).fillMaxWidth(),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+                if (outcome.closeMatches) {
+                    item(key = "close-heading") { ResultsHeading("No verse has every word. These have all but one:", spaced = false) }
+                }
+                val card: @Composable (SearchHit) -> Unit = { hit ->
                     SearchResultCard(
-                        verse = verse,
-                        isLastTapped = itemKey == lastTappedKey,
-                        onClick = { viewModel.openSearchResult(verse) }
+                        hit = hit,
+                        isLastTapped = hit.key() == lastTappedKey,
+                        onClick = { viewModel.openSearchResult(hit.verse) }
                     )
                 }
+                items(outcome.hits.subList(0, outcome.exactCount), key = { it.key() }) { card(it) }
+                if (outcome.relatedCount > 0 && !outcome.closeMatches) {
+                    item(key = "related-heading") { ResultsHeading("Same meaning, other words") }
+                }
+                items(outcome.hits.subList(outcome.exactCount, outcome.hits.size), key = { it.key() }) { card(it) }
             }
         }
     }
     }
 }
 
-// Typo-correction note plus a row of tappable "also try" word-form chips —
-// same AssistChip look as the "Recent searches" row above the field, for
-// visual consistency. The chip row only shows up when there's something to
-// offer (e.g. a word with no root-stripping candidates shows no row at all).
+// Same "book:chapter:verse" as MainViewModel's searchLastTappedKey.
+private fun SearchHit.key() = "${verse.book}:${verse.chapter}:${verse.number}"
+
+private fun countLine(outcome: SearchOutcome): String {
+    fun verses(n: Int) = if (n == 1) "1 verse" else "$n verses"
+    return when {
+        outcome.hits.isEmpty() -> "No verses found"
+        outcome.closeMatches -> verses(outcome.hits.size) + " with all but one word"
+        outcome.relatedCount == 0 -> verses(outcome.exactCount)
+        outcome.exactCount == 0 -> verses(outcome.relatedCount) + " with the same meaning"
+        else -> verses(outcome.exactCount) + " · ${outcome.relatedCount} more with the same meaning"
+    }
+}
+
+// What else the search matched besides the words as typed — their other forms, King James
+// wording, Greek and Hebrew words — each switched off and on with a tap.
 @Composable
-private fun SearchSuggestions(
-    correctedQuery: String?,
-    variantSuggestions: List<String>,
-    onSuggestionClick: (String) -> Unit
-) {
-    Column {
-        if (correctedQuery != null) {
-            Text(
-                text = "Showing results for “$correctedQuery”",
-                fontSize = 13.sp,
-                fontFamily = WorkSansFontFamily,
-                letterSpacing = 0.sp,
-                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 8.dp)
+private fun SourceChips(sources: List<SearchSource>, themeMode: ThemeMode, onToggle: (List<String>) -> Unit) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(sources, key = { it.ids.joinToString(",") }) { source ->
+            SheetChip(
+                text = source.label,
+                selected = source.enabled,
+                themeMode = themeMode,
+                count = source.count,
+                onClick = { onToggle(source.ids) }
             )
-        }
-        if (variantSuggestions.isNotEmpty()) {
-            SuggestionChipRow(label = "Also try", words = variantSuggestions, onClick = onSuggestionClick)
         }
     }
 }
 
 @Composable
-private fun SuggestionChipRow(label: String, words: List<String>, onClick: (String) -> Unit) {
+private fun DidYouMean(suggestion: String, onClick: () -> Unit) {
     Text(
-        text = label,
-        fontSize = 12.5.sp,
-        fontFamily = WorkSansFontFamily,
-        letterSpacing = 1.sp,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(bottom = 6.dp)
-    )
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(words) { word ->
-            AssistChip(
-                onClick = { onClick(word) },
-                label = { Text(word, fontSize = 13.sp, fontFamily = WorkSansFontFamily) },
-                colors = AssistChipDefaults.assistChipColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    labelColor = MaterialTheme.colorScheme.onSurface
-                ),
-                border = AssistChipDefaults.assistChipBorder(
-                    enabled = true,
-                    borderColor = MaterialTheme.colorScheme.outlineVariant
+        text = buildAnnotatedString {
+            append("Did you mean ")
+            withStyle(
+                SpanStyle(
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                    textDecoration = TextDecoration.Underline
                 )
+            ) {
+                append("“$suggestion”")
+            }
+            append("?")
+        },
+        fontSize = 14.sp,
+        fontFamily = WorkSansFontFamily,
+        letterSpacing = 0.sp,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp)
+    )
+}
+
+// spaced: a short label, letter-spaced like "Recent searches"; else a plain sentence.
+@Composable
+private fun ResultsHeading(text: String, spaced: Boolean = true) {
+    Text(
+        text = text,
+        fontSize = if (spaced) 12.5.sp else 13.sp,
+        fontFamily = WorkSansFontFamily,
+        letterSpacing = if (spaced) 1.sp else 0.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)
+    )
+}
+
+// Before anything is typed: what Search does, and where its Greek and Hebrew comes from.
+@Composable
+private fun SearchHelp() {
+    Column(modifier = Modifier.fillMaxSize()) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.weight(1f).fillMaxWidth()) {
+            Text(
+                text = "Type a word or a phrase (“worry”, “love one another”) or a reference (“John 3”, “John 3:16”). " +
+                    "Search finds other forms of your words, how the King James says them, and verses with the same Greek or Hebrew word.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontFamily = WorkSansFontFamily,
+                letterSpacing = 0.sp,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center
             )
         }
+        Text(
+            text = "Greek and Hebrew meanings: STEPBible.org, Tyndale House (CC BY 4.0). " +
+                "King James renderings: Strong’s, via Open Scriptures (CC BY-SA).",
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+            fontFamily = WorkSansFontFamily,
+            letterSpacing = 0.sp,
+            fontSize = 11.5.sp,
+            lineHeight = 16.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+        )
     }
 }
 
 // Extracted from the results list into its own composable for readability.
 @Composable
 private fun SearchResultCard(
-    verse: com.example.mybible.model.Verse,
+    hit: SearchHit,
     isLastTapped: Boolean,
     onClick: () -> Unit
 ) {
+    val verse = hit.verse
+    // Gold, like the reference above it: primary is near-black in the light themes, a grey wash.
+    val highlight = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.28f)
+    val text = remember(hit, highlight) {
+        buildAnnotatedString {
+            append(hit.text)
+            for (range in hit.highlights) {
+                if (range.first >= 0 && range.last < hit.text.length) {
+                    addStyle(SpanStyle(background = highlight), range.first, range.last + 1)
+                }
+            }
+        }
+    }
+    // A search typed in Telugu shows the Telugu it matched, in the system's Telugu font (see
+    // VerseComponents) rather than the English serif.
+    val inTelugu = hit.text != verse.text
     Card(
         onClick = onClick,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -536,12 +569,37 @@ private fun SearchResultCard(
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = verse.text,
-                    fontSize = 17.sp,
-                    fontFamily = com.example.mybible.ui.theme.SourceSerif4FontFamily,
-                    lineHeight = 29.07.sp,
+                    text = text,
+                    fontSize = if (inTelugu) 16.sp else 17.sp,
+                    fontFamily = if (inTelugu) null else com.example.mybible.ui.theme.SourceSerif4FontFamily,
+                    lineHeight = if (inTelugu) 27.sp else 29.07.sp,
                     color = MaterialTheme.colorScheme.onSurface
                 )
+                // Why a verse without the words themselves is here: "KJV wording: “careful”",
+                // "Greek merimnaō, meaning “to worry”".
+                if (hit.reasons.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(verticalAlignment = Alignment.Top) {
+                        // Other wording gets a "translation" mark; a close match's "Without “set”" doesn't.
+                        if (hit.related) {
+                            Icon(
+                                imageVector = Icons.Outlined.Translate,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 2.dp).size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                        }
+                        Text(
+                            text = hit.reasons.joinToString(" · "),
+                            fontSize = 12.5.sp,
+                            lineHeight = 17.sp,
+                            fontFamily = WorkSansFontFamily,
+                            letterSpacing = 0.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
         }
     }

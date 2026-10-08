@@ -624,7 +624,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // Cross References page (see CrossReferenceScreen) — same
     // persisted-list-and-scroll-position pattern as Search (see
-    // _searchResults / _searchScrollIndex below): the list and source verse
+    // _searchOutcome / _searchScrollIndex below): the list and source verse
     // survive navigating to the Reader to follow a reference, so "return to
     // cross references" lands back on the same list instead of a fresh
     // lookup.
@@ -882,20 +882,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    private val _searchResults = MutableStateFlow<List<Verse>>(emptyList())
-    val searchResults: StateFlow<List<Verse>> = _searchResults.asStateFlow()
-
-    // Root-word suggestion chips (see BibleRepository.stripToRoots) and the
-    // typo-corrected query (null unless a correction actually applied) —
-    // both empty/null together with searchResults on a fresh/cleared query,
-    // and always empty/null while searchExtensiveSearch is off. Tapping a
-    // chip re-searches via searchFromHistory below rather than this driving
-    // its own eagerly-fetched results.
-    private val _searchVariantSuggestions = MutableStateFlow<List<String>>(emptyList())
-    val searchVariantSuggestions: StateFlow<List<String>> = _searchVariantSuggestions.asStateFlow()
-
-    private val _searchCorrectedQuery = MutableStateFlow<String?>(null)
-    val searchCorrectedQuery: StateFlow<String?> = _searchCorrectedQuery.asStateFlow()
+    // The current search's result: the verses found (those with the words themselves first, then
+    // the ones saying it in other words), the chips for what else it matched, and a spelling to
+    // try when nothing was found. See BibleRepository.searchBible.
+    private val _searchOutcome = MutableStateFlow(SearchOutcome())
+    val searchOutcome: StateFlow<SearchOutcome> = _searchOutcome.asStateFlow()
 
     private val _isSearching = MutableStateFlow(false)
     val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
@@ -903,13 +894,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _searchCaseSensitive = MutableStateFlow(false)
     val searchCaseSensitive: StateFlow<Boolean> = _searchCaseSensitive.asStateFlow()
 
-    // Opt-in typo-tolerance + "also try" suggestions — off by default (see
-    // BibleRepository.searchBible's doc for why), mutually exclusive with
-    // searchCaseSensitive since the two can't both apply to the same
-    // search (see setSearchCaseSensitive/setSearchExtensiveSearch, which
-    // each turn the other off).
-    private val _searchExtensiveSearch = MutableStateFlow(false)
-    val searchExtensiveSearch: StateFlow<Boolean> = _searchExtensiveSearch.asStateFlow()
+    // Ids of the chips switched off: word forms, a King James wording, a Greek or Hebrew word
+    // (see SearchSource). Per search — a new query starts with everything on.
+    private val _searchDisabledSources = MutableStateFlow<Set<String>>(emptySet())
 
     // Scroll position of the search results list, saved/restored across tab
     // switches since SearchScreen is fully disposed (not just hidden) when
@@ -2580,41 +2567,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var searchJob: Job? = null
 
     fun onSearchQueryChanged(query: String) {
+        // The field reports moving the cursor too, with the same text: nothing to search again,
+        // and the chips switched off stay off.
+        if (query == _searchQuery.value) return
         _searchQuery.value = query
+        _searchDisabledSources.value = emptySet()
         runSearch()
     }
 
     fun setSearchCaseSensitive(enabled: Boolean) {
         _searchCaseSensitive.value = enabled
-        // Mutually exclusive with Extensive search — see
-        // BibleRepository.searchBible's doc for why case-sensitive mode
-        // can't also run the typo-correction/suggestion pipeline.
-        if (enabled) _searchExtensiveSearch.value = false
         runSearch()
     }
 
-    fun setSearchExtensiveSearch(enabled: Boolean) {
-        _searchExtensiveSearch.value = enabled
-        if (enabled) {
-            _searchCaseSensitive.value = false
-            // Background warm-up: builds the typo-tolerance dictionary now
-            // rather than waiting for the next search to pay that cost —
-            // see BibleRepository.prefetchExtensiveSearchIndex's doc.
-            viewModelScope.launch { repository.prefetchExtensiveSearchIndex() }
-        }
-        runSearch()
+    // Search's index takes a moment to build the first time; start it as the page opens rather
+    // than on the first search.
+    fun prepareSearch() {
+        viewModelScope.launch { repository.prepareSearch() }
     }
 
-    private suspend fun performSearch(query: String) {
-        _isSearching.value = true
-        val outcome = repository.searchBible(
+    // A chip under the search box: switches what it matched off, or back on. A chip standing for
+    // several Greek and Hebrew words shows as on only while all of them are, so a tap on it turns
+    // them all back on when any is off.
+    fun toggleSearchSource(ids: List<String>) {
+        val disabled = _searchDisabledSources.value
+        _searchDisabledSources.value = if (ids.any { it in disabled }) disabled - ids.toSet() else disabled + ids
+        searchJob?.cancel()
+        val query = _searchQuery.value
+        // No spinner: the list changes in place, under the chip just tapped.
+        searchJob = viewModelScope.launch { performSearch(query, showProgress = false) }
+    }
+
+    private suspend fun performSearch(query: String, showProgress: Boolean = true) {
+        if (showProgress) _isSearching.value = true
+        _searchOutcome.value = repository.searchBible(
             query,
             caseSensitive = _searchCaseSensitive.value,
-            extensiveSearch = _searchExtensiveSearch.value
+            disabledSources = _searchDisabledSources.value
         )
-        _searchResults.value = outcome.mainResults
-        _searchVariantSuggestions.value = outcome.variantSuggestions
-        _searchCorrectedQuery.value = outcome.correctedQuery
         _isSearching.value = false
     }
 
@@ -2623,9 +2613,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val query = _searchQuery.value
         if (query.trim().length < 2) {
             _isSearching.value = false
-            _searchResults.value = emptyList()
-            _searchVariantSuggestions.value = emptyList()
-            _searchCorrectedQuery.value = null
+            _searchOutcome.value = SearchOutcome()
             return
         }
         searchJob = viewModelScope.launch {
@@ -2672,9 +2660,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun clearSearchInput() {
         searchJob?.cancel()
         _searchQuery.value = ""
-        _searchResults.value = emptyList()
-        _searchVariantSuggestions.value = emptyList()
-        _searchCorrectedQuery.value = null
+        _searchOutcome.value = SearchOutcome()
+        _searchDisabledSources.value = emptySet()
         _isSearching.value = false
     }
 
@@ -2689,9 +2676,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun endSearchSession() {
         searchJob?.cancel()
         _searchQuery.value = ""
-        _searchResults.value = emptyList()
-        _searchVariantSuggestions.value = emptyList()
-        _searchCorrectedQuery.value = null
+        _searchOutcome.value = SearchOutcome()
+        _searchDisabledSources.value = emptySet()
         _isSearching.value = false
         _searchLastTappedKey.value = null
         _searchSourceVerse.value = null
@@ -2703,6 +2689,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun searchFromHistory(query: String) {
         searchJob?.cancel()
         _searchQuery.value = query
+        _searchDisabledSources.value = emptySet()
         addToSearchHistory(query)
         viewModelScope.launch { performSearch(query) }
     }

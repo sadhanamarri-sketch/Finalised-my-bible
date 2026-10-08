@@ -26,3 +26,11 @@ data class VerseEntity(
     val teluguText: String? = null,
     val isRedLetter: Boolean = false
 )
+
+/** A verse's place and English, without its Telugu: what Search's index reads. */
+data class VerseTextRow(
+    val book: String,
+    val chapter: Int,
+    val number: Int,
+    val text: String
+)

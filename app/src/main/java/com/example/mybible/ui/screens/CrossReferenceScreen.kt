@@ -27,7 +27,7 @@ import com.example.mybible.ui.theme.WorkSansFontFamily
  * Full-page cross-reference list, replacing the old CrossReferenceSheet
  * bottom sheet. Deliberately mirrors SearchScreen's shape: a Scaffold +
  * BackTopBar page (not a modal), results persisted in the ViewModel across
- * the trip to Reader and back (see crossReferenceList / _searchResults for
+ * the trip to Reader and back (see crossReferenceList / _searchOutcome for
  * the equivalent), and a "return to [this page]" banner in Reader instead
  * of the old xrefHistory "back to base verse" breadcrumb stack — tapping a
  * reference now returns to this list, not straight back to the base verse.

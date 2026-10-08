@@ -8,6 +8,11 @@ import com.example.mybible.data.local.VerseEntity
 import com.example.mybible.model.*
 import com.example.mybible.ui.components.BIBLE_BOOKS
 import com.example.mybible.ui.components.BOOK_CHAPTER_COUNTS
+import com.example.mybible.search.BibleIndex
+import com.example.mybible.search.IndexedVerse
+import com.example.mybible.search.SearchLexicon
+import com.example.mybible.search.SmartSearch
+import com.example.mybible.search.hasLatinLetter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -880,160 +885,90 @@ class BibleRepository(private val context: Context) {
     }
 
 
-    // Real full-Bible search across whatever's currently in Room (all 66
-    // books once the import has run, growing incrementally before that).
-    // Falls back to the old handful-of-books live search only if Room is
-    // still completely empty (e.g. first launch, offline, import not yet run).
+    // ---- Search ----
     //
-    // Also recognizes a typed reference ("john 3", "john 3:16", "1 john 3:16")
-    // and short-circuits straight to that chapter/verse instead of doing a
-    // text search — this is what powers the reference examples shown in the
-    // search box's placeholder text.
-    // extensiveSearch is the opt-in "Extensive search" toggle (mutually
-    // exclusive with caseSensitive in the UI — see MainViewModel) that
-    // brings back typo-correction and root-word ("also try") suggestions.
-    // Both were dropped by default because they required building a
-    // dictionary of every distinct word in the KJV — a scan over all
-    // ~31,000 verses' text that made the first single-word search of a
-    // session noticeably slow for a feature most searches never needed.
-    // Making it opt-in means only someone who actually wants typo
-    // tolerance pays that cost, and getKjvWordIndex is itself now bucketed
-    // by word length (see its doc) so even the recurring per-miss cost of
-    // leaving this on is much smaller than the original implementation.
-    suspend fun searchBible(query: String, caseSensitive: Boolean = false, extensiveSearch: Boolean = false): SearchOutcome = withContext(Dispatchers.IO) {
+    // English searches run on SmartSearch (com.example.mybible.search): an in-memory index of
+    // every verse with Search's bundled word data, built once per app run, when Search first
+    // opens. A typed reference ("john 3", "1 john 3:16") opens that chapter or verse instead,
+    // and a search typed in Telugu looks through the Telugu text.
+
+    private val searchEngineMutex = Mutex()
+    private var searchEngineCache: SmartSearch? = null
+
+    /** Builds Search's index ahead of the first search: called as Search opens. */
+    suspend fun prepareSearch() {
+        withContext(Dispatchers.Default) { searchEngine() }
+    }
+
+    // Null until the first import has the whole KJV: an index built from part of it would stay
+    // that way for the rest of the run, so until then searches use textSearch.
+    private suspend fun searchEngine(): SmartSearch? = searchEngineMutex.withLock {
+        searchEngineCache?.let { return@withLock it }
+        if (bibleDao.countAllVerses() < FULL_BIBLE_VERSE_THRESHOLD) return@withLock null
+        val bookIndex = BIBLE_BOOKS.withIndex().associate { (i, book) -> book to i }
+        val verses = bibleDao.getAllVerseTexts().mapNotNull { row ->
+            bookIndex[row.book]?.let { IndexedVerse(row.book, it, row.chapter, row.number, row.text) }
+        }
+        val lexicon = SearchLexicon.load { name -> context.assets.open("search/$name") }
+        SmartSearch(BibleIndex(verses), lexicon).also { searchEngineCache = it }
+    }
+
+    // disabledSources: the ids of the chips switched off on the Search page (see SearchSource).
+    suspend fun searchBible(
+        query: String,
+        caseSensitive: Boolean = false,
+        disabledSources: Set<String> = emptySet()
+    ): SearchOutcome = withContext(Dispatchers.Default) {
         val q = query.trim()
         if (q.length < 2) return@withContext SearchOutcome()
 
         parseReference(q)?.let { ref ->
             val chapterVerses = getChapterVerses(ref.book, ref.chapter, includeTelugu = true)
             val verses = if (ref.verse != null) chapterVerses.filter { it.number == ref.verse } else chapterVerses
-            return@withContext SearchOutcome(mainResults = verses)
+            return@withContext SearchOutcome(hits = verses.map { SearchHit(it, it.text) }, exactCount = verses.size)
         }
 
-        if (bibleDao.countAllVerses() == 0) {
-            // Degraded first-run fallback (KJV not imported into Room yet) —
-            // plain substring search over a small hardcoded set.
-            return@withContext SearchOutcome(mainResults = legacyFallbackSearch(q, caseSensitive))
-        }
+        if (!hasLatinLetter(q)) return@withContext textSearch(q, caseSensitive)
+        val engine = searchEngine() ?: return@withContext textSearch(q, caseSensitive)
+        engine.search(q, caseSensitive, disabledSources)
+    }
 
+    // Every word of the query somewhere in the English or the Telugu, letter for letter: for
+    // searches typed in Telugu, and while the first import is still bringing in the English.
+    private suspend fun textSearch(q: String, caseSensitive: Boolean): SearchOutcome {
         val words = q.split(Regex("\\s+")).filter { it.isNotBlank() }
-        val isSingleWord = words.size == 1 && words[0].all { it.isLetter() }
-
-        // Precise (word-boundary) matching whenever Extensive search is
-        // off, loose (plain substring, the original behavior) whenever
-        // it's on — see containsWholeWord's doc for what "precise" means.
-        // Applies uniformly regardless of case-sensitivity or word count,
-        // so a multi-word combo search is just as precise/loose as a
-        // single-word one.
-        val wholeWord = !extensiveSearch
-
-        // Case-sensitive mode is a precise/literal mode — deliberately
-        // skips typo-correction and root-word suggestions entirely rather
-        // than trying to make them case-aware, since both work by
-        // lowercasing whatever was typed. The UI already makes this and
-        // extensiveSearch mutually exclusive, but a multi-word phrase (or
-        // a query that isn't a single plain word) never had these
-        // enhancements either way regardless of the toggle.
-        if (!extensiveSearch || caseSensitive || !isSingleWord) {
-            val mainResults = if (words.size > 1) {
-                searchCombination(words, caseSensitive, wholeWord)
-            } else {
-                searchAnyTerm(q, caseSensitive, wholeWord)
+        if (words.isEmpty()) return SearchOutcome()
+        val rows = if (bibleDao.countAllVerses() == 0) {
+            legacyFallbackSearch(q, caseSensitive)
+        } else {
+            bibleDao.search(words.maxBy { it.length }).map {
+                Verse(it.book, it.chapter, it.number, it.text, it.isRedLetter, it.teluguText)
             }
-            return@withContext SearchOutcome(mainResults = mainResults)
         }
-
-        val index = getKjvWordIndex()
-        val lowerQ = q.lowercase()
-        val corrected = correctTypo(lowerQ, index)
-        val effectiveWord = corrected ?: lowerQ
-
-        // Main results are a plain single-word search — loose substring
-        // matching (this is the Extensive-search path) on its own already
-        // surfaces most inflected forms for free ("love" matches
-        // "loved"/"loveth" as substrings), so there's no need to OR in
-        // extra generated terms here. Root-word suggestions are offered as
-        // tappable chips instead (see SearchScreen) — tapping one runs a
-        // fresh search for that exact word rather than this search eagerly
-        // running (and displaying results for) every variant up front.
-        val mainResults = searchAnyTerm(effectiveWord, caseSensitive, wholeWord = false)
-        // Filtered against the same real-word dictionary used for typo-
-        // correction: stripToRoots generates candidates mechanically (e.g.
-        // "loved" -> "lov", dropping the "ed" without restoring the silent
-        // "e" it needs), and only some of them are real words — a chip
-        // offering "lov" as a suggestion looks broken in a way a discarded
-        // internal search term never would.
-        val variantSuggestions = (stripToRoots(effectiveWord) - effectiveWord).filter { it in index.allWords }
-
-        SearchOutcome(correctedQuery = corrected, mainResults = mainResults, variantSuggestions = variantSuggestions)
+        val hits = rows.mapNotNull { verse ->
+            textMatches(verse.text, words, caseSensitive)?.let { return@mapNotNull SearchHit(verse, verse.text, it) }
+            val telugu = verse.teluguText ?: return@mapNotNull null
+            textMatches(telugu, words, caseSensitive)?.let { SearchHit(verse, telugu, it) }
+        }.sortedWith(compareBy({ BIBLE_BOOKS.indexOf(it.verse.book) }, { it.verse.chapter }, { it.verse.number }))
+        return SearchOutcome(hits = hits, exactCount = hits.size)
     }
 
-    // Background warm-up for the "Extensive search" toggle — called the
-    // moment it's switched on (see MainViewModel.setSearchExtensiveSearch)
-    // so the index is often already built by the time the user actually
-    // runs a search, rather than that search itself paying the one-time
-    // cost. getKjvWordIndex's own mutex means a search that *does* arrive
-    // before this finishes just suspends until this same build completes,
-    // rather than starting a redundant second one.
-    suspend fun prefetchExtensiveSearchIndex() {
-        withContext(Dispatchers.IO) { getKjvWordIndex() }
+    // Where each of words is in text, or null when one of them isn't.
+    private fun textMatches(text: String, words: List<String>, caseSensitive: Boolean): List<IntRange>? {
+        val ranges = ArrayList<IntRange>()
+        for (word in words) {
+            var at = text.indexOf(word, ignoreCase = !caseSensitive)
+            if (at < 0) return null
+            while (at >= 0) {
+                ranges += at until at + word.length
+                at = text.indexOf(word, at + word.length, ignoreCase = !caseSensitive)
+            }
+        }
+        return ranges.sortedBy { it.first }
     }
 
-    // AND search across every word in a multi-word query — a verse must
-    // contain all of them, in any order/position, not just the exact typed
-    // phrase (which is what a plain LIKE '%q%' on the whole string would
-    // require, and almost never matches). Exact-phrase matches are ranked
-    // first since a verse containing the words together is a stronger,
-    // more relevant match than one with the same words scattered apart —
-    // they're always a subset of the AND results, not a separate search.
-    private suspend fun searchCombination(words: List<String>, caseSensitive: Boolean, wholeWord: Boolean): List<Verse> {
-        val meaningfulWords = words.filter { it.length >= 2 }
-        if (meaningfulWords.isEmpty()) return emptyList()
-
-        // Telugu always stays plain substring — see containsWholeWord's
-        // doc for why word-boundary matching doesn't extend to it.
-        fun verseContainsWord(row: VerseEntity, word: String): Boolean {
-            val englishMatch = if (wholeWord) {
-                containsWholeWord(row.text, word, caseSensitive)
-            } else {
-                row.text.contains(word, ignoreCase = !caseSensitive)
-            }
-            return englishMatch || (row.teluguText?.contains(word, ignoreCase = !caseSensitive) == true)
-        }
-
-        // Intersect each word's own (coarse, case-insensitive) Room LIKE
-        // candidates by verse identity, refining case-sensitively in
-        // Kotlin per word along the way — same "Room narrows, Kotlin
-        // refines" split every search here uses. Short-circuits the moment
-        // any word has zero remaining candidates.
-        var matches: LinkedHashMap<String, VerseEntity>? = null
-        for (word in meaningfulWords) {
-            val byKey = LinkedHashMap<String, VerseEntity>()
-            for (row in bibleDao.search(word)) {
-                if (!verseContainsWord(row, word)) continue
-                byKey["${row.book}|${row.chapter}|${row.number}"] = row
-            }
-            matches = if (matches == null) byKey else LinkedHashMap(matches.filterKeys { it in byKey })
-            if (matches.isEmpty()) break
-        }
-
-        val phrase = meaningfulWords.joinToString(" ")
-        val rows = matches?.values.orEmpty()
-        val (phraseMatches, scatteredMatches) = rows.partition { row ->
-            row.text.contains(phrase, ignoreCase = !caseSensitive)
-        }
-        return (phraseMatches + scatteredMatches).map { row ->
-            Verse(
-                book = row.book,
-                chapter = row.chapter,
-                number = row.number,
-                text = row.text,
-                isRedLetter = row.isRedLetter,
-                teluguText = row.teluguText
-            )
-        }
-    }
-
+    // Degraded first-run fallback (KJV not imported into Room yet) — plain
+    // substring search over a small hardcoded set.
     private suspend fun legacyFallbackSearch(q: String, caseSensitive: Boolean): List<Verse> {
         val qLower = q.lowercase()
         val results = mutableListOf<Verse>()
@@ -1052,200 +987,6 @@ class BibleRepository(private val context: Context) {
             }
         }
         return results
-    }
-
-    // Thin wrapper over the existing single-term Room LIKE search, mapping
-    // rows to Verse. Room's LIKE is only reliably case-insensitive for
-    // ASCII, so it's a coarse (case-insensitive) candidate filter here.
-    // When wholeWord is false (the original, pre-word-boundary behavior,
-    // now only used by Extensive search), a non-case-sensitive candidate
-    // is accepted as-is — Room's LIKE already did the substring check —
-    // and only case-sensitive mode re-verifies in Kotlin. When wholeWord
-    // is true, every candidate is always re-verified in Kotlin regardless
-    // of case-sensitivity, since word-boundary matching isn't something
-    // SQL's LIKE can express at all.
-    private suspend fun searchAnyTerm(term: String, caseSensitive: Boolean, wholeWord: Boolean): List<Verse> {
-        if (term.length < 2) return emptyList()
-        val results = mutableListOf<Verse>()
-        for (row in bibleDao.search(term)) {
-            val matches = if (wholeWord) {
-                containsWholeWord(row.text, term, caseSensitive) ||
-                    (row.teluguText?.contains(term, ignoreCase = !caseSensitive) == true)
-            } else {
-                !caseSensitive || row.text.contains(term) || (row.teluguText?.contains(term) == true)
-            }
-            if (!matches) continue
-            results += Verse(
-                book = row.book,
-                chapter = row.chapter,
-                number = row.number,
-                text = row.text,
-                isRedLetter = row.isRedLetter,
-                teluguText = row.teluguText
-            )
-        }
-        return results
-    }
-
-    // Same archaic-suffix-stripping rules as lookupWebsterStem (see its doc)
-    // — reused here to offer a searched word's root form(s) as tappable
-    // "Also try" suggestions in Search (see SearchScreen), rather than
-    // silently folding every generated surface form into the results.
-    // Backward (strip-a-suffix) only, deliberately: substring matching on
-    // the word as typed already surfaces its own forward inflections for
-    // free ("love" matches "loved"/"loving" as substrings), so there's
-    // nothing to gain from also generating those — only stripping down to
-    // a root the typed word doesn't already contain as a substring (e.g.
-    // "walked" -> "walk", which "walking"/"walketh" don't literally
-    // contain) adds real reach.
-    private fun stripToRoots(word: String): Set<String> {
-        val roots = mutableSetOf(word)
-        when {
-            word.endsWith("ies") && word.length > 4 -> roots += word.dropLast(3) + "y"
-            word.endsWith("ves") && word.length > 4 -> {
-                roots += word.dropLast(3) + "f"
-                roots += word.dropLast(3) + "fe"
-            }
-            word.endsWith("ches") || word.endsWith("shes") || word.endsWith("xes") || word.endsWith("sses") ->
-                roots += word.dropLast(2)
-        }
-        if (word.endsWith("s") && !word.endsWith("ss") && word.length > 2) roots += word.dropLast(1)
-        if (word.endsWith("eth") && word.length > 4) {
-            roots += word.dropLast(3)
-            roots += word.dropLast(2)
-        }
-        if (word.endsWith("est") && word.length > 4) {
-            roots += word.dropLast(3)
-            roots += word.dropLast(2)
-        }
-        if (word.endsWith("ed") && word.length > 3) {
-            roots += word.dropLast(2)
-            roots += word.dropLast(2) + "e" // silent-e restore: loved -> lov -> love
-        }
-        if (word.endsWith("ing") && word.length > 4) {
-            roots += word.dropLast(3)
-            roots += word.dropLast(3) + "e" // silent-e restore: loving -> lov -> love
-        }
-        return roots
-    }
-
-    private val wordTokenRegex = Regex("[A-Za-z]+")
-
-    // "Precise" search's word-boundary matching, used whenever Extensive
-    // search is off (see searchBible's wholeWord). A hit only counts if
-    // nothing precedes it within the same run of letters — that alone is
-    // enough to stop "new" matching "knew" or "love" matching "beloved"/
-    // "gloves", none of which are the searched word at all, just letters
-    // that happen to appear inside a longer, unrelated one.
-    //
-    // A recognized inflectional suffix is still allowed to follow the
-    // match, so "love" still finds "loved"/"loving"/"loveth" — rather
-    // than maintaining a second, separately-written list of suffixes to
-    // generate forward, this reuses stripToRoots (which already knows
-    // those rules, including silent-e restoration) in reverse: strip each
-    // candidate token's own suffix and see if the searched word is one of
-    // the roots that comes out. A token that equals the searched word
-    // outright is always a match irrespective of this.
-    //
-    // Only ever applied to the English verse text — Telugu script isn't
-    // covered by wordTokenRegex, and there's no established word-boundary
-    // convention plugged in for it here, so Telugu matching stays plain
-    // substring regardless of this toggle (see every caller's separate
-    // teluguText check).
-    //
-    // Case-sensitive mode only ever accepts an exact-case token match, no
-    // suffix leniency — case-sensitive is already a precise/literal mode
-    // in this app (see its own doc elsewhere), and the archaic-suffix
-    // rules aren't case-aware to begin with.
-    private fun containsWholeWord(text: String, word: String, caseSensitive: Boolean): Boolean {
-        for (match in wordTokenRegex.findAll(text)) {
-            val token = match.value
-            if (caseSensitive) {
-                if (token == word) return true
-            } else {
-                val lowerToken = token.lowercase()
-                val lowerWord = word.lowercase()
-                if (lowerToken == lowerWord) return true
-                if (stripToRoots(lowerToken).contains(lowerWord)) return true
-            }
-        }
-        return false
-    }
-
-    // Typo-tolerance's reference dictionary — every distinct word that
-    // actually appears in the KJV text, bucketed by length so correctTypo
-    // only has to scan candidates within striking distance of the typed
-    // word's length instead of the whole ~12-15k word set on every miss
-    // (a real typo/rare word never matches the dictionary exactly, so this
-    // is the recurring cost paid on every such search while "Extensive
-    // search" stays on — see searchBible's doc). Built once from Room and
-    // cached for the rest of the process's lifetime (the text never
-    // changes at runtime, so there's nothing to invalidate this cache).
-    // Guarded by a mutex rather than just a nullable cache var: a search
-    // that arrives while prefetchExtensiveSearchIndex's background build
-    // is still running must wait for that same build rather than kicking
-    // off a redundant second scan over all verse text.
-    private data class WordIndex(val byLength: Map<Int, List<String>>, val allWords: Set<String>)
-
-    private val kjvWordIndexMutex = Mutex()
-    private var kjvWordIndexCache: WordIndex? = null
-
-    private suspend fun getKjvWordIndex(): WordIndex = kjvWordIndexMutex.withLock {
-        kjvWordIndexCache?.let { return@withLock it }
-        val words = mutableSetOf<String>()
-        val wordRegex = Regex("[A-Za-z]+")
-        for (text in bibleDao.getAllVerseTexts()) {
-            for (m in wordRegex.findAll(text)) words += m.value.lowercase()
-        }
-        val index = WordIndex(byLength = words.groupBy { it.length }, allWords = words)
-        kjvWordIndexCache = index
-        index
-    }
-
-    private fun levenshteinDistance(a: String, b: String): Int {
-        val dp = Array(a.length + 1) { IntArray(b.length + 1) }
-        for (i in 0..a.length) dp[i][0] = i
-        for (j in 0..b.length) dp[0][j] = j
-        for (i in 1..a.length) {
-            for (j in 1..b.length) {
-                dp[i][j] = if (a[i - 1] == b[j - 1]) {
-                    dp[i - 1][j - 1]
-                } else {
-                    1 + minOf(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1])
-                }
-            }
-        }
-        return dp[a.length][b.length]
-    }
-
-    // Returns a correction only when the typed word isn't itself a
-    // recognized KJV word AND a close-enough match exists — a shorter max
-    // edit distance for short words avoids "correcting" one legitimate
-    // short word into another (e.g. "cat" -> "car" is 1 edit but almost
-    // certainly not a typo). Returns null (no correction) rather than
-    // guessing when nothing is close enough — a modern/non-KJV word should
-    // just search as typed and come back empty, not get mangled into an
-    // unrelated KJV word. Only scans dictionary buckets whose word length
-    // is within maxDistance of the typed word's — a word outside that
-    // range can never be within edit distance anyway, so there's no need
-    // to run the full O(n*m) Levenshtein comparison against it (or even
-    // look at it at all, unlike the original flat-set version of this).
-    private fun correctTypo(word: String, index: WordIndex): String? {
-        if (word in index.allWords) return null
-        val maxDistance = if (word.length <= 4) 1 else 2
-        var best: String? = null
-        var bestDistance = Int.MAX_VALUE
-        for (len in (word.length - maxDistance)..(word.length + maxDistance)) {
-            val candidates = index.byLength[len] ?: continue
-            for (candidate in candidates) {
-                val distance = levenshteinDistance(word, candidate)
-                if (distance < bestDistance) {
-                    bestDistance = distance
-                    best = candidate
-                }
-            }
-        }
-        return if (best != null && bestDistance <= maxDistance) best else null
     }
 
     private data class ParsedReference(val book: String, val chapter: Int, val verse: Int?)

@@ -635,8 +635,9 @@ private fun HighlightsFilterSheet(
     }
 }
 
+// Also Search's chips under the search box (see SearchScreen's SourceChips).
 @Composable
-private fun SheetChip(
+internal fun SheetChip(
     text: String,
     selected: Boolean,
     themeMode: ThemeMode,

@@ -93,36 +93,51 @@ data class Verse(
     val hebrewWords: List<HebrewWord>? = null
 )
 
-// BibleRepository.searchBible's full result. variantSuggestions (root-word
-// forms, e.g. "walk" for a search of "walked") are shown as tappable chips
-// rather than eagerly searched and displayed — tapping one runs a fresh
-// search for that exact word (see SearchScreen). Not @Serializable: search
-// results are always freshly computed, never cached to disk like Verse
-// sometimes is. correctedQuery is null when the typed word was already
-// recognized (or wasn't a single plain word to begin with, case-sensitive
-// mode was on, or "Extensive search" is off), so the UI only shows a
-// "Showing results for…" note when a real correction happened.
-//
-// Both correctedQuery and variantSuggestions are only ever populated when
-// the opt-in "Extensive search" toggle is on (see MainViewModel/
-// SearchScreen) — they require building an in-memory dictionary of every
-// distinct word in the KJV, a scan over all verse text expensive enough
-// that it's not worth paying by default for a feature most searches never
-// need (a plain substring search already surfaces "loved"/"loving" for a
-// search of "love" with no lookup at all).
-//
-// A separate Strong's-number-based "related words" feature (words sharing
-// a Strong's number with the searched word) was tried and dropped for a
-// different reason — Hebrew (OT) Strong's numbers frequently lump
-// unrelated homonyms together, surfacing garbage like a proper name as a
-// "related" suggestion with no reliable way to filter it out. That's a
-// data-quality problem the Extensive search toggle doesn't fix, so it
-// stays permanently out of scope rather than being offered behind it.
-data class SearchOutcome(
-    val correctedQuery: String? = null,
-    val mainResults: List<Verse> = emptyList(),
-    val variantSuggestions: List<String> = emptyList()
+/**
+ * One verse a search found. [text] is what its card shows: the verse's English, or its Telugu
+ * for a search typed in Telugu; [highlights] are the parts of it that matched.
+ */
+data class SearchHit(
+    val verse: Verse,
+    val text: String,
+    val highlights: List<IntRange> = emptyList(),
+    /**
+     * True when the verse says it in other words: King James wording for a word of today
+     * ("careful" for worry), or the same Greek or Hebrew word. [reasons] say which.
+     */
+    val related: Boolean = false,
+    val reasons: List<String> = emptyList()
 )
+
+/**
+ * Something a search also matched besides the words as typed, shown as a chip that switches it
+ * off and on: the words' other forms, a King James wording, or a Greek or Hebrew word (several
+ * small ones share a chip, hence [ids]).
+ */
+data class SearchSource(
+    val ids: List<String>,
+    val label: String,
+    /** Verses it adds. */
+    val count: Int,
+    val enabled: Boolean
+)
+
+/**
+ * BibleRepository.searchBible's result. [hits] holds the verses with the words themselves first
+ * ([exactCount] of them), then the ones that say it in other words. Not @Serializable: search
+ * results are always freshly computed, never saved.
+ */
+data class SearchOutcome(
+    val hits: List<SearchHit> = emptyList(),
+    val exactCount: Int = 0,
+    val sources: List<SearchSource> = emptyList(),
+    /** A spelling the Bible has, offered only when nothing was found ("fiath" → "faith"). */
+    val suggestion: String? = null,
+    /** No verse has every word: [hits] are the verses with all but one. */
+    val closeMatches: Boolean = false
+) {
+    val relatedCount: Int get() = hits.size - exactCount
+}
 
 @Serializable
 data class NoteReference(

@@ -1,0 +1,129 @@
+# Word forms the suffix rules in make_search_data.py can't produce: irregular verbs and plurals,
+# with the King James endings (-eth, -est, -edst). One family per line, base word first.
+# Searching any word in a family finds them all. Leave out forms that are mostly a different
+# word (left for leave, might for may, tare for tear, lay/lain for lie).
+be am is are art was were wast wert been being
+have has hath hast had hadst having
+do does doth doeth dost doest did didst done doing
+go goes goeth goest going gone went wentest
+say says saith sayest said saidst saying
+come comes cometh comest coming came camest
+become becomes becometh becomest becoming became
+overcome overcomes overcometh overcomest overcoming overcame
+give gives giveth givest giving gave gavest given
+forgive forgives forgiveth forgivest forgiving forgave forgavest forgiven
+take takes taketh takest taking took tookest taken
+partake partakes partaketh partakest partaking partook partaken
+forsake forsakes forsaketh forsakest forsaking forsook forsookest forsaken
+see sees seeth seest seeing saw sawest seen
+know knows knoweth knowest knowing knew knewest known
+make makes maketh makest making made madest
+speak speaks speaketh speakest speaking spake spoke spakest spoken
+eat eats eateth eatest eating ate eaten
+bring brings bringeth bringest bringing brought broughtest
+buy buys buyeth buyest buying bought
+think thinks thinketh thinkest thinking thought thoughtest
+teach teaches teacheth teachest teaching taught taughtest
+seek seeks seeketh seekest seeking sought
+fight fights fighteth fightest fighting fought
+fall falls falleth fallest falling fell fellest fallen
+rise rises riseth risest rising rose rosest risen
+arise arises ariseth arisest arising arose arisen
+write writes writeth writest writing wrote writtest written
+drink drinks drinketh drinkest drinking drank drunk drunken
+sing sings singeth singest singing sang sung
+begin begins beginneth beginnest beginning began begun
+hide hides hideth hidest hiding hid hidden
+lay lays layeth layest laying laid laidst
+flee flees fleeth fleest fleeing fled
+feed feeds feedeth feedest feeding fed
+lead leads leadeth leadest leading led
+hear hears heareth hearest hearing heard heardest
+tell tells telleth tellest telling told toldest
+sell sells selleth sellest selling sold
+stand stands standeth standest standing stood
+understand understands understandeth understandest understanding understood
+withstand withstands withstandeth withstanding withstood
+sit sits sitteth sittest sitting sat
+run runs runneth runnest running ran
+bear bears beareth bearest bearing bare borne
+break breaks breaketh breakest breaking brake broke broken
+choose chooses chooseth choosest choosing chose chosen
+get gets getteth gettest getting gat got gotten
+beget begets begetteth begettest begetting begat begotten
+hold holds holdeth holdest holding held
+behold beholds beholdeth beholdest beholding beheld
+withhold withholds withholdeth withholdest withholding withheld
+uphold upholds upholdeth upholdest upholding upheld
+keep keeps keepeth keepest keeping kept
+lose loses loseth losest losing lost
+mean means meaneth meanest meaning meant
+meet meets meeteth meetest meeting met
+pay pays payeth payest paying paid
+send sends sendeth sendest sending sent sentest
+spend spends spendeth spendest spending spent
+lend lends lendeth lendest lending lent
+bend bends bendeth bendest bending bent
+shine shines shineth shinest shining shone shined
+slay slays slayeth slayest slaying slew slewest slain
+smite smites smiteth smitest smiting smote smotest smitten
+steal steals stealeth stealest stealing stole stolen
+strike strikes striketh strikest striking struck stricken
+swear swears sweareth swearest swearing sware swore sworn
+throw throws throweth throwest throwing threw thrown
+wear wears weareth wearest wearing ware wore worn
+weep weeps weepeth weepest weeping wept
+win wins winneth winnest winning won
+awake awakes awaketh awakest awaking awoke awaked
+bind binds bindeth bindest binding bound
+bite bites biteth bitest biting bit bitten
+blow blows bloweth blowest blowing blew blown
+build builds buildeth buildest building built buildedst
+catch catches catcheth catchest catching caught
+cleave cleaves cleaveth cleavest cleaving clave cleft cloven
+creep creeps creepeth creepest creeping crept
+deal deals dealeth dealest dealing dealt
+dig digs diggeth diggest digging digged dug
+draw draws draweth drawest drawing drew drawn
+drive drives driveth drivest driving drave drove driven
+dwell dwells dwelleth dwellest dwelling dwelt
+feel feels feeleth feelest feeling felt
+find finds findeth findest finding found foundest
+fly flies flieth fliest flying flew flown
+forget forgets forgetteth forgettest forgetting forgat forgot forgotten
+grow grows groweth growest growing grew grown
+hang hangs hangeth hangest hanging hanged hung
+ride rides rideth ridest riding rode ridden
+shake shakes shaketh shakest shaking shook shaken
+shew shews sheweth shewest shewing shewed shewedst shewn
+show shows showeth showest showing showed shown
+spring springs springeth springing sprang sprung
+strive strives striveth strivest striving strove striven
+tread treads treadeth treadest treading trod trodden
+wake wakes waketh wakest waking woke waked
+weave weaves weaveth weaving wove woven
+cast casts casteth castest casting
+put puts putteth puttest putting
+set sets setteth settest setting
+cut cuts cutteth cuttest cutting
+hurt hurts hurteth hurtest hurting
+shed sheds sheddeth sheddest shedding
+spread spreads spreadeth spreadest spreading
+beat beats beateth beatest beating beaten
+abide abides abideth abidest abiding abode
+can canst could couldest
+will wilt would wouldest
+shall shalt should shouldest
+dare dared durst
+lie lies lieth liest lying lied
+die dies dieth diest dying died
+man men
+woman women
+child children
+brother brethren brothers
+foot feet
+tooth teeth
+ox oxen
+mouse mice
+goose geese
+cow cows kine
