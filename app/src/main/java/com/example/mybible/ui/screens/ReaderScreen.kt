@@ -123,6 +123,7 @@ fun ReaderScreen(
     val isBlurModeEnabled by viewModel.isBlurModeEnabled.collectAsState()
     val crossReferenceReturnAvailable by viewModel.crossReferenceReturnAvailable.collectAsState()
     val focusedVerseNumber by viewModel.focusedVerseNumber.collectAsState()
+    val focusRequest by viewModel.focusRequest.collectAsState()
     val focusedVerseBlurEnabled by viewModel.focusedVerseBlurEnabled.collectAsState()
     val focusedVersePinToTop by viewModel.focusedVersePinToTop.collectAsState()
     val searchReturnAvailable by viewModel.searchReturnAvailable.collectAsState()
@@ -234,6 +235,9 @@ fun ReaderScreen(
     var xrefFocusActive by remember { mutableStateOf(false) }
     var xrefFocusLandedIndex by remember { mutableStateOf(-1) }
     var xrefFocusLandedOffset by remember { mutableStateOf(0) }
+    // Which jump (MainViewModel.focusRequest) that landing was for — see the
+    // "scrolled away" watcher below for why it matters.
+    var xrefFocusLandedRequest by remember { mutableStateOf(-1) }
     // Tracks which chapter the effect below last ran for, so it can tell a
     // genuine chapter change (which should reset scroll to the top when
     // there's no focus target) apart from focusedVerseNumber simply being
@@ -257,7 +261,7 @@ fun ReaderScreen(
     // currentBook/currentChapter (loadChapter is called with the same
     // values, which a MutableStateFlow drops as a no-op), so without this
     // key a same-chapter xref tap wouldn't re-scroll or re-focus at all.
-    LaunchedEffect(currentBook, currentChapter, verses, focusedVerseNumber, focusedVerseBlurEnabled, focusedVersePinToTop, readerAnchor) {
+    LaunchedEffect(currentBook, currentChapter, verses, focusedVerseNumber, focusedVerseBlurEnabled, focusedVersePinToTop, readerAnchor, focusRequest) {
         if (verses.isEmpty()) return@LaunchedEffect
         // Guard against a stale `verses` list from before a tab switch —
         // e.g. returning from a Greek/Hebrew lexicon citation tears down
@@ -318,6 +322,7 @@ fun ReaderScreen(
                 }
                 xrefFocusLandedIndex = listState.firstVisibleItemIndex
                 xrefFocusLandedOffset = listState.firstVisibleItemScrollOffset
+                xrefFocusLandedRequest = focusRequest
                 xrefFocusActive = focusedVerseBlurEnabled
             } else {
                 listState.scrollToItem(0)
@@ -382,24 +387,20 @@ fun ReaderScreen(
     // blurred verse first (clearVerseFocus only) left it working — the
     // banner must only go away via its own explicit dismiss/Return, or a
     // real tab switch/backgrounding, never from the reader just scrolling.
-    LaunchedEffect(focusedVerseNumber, xrefFocusLandedIndex, xrefFocusLandedOffset) {
+    LaunchedEffect(focusedVerseNumber, focusRequest, xrefFocusLandedRequest, xrefFocusLandedIndex, xrefFocusLandedOffset) {
         if (focusedVerseNumber == null) return@LaunchedEffect
-        // xrefFocusLandedIndex's declared default is the -1 sentinel — real
-        // on-device diagnostic logging (since removed) confirmed this stays
-        // -1 across a jump that arrives via a tab remount (e.g. a Greek/
-        // Hebrew lexicon citation's "Open in Reader"): Reader's whole
-        // composition, including this remembered state, is torn down and
-        // rebuilt fresh, so this watcher restarts (its key, focusedVerseNumber,
-        // just changed) *before* the main effect above has had a chance to
-        // find the new chapter's verses and land for real. Without this
-        // check, the watcher took its first sample against that -1/0
-        // sentinel, treated the mismatch as "user scrolled away", and cleared
-        // focusedVerseNumber immediately — before the correct chapter's data
-        // even arrived to retry, permanently losing the jump target and
-        // leaving the reader stuck unblurred at the top of the chapter. A
-        // real landing always sets a non-negative index (see the FOUND
-        // branch above), which reruns this effect with real values.
-        if (xrefFocusLandedIndex < 0) return@LaunchedEffect
+        // Only a landing made for *this* jump counts. Until the jump lands
+        // (its chapter's verses still loading, or Reader just remounted with
+        // its remembered state rebuilt fresh), the landing on record is an
+        // earlier jump's — or the -1 sentinel — and comparing against it
+        // read as "the user scrolled away": the new target was cleared before
+        // its chapter even arrived, and the jump fell through to the top of
+        // the chapter. That hit any jump made after an earlier one (the
+        // cold-start restore counts) followed by some reading, whenever the
+        // screen redrew before the new chapter's verses were in — "sometimes".
+        // The main effect above records the request it lands for, which
+        // reruns this with real values.
+        if (xrefFocusLandedRequest != focusRequest) return@LaunchedEffect
         snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
             .collect { (idx, offset) ->
                 if (idx != xrefFocusLandedIndex || kotlin.math.abs(offset - xrefFocusLandedOffset) > 4) {

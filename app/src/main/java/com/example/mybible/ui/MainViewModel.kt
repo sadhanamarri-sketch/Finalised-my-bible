@@ -199,6 +199,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _focusedVersePinToTop = MutableStateFlow(false)
     val focusedVersePinToTop: StateFlow<Boolean> = _focusedVersePinToTop.asStateFlow()
 
+    // Goes up with every new focusedVerseNumber target (see setJumpTarget), so
+    // ReaderScreen can tell its landing for *this* jump apart from the last
+    // one's — its "scrolled away" watcher only ever compares the list's
+    // position with a landing made for the jump that's current.
+    private val _focusRequest = MutableStateFlow(0)
+    val focusRequest: StateFlow<Int> = _focusRequest.asStateFlow()
+
+    // Sets a new jump target for the Reader: every place that does goes
+    // through here, so each one is counted as its own request.
+    private fun setJumpTarget(verse: Int, blur: Boolean, pinToTop: Boolean) {
+        _focusedVerseNumber.value = verse
+        _focusedVerseBlurEnabled.value = blur
+        _focusedVersePinToTop.value = pinToTop
+        _focusRequest.value++
+    }
+
     // English Dictionary Lookup state
     private val _selectedEnglishWord = MutableStateFlow<String?>(null)
     val selectedEnglishWord: StateFlow<String?> = _selectedEnglishWord.asStateFlow()
@@ -954,11 +970,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val restoredVerse = repository.getLastReadVerse()
         viewModelScope.launch {
             loadCurrentChapterSuspend()
-            restoredVerse?.let { verse ->
-                _focusedVerseNumber.value = verse
-                _focusedVerseBlurEnabled.value = false
-                _focusedVersePinToTop.value = true
-            }
+            restoredVerse?.let { verse -> setJumpTarget(verse, blur = false, pinToTop = true) }
             _initialRestoreComplete.value = true
         }
 
@@ -1265,9 +1277,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // chapter reads normally instead of blurring around one cell.
     fun jumpToVerse(book: String, chapter: Int, verse: Int, focusVerse: Boolean = true) {
         finishReaderRestore()
-        _focusedVerseNumber.value = verse
-        _focusedVerseBlurEnabled.value = focusVerse
-        _focusedVersePinToTop.value = false
+        setJumpTarget(verse, blur = focusVerse, pinToTop = false)
         loadChapter(book, chapter)
     }
 
@@ -1359,11 +1369,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // each one re-anchors off the now-wrong top verse.
     fun toggleTeluguInline(anchorVerse: Int? = null) {
         _showTeluguInline.value = !_showTeluguInline.value
-        if (anchorVerse != null) {
-            _focusedVerseNumber.value = anchorVerse
-            _focusedVerseBlurEnabled.value = false
-            _focusedVersePinToTop.value = true
-        }
+        if (anchorVerse != null) setJumpTarget(anchorVerse, blur = false, pinToTop = true)
         loadCurrentChapter()
     }
 
@@ -1376,11 +1382,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // ReaderScreen's scroll-restore effect on its own).
     fun toggleInterlinear(anchorVerse: Int? = null) {
         _showInterlinear.value = !_showInterlinear.value
-        if (anchorVerse != null) {
-            _focusedVerseNumber.value = anchorVerse
-            _focusedVerseBlurEnabled.value = false
-            _focusedVersePinToTop.value = true
-        }
+        if (anchorVerse != null) setJumpTarget(anchorVerse, blur = false, pinToTop = true)
     }
 
     fun toggleBlurMode() {
@@ -1503,9 +1505,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun navigateToCrossReference(targetBook: String, targetChapter: Int, targetVerse: Int) {
         _crossReferenceReturnAvailable.value = true
         _crossReferenceLastTappedKey.value = "$targetBook:$targetChapter:$targetVerse"
-        _focusedVerseNumber.value = targetVerse
-        _focusedVerseBlurEnabled.value = true
-        _focusedVersePinToTop.value = false
+        setJumpTarget(targetVerse, blur = true, pinToTop = false)
         // Blur mode (privacy blur, the pill toggle) would defeat the whole
         // point of following a cross-reference — you followed it to read
         // the target verse, not stare at an obscured one.
