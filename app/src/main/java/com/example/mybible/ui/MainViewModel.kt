@@ -129,7 +129,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _redLetterEnabled = MutableStateFlow(repository.getRedLetterEnabled())
     val redLetterEnabled: StateFlow<Boolean> = _redLetterEnabled.asStateFlow()
 
-    private val _showTeluguInline = MutableStateFlow(true)
+    // Off at every start: the Reader opens in English only. Its Telugu
+    // toggle (and Settings') turns the Telugu lines on for the rest of the
+    // session — not saved, so the next start is English only again.
+    private val _showTeluguInline = MutableStateFlow(false)
     val showTeluguInline: StateFlow<Boolean> = _showTeluguInline.asStateFlow()
 
     private val _showInterlinear = MutableStateFlow(false)
