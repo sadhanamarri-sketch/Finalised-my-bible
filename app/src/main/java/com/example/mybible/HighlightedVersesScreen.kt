@@ -157,6 +157,8 @@ fun HighlightedVersesScreen(
     LaunchedEffect(focusSearch, filter.searchOpen) {
         if (focusSearch && filter.searchOpen) {
             focusSearch = false
+            // The field is laid out a frame after it's composed (Scaffold content).
+            withFrameNanos { }
             searchFocus.requestFocus()
             keyboard?.show()
         }

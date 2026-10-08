@@ -125,6 +125,11 @@ fun SearchScreen(
         if (suppressAutofocus) {
             viewModel.consumeSuppressSearchAutofocus()
         } else {
+            // The field sits in Scaffold's content, which is composed as the
+            // page is first laid out. When Search is in the app's very first
+            // frame (a widget shortcut opening it), this can run before that
+            // and requestFocus() throws; a frame later the field is there.
+            withFrameNanos { }
             searchFocusRequester.requestFocus()
             keyboardController?.show()
         }

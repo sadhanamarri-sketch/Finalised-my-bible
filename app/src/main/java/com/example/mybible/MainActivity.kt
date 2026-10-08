@@ -53,20 +53,71 @@ class MainActivity : ComponentActivity() {
     // here too so onStop below can reach it without being inside Compose.
     private val viewModel: MainViewModel by viewModels()
 
+    // The page a widget shortcut is opening the app on, while it does: that
+    // page is simply there — no tab change animation, and pages it closed
+    // over the tabs don't slide away first — instead of the page left open
+    // being drawn again and animating away. Cleared a few frames after it's
+    // on screen, so later navigation animates as usual. Compose-observable,
+    // since it's set from outside composition (see openFromWidget).
+    private var instantNavigationTo by mutableStateOf<NavTab?>(null)
+
     // MainActivity is singleTask (see the manifest), so a second widget tap
     // while the app is already running arrives here instead of creating a
-    // fresh Activity — and Compose has no way to know that happened unless
-    // something it actually reads changes. Plain `setIntent()` alone
-    // wouldn't trigger a recomposition, silently leaving the widget-launch
-    // handling below (`remember(currentIntent)`) stuck on the *previous*
-    // intent's extras. Backed by a Compose-observable field instead so
-    // each new intent is genuinely picked up.
-    private var currentIntent by mutableStateOf<android.content.Intent?>(null)
-
+    // fresh Activity.
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        currentIntent = intent
+        handleLaunchIntent(intent)
+    }
+
+    // Resolves widget-launch extras into nav state — here, as the intent
+    // arrives (onCreate before setContent, or onNewIntent before the app is
+    // back on screen), so the first frame drawn already shows the page asked
+    // for. Resolved from Compose instead, it landed a frame or more later,
+    // after the page left open had been drawn again.
+    private fun handleLaunchIntent(intent: android.content.Intent) {
+        // Continue Reading is checked first and handled on its own:
+        // it still needs the other five detour flags cleared (same
+        // "stale banner hijacks the first back press" reasoning as
+        // every other widget entry point below), but NOT verse
+        // focus — init already seeded focusedVerseNumber/pinToTop
+        // this same cold start from the persisted exact resume
+        // verse (see MainViewModel.saveLastReadPosition), and the
+        // blanket clearStaleReaderDetours() below would silently
+        // wipe that seed right back out, landing on the top of the
+        // chapter instead of the saved verse.
+        if (intent.getBooleanExtra(WidgetActionKeys.EXTRA_CONTINUE_READING, false)) {
+            viewModel.clearStaleReaderDetours(clearFocus = false)
+            openFromWidget(NavTab.READER)
+            return
+        }
+
+        // Every other widget entry point arrives at the app from
+        // outside it — any cross-reference/search/lexicon/note/
+        // highlights/studied "return" flag left dangling from
+        // before the app was backgrounded (these are plain in-
+        // memory state, so pressing Home mid-detour instead of
+        // formally closing it leaves them set indefinitely) needs
+        // clearing here, or the very first system back press after
+        // one of these taps gets silently hijacked by that stale
+        // detour instead of acting on the widget tap's own
+        // destination. See MainViewModel.clearStaleReaderDetours's doc.
+        viewModel.clearStaleReaderDetours()
+
+        // Quick-action icon row on the widget (Highlights/Studied/
+        // Notes/Search) — jumps straight to that tab.
+        val openTabName = intent.getStringExtra(WidgetActionKeys.EXTRA_OPEN_TAB)
+        if (!openTabName.isNullOrEmpty()) {
+            val tab = try { NavTab.valueOf(openTabName) } catch (e: IllegalArgumentException) { null }
+            if (tab != null) openFromWidget(tab)
+        }
+    }
+
+    private fun openFromWidget(tab: NavTab) {
+        // Or a note left open over the tabs would cover it.
+        viewModel.closePagesOverTabs()
+        viewModel.selectTab(tab)
+        instantNavigationTo = tab
     }
 
     // Fires synchronously the moment this Activity loses the foreground —
@@ -88,7 +139,7 @@ class MainActivity : ComponentActivity() {
         // the activity gets back the intent it was first started with —
         // handled already, and handling it again jumped back to a widget
         // shortcut's tab from wherever the user had gone since.
-        if (savedInstanceState == null) currentIntent = intent
+        if (savedInstanceState == null) handleLaunchIntent(intent)
 
         setContent {
             val viewModel: MainViewModel = viewModel()
@@ -189,73 +240,27 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // Resolves widget-launch extras into initial nav state.
-            //
-            // This is deliberately `remember(currentIntent) { ... }`, not
-            // `LaunchedEffect(currentIntent)`. LaunchedEffect runs *after*
-            // the first composition commits, so on a cold launch from the
-            // widget the very first frame rendered whatever activeTab's
-            // ViewModel default was (Reader) before the effect fired and
-            // switched tabs — a visible flash of Reader before the
-            // requested tab. `remember` runs synchronously as part of
-            // composition, so by the time `viewModel.activeTab.collectAsState()`
-            // below reads the StateFlow, selectTab() has already mutated it
-            // and the first frame renders the correct tab directly. None of
-            // the calls here are suspend functions, so no coroutine is
-            // needed. Keyed on `currentIntent` (the Compose-observable field
-            // above), not the Activity's raw `intent` property directly —
-            // MainActivity is singleTask, so a second widget tap while
-            // already running updates that property via onNewIntent without
-            // Compose otherwise having any reason to know it changed.
-            val intent = currentIntent
-            remember(currentIntent) {
-                if (intent == null) return@remember Unit
-                // Continue Reading is checked first and handled on its own:
-                // it still needs the other five detour flags cleared (same
-                // "stale banner hijacks the first back press" reasoning as
-                // every other widget entry point below), but NOT verse
-                // focus — init already seeded focusedVerseNumber/pinToTop
-                // this same cold start from the persisted exact resume
-                // verse (see MainViewModel.saveLastReadPosition), and the
-                // blanket clearStaleReaderDetours() below would silently
-                // wipe that seed right back out, landing on the top of the
-                // chapter instead of the saved verse.
-                if (intent.getBooleanExtra(WidgetActionKeys.EXTRA_CONTINUE_READING, false)) {
-                    viewModel.clearStaleReaderDetours(clearFocus = false)
-                    viewModel.closePagesOverTabs()
-                    viewModel.selectTab(NavTab.READER)
-                    return@remember Unit
-                }
-
-                // Every other widget entry point arrives at the app from
-                // outside it — any cross-reference/search/lexicon/note/
-                // highlights/studied "return" flag left dangling from
-                // before the app was backgrounded (these are plain in-
-                // memory state, so pressing Home mid-detour instead of
-                // formally closing it leaves them set indefinitely) needs
-                // clearing here, or the very first system back press after
-                // one of these taps gets silently hijacked by that stale
-                // detour instead of acting on the widget tap's own
-                // destination. See MainViewModel.clearStaleReaderDetours's doc.
-                viewModel.clearStaleReaderDetours()
-
-                // Quick-action icon row on the widget (Highlights/Studied/
-                // Notes/Search) — jumps straight to that tab.
-                val openTabName = intent.getStringExtra(WidgetActionKeys.EXTRA_OPEN_TAB)
-                if (!openTabName.isNullOrEmpty()) {
-                    val tab = try { NavTab.valueOf(openTabName) } catch (e: IllegalArgumentException) { null }
-                    if (tab != null) {
-                        // Or a note left open over the tabs would cover it.
-                        viewModel.closePagesOverTabs()
-                        viewModel.selectTab(tab)
-                    }
-                }
-                Unit
-            }
-
             val themeMode by viewModel.themeMode.collectAsState()
             val activeTab by viewModel.activeTab.collectAsState()
             val initialRestoreComplete by viewModel.initialRestoreComplete.collectAsState()
+
+            // See instantNavigationTo: a few frames after a widget
+            // shortcut's page is on screen, navigation animates again.
+            val instantTo = instantNavigationTo
+            LaunchedEffect(instantTo) {
+                if (instantTo != null) {
+                    repeat(3) { withFrameNanos { } }
+                    instantNavigationTo = null
+                }
+            }
+            // Pages over the tabs slide down as they close — except ones a
+            // widget shortcut closed on its way in, which just go.
+            fun pageExit(durationMillis: Int): ExitTransition =
+                if (instantNavigationTo != null) ExitTransition.None
+                else slideOutVertically(
+                    animationSpec = tween(durationMillis),
+                    targetOffsetY = { fullHeight -> fullHeight }
+                )
 
             val showBookPicker by viewModel.showBookPicker.collectAsState()
             val currentBook by viewModel.currentBook.collectAsState()
@@ -438,20 +443,25 @@ class MainActivity : ComponentActivity() {
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.background)
                 ) {
-                    // Holds every tab's content back — not just Reader's —
-                    // until MainViewModel's cold-start restore has fully
-                    // landed (chapter loaded, saved verse applied). A blank
-                    // themed background for that one brief window beats
-                    // mounting Reader (or any tab) before it has real data
+                    // Holds Reader back until MainViewModel's cold-start
+                    // restore has fully landed (chapter loaded, saved verse
+                    // applied). A blank themed background for that one brief
+                    // window beats mounting Reader before it has real data
                     // to show, which is what forced ReaderScreen into
                     // fragile seed/hide/reveal timing to avoid a visible
                     // wrong-position flash. See
-                    // MainViewModel.initialRestoreComplete's own doc.
-                    if (initialRestoreComplete) {
+                    // MainViewModel.initialRestoreComplete's own doc. The
+                    // other tabs don't depend on that restore, so a widget
+                    // shortcut to one of them shows it straight away rather
+                    // than that blank background first.
+                    if (initialRestoreComplete || activeTab != NavTab.READER) {
                     AnimatedContent(
                         targetState = activeTab,
                         transitionSpec = {
-                            if (initialState == NavTab.VERSE_SCROLL || targetState == NavTab.VERSE_SCROLL) {
+                            if (instantNavigationTo != null) {
+                                // Opened from a widget shortcut: its page is simply there.
+                                EnterTransition.None togetherWith ExitTransition.None
+                            } else if (initialState == NavTab.VERSE_SCROLL || targetState == NavTab.VERSE_SCROLL) {
                                 // Verse Scroll is a full-screen photo: it dissolves in over the
                                 // tab it came from (and that tab back over it), the old one
                                 // staying put underneath until the new one is all the way in.
@@ -529,10 +539,7 @@ class MainActivity : ComponentActivity() {
                             animationSpec = tween(340),
                             initialOffsetY = { fullHeight -> fullHeight }
                         ),
-                        exit = slideOutVertically(
-                            animationSpec = tween(340),
-                            targetOffsetY = { fullHeight -> fullHeight }
-                        )
+                        exit = pageExit(340)
                     ) {
                         BookChapterPickerSheet(
                             currentBook = currentBook,
@@ -629,10 +636,7 @@ class MainActivity : ComponentActivity() {
                             animationSpec = tween(300),
                             initialOffsetY = { fullHeight -> fullHeight }
                         ),
-                        exit = slideOutVertically(
-                            animationSpec = tween(300),
-                            targetOffsetY = { fullHeight -> fullHeight }
-                        )
+                        exit = pageExit(300)
                     ) {
                         val note = lastReadNote
                         if (note != null) {
@@ -726,10 +730,7 @@ class MainActivity : ComponentActivity() {
                             animationSpec = tween(300),
                             initialOffsetY = { fullHeight -> fullHeight }
                         ),
-                        exit = slideOutVertically(
-                            animationSpec = tween(300),
-                            targetOffsetY = { fullHeight -> fullHeight }
-                        )
+                        exit = pageExit(300)
                     ) {
                         TagsScreen(viewModel = viewModel)
                     }
@@ -742,10 +743,7 @@ class MainActivity : ComponentActivity() {
                             animationSpec = tween(300),
                             initialOffsetY = { fullHeight -> fullHeight }
                         ),
-                        exit = slideOutVertically(
-                            animationSpec = tween(300),
-                            targetOffsetY = { fullHeight -> fullHeight }
-                        )
+                        exit = pageExit(300)
                     ) {
                         SavedWordsScreen(viewModel = viewModel)
                     }
