@@ -619,6 +619,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private var hebrewLexiconLookupJob: Job? = null
 
+    // The word pages under the open one, the last the one just below it (see WordPage).
+    private val wordPagesBelow = ArrayList<WordPage>()
+
     // Scroll position within GreekWordScreen/HebrewWordScreen's definition
     // text, saved/restored across the trip to Reader and back the same way
     // Search/CrossReferenceScreen do (see _searchScrollIndex etc. below) —
@@ -771,6 +774,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun dismissLexiconReturnBanner() {
         _lexiconReturnTab.value = null
+        wordPagesBelow.clear()
     }
 
     // Which note (if any) a "return to note" banner in the Reader should
@@ -1142,7 +1146,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun selectTab(tab: NavTab) {
         finishReaderRestore()
-        _activeTab.value = tab
+        _activeTab.value = if (tab == NavTab.GREEK_WORD || tab == NavTab.HEBREW_WORD) wordPageTab(tab) else tab
     }
 
     // In-memory-only "where was I reading" anchor — separate from
@@ -1655,6 +1659,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _crossReferenceReturnAvailable.value = false
         _searchReturnAvailable.value = false
         _lexiconReturnTab.value = null
+        wordPagesBelow.clear()
         _noteReturnItem.value = null
         _highlightsReturnAvailable.value = false
         _studiedReturnAvailable.value = false
@@ -1777,6 +1782,112 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _wordStudy = MutableStateFlow<WordStudy?>(null)
     val wordStudy: StateFlow<WordStudy?> = _wordStudy.asStateFlow()
 
+    // A Greek or Hebrew word page another one was opened over, from a detour off it: a word tapped
+    // in a verse its definition cites, or in its search's results. Everything it showed is kept,
+    // so going back to it finds it as it was, and so is the Reader's "Return to … word" to it.
+    private class WordPage(
+        val greek: GreekWord?,
+        val hebrew: HebrewWord?,
+        val lexiconResult: LexiconLookupResult?,
+        val scrollPosition: Int,
+        val baseVerse: Verse?,
+        val openedFromSavedWords: Boolean,
+        val searchPreview: WordSearchPreview?,
+        val study: WordStudy?,
+        val returnTab: NavTab?
+    ) {
+        val tab: NavTab get() = if (greek != null) NavTab.GREEK_WORD else NavTab.HEBREW_WORD
+    }
+
+    // Before another word's page opens: the open one goes below it. One word page is open at a time.
+    private fun coverOpenWordPage() {
+        val greek = _selectedGreekWord.value
+        val hebrew = _selectedHebrewWord.value
+        if (greek == null && hebrew == null) return
+        wordPagesBelow += WordPage(
+            greek = greek,
+            hebrew = if (greek == null) hebrew else null,
+            lexiconResult = if (greek != null) _lexiconResult.value else _hebrewLexiconResult.value,
+            scrollPosition = if (greek != null) _greekWordScrollPosition.value else _hebrewWordScrollPosition.value,
+            baseVerse = _lexiconBaseVerse.value,
+            openedFromSavedWords = _lexiconOpenedFromSavedWords.value,
+            searchPreview = _wordSearchPreview.value,
+            study = _wordStudy.value,
+            returnTab = _lexiconReturnTab.value
+        )
+        _selectedGreekWord.value = null
+        _selectedHebrewWord.value = null
+        _lexiconBaseVerse.value = null
+    }
+
+    // The word page [tab] shows: the open one, else the one below it, opened again as it was; the
+    // Reader when there's neither, rather than an empty page.
+    private fun wordPageTab(tab: NavTab): NavTab {
+        val open = if (tab == NavTab.GREEK_WORD) _selectedGreekWord.value else _selectedHebrewWord.value
+        if (open != null) return tab
+        if (_selectedGreekWord.value != null || _selectedHebrewWord.value != null) return NavTab.READER
+        val page = wordPagesBelow.removeLastOrNull() ?: return NavTab.READER
+        lexiconLookupJob?.cancel()
+        hebrewLexiconLookupJob?.cancel()
+        wordSearchPreviewJob?.cancel()
+        _selectedGreekWord.value = page.greek
+        _selectedHebrewWord.value = page.hebrew
+        if (page.greek != null) {
+            _lexiconResult.value = page.lexiconResult
+            _isLoadingLexicon.value = false
+            _greekWordScrollPosition.value = page.scrollPosition
+            if (page.lexiconResult == null) loadGreekLexicon(page.greek)
+        }
+        if (page.hebrew != null) {
+            _hebrewLexiconResult.value = page.lexiconResult
+            _isLoadingHebrewLexicon.value = false
+            _hebrewWordScrollPosition.value = page.scrollPosition
+            if (page.lexiconResult == null) loadHebrewLexicon(page.hebrew)
+        }
+        _lexiconBaseVerse.value = page.baseVerse
+        _lexiconOpenedFromSavedWords.value = page.openedFromSavedWords
+        _wordSearchPreview.value = page.searchPreview
+        _wordStudy.value = page.study
+        // Covered before its search data came in: worked out again.
+        if (page.searchPreview == null || page.study == null) {
+            loadWordSearchPreview(page.greek?.strongs ?: page.hebrew?.strongs, page.baseVerse)
+        }
+        return page.tab
+    }
+
+    // A word page just closed, or was backed out of: the one below it, if there is one, can be
+    // gone back to again by the Reader's "Return to … word" it had, or by the search it was in.
+    // Those that can't any more are dropped.
+    private fun rearmWordPageBelow() {
+        while (true) {
+            val below = wordPagesBelow.lastOrNull() ?: return
+            if (below.returnTab != null) {
+                _lexiconReturnTab.value = below.returnTab
+                return
+            }
+            if (_searchFromWordPage.value == below.tab) return
+            wordPagesBelow.removeAt(wordPagesBelow.lastIndex)
+        }
+    }
+
+    private fun loadGreekLexicon(word: GreekWord) {
+        _isLoadingLexicon.value = true
+        lexiconLookupJob = viewModelScope.launch {
+            val result = repository.getLexiconEntry(word.strongs)
+            _lexiconResult.value = result
+            _isLoadingLexicon.value = false
+        }
+    }
+
+    private fun loadHebrewLexicon(word: HebrewWord) {
+        _isLoadingHebrewLexicon.value = true
+        hebrewLexiconLookupJob = viewModelScope.launch {
+            val result = repository.getHebrewLexiconEntry(word.strongs)
+            _hebrewLexiconResult.value = result
+            _isLoadingHebrewLexicon.value = false
+        }
+    }
+
     private fun loadWordSearchPreview(strongs: String?, verse: Verse?) {
         wordSearchPreviewJob?.cancel()
         _wordSearchPreview.value = null
@@ -1817,6 +1928,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // dedicated no-op path for any future non-navigating "just clear it"
     // caller); baseVerse is only meaningful on that real-selection path.
     fun selectGreekWord(greekWord: GreekWord?, baseVerse: Verse? = null, openedFromSavedWords: Boolean = false) {
+        // A word tapped on a detour from another word's page: that page waits below this one.
+        if (greekWord != null) coverOpenWordPage()
         _selectedGreekWord.value = greekWord
         lexiconLookupJob?.cancel()
         _lexiconResult.value = null
@@ -1826,12 +1939,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _lexiconOpenedFromSavedWords.value = openedFromSavedWords
 
         _greekWordScrollPosition.value = 0
-        _isLoadingLexicon.value = true
-        lexiconLookupJob = viewModelScope.launch {
-            val result = repository.getLexiconEntry(greekWord.strongs)
-            _lexiconResult.value = result
-            _isLoadingLexicon.value = false
-        }
+        loadGreekLexicon(greekWord)
         loadWordSearchPreview(greekWord.strongs, baseVerse)
         selectTab(NavTab.GREEK_WORD)
     }
@@ -1857,6 +1965,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             jumpToLexiconBaseVerse()
             selectTab(NavTab.READER)
         }
+        rearmWordPageBelow()
     }
 
     // Bookmark toggle for GreekWordScreen's Save action — see
@@ -1886,6 +1995,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectHebrewWord(hebrewWord: HebrewWord?, baseVerse: Verse? = null, openedFromSavedWords: Boolean = false) {
+        // See selectGreekWord.
+        if (hebrewWord != null) coverOpenWordPage()
         _selectedHebrewWord.value = hebrewWord
         hebrewLexiconLookupJob?.cancel()
         _hebrewLexiconResult.value = null
@@ -1895,12 +2006,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _lexiconOpenedFromSavedWords.value = openedFromSavedWords
 
         _hebrewWordScrollPosition.value = 0
-        _isLoadingHebrewLexicon.value = true
-        hebrewLexiconLookupJob = viewModelScope.launch {
-            val result = repository.getHebrewLexiconEntry(hebrewWord.strongs)
-            _hebrewLexiconResult.value = result
-            _isLoadingHebrewLexicon.value = false
-        }
+        loadHebrewLexicon(hebrewWord)
         loadWordSearchPreview(hebrewWord.strongs, baseVerse)
         selectTab(NavTab.HEBREW_WORD)
     }
@@ -1942,6 +2048,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             jumpToLexiconBaseVerse()
             selectTab(NavTab.READER)
         }
+        rearmWordPageBelow()
     }
 
     // Shared by closeGreekWordPage/closeHebrewWordPage and
@@ -1974,9 +2081,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // stale definition.
     fun backToLexiconOriginVerse() {
         _lexiconReturnTab.value = null
+        // The banner was to a page below the one last closed (see WordPage): its verse, then.
+        if (_selectedGreekWord.value == null && _selectedHebrewWord.value == null) {
+            wordPagesBelow.removeLastOrNull()?.let { _lexiconBaseVerse.value = it.baseVerse }
+        }
         selectGreekWord(null)
         selectHebrewWord(null)
         jumpToLexiconBaseVerse()
+        rearmWordPageBelow()
     }
 
     // Which screen Cross References was opened from: Reader (a verse's
