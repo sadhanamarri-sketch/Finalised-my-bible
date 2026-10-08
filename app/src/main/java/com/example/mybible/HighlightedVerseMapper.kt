@@ -35,6 +35,8 @@ suspend fun buildHighlightedVerseItems(
             verse = highlight.verse,
             text = text,
             colorName = labelsByHex[highlight.colorHex.lowercase()] ?: "Uncategorized",
+            colorHex = highlight.colorHex.lowercase(),
+            updatedAt = highlight.updatedAt,
             noteText = highlight.noteId?.let { notesById[it]?.text }
         )
     }.sortedWith(compareBy({ BIBLE_BOOKS.indexOf(it.book) }, { it.chapter }, { it.verse }))

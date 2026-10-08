@@ -57,7 +57,7 @@ val CURATED_TOUR_STEPS: List<TourStep> = listOf(
     TourStep(
         NavTab.HIGHLIGHTS,
         "Highlighted Verses",
-        "Every verse you highlight shows up here, organized by color, with any notes you attached right underneath."
+        "Every verse you highlight shows up here, newest first, with any notes you attached right underneath. The filter button narrows it to a color, a book or a testament."
     ),
     TourStep(
         NavTab.NOTES,

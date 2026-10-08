@@ -10,6 +10,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.viewModelScope
 import com.example.mybible.HighlightedVerseItem
+import com.example.mybible.HighlightsFilter
 import com.example.mybible.StudyStats
 import com.example.mybible.StudySummary
 import com.example.mybible.buildHighlightedVerseItems
@@ -86,7 +87,8 @@ private const val DETOUR_SETTLE_MS = 300_000L
 // How long a tab change takes on screen (MainActivity's AnimatedContent:
 // the old tab is gone by 90 ms, or 300 ms to and from Verse Scroll, and the
 // new one in by about 310 ms). Work that would show on the outgoing tab
-// waits this long — see leaveReaderThenRestore and closeCrossReferences.
+// waits this long — see leaveReaderThenRestore, closeCrossReferences and
+// resetHighlightsPageWhenOffScreen.
 private const val TAB_CHANGE_MS = 400L
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -292,6 +294,55 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Highlights tab is exited entirely.
     private val _highlightsSourceVerse = MutableStateFlow<ReaderScrollAnchor?>(null)
 
+    // What the Highlighted Verses page is narrowed to, and where its list
+    // was scrolled. Kept here, not in the screen (which is torn down with
+    // its tab), so opening a verse and tapping Return lands back on the
+    // same list. Leaving the page starts it over — see
+    // resetHighlightsPageWhenOffScreen.
+    private val _highlightsFilter = MutableStateFlow(HighlightsFilter())
+    val highlightsFilter: StateFlow<HighlightsFilter> = _highlightsFilter.asStateFlow()
+
+    fun updateHighlightsFilter(change: (HighlightsFilter) -> HighlightsFilter) {
+        _highlightsFilter.value = change(_highlightsFilter.value)
+    }
+
+    private val _highlightsScrollIndex = MutableStateFlow(0)
+    val highlightsScrollIndex: StateFlow<Int> = _highlightsScrollIndex.asStateFlow()
+
+    private val _highlightsScrollOffset = MutableStateFlow(0)
+    val highlightsScrollOffset: StateFlow<Int> = _highlightsScrollOffset.asStateFlow()
+
+    fun saveHighlightsScrollPosition(index: Int, offset: Int) {
+        _highlightsScrollIndex.value = index
+        _highlightsScrollOffset.value = offset
+    }
+
+    // Newest first or Bible order: a preference, so it's saved and outlives
+    // the page's filters.
+    private val _highlightsNewestFirst = MutableStateFlow(repository.getHighlightsNewestFirst())
+    val highlightsNewestFirst: StateFlow<Boolean> = _highlightsNewestFirst.asStateFlow()
+
+    fun setHighlightsNewestFirst(newestFirst: Boolean) {
+        _highlightsNewestFirst.value = newestFirst
+        repository.setHighlightsNewestFirst(newestFirst)
+    }
+
+    private fun resetHighlightsPage() {
+        _highlightsFilter.value = HighlightsFilter()
+        _highlightsScrollIndex.value = 0
+        _highlightsScrollOffset.value = 0
+    }
+
+    // The page was left for good: next time it opens unfiltered, at the
+    // top. Done once it's off screen (it fades out — see TAB_CHANGE_MS), and
+    // skipped if it has been opened again by then.
+    private fun resetHighlightsPageWhenOffScreen() {
+        viewModelScope.launch {
+            delay(TAB_CHANGE_MS)
+            if (_activeTab.value != NavTab.HIGHLIGHTS) resetHighlightsPage()
+        }
+    }
+
     // Same pattern, for StudiedScreen's two jump-to-Reader entry points
     // ("Recently Studied" card, verse grid selection) — neither of those
     // used to set any return flag at all, so system back after either one
@@ -438,6 +489,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             jumpToVerse(source.book, source.chapter, source.verse)
             _isBlurModeEnabled.value = false
         }
+        resetHighlightsPageWhenOffScreen()
     }
 
     // See returnToStudied's doc for why this restores currentBook/
@@ -451,8 +503,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // No Return to the list any more, so nothing left to keep its filters for.
     fun dismissHighlightsReturnBanner() {
         _highlightsReturnAvailable.value = false
+        resetHighlightsPage()
     }
 
     // ---- Verse Scroll ----
@@ -1588,6 +1642,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _highlightsSourceVerse.value = null
         _studiedSourceVerse.value = null
         _notesSourceVerse.value = null
+        // Same for the Highlighted Verses page's filters, kept only for a
+        // Return to the list that can't happen now.
+        resetHighlightsPageWhenOffScreen()
         if (clearFocus) clearVerseFocus()
     }
 

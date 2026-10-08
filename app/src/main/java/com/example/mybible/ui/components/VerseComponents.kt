@@ -854,7 +854,7 @@ private fun HighlightSwatchItem(
 /** Parses a "#RRGGBB" hex string (as stored in HighlightColorDef/HighlightItem)
  *  into a Compose Color, or null if it's malformed — callers fall back to a
  *  neutral gray rather than crashing on a corrupted/hand-edited pref value. */
-private fun parseHexColorOrNull(hex: String): Color? {
+internal fun parseHexColorOrNull(hex: String): Color? {
     return try {
         val cleaned = hex.removePrefix("#")
         if (cleaned.length != 6) return null

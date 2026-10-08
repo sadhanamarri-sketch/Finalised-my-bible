@@ -466,22 +466,15 @@ class MainActivity : ComponentActivity() {
                             NavTab.GREEK_WORD -> GreekWordScreen(viewModel = viewModel)
                             NavTab.HEBREW_WORD -> HebrewWordScreen(viewModel = viewModel)
                             NavTab.VERSE_SCROLL -> VerseScrollScreen(viewModel = viewModel)
-                            NavTab.HIGHLIGHTS -> {
-                                val highlightedItems by viewModel.highlightedVerseItems.collectAsState()
-                                val currentBook by viewModel.currentBook.collectAsState()
-                                val currentChapter by viewModel.currentChapter.collectAsState()
-                                HighlightedVersesScreen(
-                                    highlights = highlightedItems,
-                                    themeMode = themeMode,
-                                    currentBook = currentBook,
-                                    currentChapter = currentChapter,
-                                    onOpenVerse = { viewModel.openHighlightedVerse(it) },
-                                    onClose = {
-                                        viewModel.backToHighlightsSourceVerse()
-                                        viewModel.selectTab(NavTab.READER)
-                                    }
-                                )
-                            }
+                            NavTab.HIGHLIGHTS -> HighlightedVersesScreen(
+                                viewModel = viewModel,
+                                themeMode = themeMode,
+                                onOpenVerse = { viewModel.openHighlightedVerse(it) },
+                                onClose = {
+                                    viewModel.backToHighlightsSourceVerse()
+                                    viewModel.selectTab(NavTab.READER)
+                                }
+                            )
                             NavTab.SETTINGS -> SettingsScreen(
                                 viewModel = viewModel,
                                 onShowTour = { viewModel.startTour() },

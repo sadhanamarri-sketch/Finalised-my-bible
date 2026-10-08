@@ -173,6 +173,11 @@ class BibleRepository(private val context: Context) {
         prefs.edit().putBoolean("red_letter_enabled", enabled).apply()
     }
 
+    // Highlighted Verses' order: newest first (the default) or Bible order.
+    fun getHighlightsNewestFirst(): Boolean = prefs.getBoolean("highlights_newest_first", true)
+    fun setHighlightsNewestFirst(newestFirst: Boolean) =
+        prefs.edit().putBoolean("highlights_newest_first", newestFirst).apply()
+
     fun getLastPosition(): Pair<String, Int> {
         val book = prefs.getString("last_book", "Genesis") ?: "Genesis"
         val chapter = prefs.getInt("last_chapter", 1)
