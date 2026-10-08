@@ -4,6 +4,8 @@ import android.content.Context
 import com.example.mybible.data.local.AppDatabase
 import com.example.mybible.data.local.BibleDao
 import com.example.mybible.data.local.CrossReferenceEntity
+import com.example.mybible.data.local.StudiedVerseEntity
+import com.example.mybible.data.local.UserDatabase
 import com.example.mybible.data.local.VerseEntity
 import com.example.mybible.model.*
 import com.example.mybible.ui.components.BIBLE_BOOKS
@@ -24,6 +26,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -91,6 +95,9 @@ class BibleRepository(private val context: Context) {
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
 
     private val bibleDao: BibleDao = AppDatabase.getInstance(context).bibleDao()
+
+    // The verses marked studied, a row each, in the reader's own database (see UserDatabase).
+    private val studiedDao = UserDatabase.getInstance(context).studiedVerseDao()
 
     /** Runs the one-time KJV download + Telugu asset import; see [BibleDataInitializer].
      *  A process-wide singleton (BibleDataInitializer.getInstance), not a fresh
@@ -252,13 +259,9 @@ class BibleRepository(private val context: Context) {
         prefs.edit().putBoolean("is_first_launch", false).apply()
     }
 
-    fun getTotalStudyTimeMs(): Long {
-        return prefs.getLong("total_study_time_ms", 0L)
-    }
-
-    fun addStudyTimeMs(deltaMs: Long) {
-        val current = getTotalStudyTimeMs()
-        prefs.edit().putLong("total_study_time_ms", current + deltaMs).apply()
+    init {
+        // Left by a study timer the app no longer has.
+        if (prefs.contains("total_study_time_ms")) prefs.edit().remove("total_study_time_ms").apply()
     }
 
     private val _notesFlow = MutableStateFlow<List<NoteItem>>(loadNotesFromPrefs())
@@ -355,10 +358,22 @@ class BibleRepository(private val context: Context) {
         prefs.edit().putString("tombstones_json", json.encodeToString(pruned)).apply()
     }
 
-    private fun recordTombstone(key: String) {
+    private fun recordTombstone(key: String) = recordTombstones(listOf(key))
+
+    private fun recordTombstones(keys: Collection<String>) {
+        if (keys.isEmpty()) return
+        val now = System.currentTimeMillis()
         val updated = _tombstonesFlow.value.toMutableMap()
-        updated[key] = System.currentTimeMillis()
+        for (key in keys) updated[key] = now
         saveTombstonesToPrefs(updated)
+    }
+
+    // Something deleted is back (a verse marked studied again, an undo): no longer deleted, so a
+    // restore or another device's backup doesn't skip it.
+    private fun clearTombstones(keys: Collection<String>) {
+        val current = _tombstonesFlow.value
+        if (keys.none { it in current }) return
+        saveTombstonesToPrefs(current - keys.toSet())
     }
 
     private fun noteTombstoneKey(id: Long) = "note:$id"
@@ -367,8 +382,11 @@ class BibleRepository(private val context: Context) {
     private fun tagTombstoneKey(name: String) = "tag:${name.lowercase(Locale.US)}"
     private fun savedWordTombstoneKey(dedupeKey: String) = "savedword:$dedupeKey"
 
-    private val _completedVersesFlow = MutableStateFlow<List<CompletedVerseItem>>(loadCompletedFromPrefs())
-    val allCompletedVerses: Flow<List<CompletedVerseItem>> = _completedVersesFlow.asStateFlow()
+    /** Every verse marked studied, again each time one is marked or unmarked, here or by a sync. */
+    val allCompletedVerses: Flow<List<CompletedVerseItem>> = flow {
+        moveLegacyCompletedVerses()
+        emitAll(studiedDao.observeAll().map { rows -> rows.map { it.toItem() } })
+    }
 
     private val _highlightsFlow = MutableStateFlow<List<HighlightItem>>(loadHighlightsFromPrefs())
     val allHighlights: Flow<List<HighlightItem>> = _highlightsFlow.asStateFlow()
@@ -423,14 +441,16 @@ class BibleRepository(private val context: Context) {
         prefs.edit().putString("saved_notes_json", json.encodeToString(list)).apply()
     }
 
-    private fun loadCompletedFromPrefs(): List<CompletedVerseItem> {
-        val str = prefs.getString("saved_completed_json", null) ?: return emptyList()
-        return try { json.decodeFromString(str) } catch (e: Exception) { emptyList() }
-    }
-
-    private fun saveCompletedToPrefs(list: List<CompletedVerseItem>) {
-        _completedVersesFlow.value = list
-        prefs.edit().putString("saved_completed_json", json.encodeToString(list)).apply()
+    // Studied verses were once one JSON list in these preferences, rewritten whole on every mark.
+    // They're moved into the database the first time they're needed, and the list removed.
+    private suspend fun moveLegacyCompletedVerses() {
+        if (!prefs.contains(LEGACY_COMPLETED_KEY)) return
+        studiedMutex.withLock {
+            val str = prefs.getString(LEGACY_COMPLETED_KEY, null) ?: return
+            val items = try { json.decodeFromString<List<CompletedVerseItem>>(str) } catch (_: Exception) { emptyList() }
+            withContext(Dispatchers.IO) { studiedDao.insertNew(items.map { it.toEntity() }) }
+            prefs.edit().remove(LEGACY_COMPLETED_KEY).apply()
+        }
     }
 
     // One-time wipe when upgrading into the fixed 12-color palette: old
@@ -658,6 +678,15 @@ class BibleRepository(private val context: Context) {
         bibleDao.countVersesForBooks(books)
     }
 
+    /** How many verses each chapter has, by book: Genesis to [31, 25, 24…]. Empty before the import. */
+    suspend fun getChapterVerseCounts(): Map<String, List<Int>> = withContext(Dispatchers.IO) {
+        bibleDao.chapterVerseCounts().groupBy { it.book }.mapValues { (_, rows) ->
+            val counts = IntArray(rows.maxOf { it.chapter })
+            for (row in rows) counts[row.chapter - 1] = row.verses
+            counts.toList()
+        }
+    }
+
     // Single-verse text lookup for list cards (Highlighted Verses, and
     // reused wherever a preview snippet is needed) — doesn't go through the
     // full getChapterVerses fallback chain since a card just needs
@@ -761,23 +790,79 @@ class BibleRepository(private val context: Context) {
     }
 
     // Persistence mutation actions
-    suspend fun toggleCompletedVerse(book: String, chapter: Int, verse: Int) {
-        val current = _completedVersesFlow.value.toMutableList()
-        val existing = current.find { it.book == book && it.chapter == chapter && it.verse == verse }
-        if (existing != null) {
-            current.remove(existing)
-            recordTombstone(completedTombstoneKey(book, chapter, verse))
-        } else {
-            current.add(CompletedVerseItem(book, chapter, verse, System.currentTimeMillis()))
+
+    /** Marks the verse studied, or unmarks it if it was: then it's returned, with when it was marked. */
+    suspend fun toggleCompletedVerse(book: String, chapter: Int, verse: Int): CompletedVerseItem? {
+        moveLegacyCompletedVerses()
+        return studiedMutex.withLock {
+            val existing = withContext(Dispatchers.IO) { studiedDao.find(book, chapter, verse) }
+            if (existing != null) {
+                withContext(Dispatchers.IO) { studiedDao.delete(book, chapter, verse) }
+                recordTombstone(completedTombstoneKey(book, chapter, verse))
+                existing.toItem()
+            } else {
+                withContext(Dispatchers.IO) { studiedDao.upsert(listOf(StudiedVerseEntity(book, chapter, verse, System.currentTimeMillis()))) }
+                clearTombstones(listOf(completedTombstoneKey(book, chapter, verse)))
+                null
+            }
         }
-        saveCompletedToPrefs(current)
     }
 
-    suspend fun removeCompletedVerse(book: String, chapter: Int, verse: Int) {
-        val current = _completedVersesFlow.value.toMutableList()
-        current.removeAll { it.book == book && it.chapter == chapter && it.verse == verse }
-        saveCompletedToPrefs(current)
-        recordTombstone(completedTombstoneKey(book, chapter, verse))
+    /** Marks the chapter's [verses] studied: those that weren't, which are returned. */
+    suspend fun markCompletedVerses(book: String, chapter: Int, verses: List<Int>): List<CompletedVerseItem> {
+        moveLegacyCompletedVerses()
+        return studiedMutex.withLock {
+            val now = System.currentTimeMillis()
+            val rows = verses.map { StudiedVerseEntity(book, chapter, it, now) }
+            val ids = withContext(Dispatchers.IO) { studiedDao.insertNew(rows) }
+            val added = rows.filterIndexed { i, _ -> ids.getOrElse(i) { -1L } != -1L }.map { it.toItem() }
+            clearTombstones(added.map { completedTombstoneKey(it.book, it.chapter, it.verse) })
+            added
+        }
+    }
+
+    /** Unmarks [items]: those that were studied, returned with when they were marked. */
+    suspend fun unmarkCompletedVerses(items: List<CompletedVerseItem>): List<CompletedVerseItem> {
+        moveLegacyCompletedVerses()
+        return studiedMutex.withLock {
+            val removed = withContext(Dispatchers.IO) {
+                val found = items.mapNotNull { studiedDao.find(it.book, it.chapter, it.verse) }
+                studiedDao.deleteEach(found)
+                found
+            }
+            recordTombstones(removed.map { completedTombstoneKey(it.book, it.chapter, it.verse) })
+            removed.map { it.toItem() }
+        }
+    }
+
+    /** Unmarks every studied verse of the chapter: they're returned, with when they were marked. */
+    suspend fun unmarkCompletedChapter(book: String, chapter: Int): List<CompletedVerseItem> {
+        moveLegacyCompletedVerses()
+        val studied = withContext(Dispatchers.IO) { studiedDao.inChapter(book, chapter) }
+        return unmarkCompletedVerses(studied.map { it.toItem() })
+    }
+
+    /** Unmarks every studied verse, to start over: they're returned, with when they were marked. */
+    suspend fun clearAllCompletedVerses(): List<CompletedVerseItem> {
+        moveLegacyCompletedVerses()
+        return studiedMutex.withLock {
+            val all = withContext(Dispatchers.IO) {
+                studiedDao.getAll().also { studiedDao.deleteAll() }
+            }
+            // So a backup in the cloud doesn't bring them back on the next sync.
+            recordTombstones(all.map { completedTombstoneKey(it.book, it.chapter, it.verse) })
+            all.map { it.toItem() }
+        }
+    }
+
+    /** Marks [items] studied again as they were, with their own times: an undo. */
+    suspend fun restoreCompletedVerses(items: List<CompletedVerseItem>) {
+        if (items.isEmpty()) return
+        moveLegacyCompletedVerses()
+        studiedMutex.withLock {
+            withContext(Dispatchers.IO) { studiedDao.upsert(items.map { it.toEntity() }) }
+            clearTombstones(items.map { completedTombstoneKey(it.book, it.chapter, it.verse) })
+        }
     }
 
     suspend fun setHighlight(book: String, chapter: Int, verse: Int, colorHex: String, noteId: Long? = null) {
@@ -1398,7 +1483,10 @@ class BibleRepository(private val context: Context) {
             // the only one that carries `description`.
             tags = _tagDefinitionsFlow.value.map { it.name },
             tagDefs = _tagDefinitionsFlow.value,
-            completed = _completedVersesFlow.value,
+            completed = run {
+                moveLegacyCompletedVerses()
+                studiedDao.getAll().map { it.toItem() }
+            },
             highlights = _highlightsFlow.value,
             highlightColorDefs = resolvedHighlightColorDefs(_highlightColorLabelOverridesFlow.value),
             savedWords = _savedWordsFlow.value,
@@ -1537,22 +1625,24 @@ class BibleRepository(private val context: Context) {
         // delete" signal beyond completedAt itself, which restore would
         // just overwrite with an older value anyway, so there's nothing
         // reliable to compare against the tombstone.
-        val existingCompleted = _completedVersesFlow.value
+        moveLegacyCompletedVerses()
         var completedAdded = 0
-        val mergedCompleted = existingCompleted.toMutableList()
-        for (incoming in data.completed) {
-            if (tombstones.containsKey(completedTombstoneKey(incoming.book, incoming.chapter, incoming.verse))) continue
-            val idx = mergedCompleted.indexOfFirst {
-                it.book == incoming.book && it.chapter == incoming.chapter && it.verse == incoming.verse
+        studiedMutex.withLock {
+            val mergedCompleted = studiedDao.getAll().associateByTo(HashMap()) { Triple(it.book, it.chapter, it.verse) }
+            val changed = LinkedHashMap<Triple<String, Int, Int>, StudiedVerseEntity>()
+            for (incoming in data.completed) {
+                if (tombstones.containsKey(completedTombstoneKey(incoming.book, incoming.chapter, incoming.verse))) continue
+                val key = Triple(incoming.book, incoming.chapter, incoming.verse)
+                val existing = mergedCompleted[key]
+                if (existing == null) completedAdded++
+                if (existing == null || incoming.completedAt < existing.completedAt) {
+                    val row = incoming.toEntity()
+                    mergedCompleted[key] = row
+                    changed[key] = row
+                }
             }
-            if (idx < 0) {
-                mergedCompleted.add(incoming)
-                completedAdded++
-            } else if (incoming.completedAt < mergedCompleted[idx].completedAt) {
-                mergedCompleted[idx] = incoming
-            }
+            studiedDao.upsert(changed.values.toList())
         }
-        saveCompletedToPrefs(mergedCompleted)
 
         // Highlights: union by (book, chapter, verse). Now that
         // HighlightItem carries updatedAt, a tombstoned key is skipped
@@ -1642,4 +1732,17 @@ class BibleRepository(private val context: Context) {
     // this uploads data on a schedule even when they're not in the app.
     fun getAutoBackupEnabled(): Boolean = prefs.getBoolean("auto_backup_enabled", false)
     fun setAutoBackupEnabled(enabled: Boolean) = prefs.edit().putBoolean("auto_backup_enabled", enabled).apply()
+
+    private companion object {
+        // Where studied verses were kept before the database (see moveLegacyCompletedVerses).
+        const val LEGACY_COMPLETED_KEY = "saved_completed_json"
+
+        // One change to the studied verses at a time, across every BibleRepository in the
+        // process (the app's, and a sync worker's): a mark, an undo, a restore's merge.
+        val studiedMutex = Mutex()
+
+        fun StudiedVerseEntity.toItem() = CompletedVerseItem(book, chapter, verse, completedAt)
+        fun CompletedVerseItem.toEntity() = StudiedVerseEntity(book, chapter, verse, completedAt)
+    }
+
 }

@@ -5,15 +5,11 @@ import android.content.Intent
 import android.util.Log
 import androidx.glance.appwidget.updateAll
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.viewModelScope
 import com.example.mybible.BiblePlace
 import com.example.mybible.HighlightedVerseItem
 import com.example.mybible.HighlightsFilter
-import com.example.mybible.StudyStats
-import com.example.mybible.StudySummary
+import com.example.mybible.StudiedProgress
 import com.example.mybible.buildHighlightedVerseItems
 import com.example.mybible.data.BibleDataImportWorker
 import com.example.mybible.data.BibleRepository
@@ -250,9 +246,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // completedVerses is a StateFlow (not a plain Flow) so pick-mode logic
     // below can read .value synchronously when a verse is tapped, the same
     // way Capacitor's toggleSelectVerse() reads the in-memory `completed`
-    // array directly rather than awaiting a fresh emission.
+    // array directly rather than awaiting a fresh emission. Kept current the
+    // whole session (Eagerly), not only while a screen shows it, so that
+    // .value is never a stale copy.
     val completedVerses: StateFlow<List<CompletedVerseItem>> =
-        repository.allCompletedVerses.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        repository.allCompletedVerses.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val notes = repository.allNotes
     val tagDefinitions = repository.allTagDefinitions
     val highlights = repository.allHighlights
@@ -989,21 +987,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _searchLastTappedKey.value = null
     }
 
-    // Timer state
-    private val _totalStudyTimeMs = MutableStateFlow(repository.getTotalStudyTimeMs())
-    val totalStudyTimeMs: StateFlow<Long> = _totalStudyTimeMs.asStateFlow()
-
-    private var timerJob: Job? = null
-
-    // Real consecutive-day streak (StudyStats.kt) rather than a flat
-    // "0 or 1" placeholder. completedAt is stored as epoch millis; StudyStats
-    // works in yyyy-MM-dd device-local day strings, so convert here at the
-    // one call site rather than changing the stored model.
+    // A note's date, yyyy-MM-dd in the device's own time zone (see todayDateString).
     private val studyDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-    val studySummary: StateFlow<StudySummary> =
-        repository.allCompletedVerses
-            .map { list -> StudyStats.summary(list.map { studyDateFormat.format(Date(it.completedAt)) }) }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), StudySummary(0, 0, 0, 0))
 
     // Bible data import progress (KJV download + Telugu asset load) — see BibleDataInitializer.
     val importProgress = repository.dataInitializer.progress
@@ -1018,6 +1003,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _ntTotalVerses = MutableStateFlow(0)
     val ntTotalVerses: StateFlow<Int> = _ntTotalVerses.asStateFlow()
+
+    // How many verses each chapter has, by book (Genesis: 31, 25, 24…), for the Studied page's
+    // progress per book and chapter. Read once the Bible data import finishes; empty until then.
+    private val _chapterVerseCounts = MutableStateFlow<Map<String, List<Int>>>(emptyMap())
+    val chapterVerseCounts: StateFlow<Map<String, List<Int>>> = _chapterVerseCounts.asStateFlow()
 
     // True once the cold-start restore below has fully landed: chapter
     // loaded (verses populated) and, if there was one, the saved verse
@@ -1064,25 +1054,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _initialRestoreComplete.value = true
         }
 
-        // Study time should only accrue while the app is actually in the
-        // foreground — previously it started once here and never stopped,
-        // so it counted process-alive time (including backgrounded) rather
-        // than time spent reading. ProcessLifecycleOwner gives us one
-        // app-wide foreground/background signal without wiring per-Activity
-        // lifecycle callbacks through the ViewModel.
-        // Deliberately NOT where the exact reading position gets persisted
-        // (see persistCurrentReadingPosition below and MainActivity's own
-        // onStop override) — ProcessLifecycleOwner debounces this callback
-        // by roughly 700ms to avoid false "backgrounded" signals from brief
-        // activity transitions, which is exactly right for study-time
-        // tracking but means backgrounding the app and reopening it (e.g.
-        // via the widget) within that window would race the save and could
-        // still find yesterday's — or no — saved verse.
-        ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
-            override fun onStart(owner: LifecycleOwner) = startStudyTimer()
-            override fun onStop(owner: LifecycleOwner) = stopStudyTimer()
-        })
-
         // Runs as WorkManager foreground work (see BibleDataImportWorker)
         // instead of a plain coroutine here, so the one-time download
         // actually survives the app being backgrounded. enqueue() is safe
@@ -1102,6 +1073,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val ntBooks = BIBLE_BOOKS.drop(BIBLE_BOOKS.indexOf("Matthew"))
             _otTotalVerses.value = repository.getVerseCountForBooks(otBooks)
             _ntTotalVerses.value = repository.getVerseCountForBooks(ntBooks)
+            _chapterVerseCounts.value = repository.getChapterVerseCounts()
         }
     }
 
@@ -1126,22 +1098,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             BibleDataImportWorker.awaitCompletion(appContext)
             loadCurrentChapter()
         }
-    }
-
-    private fun startStudyTimer() {
-        timerJob?.cancel()
-        timerJob = viewModelScope.launch {
-            while (true) {
-                delay(5000)
-                repository.addStudyTimeMs(5000)
-                _totalStudyTimeMs.value = repository.getTotalStudyTimeMs()
-            }
-        }
-    }
-
-    private fun stopStudyTimer() {
-        timerJob?.cancel()
-        timerJob = null
     }
 
     fun selectTab(tab: NavTab) {
@@ -2220,12 +2176,56 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Used by the Studied screen's multi-select mode (long-press to enter,
-    // tap to select, then remove) — removes rather than toggles, since a
-    // bulk action should never re-add an already-removed verse.
-    fun removeCompletedVerses(items: List<CompletedVerseItem>) {
+    /**
+     * A change to what's studied that can be taken back, while its message shows: a verse
+     * unmarked by a long-press, a chapter marked or unmarked, everything cleared. [id] tells one
+     * from the next.
+     */
+    class StudiedUndo(val id: Long, val message: String, internal val undo: suspend () -> Unit)
+
+    private val _studiedUndo = MutableStateFlow<StudiedUndo?>(null)
+    val studiedUndo: StateFlow<StudiedUndo?> = _studiedUndo.asStateFlow()
+    private var studiedUndoCount = 0L
+
+    private fun offerStudiedUndo(message: String, undo: suspend () -> Unit) {
+        _studiedUndo.value = StudiedUndo(++studiedUndoCount, message, undo)
+    }
+
+    fun undoStudiedChange(id: Long) {
+        val change = _studiedUndo.value?.takeIf { it.id == id } ?: return
+        _studiedUndo.value = null
+        viewModelScope.launch { change.undo() }
+    }
+
+    fun dismissStudiedUndo(id: Long) {
+        if (_studiedUndo.value?.id == id) _studiedUndo.value = null
+    }
+
+    /** The end of a chapter's "Mark … studied": the verses of it not yet studied, marked. */
+    fun markChapterStudied(book: String, chapter: Int) {
         viewModelScope.launch {
-            items.forEach { repository.removeCompletedVerse(it.book, it.chapter, it.verse) }
+            val verses = (1..repository.getVerseCount(book, chapter)).toList()
+            val added = repository.markCompletedVerses(book, chapter, verses)
+            if (added.isNotEmpty()) offerStudiedUndo("Marked $book $chapter studied") { repository.unmarkCompletedVerses(added) }
+        }
+    }
+
+    /** Every studied verse of the chapter, unmarked. */
+    fun unmarkChapterStudied(book: String, chapter: Int) {
+        viewModelScope.launch {
+            val removed = repository.unmarkCompletedChapter(book, chapter)
+            if (removed.isNotEmpty()) offerStudiedUndo("Unmarked $book $chapter") { repository.restoreCompletedVerses(removed) }
+        }
+    }
+
+    /** The Studied page's "Start over": no verse studied any more. */
+    fun clearAllStudied() {
+        viewModelScope.launch {
+            val removed = repository.clearAllCompletedVerses()
+            if (removed.isNotEmpty()) {
+                val count = if (removed.size == 1) "1 studied verse" else "${StudiedProgress.count(removed.size)} studied verses"
+                offerStudiedUndo("Cleared $count") { repository.restoreCompletedVerses(removed) }
+            }
         }
     }
 
@@ -2463,13 +2463,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val wasCompleted = completedVerses.value.any {
             it.book == verse.book && it.chapter == verse.chapter && it.verse == verse.number
         }
-        toggleCompletedVerse(verse.book, verse.chapter, verse.number)
         if (wasCompleted) {
             // Long-pressed an already-completed verse — nothing left
             // selected this session, so close immediately like a
-            // single-verse quick-toggle.
+            // single-verse quick-toggle, and say what happened, with an undo.
             _readerPickMode.value = ReaderPickMode.NONE
+            viewModelScope.launch {
+                val removed = repository.toggleCompletedVerse(verse.book, verse.chapter, verse.number) ?: return@launch
+                offerStudiedUndo("Unmarked ${verse.book} ${verse.chapter}:${verse.number}") {
+                    repository.restoreCompletedVerses(listOf(removed))
+                }
+            }
         } else {
+            toggleCompletedVerse(verse.book, verse.chapter, verse.number)
             studyPickSessionVerses.add(key)
         }
     }

@@ -372,9 +372,9 @@ private fun BookListGroupBanner(text: String, color: Color) {
 }
 
 // `chapters` defaults to the book's full 1..N range (BookChapterPickerSheet's
-// use case). The Studied browser passes a filtered subset (only chapters
-// containing a studied verse) and can override `cellBackground`/`cellContent`
-// to shade/badge each box without needing a second copy of the grid.
+// use case). The Studied browser shows every chapter too, and overrides
+// `cellBackground`/`cellContent` to shade/badge each box by how much of it is
+// studied, without needing a second copy of the grid.
 @Composable
 internal fun ChapterGridStep(
     bookName: String,
@@ -390,7 +390,9 @@ internal fun ChapterGridStep(
             letterSpacing = 0.sp,
             color = MaterialTheme.colorScheme.onBackground
         )
-    }
+    },
+    // Above the grid, under "All books": the Studied browser's progress and legend.
+    header: @Composable () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -408,6 +410,7 @@ internal fun ChapterGridStep(
                 .padding(vertical = 10.dp, horizontal = 4.dp)
                 .testTag("picker_back_to_books")
         )
+        header()
         LazyVerticalGrid(
             columns = GridCells.Fixed(6),
             horizontalArrangement = Arrangement.spacedBy(8.dp),

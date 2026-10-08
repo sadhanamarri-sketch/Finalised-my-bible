@@ -3,6 +3,7 @@ package com.example.mybible.ui.screens
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -1151,6 +1152,11 @@ fun ReaderScreen(
                         },
                     label = "chapterSwipe"
                 ) { _ ->
+                // The chapter's studied verses, by number: looked up for each verse, not searched for
+                // in every verse ever marked.
+                val studiedHere = remember(completedVerses, currentBook, currentChapter) {
+                    completedVerses.filter { it.book == currentBook && it.chapter == currentChapter }.mapTo(HashSet()) { it.verse }
+                }
                 LazyColumn(
                     state = listState,
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = bottomOverlayPaddingDp),
@@ -1171,9 +1177,7 @@ fun ReaderScreen(
                     }
 
                     itemsIndexed(verses) { idx, verse ->
-                        val isCompleted = completedVerses.any {
-                            it.book == verse.book && it.chapter == verse.chapter && it.verse == verse.number
-                        }
+                        val isCompleted = verse.number in studiedHere
                         val highlightObj = highlights.find {
                             it.book == verse.book && it.chapter == verse.chapter && it.verse == verse.number
                         }
@@ -1305,6 +1309,20 @@ fun ReaderScreen(
                                 runUnlessBlurred { viewModel.openEnglishWordLookup(word, baseVerse = verse) }
                             }
                         )
+                    }
+
+                    // The chapter's end: marking all of it studied in one tap, or, once it is, unmarking it.
+                    if (verses.isNotEmpty() && readerPickMode == ReaderPickMode.NONE) {
+                        item(key = "chapter-studied") {
+                            ChapterStudiedFooter(
+                                book = currentBook,
+                                chapter = currentChapter,
+                                studied = verses.count { it.number in studiedHere },
+                                verses = verses.size,
+                                onMark = { viewModel.markChapterStudied(currentBook, currentChapter) },
+                                onUnmark = { viewModel.unmarkChapterStudied(currentBook, currentChapter) }
+                            )
+                        }
                     }
                 }
                 }
@@ -1651,5 +1669,69 @@ private fun PillIconToggle(
             tint = if (active) activeColor else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(20.dp)
         )
+    }
+}
+
+/**
+ * The end of a chapter in the Reader: "Mark John 3 studied", one tap for every verse of it (with
+ * how many already are), or, once every verse is, that it's studied and a way to unmark it.
+ */
+@Composable
+private fun ChapterStudiedFooter(
+    book: String,
+    chapter: Int,
+    studied: Int,
+    verses: Int,
+    onMark: () -> Unit,
+    onUnmark: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 20.dp, bottom = 8.dp)
+    ) {
+        if (studied >= verses) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    text = "$book $chapter studied",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+                TextButton(onClick = onUnmark) {
+                    Text("Unmark", fontSize = 13.sp)
+                }
+            }
+        } else {
+            OutlinedButton(
+                onClick = onMark,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+                Text(
+                    text = "Mark $book $chapter studied",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+            if (studied > 0) {
+                Text(
+                    text = "$studied of $verses verses studied",
+                    fontSize = 12.5.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
+            }
+        }
     }
 }

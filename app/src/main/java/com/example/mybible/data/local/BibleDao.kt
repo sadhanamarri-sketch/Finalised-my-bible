@@ -34,6 +34,10 @@ interface BibleDao {
     @Query("SELECT COUNT(*) FROM verses WHERE book IN (:books)")
     suspend fun countVersesForBooks(books: List<String>): Int
 
+    // Every chapter's verse count, for the Studied page's progress per book and chapter.
+    @Query("SELECT book, chapter, COUNT(*) AS verses FROM verses GROUP BY book, chapter")
+    suspend fun chapterVerseCounts(): List<ChapterVerseCount>
+
     @Query("SELECT COUNT(*) FROM verses WHERE teluguText IS NOT NULL")
     suspend fun countTeluguVerses(): Int
 
@@ -187,3 +191,6 @@ interface BibleDao {
     suspend fun countWebsterEntries(): Int
 
 }
+
+/** One chapter's verse count (see BibleDao.chapterVerseCounts). */
+data class ChapterVerseCount(val book: String, val chapter: Int, val verses: Int)

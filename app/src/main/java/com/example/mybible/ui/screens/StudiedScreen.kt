@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,19 +17,28 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.mybible.BookProgress
+import com.example.mybible.ChapterProgress
+import com.example.mybible.ChapterState
+import com.example.mybible.StudiedProgress
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.components.BackTopBar
 import com.example.mybible.ui.components.BIBLE_BOOKS
+import com.example.mybible.ui.components.BOOK_CHAPTER_COUNTS
 import com.example.mybible.ui.components.BookListStep
 import com.example.mybible.ui.components.ChapterGridStep
 import com.example.mybible.ui.components.PickerDarkGold
 import com.example.mybible.ui.components.PickerPaperGold
 import com.example.mybible.ui.components.VerseGridStep
+import com.example.mybible.ui.theme.WorkSansFontFamily
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -68,14 +78,15 @@ private data class RecentGroup(
  * the last active day, and a Book -> Chapter -> Verse browser (built on the
  * same step components as
  * [com.example.mybible.ui.components.BookChapterPickerSheet]) for revisiting
- * what's been studied. Book and chapter steps are filtered down to only
- * what contains a studied verse; the verse step shows every verse in the
- * chapter for context, with studied ones filled/checked. Tapping any verse
- * jumps to it in the Reader.
+ * what's been studied. The book step lists the books with a studied verse,
+ * each with how much of it is studied; the chapter step shows every chapter
+ * of the book as done, partly studied or not started; the verse step shows
+ * every verse in the chapter for context, with studied ones filled/checked.
+ * Tapping any verse jumps to it in the Reader.
  *
- * Marking/unmarking a verse as studied is not available anywhere in this
- * screen — that's exclusively a Reader-tab action (long-press a verse, or
- * the picking-mode banner started from Reader's own menu).
+ * Marking/unmarking a verse as studied is a Reader-tab action (long-press a
+ * verse, the picking-mode banner, or a chapter's "Mark … studied" at its
+ * end). Here there's only starting over: clearing every mark at once.
  */
 @Composable
 fun StudiedScreen(
@@ -85,6 +96,9 @@ fun StudiedScreen(
     val completedList by viewModel.completedVerses.collectAsState(initial = emptyList())
     val otTotalVerses by viewModel.otTotalVerses.collectAsState()
     val ntTotalVerses by viewModel.ntTotalVerses.collectAsState()
+    val chapterVerseCounts by viewModel.chapterVerseCounts.collectAsState()
+    var showMenu by remember { mutableStateOf(false) }
+    var confirmClearAll by remember { mutableStateOf(false) }
 
     // Remembered across a tab visit — StudiedScreen is fully disposed (not
     // just hidden) on a tab switch, so without this, leaving mid-browse and
@@ -132,8 +146,15 @@ fun StudiedScreen(
 
     val studiedByBook = remember(completedList) { completedList.groupBy { it.book } }
     val studiedBooks = remember(studiedByBook) { BIBLE_BOOKS.filter { studiedByBook.containsKey(it) } }
-    val studiedChaptersForBook = remember(selectedBook, studiedByBook) {
-        selectedBook?.let { book -> studiedByBook[book]?.map { it.chapter }?.distinct()?.sorted() } ?: emptyList()
+    // Each book's verse counts by chapter, once the import has them; before, its chapters with
+    // their counts unknown (zero).
+    fun verseCountsOf(book: String): List<Int> =
+        chapterVerseCounts[book] ?: List(BOOK_CHAPTER_COUNTS[book] ?: 1) { 0 }
+    val bookProgress = remember(studiedByBook, chapterVerseCounts) {
+        studiedByBook.mapValues { (book, items) -> StudiedProgress.book(items, verseCountsOf(book)) }
+    }
+    val chapterProgress = remember(selectedBook, studiedByBook, chapterVerseCounts) {
+        selectedBook?.let { book -> StudiedProgress.chapters(studiedByBook[book].orEmpty(), verseCountsOf(book)) } ?: emptyList()
     }
     val studiedVersesForChapter = remember(selectedBook, selectedChapter, completedList) {
         if (selectedBook != null && selectedChapter != null) {
@@ -150,8 +171,6 @@ fun StudiedScreen(
         completedList.count { BIBLE_BOOKS.indexOf(it.book) < otCount }
     }
     val ntStudiedCount = completedList.size - otStudiedCount
-    val otProgress = if (otTotalVerses > 0) otStudiedCount.toFloat() / otTotalVerses else 0f
-    val ntProgress = if (ntTotalVerses > 0) ntStudiedCount.toFloat() / ntTotalVerses else 0f
 
     // Recently Studied — every verse marked on the most recent day that has
     // any studied verse at all, grouped by chapter and range-compressed.
@@ -204,10 +223,27 @@ fun StudiedScreen(
                     // tapping verses there marks them studied. Only shown at
                     // the top level. This is the one marking-related entry
                     // point that still lives in Studied; everything else
-                    // (unmarking, single-verse marking) stays Reader-only.
+                    // (unmarking, single-verse marking) stays Reader-only,
+                    // but for starting over, in the menu beside it.
                     if (selectedBook == null) {
                         TextButton(onClick = { viewModel.startStudyPicking() }) {
                             Text("+ Select", fontSize = 13.sp)
+                        }
+                        if (completedList.isNotEmpty()) {
+                            Box {
+                                IconButton(onClick = { showMenu = true }) {
+                                    Icon(Icons.Default.MoreVert, contentDescription = "More options")
+                                }
+                                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                                    DropdownMenuItem(
+                                        text = { Text("Clear all studied") },
+                                        onClick = {
+                                            showMenu = false
+                                            confirmClearAll = true
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -218,8 +254,10 @@ fun StudiedScreen(
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             if (selectedBook == null) {
                 TestamentProgressCard(
-                    otProgress = otProgress,
-                    ntProgress = ntProgress,
+                    otStudied = otStudiedCount,
+                    otTotal = otTotalVerses,
+                    ntStudied = ntStudiedCount,
+                    ntTotal = ntTotalVerses,
                     modifier = Modifier.padding(16.dp, 16.dp, 16.dp, 8.dp)
                 )
                 if (recentGroups.isNotEmpty()) {
@@ -266,9 +304,22 @@ fun StudiedScreen(
                         goldColor = goldColor,
                         books = studiedBooks,
                         trailingContent = { book ->
+                            val progress = bookProgress[book]
                             Text(
-                                text = "${studiedByBook[book]?.size ?: 0} studied",
+                                text = buildAnnotatedString {
+                                    if (progress == null || progress.verses == 0) {
+                                        append("${studiedByBook[book]?.size ?: 0} studied")
+                                    } else {
+                                        withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)) {
+                                            append(StudiedProgress.percent(progress.studied, progress.verses))
+                                        }
+                                        val chapters = if (progress.chapters == 1) "chapter" else "chapters"
+                                        append(" \u00B7 ${progress.chaptersDone} of ${progress.chapters} $chapters")
+                                    }
+                                },
                                 fontSize = 13.5.sp,
+                                fontFamily = WorkSansFontFamily,
+                                letterSpacing = 0.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         },
@@ -276,10 +327,18 @@ fun StudiedScreen(
                     )
                     selectedChapter == null -> ChapterGridStep(
                         bookName = selectedBook!!,
-                        chapters = studiedChaptersForBook,
+                        chapters = chapterProgress.map { it.chapter },
                         onBack = { selectedBook = null },
                         onChapterSelected = { chap -> selectedChapter = chap },
-                        cellBackground = { MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f) }
+                        cellBackground = { chap ->
+                            when (chapterProgress.getOrNull(chap - 1)?.state) {
+                                ChapterState.DONE -> MaterialTheme.colorScheme.primaryContainer
+                                ChapterState.PARTLY -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                                else -> Color.Transparent
+                            }
+                        },
+                        cellContent = { chap -> ChapterCell(chap, chapterProgress.getOrNull(chap - 1)) },
+                        header = { ChapterGridHeader(selectedBook!!, bookProgress[selectedBook!!]) }
                     )
                     else -> VerseGridStep(
                         bookName = selectedBook!!,
@@ -328,10 +387,36 @@ fun StudiedScreen(
             }
         }
     }
+
+    if (confirmClearAll) {
+        val count = completedList.size
+        AlertDialog(
+            onDismissRequest = { confirmClearAll = false },
+            title = { Text("Start over?") },
+            text = {
+                Text(
+                    "This unmarks all ${StudiedProgress.count(count)} studied " +
+                        (if (count == 1) "verse" else "verses") +
+                        ". Your notes and highlights stay as they are."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmClearAll = false
+                    viewModel.clearAllStudied()
+                }) {
+                    Text("Clear all", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmClearAll = false }) { Text("Cancel") }
+            }
+        )
+    }
 }
 
-// "Today" / "Yesterday" / "MMM d" — mirrors how most reading-streak style
-// UIs label a relative day rather than always showing a bare date.
+// "Today" / "Yesterday" / "MMM d" — a recent day the way people say it,
+// rather than always a bare date.
 private fun formatDayLabel(dayString: String, dayFormat: SimpleDateFormat): String {
     val todayStr = dayFormat.format(Date())
     val yesterdayStr = dayFormat.format(Calendar.getInstance().apply { add(Calendar.DATE, -1) }.time)
@@ -344,8 +429,10 @@ private fun formatDayLabel(dayString: String, dayFormat: SimpleDateFormat): Stri
 
 @Composable
 private fun TestamentProgressCard(
-    otProgress: Float,
-    ntProgress: Float,
+    otStudied: Int,
+    otTotal: Int,
+    ntStudied: Int,
+    ntTotal: Int,
     modifier: Modifier = Modifier
 ) {
     // Flat bordered box, not an elevated Card — matches the "boxed
@@ -360,14 +447,17 @@ private fun TestamentProgressCard(
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
             .padding(20.dp)
     ) {
-        TestamentProgressRow(label = "Old Testament", progress = otProgress)
+        TestamentProgressRow(label = "Old Testament", studied = otStudied, total = otTotal)
         Spacer(modifier = Modifier.height(14.dp))
-        TestamentProgressRow(label = "New Testament", progress = ntProgress)
+        TestamentProgressRow(label = "New Testament", studied = ntStudied, total = ntTotal)
     }
 }
 
+// A testament's share studied: "0.8%" (see StudiedProgress.percent, which never rounds a
+// little up to nothing or a lot up to done), a bar on a track of the same color, lighter, and
+// the verses themselves: "200 of 23,145 verses".
 @Composable
-private fun TestamentProgressRow(label: String, progress: Float) {
+private fun TestamentProgressRow(label: String, studied: Int, total: Int) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -376,20 +466,129 @@ private fun TestamentProgressRow(label: String, progress: Float) {
         ) {
             Text(text = label, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
             Text(
-                text = "${(progress * 100).toInt()}%",
+                text = StudiedProgress.percent(studied, total),
                 fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
         Spacer(modifier = Modifier.height(6.dp))
         LinearProgressIndicator(
-            progress = { progress.coerceIn(0f, 1f) },
+            progress = { if (total > 0) (studied.toFloat() / total).coerceIn(0f, 1f) else 0f },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(8.dp)
                 .clip(RoundedCornerShape(4.dp)),
-            trackColor = MaterialTheme.colorScheme.surfaceVariant
+            trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+            gapSize = 0.dp,
+            drawStopIndicator = {}
         )
+        if (total > 0) {
+            Text(
+                text = "${StudiedProgress.count(studied)} of ${StudiedProgress.count(total)} verses",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 5.dp)
+            )
+        }
+    }
+}
+
+// Above a book's chapters: how much of it is studied, and what the chapters' marks mean.
+@Composable
+private fun ChapterGridHeader(book: String, progress: BookProgress?) {
+    Column(modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)) {
+        if (progress != null && progress.verses > 0) {
+            Text(
+                text = "${StudiedProgress.percent(progress.studied, progress.verses)} of $book studied \u00B7 " +
+                    "${progress.chaptersDone} of ${progress.chapters} " + (if (progress.chapters == 1) "chapter" else "chapters") + " done",
+                fontSize = 13.5.sp,
+                fontFamily = WorkSansFontFamily,
+                letterSpacing = 0.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(top = 8.dp)
+        ) {
+            LegendItem(ChapterState.DONE, "Done")
+            LegendItem(ChapterState.PARTLY, "Partly")
+            LegendItem(ChapterState.NOT_STARTED, "Not started")
+        }
+    }
+}
+
+@Composable
+private fun LegendItem(state: ChapterState, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(14.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(
+                    when (state) {
+                        ChapterState.DONE -> MaterialTheme.colorScheme.primaryContainer
+                        ChapterState.PARTLY -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                        ChapterState.NOT_STARTED -> Color.Transparent
+                    }
+                )
+                .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(3.dp))
+        ) {
+            if (state == ChapterState.PARTLY) {
+                Box(
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth(0.5f)
+                        .height(2.dp)
+                        .background(MaterialTheme.colorScheme.primary)
+                )
+            }
+        }
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            fontFamily = WorkSansFontFamily,
+            letterSpacing = 0.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 6.dp)
+        )
+    }
+}
+
+// One chapter of the grid: its number, a check when every verse is studied, and a line along
+// the bottom for how much of it is when it's partly.
+@Composable
+private fun BoxScope.ChapterCell(chapter: Int, progress: ChapterProgress?) {
+    val state = progress?.state ?: ChapterState.NOT_STARTED
+    Text(
+        text = "$chapter",
+        fontSize = 15.5.sp,
+        fontFamily = WorkSansFontFamily,
+        letterSpacing = 0.sp,
+        fontWeight = if (state == ChapterState.DONE) FontWeight.SemiBold else FontWeight.Normal,
+        color = if (state == ChapterState.DONE) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onBackground,
+        modifier = Modifier.align(Alignment.Center)
+    )
+    when (state) {
+        ChapterState.DONE -> Icon(
+            imageVector = Icons.Default.CheckCircle,
+            contentDescription = "Studied",
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(2.dp)
+                .size(10.dp)
+        )
+        ChapterState.PARTLY -> Box(
+            Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth(progress!!.fraction.coerceIn(0.08f, 1f))
+                .height(3.dp)
+                .background(MaterialTheme.colorScheme.primary)
+        )
+        ChapterState.NOT_STARTED -> Unit
     }
 }
 

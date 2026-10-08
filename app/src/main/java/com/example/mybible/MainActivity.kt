@@ -20,9 +20,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -787,6 +789,36 @@ class MainActivity : ComponentActivity() {
 
                     if (tourJustFinishedCurated) {
                         TourCuratedEndDialog(onDismiss = { viewModel.dismissTourCuratedEndNote() })
+                    }
+
+                    // A change to what's studied, with a way to take it back: "Unmarked John 3:16",
+                    // "Marked John 3 studied", "Cleared 1,234 studied verses" (see
+                    // MainViewModel.studiedUndo). Over whichever page is showing; on the Reader,
+                    // above its bar.
+                    val studiedUndo by viewModel.studiedUndo.collectAsState()
+                    val studiedSnackbar = remember { SnackbarHostState() }
+                    LaunchedEffect(studiedUndo?.id) {
+                        val change = studiedUndo ?: return@LaunchedEffect
+                        val result = studiedSnackbar.showSnackbar(change.message, actionLabel = "Undo", duration = SnackbarDuration.Long)
+                        if (result == SnackbarResult.ActionPerformed) viewModel.undoStudiedChange(change.id)
+                        else viewModel.dismissStudiedUndo(change.id)
+                    }
+                    SnackbarHost(
+                        hostState = studiedSnackbar,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .navigationBarsPadding()
+                            .padding(bottom = if (activeTab == NavTab.READER) 84.dp else 16.dp)
+                    ) { data ->
+                        // The page's ink and paper the other way round, and "Undo" in gold, not
+                        // Material's default purple-gray (the themes don't set its inverse colors).
+                        val inkIsDark = MaterialTheme.colorScheme.onBackground.luminance() < 0.5f
+                        Snackbar(
+                            snackbarData = data,
+                            containerColor = MaterialTheme.colorScheme.onBackground,
+                            contentColor = MaterialTheme.colorScheme.background,
+                            actionColor = if (inkIsDark) PickerDarkGold else Color(0xFF6B5218)
+                        )
                     }
                 }
             }
