@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -19,6 +20,8 @@ import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.*
@@ -38,6 +41,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -45,6 +49,7 @@ import com.example.mybible.SheetChip
 import com.example.mybible.model.SearchHit
 import com.example.mybible.model.SearchOutcome
 import com.example.mybible.model.SearchSource
+import com.example.mybible.model.TopicCard
 import com.example.mybible.model.ThemeMode
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
@@ -57,6 +62,23 @@ fun SearchScreen(
     viewModel: MainViewModel,
     themeMode: ThemeMode,
     modifier: Modifier = Modifier
+) {
+    // A Nave's topic opened from the results covers them, with its own back; the results keep
+    // their place underneath (saved as they leave, like a trip to the Reader).
+    val openTopic by viewModel.openTopic.collectAsState()
+    val topic = openTopic
+    if (topic != null) {
+        TopicScreen(topic, viewModel, modifier)
+    } else {
+        SearchPage(viewModel, themeMode, modifier)
+    }
+}
+
+@Composable
+private fun SearchPage(
+    viewModel: MainViewModel,
+    themeMode: ThemeMode,
+    modifier: Modifier
 ) {
     val searchQuery by viewModel.searchQuery.collectAsState()
     val outcome by viewModel.searchOutcome.collectAsState()
@@ -347,6 +369,11 @@ fun SearchScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
+                if (outcome.topics.isNotEmpty()) {
+                    item(key = "topics") {
+                        TopicCards(outcome.topics, onOpen = { viewModel.openTopic(it.topicId, it.section) })
+                    }
+                }
                 // Shown even when nothing is left on: it's how to turn things back on.
                 if (outcome.sources.isNotEmpty()) {
                     item(key = "sources") {
@@ -423,6 +450,91 @@ private fun SourceChips(sources: List<SearchSource>, themeMode: ThemeMode, onTog
     }
 }
 
+// Nave's topics the search names: the first few, the rest a tap away.
+@Composable
+private fun TopicCards(topics: List<TopicCard>, onOpen: (TopicCard) -> Unit) {
+    var showAll by remember(topics) { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ResultsHeading("Topics")
+        for (topic in if (showAll) topics else topics.take(TOPICS_SHOWN)) TopicCardRow(topic) { onOpen(topic) }
+        if (!showAll && topics.size > TOPICS_SHOWN) {
+            Text(
+                text = "More topics (${topics.size - TOPICS_SHOWN})",
+                fontSize = 13.5.sp,
+                fontFamily = WorkSansFontFamily,
+                letterSpacing = 0.sp,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .clickable { showAll = true }
+                    .padding(vertical = 4.dp)
+            )
+        }
+    }
+}
+
+private const val TOPICS_SHOWN = 3
+
+@Composable
+private fun TopicCardRow(topic: TopicCard, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.MenuBook,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = topic.name + (topic.sectionLabel?.let { " › $it" } ?: ""),
+                    fontSize = 15.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = WorkSansFontFamily,
+                    letterSpacing = 0.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                // "Anxiety: see Care" — why a search for anxiety shows Care.
+                val detail = topic.via?.let { "$it: see ${topic.name}" } ?: topic.summary
+                if (detail.isNotBlank()) {
+                    Text(
+                        text = detail,
+                        fontSize = 13.sp,
+                        fontFamily = WorkSansFontFamily,
+                        letterSpacing = 0.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            Text(
+                text = "${topic.referenceCount}",
+                fontSize = 13.sp,
+                fontFamily = WorkSansFontFamily,
+                letterSpacing = 0.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 8.dp)
+            )
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
 @Composable
 private fun DidYouMean(suggestion: String, onClick: () -> Unit) {
     Text(
@@ -470,7 +582,8 @@ private fun SearchHelp() {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.weight(1f).fillMaxWidth()) {
             Text(
                 text = "Type a word or a phrase (“worry”, “love one another”) or a reference (“John 3”, “John 3:16”). " +
-                    "Search finds other forms of your words, how the King James says them, and verses with the same Greek or Hebrew word.",
+                    "Search finds other forms of your words, how the King James says them, verses with the same Greek or Hebrew word, " +
+                    "and topics from Nave’s Topical Bible.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontFamily = WorkSansFontFamily,
                 letterSpacing = 0.sp,
@@ -480,7 +593,8 @@ private fun SearchHelp() {
         }
         Text(
             text = "Greek and Hebrew meanings: STEPBible.org, Tyndale House (CC BY 4.0). " +
-                "King James renderings: Strong’s, via Open Scriptures (CC BY-SA).",
+                "King James renderings: Strong’s, via Open Scriptures (CC BY-SA). " +
+                "Topics: Nave’s Topical Bible, structured by BibleData (CC BY 4.0).",
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
             fontFamily = WorkSansFontFamily,
             letterSpacing = 0.sp,

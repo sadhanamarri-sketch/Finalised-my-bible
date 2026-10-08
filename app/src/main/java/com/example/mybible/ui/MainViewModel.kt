@@ -66,6 +66,20 @@ enum class TourMode { NONE, CHOOSING, CURATED, FULL }
 // book/chapter granularity).
 data class ReaderScrollAnchor(val book: String, val chapter: Int, val verse: Int)
 
+// A Nave's topic open over Search's results (see TopicScreen): its page, which of its sections are
+// unfolded, where its list was scrolled to, and a section to bring into view when it opens.
+data class OpenTopic(
+    val page: TopicPage,
+    val expanded: Set<Int>,
+    val focusSection: Int? = null,
+    val scrollIndex: Int = 0,
+    val scrollOffset: Int = 0
+)
+
+// A topic with up to this many references opens with every section unfolded; a bigger one (God
+// has over 3,000 references under 72 headings) with its headings folded, to open one at a time.
+private const val TOPIC_UNFOLDED_MAX = 40
+
 // How long to wait after the last scroll update before writing the exact
 // reading position to disk (see MainViewModel.reportLiveTopVerse) — long
 // enough that active scrolling doesn't turn into a write per frame, short
@@ -897,6 +911,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Ids of the chips switched off: word forms, a King James wording, a Greek or Hebrew word
     // (see SearchSource). Per search — a new query starts with everything on.
     private val _searchDisabledSources = MutableStateFlow<Set<String>>(emptySet())
+
+    // Nave's topics opened from Search, the one on screen last: a topic's "see" links open more on
+    // top, and back closes them one at a time. Kept through a trip to the Reader and back, like
+    // the results under them; gone with the search session.
+    private val _topicStack = MutableStateFlow<List<OpenTopic>>(emptyList())
+    val openTopic: StateFlow<OpenTopic?> =
+        _topicStack.map { it.lastOrNull() }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     // Scroll position of the search results list, saved/restored across tab
     // switches since SearchScreen is fully disposed (not just hidden) when
@@ -2598,6 +2619,48 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         searchJob = viewModelScope.launch { performSearch(query, showProgress = false) }
     }
 
+    fun openTopic(topicId: Int, section: Int? = null) {
+        // A link to another heading of the topic on screen ("see King, above") goes there.
+        if (_topicStack.value.lastOrNull()?.page?.topicId == topicId) {
+            if (section != null) updateTopTopic { it.copy(expanded = it.expanded + section, focusSection = section) }
+            return
+        }
+        viewModelScope.launch {
+            val page = repository.topicPage(topicId) ?: return@launch
+            val sections = page.items.filterIsInstance<TopicItem.Section>().map { it.index }
+            // Sections under no heading have nothing to unfold them with.
+            val expanded = if (page.referenceCount <= TOPIC_UNFOLDED_MAX) sections.toSet()
+            else sections.filter { it < 0 }.toSet() + listOfNotNull(section)
+            _topicStack.value = _topicStack.value + OpenTopic(page, expanded, focusSection = section)
+        }
+    }
+
+    fun closeTopic() {
+        _topicStack.value = _topicStack.value.dropLast(1)
+        // Back on the results under it, not in the search box with the keyboard up.
+        if (_topicStack.value.isEmpty()) _suppressNextSearchAutofocus.value = true
+    }
+
+    fun toggleTopicSection(index: Int) = updateTopTopic { topic ->
+        topic.copy(expanded = if (index in topic.expanded) topic.expanded - index else topic.expanded + index)
+    }
+
+    fun consumeTopicFocus() = updateTopTopic { it.copy(focusSection = null) }
+
+    // By topic, not "the one on top": a page saves its place as it goes, which may be after a
+    // link has opened another topic over it, or back has closed it.
+    fun saveTopicScrollPosition(topicId: Int, index: Int, offset: Int) {
+        val stack = _topicStack.value
+        val at = stack.indexOfLast { it.page.topicId == topicId }
+        if (at < 0) return
+        _topicStack.value = stack.toMutableList().also { it[at] = it[at].copy(scrollIndex = index, scrollOffset = offset) }
+    }
+
+    private fun updateTopTopic(change: (OpenTopic) -> OpenTopic) {
+        val stack = _topicStack.value
+        if (stack.isNotEmpty()) _topicStack.value = stack.dropLast(1) + change(stack.last())
+    }
+
     private suspend fun performSearch(query: String, showProgress: Boolean = true) {
         if (showProgress) _isSearching.value = true
         _searchOutcome.value = repository.searchBible(
@@ -2678,6 +2741,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _searchQuery.value = ""
         _searchOutcome.value = SearchOutcome()
         _searchDisabledSources.value = emptySet()
+        _topicStack.value = emptyList()
         _isSearching.value = false
         _searchLastTappedKey.value = null
         _searchSourceVerse.value = null

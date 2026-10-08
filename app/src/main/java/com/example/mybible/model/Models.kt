@@ -134,9 +134,52 @@ data class SearchOutcome(
     /** A spelling the Bible has, offered only when nothing was found ("fiath" → "faith"). */
     val suggestion: String? = null,
     /** No verse has every word: [hits] are the verses with all but one. */
-    val closeMatches: Boolean = false
+    val closeMatches: Boolean = false,
+    /** Nave's topics the search names, shown above the verses. */
+    val topics: List<TopicCard> = emptyList()
 ) {
     val relatedCount: Int get() = hits.size - exactCount
+}
+
+/** A Nave's Topical Bible topic a search found, as a card above the verses. */
+data class TopicCard(
+    val topicId: Int,
+    val name: String,
+    /** The part of it the search named ("Of enemies" for "forgive enemies"), which it opens at. */
+    val section: Int? = null,
+    val sectionLabel: String? = null,
+    /** The topic the search actually named, when that one only says "see" this: Anxiety for Care. */
+    val via: String? = null,
+    val referenceCount: Int,
+    /** Its first few headings: "Worldly · Remedy for · Instances of". */
+    val summary: String
+)
+
+/** A Nave's topic as its page shows it: its sections, each a heading that can fold, and "see" links. */
+data class TopicPage(val topicId: Int, val name: String, val items: List<TopicItem>) {
+    val referenceCount: Int get() = items.sumOf { (it as? TopicItem.Section)?.referenceCount ?: 0 }
+}
+
+sealed interface TopicItem {
+    /**
+     * One of Nave's main headings ("Worldly", "Remedy for") with everything under it. [index] is
+     * its place among them, what a link's section means; negative for verses under no heading.
+     */
+    data class Section(val index: Int, val label: String, val referenceCount: Int, val rows: List<TopicRow>) : TopicItem
+
+    data class Link(val text: String, val topicId: Int, val section: Int?) : TopicItem
+}
+
+sealed interface TopicRow {
+    /** Nave's indent: 0 for a main heading's own verses, then 1 to 3 for those under a subheading. */
+    val level: Int
+
+    data class Heading(override val level: Int, val label: String) : TopicRow
+
+    /** A verse or passage ("Matthew 6:25–34"), with its first verse's text. */
+    data class Reference(override val level: Int, val label: String, val preview: String, val verse: Verse) : TopicRow
+
+    data class Link(override val level: Int, val text: String, val topicId: Int, val section: Int?) : TopicRow
 }
 
 @Serializable

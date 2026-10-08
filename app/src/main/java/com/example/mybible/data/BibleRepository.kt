@@ -12,6 +12,8 @@ import com.example.mybible.search.BibleIndex
 import com.example.mybible.search.IndexedVerse
 import com.example.mybible.search.SearchLexicon
 import com.example.mybible.search.SmartSearch
+import com.example.mybible.search.TopicBook
+import com.example.mybible.search.TopicSearch
 import com.example.mybible.search.hasLatinLetter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -892,8 +894,11 @@ class BibleRepository(private val context: Context) {
     // opens. A typed reference ("john 3", "1 john 3:16") opens that chapter or verse instead,
     // and a search typed in Telugu looks through the Telugu text.
 
+    // Verse search and Nave's topics, sharing the index and word data.
+    private class SearchEngine(val verses: SmartSearch, val topics: TopicSearch)
+
     private val searchEngineMutex = Mutex()
-    private var searchEngineCache: SmartSearch? = null
+    private var searchEngineCache: SearchEngine? = null
 
     /** Builds Search's index ahead of the first search: called as Search opens. */
     suspend fun prepareSearch() {
@@ -902,15 +907,18 @@ class BibleRepository(private val context: Context) {
 
     // Null until the first import has the whole KJV: an index built from part of it would stay
     // that way for the rest of the run, so until then searches use textSearch.
-    private suspend fun searchEngine(): SmartSearch? = searchEngineMutex.withLock {
+    private suspend fun searchEngine(): SearchEngine? = searchEngineMutex.withLock {
         searchEngineCache?.let { return@withLock it }
         if (bibleDao.countAllVerses() < FULL_BIBLE_VERSE_THRESHOLD) return@withLock null
         val bookIndex = BIBLE_BOOKS.withIndex().associate { (i, book) -> book to i }
         val verses = bibleDao.getAllVerseTexts().mapNotNull { row ->
             bookIndex[row.book]?.let { IndexedVerse(row.book, it, row.chapter, row.number, row.text) }
         }
-        val lexicon = SearchLexicon.load { name -> context.assets.open("search/$name") }
-        SmartSearch(BibleIndex(verses), lexicon).also { searchEngineCache = it }
+        val open = { name: String -> context.assets.open("search/$name") }
+        val lexicon = SearchLexicon.load(open)
+        val index = BibleIndex(verses)
+        SearchEngine(SmartSearch(index, lexicon), TopicSearch(TopicBook.load(open), lexicon, index))
+            .also { searchEngineCache = it }
     }
 
     // disabledSources: the ids of the chips switched off on the Search page (see SearchSource).
@@ -930,7 +938,14 @@ class BibleRepository(private val context: Context) {
 
         if (!hasLatinLetter(q)) return@withContext textSearch(q, caseSensitive)
         val engine = searchEngine() ?: return@withContext textSearch(q, caseSensitive)
-        engine.search(q, caseSensitive, disabledSources)
+        val outcome = engine.verses.search(q, caseSensitive, disabledSources)
+        // Topics go by meaning, not spelling: none for a case-sensitive search.
+        if (caseSensitive) outcome else outcome.copy(topics = engine.topics.find(q))
+    }
+
+    /** A Nave's topic's page, for Search: its headings and verses (see TopicSearch.page). */
+    suspend fun topicPage(id: Int): TopicPage? = withContext(Dispatchers.Default) {
+        searchEngine()?.topics?.page(id)
     }
 
     // Every word of the query somewhere in the English or the Telugu, letter for letter: for

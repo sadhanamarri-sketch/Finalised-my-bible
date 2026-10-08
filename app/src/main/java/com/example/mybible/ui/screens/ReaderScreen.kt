@@ -40,6 +40,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -127,6 +128,8 @@ fun ReaderScreen(
     val focusedVerseBlurEnabled by viewModel.focusedVerseBlurEnabled.collectAsState()
     val focusedVersePinToTop by viewModel.focusedVersePinToTop.collectAsState()
     val searchReturnAvailable by viewModel.searchReturnAvailable.collectAsState()
+    // A verse opened from a Nave's topic page returns to that page (see TopicScreen).
+    val searchTopic by viewModel.openTopic.collectAsState()
     val lexiconReturnTab by viewModel.lexiconReturnTab.collectAsState()
     val noteReturnItem by viewModel.noteReturnItem.collectAsState()
     val highlightsReturnAvailable by viewModel.highlightsReturnAvailable.collectAsState()
@@ -721,10 +724,12 @@ fun ReaderScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Return to search results",
+                                text = searchTopic?.let { "Return to “${it.page.name}”" } ?: "Return to search results",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f)
                             )
                             Button(
