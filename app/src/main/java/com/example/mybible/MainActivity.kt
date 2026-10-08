@@ -84,7 +84,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        currentIntent = intent
+        // Only on a fresh start. Rebuilt (a rotation, a dark-mode switch),
+        // the activity gets back the intent it was first started with —
+        // handled already, and handling it again jumped back to a widget
+        // shortcut's tab from wherever the user had gone since.
+        if (savedInstanceState == null) currentIntent = intent
 
         setContent {
             val viewModel: MainViewModel = viewModel()
@@ -218,6 +222,7 @@ class MainActivity : ComponentActivity() {
                 // chapter instead of the saved verse.
                 if (intent.getBooleanExtra(WidgetActionKeys.EXTRA_CONTINUE_READING, false)) {
                     viewModel.clearStaleReaderDetours(clearFocus = false)
+                    viewModel.closePagesOverTabs()
                     viewModel.selectTab(NavTab.READER)
                     return@remember Unit
                 }
@@ -239,7 +244,11 @@ class MainActivity : ComponentActivity() {
                 val openTabName = intent.getStringExtra(WidgetActionKeys.EXTRA_OPEN_TAB)
                 if (!openTabName.isNullOrEmpty()) {
                     val tab = try { NavTab.valueOf(openTabName) } catch (e: IllegalArgumentException) { null }
-                    if (tab != null) viewModel.selectTab(tab)
+                    if (tab != null) {
+                        // Or a note left open over the tabs would cover it.
+                        viewModel.closePagesOverTabs()
+                        viewModel.selectTab(tab)
+                    }
                 }
                 Unit
             }

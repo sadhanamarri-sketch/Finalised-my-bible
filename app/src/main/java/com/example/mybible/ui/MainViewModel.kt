@@ -2116,6 +2116,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _noteToRead.value = null
     }
 
+    // A widget shortcut lands on its own destination, so the pages that
+    // slide up over the tabs close first: a note being read, Tags, Saved
+    // Words, the book picker, a word or verse-mention preview. Left open
+    // from before the app went to the background, they covered the very tab
+    // the shortcut had just opened. The note editor stays open — it may
+    // hold writing that isn't saved yet.
+    fun closePagesOverTabs() {
+        closeNoteReader()
+        closeTagsScreen()
+        closeSavedWordsScreen()
+        setShowBookPicker(false)
+        dismissEnglishWordSheet()
+        closeVerseMentionPreview()
+    }
+
     // Opens the editor directly for a single known verse (from the verse
     // action toolbar's "Add note" / "Add another note") or an existing note
     // (edit). Mirrors Capacitor's startNewNote(b,c,v) / openNoteEditor(note).
