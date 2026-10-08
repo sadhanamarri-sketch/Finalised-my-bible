@@ -132,8 +132,13 @@ fun CrossReferenceScreen(
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
+            // Read once, here: the LazyColumn below also builds its item
+            // list outside composition, and reading crossReferences there
+            // crashed the app (!! on null) when the list was cleared with
+            // the page still on screen.
+            val list = crossReferences
             when {
-                crossReferences == null -> {
+                list == null -> {
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier.fillMaxSize()
@@ -141,7 +146,7 @@ fun CrossReferenceScreen(
                         CircularProgressIndicator()
                     }
                 }
-                crossReferences!!.isEmpty() -> {
+                list.isEmpty() -> {
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier.fillMaxSize()
@@ -163,7 +168,7 @@ fun CrossReferenceScreen(
                         modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        items(crossReferences!!) { item ->
+                        items(list) { item ->
                             val itemKey = "${item.targetBook}:${item.targetChapter}:${item.targetVerse}"
                             val isLastTapped = itemKey == lastTappedKey
                             Card(

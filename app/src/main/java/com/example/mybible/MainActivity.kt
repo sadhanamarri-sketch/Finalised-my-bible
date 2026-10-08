@@ -300,9 +300,10 @@ class MainActivity : ComponentActivity() {
                     NavTab.HIGHLIGHTS -> viewModel.backToHighlightsSourceVerse()
                     NavTab.STUDIED -> viewModel.backToStudiedSourceVerse()
                     NavTab.NOTES -> viewModel.backToNotesSourceVerse()
-                    // Opened from Verse Scroll's links button: back goes
-                    // there, not to the Reader.
-                    NavTab.CROSS_REFERENCES -> if (!viewModel.crossReferencesOpenedFromReader) {
+                    // Same as the page's own back arrow: back to whichever
+                    // screen opened it (Reader, or Verse Scroll's links
+                    // button), ending the cross-reference session.
+                    NavTab.CROSS_REFERENCES -> {
                         viewModel.closeCrossReferences()
                         return@BackHandler
                     }

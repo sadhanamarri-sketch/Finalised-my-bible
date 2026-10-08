@@ -86,7 +86,7 @@ private const val DETOUR_SETTLE_MS = 300_000L
 // How long a tab change takes on screen (MainActivity's AnimatedContent:
 // the old tab is gone by 90 ms, or 300 ms to and from Verse Scroll, and the
 // new one in by about 310 ms). Work that would show on the outgoing tab
-// waits this long — see leaveReaderThenRestore.
+// waits this long — see leaveReaderThenRestore and closeCrossReferences.
 private const val TAB_CHANGE_MS = 400L
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -1503,6 +1503,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // "return to cross references" banner (rather than dismissing/clearing
     // the list, which now stays intact for that return trip) and jumps.
     fun navigateToCrossReference(targetBook: String, targetChapter: Int, targetVerse: Int) {
+        crossReferenceSessionEndJob?.cancel()
         _crossReferenceReturnAvailable.value = true
         _crossReferenceLastTappedKey.value = "$targetBook:$targetChapter:$targetVerse"
         setJumpTarget(targetVerse, blur = true, pinToTop = false)
@@ -1854,7 +1855,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // backToCrossReferenceSourceVerse).
     private val _crossReferenceReaderAnchor = MutableStateFlow<ReaderScrollAnchor?>(null)
 
-    val crossReferencesOpenedFromReader: Boolean get() = crossReferenceOrigin == NavTab.READER
+    // Ends the session once a closed page is off screen (see
+    // closeCrossReferences). Opening the page again, or following a
+    // reference from it, before then keeps the session instead.
+    private var crossReferenceSessionEndJob: Job? = null
 
     // Opens CrossReferenceScreen for this verse — same shape as a search:
     // fetch the list, land on the page. Remember the verse the xrefs were
@@ -1862,6 +1866,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // (onCrossReferenceMarkerClick) opens xrefs without ever selecting the
     // verse.
     fun openCrossReferences(verse: Verse, origin: NavTab = NavTab.READER) {
+        crossReferenceSessionEndJob?.cancel()
         crossReferenceOrigin = origin
         _crossReferenceReaderAnchor.value = null
         if (origin != NavTab.READER) captureReaderSourceVerseIfNeeded(_crossReferenceReaderAnchor)
@@ -1898,11 +1903,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // The page's own back arrow, and system back on it.
+    // The page's own back arrow, and system back on it: back to whichever
+    // screen opened it. The session ends only once the page is off screen
+    // (tab changes are animated) — ended first, it emptied the page while
+    // it was still fading out.
     fun closeCrossReferences() {
-        val origin = crossReferenceOrigin
-        endCrossReferenceSession()
-        selectTab(origin)
+        selectTab(crossReferenceOrigin)
+        crossReferenceSessionEndJob?.cancel()
+        crossReferenceSessionEndJob = viewModelScope.launch {
+            delay(TAB_CHANGE_MS)
+            crossReferenceSessionEndJob = null
+            endCrossReferenceSession()
+        }
     }
 
     // System back while Reader shows the "Return to cross references"
@@ -1940,9 +1952,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Ends the whole cross-reference session: list, source verse, scroll
-    // position, everything reset. Called when the user explicitly leaves
-    // CrossReferenceScreen via its own back button, or dismisses the
-    // "Return to cross references" banner.
+    // position, everything reset. Called once the user has left
+    // CrossReferenceScreen (closeCrossReferences), backed out of a
+    // reference followed from it, or dismissed the "Return to cross
+    // references" banner.
     fun endCrossReferenceSession() {
         crossReferenceOrigin = NavTab.READER
         _crossReferenceReaderAnchor.value = null
