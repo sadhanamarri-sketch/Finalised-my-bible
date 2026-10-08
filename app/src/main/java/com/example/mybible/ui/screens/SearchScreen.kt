@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mybible.SheetChip
 import com.example.mybible.model.OriginalWordCard
+import com.example.mybible.model.RelatedKind
 import com.example.mybible.model.SearchHit
 import com.example.mybible.model.SearchOutcome
 import com.example.mybible.model.SearchSource
@@ -416,7 +417,14 @@ private fun SearchPage(
                 }
                 items(outcome.hits.subList(0, outcome.exactCount), key = { it.key() }) { card(it) }
                 if (outcome.relatedCount > 0 && !outcome.closeMatches) {
-                    item(key = "related-heading") { ResultsHeading("Same meaning, other words") }
+                    item(key = "related-heading") {
+                        ResultsHeading(
+                            when (outcome.relatedKind) {
+                                RelatedKind.SAME_MEANING -> "Same meaning, other words"
+                                RelatedKind.INSIDE_LONGER_WORDS -> "Inside longer words"
+                            }
+                        )
+                    }
                 }
                 items(outcome.hits.subList(outcome.exactCount, outcome.hits.size), key = { it.key() }) { card(it) }
             }
@@ -430,12 +438,16 @@ private fun SearchHit.key() = "${verse.book}:${verse.chapter}:${verse.number}"
 
 private fun countLine(outcome: SearchOutcome): String {
     fun verses(n: Int) = if (n == 1) "1 verse" else "$n verses"
+    val related = when (outcome.relatedKind) {
+        RelatedKind.SAME_MEANING -> "with the same meaning"
+        RelatedKind.INSIDE_LONGER_WORDS -> "inside longer words"
+    }
     return when {
         outcome.hits.isEmpty() -> "No verses found"
         outcome.closeMatches -> verses(outcome.hits.size) + " with all but one word"
         outcome.relatedCount == 0 -> verses(outcome.exactCount)
-        outcome.exactCount == 0 -> verses(outcome.relatedCount) + " with the same meaning"
-        else -> verses(outcome.exactCount) + " · ${outcome.relatedCount} more with the same meaning"
+        outcome.exactCount == 0 -> verses(outcome.relatedCount) + " " + related
+        else -> verses(outcome.exactCount) + " · ${outcome.relatedCount} more " + related
     }
 }
 
@@ -666,7 +678,7 @@ private fun SearchHelp() {
             Text(
                 text = "Type a word or a phrase (“worry”, “love one another”) or a reference (“John 3”, “John 3:16”). " +
                     "Search finds other forms of your words, how the King James says them, verses with the same Greek or Hebrew word, " +
-                    "and topics from Nave’s Topical Bible.\n\nOr look up a Greek or Hebrew word itself: ἀγάπη, “agape”, or its Strong’s number, G26.",
+                    "and topics from Nave’s Topical Bible.\n\nSearch in Telugu too (“ప్రేమ”), or look up a Greek or Hebrew word itself: ἀγάπη, “agape”, or its Strong’s number, G26.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontFamily = WorkSansFontFamily,
                 letterSpacing = 0.sp,

@@ -138,9 +138,18 @@ data class SearchOutcome(
     /** Nave's topics the search names, shown above the verses. */
     val topics: List<TopicCard> = emptyList(),
     /** For a search typed in Greek or Hebrew, or by Strong's number: the words it found. */
-    val originalWords: List<OriginalWordCard> = emptyList()
+    val originalWords: List<OriginalWordCard> = emptyList(),
+    /** What the hits past [exactCount] are. */
+    val relatedKind: RelatedKind = RelatedKind.SAME_MEANING
 ) {
     val relatedCount: Int get() = hits.size - exactCount
+}
+
+enum class RelatedKind {
+    /** Verses that say it in other words: King James wording, the same Greek or Hebrew word. */
+    SAME_MEANING,
+    /** A search in Telugu: verses with a word only inside a longer one (యేసు in క్రీస్తుయేసు). */
+    INSIDE_LONGER_WORDS
 }
 
 /** A Greek or Hebrew word a search names (ἀγάπη, "agape", G26), shown above its verses. */

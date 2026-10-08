@@ -43,6 +43,14 @@ interface BibleDao {
     )
     suspend fun search(query: String): List<VerseEntity>
 
+    // Telugu verses with the query somewhere, leaving out the zero-width non-joiners (char 8204)
+    // and soft hyphens (char 173) the text has inside a few words (ఆమేన్‌), which a query won't.
+    @Query(
+        "SELECT * FROM verses WHERE REPLACE(REPLACE(teluguText, char(8204), ''), char(173), '') " +
+        "LIKE '%' || :query || '%'"
+    )
+    suspend fun searchTelugu(query: String): List<VerseEntity>
+
     @Query("SELECT text FROM verses WHERE book = :book AND chapter = :chapter AND number = :verse LIMIT 1")
     suspend fun getVerseText(book: String, chapter: Int, verse: Int): String?
 

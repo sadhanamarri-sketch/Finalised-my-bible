@@ -13,9 +13,11 @@ import com.example.mybible.search.IndexedVerse
 import com.example.mybible.search.SearchLexicon
 import com.example.mybible.search.SmartSearch
 import com.example.mybible.search.TopicBook
+import com.example.mybible.search.TeluguSearch
 import com.example.mybible.search.TopicSearch
 import com.example.mybible.search.hasLatinLetter
 import com.example.mybible.search.hasOriginalLetter
+import com.example.mybible.search.hasTeluguLetter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -894,7 +896,7 @@ class BibleRepository(private val context: Context) {
     // every verse with Search's bundled word data, built once per app run, when Search first
     // opens. So do searches for a Greek or Hebrew word (ἀγάπη, G26). A typed reference ("john 3",
     // "1 john 3:16") opens that chapter or verse instead, and a search typed in Telugu looks
-    // through the Telugu text.
+    // through the Telugu text (TeluguSearch).
 
     // Verse search and Nave's topics, sharing the index and word data.
     private class SearchEngine(val verses: SmartSearch, val topics: TopicSearch)
@@ -938,6 +940,7 @@ class BibleRepository(private val context: Context) {
             return@withContext SearchOutcome(hits = verses.map { SearchHit(it, it.text) }, exactCount = verses.size)
         }
 
+        if (hasTeluguLetter(q)) return@withContext teluguSearch(q, disabledSources)
         if (!hasLatinLetter(q) && !hasOriginalLetter(q)) return@withContext textSearch(q, caseSensitive)
         val engine = searchEngine() ?: return@withContext textSearch(q, caseSensitive)
         val outcome = engine.verses.search(q, caseSensitive, disabledSources)
@@ -950,8 +953,19 @@ class BibleRepository(private val context: Context) {
         searchEngine()?.topics?.page(id)
     }
 
-    // Every word of the query somewhere in the English or the Telugu, letter for letter: for
-    // searches typed in Telugu, and while the first import is still bringing in the English.
+    // A search typed in Telugu (see TeluguSearch): the verses with its longest word anywhere,
+    // then those with every word where TeluguSearch looks for it.
+    private suspend fun teluguSearch(q: String, disabledSources: Set<String>): SearchOutcome {
+        val words = TeluguSearch.wordsOf(q)
+        if (words.isEmpty()) return SearchOutcome()
+        val verses = bibleDao.searchTelugu(TeluguSearch.longest(words))
+            .map { Verse(it.book, it.chapter, it.number, it.text, it.isRedLetter, it.teluguText) }
+            .sortedWith(compareBy({ BIBLE_BOOKS.indexOf(it.book) }, { it.chapter }, { it.number }))
+        return TeluguSearch.search(q, verses, disabledSources)
+    }
+
+    // Every word of the query somewhere in the English or the Telugu, letter for letter, while
+    // the first import is still bringing in the English.
     private suspend fun textSearch(q: String, caseSensitive: Boolean): SearchOutcome {
         val words = q.split(Regex("\\s+")).filter { it.isNotBlank() }
         if (words.isEmpty()) return SearchOutcome()
