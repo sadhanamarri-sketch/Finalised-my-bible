@@ -136,10 +136,27 @@ data class SearchOutcome(
     /** No verse has every word: [hits] are the verses with all but one. */
     val closeMatches: Boolean = false,
     /** Nave's topics the search names, shown above the verses. */
-    val topics: List<TopicCard> = emptyList()
+    val topics: List<TopicCard> = emptyList(),
+    /** For a search typed in Greek or Hebrew, or by Strong's number: the words it found. */
+    val originalWords: List<OriginalWordCard> = emptyList()
 ) {
     val relatedCount: Int get() = hits.size - exactCount
 }
+
+/** A Greek or Hebrew word a search names (ἀγάπη, "agape", G26), shown above its verses. */
+data class OriginalWordCard(
+    /** Greek, Hebrew or Aramaic. */
+    val language: String,
+    val word: String,
+    val transliteration: String,
+    /** Its Strong's number as people write it: G26, H2617. */
+    val number: String,
+    /** What it means, its senses' meanings from the most used: to release, forgive, permit. */
+    val meanings: List<String>,
+    /** The King James words most often found where it is: love, charity. */
+    val kingJames: List<String>,
+    val verseCount: Int
+)
 
 /** A Nave's Topical Bible topic a search found, as a card above the verses. */
 data class TopicCard(

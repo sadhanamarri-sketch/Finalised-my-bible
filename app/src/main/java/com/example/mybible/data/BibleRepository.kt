@@ -15,6 +15,7 @@ import com.example.mybible.search.SmartSearch
 import com.example.mybible.search.TopicBook
 import com.example.mybible.search.TopicSearch
 import com.example.mybible.search.hasLatinLetter
+import com.example.mybible.search.hasOriginalLetter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -891,8 +892,9 @@ class BibleRepository(private val context: Context) {
     //
     // English searches run on SmartSearch (com.example.mybible.search): an in-memory index of
     // every verse with Search's bundled word data, built once per app run, when Search first
-    // opens. A typed reference ("john 3", "1 john 3:16") opens that chapter or verse instead,
-    // and a search typed in Telugu looks through the Telugu text.
+    // opens. So do searches for a Greek or Hebrew word (ἀγάπη, G26). A typed reference ("john 3",
+    // "1 john 3:16") opens that chapter or verse instead, and a search typed in Telugu looks
+    // through the Telugu text.
 
     // Verse search and Nave's topics, sharing the index and word data.
     private class SearchEngine(val verses: SmartSearch, val topics: TopicSearch)
@@ -936,11 +938,11 @@ class BibleRepository(private val context: Context) {
             return@withContext SearchOutcome(hits = verses.map { SearchHit(it, it.text) }, exactCount = verses.size)
         }
 
-        if (!hasLatinLetter(q)) return@withContext textSearch(q, caseSensitive)
+        if (!hasLatinLetter(q) && !hasOriginalLetter(q)) return@withContext textSearch(q, caseSensitive)
         val engine = searchEngine() ?: return@withContext textSearch(q, caseSensitive)
         val outcome = engine.verses.search(q, caseSensitive, disabledSources)
-        // Topics go by meaning, not spelling: none for a case-sensitive search.
-        if (caseSensitive) outcome else outcome.copy(topics = engine.topics.find(q))
+        // Topics go by meaning, not spelling: none for a case-sensitive search, nor for a Greek or Hebrew word.
+        if (caseSensitive || outcome.originalWords.isNotEmpty()) outcome else outcome.copy(topics = engine.topics.find(q))
     }
 
     /** A Nave's topic's page, for Search: its headings and verses (see TopicSearch.page). */

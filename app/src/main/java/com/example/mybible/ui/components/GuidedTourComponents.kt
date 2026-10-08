@@ -67,7 +67,7 @@ val CURATED_TOUR_STEPS: List<TourStep> = listOf(
     TourStep(
         NavTab.SEARCH,
         "Search",
-        "Look up a word or phrase in everyday English: it also finds how the King James says it, verses with the same Greek or Hebrew word, and topics from Nave\u2019s Topical Bible. Or type a reference, like \u201cJohn 3:16\u201d, to jump straight there."
+        "Look up a word or phrase in everyday English: it also finds how the King James says it, verses with the same Greek or Hebrew word, and topics from Nave\u2019s Topical Bible. Type a Greek or Hebrew word, or its Strong\u2019s number, to find every verse it\u2019s in. Or type a reference, like \u201cJohn 3:16\u201d, to jump straight there."
     ),
     TourStep(
         NavTab.SETTINGS,

@@ -18,12 +18,18 @@ import java.util.BitSet
  * A verse needs every other word of the query, through its forms or one of those. Verses with
  * the words themselves come first, then those that say it in other words, each with why it
  * matched. Every addition is a [SearchSource] the Search page can switch off ([disabled] ids).
+ *
+ * A search typed in Greek or Hebrew, by Strong's number, or for a transliteration the King
+ * James text doesn't have (agape) goes to [OriginalSearch] instead.
  */
 class SmartSearch(private val index: BibleIndex, private val lexicon: SearchLexicon) {
 
     private val inBible: (String) -> Boolean = index::contains
+    private val originals = OriginalSearch(index, lexicon)
 
     fun search(query: String, caseSensitive: Boolean = false, disabled: Set<String> = emptySet()): SearchOutcome {
+        originals.search(query, disabled)?.let { return it }
+        originals.searchTransliteration(query, disabled)?.let { return it }
         val typed = typedWordsOf(query)
         val terms = termsOf(typed, caseSensitive)
         if (terms.isEmpty()) return SearchOutcome()
@@ -179,10 +185,10 @@ class SmartSearch(private val index: BibleIndex, private val lexicon: SearchLexi
                 }
                 val added = (verses.clone() as BitSet).apply { andNot(t.exact) }.cardinality()
                 if (added == 0) continue
-                val marked = original.renderings.filterValues { it >= MARK_SHARE }.keys.flatMapTo(HashSet(), lexicon::formsOf)
+                val marked = lexicon.markedFormsOf(original)
                 val name = "${original.language} ${original.transliteration}"
                 val source = Source(
-                    id = "orig:${original.key}",
+                    id = OriginalSearch.SOURCE_PREFIX + original.key,
                     kind = Kind.ORIGINAL,
                     chip = name,
                     reason = "$name, meaning “${original.gloss}”",
@@ -508,8 +514,6 @@ class SmartSearch(private val index: BibleIndex, private val lexicon: SearchLexi
         const val FORMS = "forms"
         /** A word already in this many verses gets no Greek and Hebrew: come, say, lord. */
         const val COMMON_WORD_VERSES = 1000
-        /** A Greek or Hebrew word's renderings used at least this often get marked in its verses. */
-        const val MARK_SHARE = 5
         /** Past this many, Greek and Hebrew words share one "More Greek & Hebrew" chip. */
         const val MAX_ORIGINAL_CHIPS = 5
     }

@@ -12,9 +12,14 @@ reads it:
 - `modern_kjv.tsv`: today's words with the King James wording for them (worry → careful, take no
   thought; Holy Spirit → Holy Ghost; you → thee, thou, ye), from `modern_kjv.txt`. The builder drops
   any King James term the KJV text doesn't have.
-- `original_words.tsv`: every Greek and Hebrew word in each of its senses (STEPBible splits
-  aphiēmi into "leave", "forgive" and "permit"), with its meaning, how often the King James renders
-  it with each English word, and the verses it's in (for words in at most 500 verses).
+- `original_words.tsv`: every Greek, Hebrew and Aramaic word in each of its senses (STEPBible
+  splits aphiēmi into "leave", "forgive" and "permit"): the word itself (ἀφίημι), its
+  transliteration and meaning, how often the King James renders it with each English word (and
+  which of those are worth highlighting where it is: common, and several times likelier there than
+  anywhere), and the verses it's in.
+- `original_forms.tsv`: every other spelling of those words in the text, without accents, vowel
+  points or Hebrew prefixes, so a search typed in Greek or Hebrew finds the word from any form of
+  it (ἠγάπησεν: agapaō).
 - `topics.tsv`: Nave's Topical Bible, from `make_topics_data.py`: each topic's headings and
   subheadings, the verses under them, and its "see" links, resolved to the topic (or the heading)
   they name. References are checked against the KJV text, and consecutive verses become one passage.
@@ -30,6 +35,8 @@ python3 make_topics_data.py eng-kjv.osis.xml NavesTopicalDictionary.csv ../../ap
 - `STEP_DIR` holds STEPBible's TAGNT (2 files) and TAHOT (4 files), the words of each verse, and
   TBESG and TBESH, the lexicons, under the names `GreekImporter`, `HebrewImporter`, `TbesgImporter`
   and `TbeshImporter` download them by.
+- Strong's notation for the King James renderings is read in full: `Juda(-h, -s)` is Judah and
+  Judas, `(loving-) kindness` is lovingkindness, `right(-eous) (act, -ly, -ness)` is righteousness.
 - `STRONGS_DIR` holds Open Scriptures' `strongs-greek-dictionary.js` and
   `strongs-hebrew-dictionary.js` (github.com/openscriptures/strongs).
 - `NavesTopicalDictionary.csv` is BibleData's (github.com/BradyStephenson/bible-data).
@@ -37,8 +44,8 @@ python3 make_topics_data.py eng-kjv.osis.xml NavesTopicalDictionary.csv ../../ap
 ## Sources and licenses
 
 - King James Version: public domain.
-- Greek and Hebrew words, senses, meanings and verses: STEPBible.org, Tyndale House Cambridge,
-  CC BY 4.0. A few misspelled glosses are corrected (`GLOSS_FIXES`).
+- Greek and Hebrew words, senses, meanings, spellings and verses: STEPBible.org, Tyndale House
+  Cambridge, CC BY 4.0. A few misspelled glosses are corrected (`GLOSS_FIXES`).
 - King James renderings: Strong's dictionaries as published by Open Scriptures, CC BY-SA. The
   renderings column of `original_words.tsv` is derived from them and shared under the same license.
 - Topics: Nave's Topical Bible (Orville J. Nave), public domain, as structured by BibleData

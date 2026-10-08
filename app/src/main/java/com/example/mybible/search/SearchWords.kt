@@ -1,5 +1,7 @@
 package com.example.mybible.search
 
+import java.text.Normalizer
+
 private val whitespace = Regex("\\s+")
 
 /**
@@ -27,6 +29,38 @@ private fun isAsciiLetter(c: Char) = c in 'a'..'z' || c in 'A'..'Z'
 
 /** True when [text] has a letter a to z: an English search rather than a Telugu one. */
 internal fun hasLatinLetter(text: String) = text.any(::isAsciiLetter)
+
+internal fun isGreekLetter(c: Char) = (c in '\u0370'..'\u03FF' || c in '\u1F00'..'\u1FFF') && Character.isLetter(c)
+
+internal fun isHebrewLetter(c: Char) = c in '\u05D0'..'\u05EA' || c in '\uFB1D'..'\uFB4F'
+
+/** True when [text] has a Greek or Hebrew letter: a search for a word of the original text. */
+internal fun hasOriginalLetter(text: String) = text.any { isGreekLetter(it) || isHebrewLetter(it) }
+
+// Hebrew's final letters, and Greek's final sigma, as the plain letter.
+private val plainLetter = mapOf('ך' to 'כ', 'ם' to 'מ', 'ן' to 'נ', 'ף' to 'פ', 'ץ' to 'צ', 'ς' to 'σ')
+
+/**
+ * A Greek or Hebrew word with no accents, breathings or vowel points, lowercase, its final
+ * letters as the plain ones: ἀγάπης → αγαπησ, חֶ֫סֶד → חסד. Same as make_search_data.py's
+ * script_key, which writes the spellings in original_forms.tsv this way.
+ */
+internal fun originalKey(text: String): String {
+    val out = StringBuilder(text.length)
+    for (c in Normalizer.normalize(text, Normalizer.Form.NFD)) {
+        if (Character.isLetter(c)) out.append(plainLetter[c] ?: c.lowercaseChar())
+    }
+    return out.toString()
+}
+
+/** A transliteration's letters a to z, without accents or the dots between syllables: agapē → agape. */
+internal fun latinKey(text: String): String {
+    val out = StringBuilder(text.length)
+    for (c in Normalizer.normalize(text.lowercase(), Normalizer.Form.NFD)) {
+        if (c in 'a'..'z') out.append(c)
+    }
+    return out.toString()
+}
 
 /**
  * Calls [onWord] with each run of the letters a to z in [text], lowercased, and where it starts

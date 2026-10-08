@@ -1,5 +1,6 @@
 """Writes Search's bundled data into the app: King James word forms, the modern-to-King-James
-wording list, and the Greek and Hebrew words with their meanings and King James renderings.
+wording list, the Greek and Hebrew words with their meanings and King James renderings, and the
+forms those words take in the text.
 
     python3 make_search_data.py KJV_OSIS_XML STEP_DIR STRONGS_DIR APP_ASSETS_DIR
 
@@ -15,6 +16,7 @@ import json
 import os
 import re
 import sys
+import unicodedata
 
 osis_path, step_dir, strongs_dir, out_dir = sys.argv[1:5]
 here = os.path.dirname(os.path.abspath(__file__))
@@ -193,9 +195,8 @@ print(f"{len(modern_lines)} modern wording entries", file=sys.stderr)
 # G0863G where it means "leave". The app's search treats each sense as its own word.
 REF = re.compile(r"^([0-9A-Za-z]+)\.(\d+)\.(\d+)(?:\([^)]*\))?#(\d+)=(\S*)$")
 DSTRONG = re.compile(r"^([HG])(\d+)([A-Za-z]?)$")
-# The app only uses words found in at most this many verses (more is a word like "God" or "the",
-# whose verses mostly say it anyway), so only those get a verse list. Same as SearchLexicon.MAX_VERSES.
-MAX_VERSES = 500
+# Hebrew letters' final forms, and Greek's final sigma, as the letter itself.
+FINAL_LETTERS = str.maketrans("\u05da\u05dd\u05df\u05e3\u05e5\u03c2", "\u05db\u05de\u05e0\u05e4\u05e6\u03c3")
 
 
 def dstrong(raw):
@@ -208,7 +209,16 @@ def base_of(key):
     return key[0] + str(int(key[1:5] if key[-1].isalpha() else key[1:]))
 
 
+def script_key(text):
+    """A Greek or Hebrew word with no accents, breathings or vowel points, lowercase, final letters
+    as the plain ones: 'ἀγάπης' -> 'αγαπησ'. Same as originalKey in the app's OriginalSearch."""
+    letters = (c for c in unicodedata.normalize("NFD", text) if unicodedata.category(c).startswith("L"))
+    return "".join(letters).lower().translate(FINAL_LETTERS)
+
+
 verses_of = {}
+# The forms each word takes in the text, by its number without the sense letter (G0863).
+forms_of_number = {}
 
 
 def read_step_words(pattern, strongs_column):
@@ -222,22 +232,35 @@ def read_step_words(pattern, strongs_column):
             m = REF.match(cols[0].strip())
             if not m or m.group(1) not in BOOK_OF_STEP:
                 continue
-            if pattern.startswith("TAGNT") and not re.search("[NnKk]", m.group(5)):
-                continue  # a word only some other manuscripts have, not the KJV's
             cell = cols[strongs_column]
             braced = re.search(r"\{([^}]+)\}", cell)
             key = dstrong((braced.group(1) if braced else cell).split("=")[0])
-            if key:
-                verses_of.setdefault(key, set()).add((BOOK_OF_STEP[m.group(1)], int(m.group(2)), int(m.group(3))))
+            if not key:
+                continue
+            forms_of_number.setdefault(key[:5], set()).add(script_key(spelled(cols[1], cell)))
+            if pattern.startswith("TAGNT") and not re.search("[NnKk]", m.group(5)):
+                continue  # a word only some other manuscripts have, not the KJV's
+            verses_of.setdefault(key, set()).add((BOOK_OF_STEP[m.group(1)], int(m.group(2)), int(m.group(3))))
+
+
+def spelled(word, strongs):
+    """The word as the text spells it, without the Hebrew prefixes TAHOT marks off ('and', 'the',
+    'in'...): 'ה/אָֽרֶץ' -> 'אָֽרֶץ', its suffixes kept. TAGNT's 'ἠγάπησεν (ēgapēsen)' -> 'ἠγάπησεν'."""
+    if "(" in word:
+        return word.split("(")[0]
+    parts, keys = word.split("/"), strongs.split("/")
+    main = next((i for i, k in enumerate(keys) if "{" in k), 0)
+    return "".join(parts[main:]) if len(parts) == len(keys) else word
 
 
 read_step_words("TAGNT*", 3)
 read_step_words("TAHOT*", 4)
 print(f"{len(verses_of)} Greek and Hebrew word senses with verses", file=sys.stderr)
 
-# TBESG/TBESH: one row per sense. Column 2 is "G0863H = a Meaning of"; column 7 the gloss, which
-# for a sense is "to release: forgive" (the word's meaning, then this sense's). A sense row keeps
-# the part after the colon; the word's main row keeps the part before it ("to love: lover").
+# TBESG/TBESH: one row per sense. Column 2 is "G0863H = a Meaning of"; column 4 the word itself
+# (ἀφίημι), 5 its transliteration, 6 its grammar, starting "A:" for Aramaic; column 7 the gloss,
+# which for a sense is "to release: forgive" (the word's meaning, then this sense's). A sense row
+# keeps the part after the colon; the word's main row keeps the part before it ("to love: lover").
 # Spelling slips in STEPBible's glosses, put right so a search for the word finds them (and a
 # misspelled search doesn't look like a real word).
 GLOSS_FIXES = {"recieve": "receive", "govenors": "governors", "neighours": "neighbours",
@@ -258,29 +281,73 @@ for pattern in ("TBESG*", "TBESH*"):
             general, _, specific = cols[6].strip().partition(":")
             gloss = specific.strip() if relation == "a Meaning of" and specific.strip() else general.strip()
             gloss = re.sub(r"[a-z]+", lambda m: GLOSS_FIXES.get(m.group(0), m.group(0)), gloss)
-            meaning[key] = (cols[4].strip().replace(".", ""), gloss)
+            language = "G" if key[0] == "G" else "A" if cols[5].startswith("A:") else "H"
+            lemma = unicodedata.normalize("NFC", re.sub(r"\s*,\s*", ", ", cols[3].strip()))
+            meaning[key] = (language, lemma, cols[4].strip().replace(".", ""), gloss)
             meaning_of_base.setdefault(base_of(key), meaning[key])
 
 
 def kjv_renderings(definition):
-    """The English words Strong's lists for a word: '(feast of) charity(-ably), dear, love'."""
+    """The English words Strong's lists for a word: '(feast of) charity(-ably), dear, love' gives
+    charity, charitably, feast, dear, love; '(loving-) kindness' lovingkindness and kindness;
+    'right(-eous) (act, -ly, -ness)' righteous, righteously, righteousness."""
     if not definition:
         return set()
-    d = re.sub(r"\[idiom\]|\[phrase\]|×|\bX\b", " ", definition)
+    d = re.sub(r"\[idiom\]|\[phrase\]|×|\bX\b|\+", " ", definition)
     out = set()
-    for part in re.split(r"[,;.]", d):
+    for part in split_outside_brackets(d, ",;."):
         part = part.strip()
         if not part or part.lower().startswith("compare"):
             continue
-        for m in re.finditer(r"([A-Za-z]+)\(-([^)]*)\)", part):
+        for m in re.finditer(r"\(([A-Za-z]+)-\)\s*([A-Za-z]+)", part):
+            out.add((m.group(1) + m.group(2)).lower())
+        # A word with its endings, then maybe more endings for it or for what they made:
+        # husband(-man) (-ry) is husbandman and husbandry.
+        for m in re.finditer(r"([A-Za-z]+)\(-([^)]*)\)(?:\s*\(([^)]*)\))?", part):
             stem = m.group(1).lower()
-            for suffix in m.group(2).split(","):
-                suffix = suffix.strip().lstrip("-").lower()
-                if suffix:
-                    out.add(stem[:-1] + suffix if stem.endswith("e") and suffix[0] in "aeiou" else stem + suffix)
+            made = {w for suffix in endings(m.group(2)) for w in attached(stem, suffix)}
+            out |= made
+            for suffix in endings(m.group(3) or "", dashed_only=True):
+                out |= {w for base in made | {stem} for w in attached(base, suffix)}
         part = re.sub(r"\(-[^)]*\)", "", part)
-        out |= set(words(re.sub(r"[()\[\]+]", " ", part)))
-    return {w for w in out if w in vocab and w not in STOPWORDS}
+        out |= set(words(re.sub(r"[()\[\]-]", " ", part)))
+    # (The "s" of "man's" is a word of the text too, as the app splits it.)
+    return {w for w in out if w in vocab and w not in STOPWORDS and len(w) > 1}
+
+
+def split_outside_brackets(text, separators):
+    """text split at each separator that isn't inside (): 'Juda(-h, -s); Jude' -> 'Juda(-h, -s)', ' Jude'."""
+    parts, depth, current = [], 0, []
+    for c in text:
+        depth += (c == "(") - (c == ")")
+        depth = max(depth, 0)
+        if c in separators and depth == 0:
+            parts.append("".join(current))
+            current = []
+        else:
+            current.append(c)
+    parts.append("".join(current))
+    return parts
+
+
+def endings(group, dashed_only=False):
+    """'-h, -s' -> h, s; with dashed_only, '(act, -ly, -ness)' gives ly and ness, not act."""
+    out = []
+    for item in group.split(","):
+        item = item.strip().lower()
+        if item.startswith("-"):
+            out.append(item.lstrip("-"))
+        elif item and not dashed_only:
+            out.append(item)
+    return [e for e in out if e.isalpha()]
+
+
+def attached(stem, ending):
+    """stem with ending, both ways when stem ends in e: store + house, treasure + y -> treasury."""
+    out = {stem + ending}
+    if stem.endswith("e"):
+        out.add(stem[:-1] + ending)
+    return out
 
 
 # Strong's own numbers have no senses, so every sense of a word starts from the word's renderings;
@@ -316,9 +383,29 @@ def base36(n):
             return s
 
 
+# A rendering worth marking where the word is (the app's OriginalWord.marked): used in 5% of its
+# verses or more, and at least 4 times likelier there than in any verse (logos: "word", not "say",
+# which is everywhere).
+MARK_SHARE, MARK_LIFT = 5, 4
+base_share = {}
+
+
+verses_with = {}
+for verse, ws in verse_words.items():
+    for w in ws:
+        verses_with.setdefault(w, set()).add(verse)
+
+
+def share_everywhere(rendering):
+    if rendering not in base_share:
+        found = set().union(*(verses_with.get(f, set()) for f in forms_of(rendering)))
+        base_share[rendering] = 100 * len(found) / len(verse_words)
+    return base_share[rendering]
+
+
 rows = []
 for key in sorted(verses_of):
-    translit, gloss = meaning.get(key) or meaning_of_base.get(base_of(key)) or (None, None)
+    language, lemma, translit, gloss = meaning.get(key) or meaning_of_base.get(base_of(key)) or (None,) * 4
     if translit is None:
         continue
     vs = {v for v in verses_of[key] if v in verse_words}  # the KJV's versification only
@@ -329,12 +416,29 @@ for key in sorted(verses_of):
         forms = forms_of(r)
         share = round(100 * sum(1 for v in vs if verse_words[v] & forms) / len(vs))
         if share >= 2:
-            shares.append(f"{r}:{share}")
-    refs = encode_refs(vs) if len(vs) <= MAX_VERSES else ""
-    rows.append(f"{key}\t{translit}\t{gloss}\t{len(vs)}\t{','.join(shares)}\t{refs}")
+            marked = share >= MARK_SHARE and share >= MARK_LIFT * share_everywhere(r)
+            shares.append(f"{r}:{share}{'*' if marked else ''}")
+    rows.append(f"{key}\t{language}\t{lemma}\t{translit}\t{gloss}\t{len(vs)}\t{','.join(shares)}\t{encode_refs(vs)}")
 with open(os.path.join(out_dir, "original_words.tsv"), "w", encoding="utf-8") as f:
-    f.write("# Sense-level Strong's number, transliteration and meaning (STEPBible TBESG/TBESH); verses it's in\n")
-    f.write("# (TAGNT/TAHOT); King James renderings (Strong's via Open Scriptures) with the % of those verses\n")
-    f.write(f"# using each; the verses, for words in at most {MAX_VERSES} (see encode_refs in make_search_data.py).\n")
+    f.write("# Sense-level Strong's number; language (G Greek, H Hebrew, A Aramaic); the word, its transliteration\n")
+    f.write("# and meaning (STEPBible TBESG/TBESH); how many verses it's in (TAGNT/TAHOT); King James renderings\n")
+    f.write("# (Strong's via Open Scriptures) with the % of those verses using each, * for those worth marking there\n")
+    f.write("# (see MARK_LIFT); the verses (see encode_refs).\n")
     f.write("\n".join(rows) + "\n")
 print(f"{len(rows)} Greek and Hebrew word senses", file=sys.stderr)
+
+# Every other spelling of each word in the text, for a search typed in Greek or Hebrew: ηγαπησεν
+# finds agapaō. Its own spelling (the lemma) is in original_words.tsv already.
+lemma_keys = {}
+for key, (_, lemma, _, _) in meaning.items():
+    lemma_keys.setdefault(key[:5], set()).update(script_key(part) for part in lemma.split(","))
+form_rows = []
+for number in sorted(forms_of_number):
+    forms = sorted(f for f in forms_of_number[number] - lemma_keys.get(number, set()) if f)
+    if forms and number in lemma_keys:
+        form_rows.append(f"{number}\t{' '.join(forms)}")
+with open(os.path.join(out_dir, "original_forms.tsv"), "w", encoding="utf-8") as f:
+    f.write("# Strong's number<TAB>the other spellings of the word in TAGNT/TAHOT, without accents or vowel points,\n")
+    f.write("# lowercase, final letters as plain ones, Hebrew without its prefixes (make_search_data.py, script_key).\n")
+    f.write("\n".join(form_rows) + "\n")
+print(f"{sum(len(r.split(' ')) for r in form_rows)} other spellings of {len(form_rows)} Greek and Hebrew words", file=sys.stderr)

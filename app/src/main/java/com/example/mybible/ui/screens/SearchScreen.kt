@@ -36,6 +36,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
@@ -46,6 +48,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mybible.SheetChip
+import com.example.mybible.model.OriginalWordCard
 import com.example.mybible.model.SearchHit
 import com.example.mybible.model.SearchOutcome
 import com.example.mybible.model.SearchSource
@@ -369,6 +372,9 @@ private fun SearchPage(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
+                if (outcome.originalWords.isNotEmpty()) {
+                    item(key = "words") { OriginalWordCards(outcome.originalWords) }
+                }
                 if (outcome.topics.isNotEmpty()) {
                     item(key = "topics") {
                         TopicCards(outcome.topics, onOpen = { viewModel.openTopic(it.topicId, it.section) })
@@ -535,6 +541,83 @@ private fun TopicCardRow(topic: TopicCard, onClick: () -> Unit) {
     }
 }
 
+// The Greek or Hebrew word a search named (ἀγάπη, "agape", G26): what it means and what the
+// King James calls it, above its verses.
+@Composable
+private fun OriginalWordCards(words: List<OriginalWordCard>) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        for (word in words) OriginalWordCardView(word)
+    }
+}
+
+@Composable
+private fun OriginalWordCardView(word: OriginalWordCard) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "${word.language} · ${word.number}".uppercase(),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = WorkSansFontFamily,
+                    letterSpacing = 0.5.sp,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = if (word.verseCount == 1) "1 verse" else "${word.verseCount} verses",
+                    fontSize = 12.5.sp,
+                    fontFamily = WorkSansFontFamily,
+                    letterSpacing = 0.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Row {
+                // The system serif: it has Greek and Hebrew, as the Reader's interlinear words use.
+                Text(
+                    text = word.word,
+                    fontSize = 24.sp,
+                    fontFamily = FontFamily.Serif,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.alignByBaseline()
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = word.transliteration,
+                    fontSize = 15.sp,
+                    fontStyle = FontStyle.Italic,
+                    fontFamily = FontFamily.Serif,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.alignByBaseline()
+                )
+            }
+            Text(
+                text = word.meanings.joinToString(" · ") { "“$it”" },
+                fontSize = 15.sp,
+                fontFamily = WorkSansFontFamily,
+                letterSpacing = 0.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (word.kingJames.isNotEmpty()) {
+                Text(
+                    text = "King James: " + word.kingJames.joinToString(", "),
+                    fontSize = 13.sp,
+                    fontFamily = WorkSansFontFamily,
+                    letterSpacing = 0.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun DidYouMean(suggestion: String, onClick: () -> Unit) {
     Text(
@@ -583,7 +666,7 @@ private fun SearchHelp() {
             Text(
                 text = "Type a word or a phrase (“worry”, “love one another”) or a reference (“John 3”, “John 3:16”). " +
                     "Search finds other forms of your words, how the King James says them, verses with the same Greek or Hebrew word, " +
-                    "and topics from Nave’s Topical Bible.",
+                    "and topics from Nave’s Topical Bible.\n\nOr look up a Greek or Hebrew word itself: ἀγάπη, “agape”, or its Strong’s number, G26.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontFamily = WorkSansFontFamily,
                 letterSpacing = 0.sp,

@@ -27,6 +27,7 @@ object TestBible {
         Triple("Psalms 18:1", 0, "I will love thee, O LORD, my strength."),
         Triple("Psalms 23:1", 0, "The LORD is my shepherd; I shall not want."),
         Triple("Matthew 1:18", 0, "Now the birth of Jesus Christ was on this wise: When as his mother Mary was espoused to Joseph, before they came together, she was found with child of the Holy Ghost."),
+        Triple("Matthew 4:20", 0, "And they straightway left their nets, and followed him."),
         Triple("Matthew 6:14", 0, "For if ye forgive men their trespasses, your heavenly Father will also forgive you:"),
         Triple("Matthew 6:25", 0, "Therefore I say unto you, Take no thought for your life, what ye shall eat, or what ye shall drink; nor yet for your body, what ye shall put on. Is not the life more than meat, and the body than raiment?"),
         Triple("Matthew 6:34", 0, "Take therefore no thought for the morrow: for the morrow shall take thought for the things of itself. Sufficient unto the day is the evil thereof."),

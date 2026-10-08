@@ -7,7 +7,6 @@
 holy spirit = holy ghost
 holy ghost = holy spirit
 messiah = christ, messias
-yahweh, jehovah = jehovah
 demon, demons = devil, devils
 demonic, demon possessed = possessed with devils
 
@@ -32,6 +31,8 @@ self control = temperance
 humble = lowly, meek
 gentle = meek
 arrogant = proud, haughty
+# ego is also a Greek word ("I"); this keeps the English one.
+ego, egotism = pride, vainglory, conceit
 greed, greedy = covetousness, covetous
 gossip = talebearer, whisperer, tattlers
 slander = backbiting

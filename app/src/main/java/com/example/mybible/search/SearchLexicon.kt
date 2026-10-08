@@ -1,6 +1,7 @@
 package com.example.mybible.search
 
 import java.io.InputStream
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * A Greek or Hebrew word in one of its senses (STEPBible splits aphiēmi into "leave", "forgive"
@@ -9,6 +10,10 @@ import java.io.InputStream
 class OriginalWord(
     /** STEPBible's sense-level Strong's number: G0863H. */
     val key: String,
+    /** Greek, Hebrew or Aramaic. */
+    val language: String,
+    /** The word itself: ἀφίημι. Now and then two spellings: "ἄρρην, ἄρσην". */
+    val lemma: String,
     val transliteration: String,
     /** What it means, in today's English: "forgive", "to worry". */
     val gloss: String,
@@ -16,10 +21,16 @@ class OriginalWord(
     val verseCount: Int,
     /** The King James words Strong's lists for it, with the % of its verses using each. */
     val renderings: Map<String, Int>,
-    /** Its verses as book index * 65536 + chapter * 256 + verse; empty past MAX_VERSES. */
+    /**
+     * The renderings worth marking where it is: used in 5% of its verses or more, and at least 4
+     * times likelier there than anywhere (logos: word, not say). See make_search_data.py.
+     */
+    val marked: Set<String>,
+    /** Its verses as book index * 65536 + chapter * 256 + verse. */
     val verses: IntArray
 ) {
-    val language: String get() = if (key.startsWith("G")) "Greek" else "Hebrew"
+    /** Its Strong's number without the sense: G0863. */
+    val number: String get() = key.substring(0, 5)
 
     /** The single words its gloss means: "to worry" → worry; "to hope/expect" → hope, expect. */
     val heads: Set<String> = glossHeads(gloss)
@@ -31,21 +42,26 @@ class OriginalMatch(val word: OriginalWord, val byMeaning: Boolean)
 /**
  * Search's bundled word data in app/src/main/assets/search, written by
  * tools/search/make_search_data.py: the King James word forms, today's words with their King
- * James wording, and the Greek and Hebrew words with their meanings, renderings and verses.
+ * James wording, and the Greek and Hebrew words with their meanings, renderings, verses and the
+ * forms they take in the text.
  */
 class SearchLexicon private constructor(
     families: List<List<String>>,
     private val modern: List<Pair<List<String>, List<List<String>>>>,
-    originals: List<OriginalWord>
+    private val originals: List<OriginalWord>,
+    // original_forms.tsv's text, read the first time a search is typed in Greek or Hebrew.
+    private val originalForms: () -> String
 ) {
     private val familiesOf = HashMap<String, MutableList<List<String>>>()
     private val byHead = HashMap<String, MutableList<OriginalWord>>()
     private val byRendering = HashMap<String, MutableList<OriginalWord>>()
+    private val markedForms = ConcurrentHashMap<String, Set<String>>()
 
     init {
         for (family in families) for (word in family) familiesOf.getOrPut(word) { ArrayList(1) } += family
         for (word in originals) {
-            if (word.verses.isEmpty()) continue
+            // God, Lord, "the": their verses mostly say it anyway.
+            if (word.verseCount > MAX_VERSES) continue
             for (head in word.heads) byHead.getOrPut(head) { ArrayList(2) } += word
             if (word.verseCount < MIN_VERSES_FOR_RENDERINGS) continue
             for ((rendering, share) in word.renderings) {
@@ -122,6 +138,56 @@ class SearchLexicon private constructor(
         return found.values.toList()
     }
 
+    /** The words to mark in a verse where [word] is: every form of its [OriginalWord.marked] renderings. */
+    fun markedFormsOf(word: OriginalWord): Set<String> =
+        markedForms.getOrPut(word.key) { word.marked.flatMapTo(HashSet(), ::formsOf) }
+
+    // ---- Greek and Hebrew words by how a search names them (see OriginalSearch) ----
+
+    private val byNumber: Map<String, List<OriginalWord>> by lazy { originals.groupBy { it.number } }
+
+    // By originalKey of the word (each spelling of it) and latinKey of its transliteration.
+    private val byLemma: Map<String, List<OriginalWord>> by lazy { indexBy { word -> word.lemma.split(',').map(::originalKey) } }
+    private val byTransliteration: Map<String, List<OriginalWord>> by lazy {
+        indexBy { word -> word.transliteration.split(',').map(::latinKey) }
+    }
+
+    // Every other spelling the text has (ηγαπησεν), as originalKey, with the numbers of the words spelled so.
+    private val numbersBySpelling: Map<String, List<String>> by lazy {
+        val out = HashMap<String, MutableList<String>>(65_536)
+        for (line in dataLines(originalForms())) {
+            val tab = line.indexOf('\t')
+            if (tab < 0) continue
+            val number = line.substring(0, tab)
+            for (spelling in line.substring(tab + 1).split(' ')) out.getOrPut(spelling) { ArrayList(1) } += number
+        }
+        out
+    }
+
+    private fun indexBy(keys: (OriginalWord) -> List<String>): Map<String, List<OriginalWord>> {
+        val out = HashMap<String, MutableList<OriginalWord>>(originals.size * 2)
+        for (word in originals) for (key in keys(word)) if (key.isNotEmpty()) out.getOrPut(key) { ArrayList(2) } += word
+        return out
+    }
+
+    /** Every sense of the word numbered [number] (G0863): aphiēmi's "leave", "forgive" and "permit". */
+    fun originalsNumbered(number: String): List<OriginalWord> = byNumber[number].orEmpty()
+
+    /** The sense numbered [key] (G0863H), or null. */
+    fun original(key: String): OriginalWord? = byNumber[key.take(5)]?.firstOrNull { it.key == key }
+
+    /** The numbers of the words spelled [key] (an [originalKey]) themselves: αγαπη, agapē's. */
+    fun numbersWithLemma(key: String): List<String> = byLemma[key]?.map { it.number }?.distinct().orEmpty()
+
+    /** The numbers of the words the text spells [key] somewhere: ηγαπησεν, agapaō's. */
+    fun numbersWithForm(key: String): List<String> = numbersBySpelling[key].orEmpty()
+
+    /** The words STEPBible transliterates as [key] (a [latinKey]: agape, chesed). */
+    fun originalsTransliterated(key: String): List<OriginalWord> = byTransliteration[key].orEmpty()
+
+    /** Every spelling those two know, for suggesting one: the words' own, then their forms. */
+    fun originalSpellings(): Sequence<String> = byLemma.keys.asSequence() + numbersBySpelling.keys.asSequence()
+
     // A gloss in today's spelling or words, with the King James one: favor → favour.
     private fun kingJamesWordsOf(heads: Set<String>, inBible: (String) -> Boolean): Set<String> {
         val out = HashSet(heads)
@@ -132,7 +198,7 @@ class SearchLexicon private constructor(
     }
 
     companion object {
-        /** Words in more verses than this have no verse list: God, Lord, "the" (make_search_data.py). */
+        /** Words in more verses than this mean nothing more for a search in English: God, Lord, "the". */
         const val MAX_VERSES = 500
         const val MIN_RENDERING_SHARE = 20
         const val MIN_COMBINED_SHARE = 80
@@ -142,14 +208,14 @@ class SearchLexicon private constructor(
         const val WORD_FORMS = "word_forms.tsv"
         const val MODERN_KJV = "modern_kjv.tsv"
         const val ORIGINAL_WORDS = "original_words.tsv"
+        const val ORIGINAL_FORMS = "original_forms.tsv"
 
-        fun load(open: (String) -> InputStream): SearchLexicon = parse(
-            wordForms = open(WORD_FORMS).bufferedReader().use { it.readText() },
-            modernKjv = open(MODERN_KJV).bufferedReader().use { it.readText() },
-            originalWords = open(ORIGINAL_WORDS).bufferedReader().use { it.readText() }
-        )
+        fun load(open: (String) -> InputStream): SearchLexicon {
+            fun read(name: String) = open(name).bufferedReader().use { it.readText() }
+            return parse(read(WORD_FORMS), read(MODERN_KJV), read(ORIGINAL_WORDS), originalForms = { read(ORIGINAL_FORMS) })
+        }
 
-        fun parse(wordForms: String, modernKjv: String, originalWords: String): SearchLexicon {
+        fun parse(wordForms: String, modernKjv: String, originalWords: String, originalForms: () -> String = { "" }): SearchLexicon {
             val families = dataLines(wordForms).map { it.split(' ') }.filter { it.size > 1 }
             val modern = dataLines(modernKjv).mapNotNull { line ->
                 val tab = line.indexOf('\t')
@@ -158,26 +224,39 @@ class SearchLexicon private constructor(
                 line.substring(0, tab).split('|').map { it.split(' ') to kjv }
             }.flatten()
             val originals = dataLines(originalWords).mapNotNull(::parseOriginal)
-            return SearchLexicon(families, modern, originals)
+            return SearchLexicon(families, modern, originals, originalForms)
         }
 
         private fun dataLines(text: String) = text.lineSequence().filter { it.isNotBlank() && !it.startsWith("#") }.toList()
 
+        // Sense, language, word, transliteration, meaning, verse count, renderings, verses.
         private fun parseOriginal(line: String): OriginalWord? {
             val cols = line.split('\t')
-            if (cols.size < 6) return null
+            if (cols.size < 8 || cols[0].length < 5) return null
+            // "love:75*": love in 75% of its verses, worth marking there.
             val renderings = HashMap<String, Int>()
-            for (part in cols[4].split(',')) {
+            val marked = HashSet<String>()
+            for (part in cols[6].split(',')) {
                 val colon = part.indexOf(':')
-                if (colon > 0) renderings[part.substring(0, colon)] = part.substring(colon + 1).toIntOrNull() ?: continue
+                if (colon <= 0) continue
+                val rendering = part.substring(0, colon)
+                renderings[rendering] = part.substring(colon + 1).removeSuffix("*").toIntOrNull() ?: continue
+                if (part.endsWith('*')) marked += rendering
             }
             return OriginalWord(
                 key = cols[0],
-                transliteration = cols[1],
-                gloss = cols[2],
-                verseCount = cols[3].toIntOrNull() ?: return null,
+                language = when (cols[1]) {
+                    "G" -> "Greek"
+                    "A" -> "Aramaic"
+                    else -> "Hebrew"
+                },
+                lemma = cols[2],
+                transliteration = cols[3],
+                gloss = cols[4],
+                verseCount = cols[5].toIntOrNull() ?: return null,
                 renderings = renderings,
-                verses = decodeRefs(cols[5])
+                marked = marked,
+                verses = decodeRefs(cols[7])
             )
         }
 
