@@ -8,15 +8,21 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
 
 ## Noted 9 Oct 2026
 
-1. **Highlight several verses at once.** "Multi highlighted verses."
-   Likely: select a few verses (say Romans 8:28–30) and give them one colour in one go,
-   instead of one verse at a time.
-   *To ask:* is that it, or is it one verse carrying more than one colour?
+1. **More than one colour on a highlighted verse.** "Multi highlighted verses", clarified as
+   "multi colors to one highlighted verse": one verse can carry, say, both Promise and Prayer.
+   Today a highlight is one colour per verse (`HighlightItem`, keyed by book, chapter and
+   verse), so the stored highlights, Drive backups, the Highlighted Verses page and its colour
+   filter, and Verse Scroll's colour box all need to allow several.
+   *To ask:* how should two or three colours show on the verse in the Reader (split
+   background, stripes, small colour marks)? Is there a limit on how many?
 
-2. **Verse Scroll: the bottom of the screen.** "Verse scroll bottom (next picture)."
-   A picture was mentioned but hasn't arrived yet.
-   *To ask:* what's wrong or wanted at the bottom — for example the next card's photo
-   showing, or something about the bar there?
+2. **Bug — Verse Scroll: part of the next photo shows at the bottom of the current one.**
+   "Verse scroll bottom (next picture)", clarified as "a part of next image is seen at the
+   bottom of current image in verse scroll." The card's own photo should fill it, with nothing
+   of the next card's photo showing.
+   *Where to start:* how the photos of the cards on either side are loaded and placed ahead of
+   a swipe (`ui/versescroll/VerseScrollScreen.kt`, `SceneLayer.kt`).
+   *To check:* on every card or only some, and all the time or only after a swipe?
 
 3. **Verse Scroll for one chapter or book**, "to stay on context instead of wandering."
    Pick a book or chapter (John, Romans 8) and every card comes from there.
