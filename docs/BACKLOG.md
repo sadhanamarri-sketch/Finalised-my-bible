@@ -84,9 +84,14 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
          appears to have verse timings, so the Reader could follow along verse by verse and
          start playing from any verse.
        - *Telugu:* audio exists for other translations — the Easy-to-Read Version (a
-         dramatised New Testament, Bible.is `TELWTC`) and the Indian Revised Version
-         (`TELDPI`) — but nothing found for the BSI text the app shows, so the words heard
-         wouldn't match the words on screen.
+         dramatised New Testament, Bible.is `TELWTC`), the Indian Revised Version (`TELDPI`)
+         and Grace Ministries (`TELGMI`) — but nothing found for the BSI text the app shows,
+         so the words heard wouldn't match the words on screen. Checked on Bible.is on 11 Oct
+         against the app's Telugu text in Genesis 1, Psalm 23, John 1, John 3 and Romans 8:
+         not one of about 160 verses is the same in any of the three (the Indian Revised
+         Version is closest, about 64% alike; the others 51% and 59%). Verse numbers do line
+         up. The BSI Old Version does have audio on YouVersion (Bible.com, `TELUBSI`, there
+         by BSI's permission) — that's YouVersion, not Bible Brain.
        - *Delivery:* streamed a chapter at a time (MP3 at 64 kbps, about half a megabyte a
          minute; also smaller Opus and HLS streams). Listening offline is allowed only for
          recordings the API marks as downloadable, kept inside the app.
