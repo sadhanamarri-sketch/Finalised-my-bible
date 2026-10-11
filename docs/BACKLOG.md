@@ -104,6 +104,24 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
        - *To build it:* a key requested in your name (the licence is between the app's
          maker and Faith Comes By Hearing), and the build environment allowed to reach
          `4.dbt.io` to test against.
+   - *Other Telugu options looked at, 11 Oct:*
+     - YouVersion's Old Version audio (`TELUBSI`) is there by BSI's permission, for
+       YouVersion's own app; whether it covers the Old Testament wasn't confirmed, and
+       there's no way for another app to use it without BSI.
+     - A complete-looking Telugu MP3 set (sermon-online) names no translation, is missing 26
+       chapters, and its rights are unknown — not usable.
+     - A natural-sounding AI voice could record the whole Old Version ahead of time, one
+       file per verse (Azure has two Telugu neural voices; AI4Bharat's open models IndicF5
+       and Indic Parler-TTS also speak Telugu). The text is 3.7 million characters. But
+       handing out recordings of BSI's text is an audio edition, which BSI's terms keep
+       for their permission — so this needs BSI's say too, and if asking BSI, their own
+       human recording is the better thing to ask for.
+   - *Suggested plan (to confirm):* the phone's own voice for Telugu — whole Bible, exactly
+     the app's text, a verse at a time with each verse highlighted as it's read, offline,
+     free, and nothing handed out (the phone reads the text, as a screen reader would).
+     Bible Brain's human narration for KJV, with the phone's voice as the offline fallback.
+     Optionally, Bible Brain's dramatised Old Version for the Telugu New Testament as a
+     second choice there.
    *To ask:* is the phone's voice good enough to start with, or only real narration? For
    Telugu, the phone's voice reading the BSI text, or a recording of a different
    translation? Play a chapter, or continue through the book?
