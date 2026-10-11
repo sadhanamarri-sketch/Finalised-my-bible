@@ -74,15 +74,39 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
        need their permission. A Telugu audio Bible under an open licence (CC BY-SA) does exist,
        but for a different translation (Indian Revised Version), so its wording wouldn't match
        the app's Telugu text.
-     - Faith Comes By Hearing's Bible Brain gives free audio access to approved apps
-       (reportedly only apps that are free to users); whether it has Telugu wasn't confirmed.
-   *To ask:* is the phone's voice good enough to start with, or only real narration? Play a
-   chapter, or continue through the book?
+     - Faith Comes By Hearing's Bible Brain API (looked into 11 Oct, from search results;
+       its own site and API are blocked from the build environment, so the licence wasn't
+       read first-hand):
+       - *Cost and terms:* free, with an API key they approve on request. The licence
+         reportedly requires the app to be free to its users, and lets them restrict or
+         withdraw any content at any time.
+       - *KJV:* yes, narrated (fileset IDs like `ENGKJVO1DA`, Old Testament, MP3), and KJV
+         appears to have verse timings, so the Reader could follow along verse by verse and
+         start playing from any verse.
+       - *Telugu:* audio exists for other translations — the Easy-to-Read Version (a
+         dramatised New Testament, Bible.is `TELWTC`) and the Indian Revised Version
+         (`TELDPI`) — but nothing found for the BSI text the app shows, so the words heard
+         wouldn't match the words on screen.
+       - *Delivery:* streamed a chapter at a time (MP3 at 64 kbps, about half a megabyte a
+         minute; also smaller Opus and HLS streams). Listening offline is allowed only for
+         recordings the API marks as downloadable, kept inside the app.
+       - *To build it:* a key requested in your name (the licence is between the app's
+         maker and Faith Comes By Hearing), and the build environment allowed to reach
+         `4.dbt.io` to test against.
+   *To ask:* is the phone's voice good enough to start with, or only real narration? For
+   Telugu, the phone's voice reading the BSI text, or a recording of a different
+   translation? Play a chapter, or continue through the book?
    Sources: [LibriVox KJV group](https://librivox.org/group/360),
    [Telugu IRV audio on Bible.com](https://my.bible.com/audio-bible/1895/JHN.3.IRVTEL),
    [Bible Society of India](https://www.bsind.org/category/uncategorized/page/32/),
    [Bible Brain](https://www.faithcomesbyhearing.com/audio-bible-resources/bible-brain),
-   [a review of Bible Brain's terms](https://learnofchrist.com/resources/bible-brain-api).
+   [Bible Brain licence](https://www.faithcomesbyhearing.com/bible-brain/license),
+   [Bible Brain core concepts](https://www.faithcomesbyhearing.com/bible-brain/core-concepts),
+   [a review of Bible Brain's terms](https://learnofchrist.com/resources/bible-brain-api),
+   [BibleBrainSharp (timestamps example)](https://github.com/MarkIvanDev/BibleBrainSharp),
+   [Telugu ERV](https://www.southasiabibles.com/resource/language/telugu/Easy-to-Read-Version),
+   [Telugu IRV](https://southasiabibles.com/resource/language/Telugu/Indian-Revised-Version),
+   [Telugu dramatised New Testament](https://podbay.fm/p/-telugu-bible-dramatized).
 
 8. **Pronunciation for Greek and Hebrew words.** "Can pronunciation be included for greek and
    hebrew?"
