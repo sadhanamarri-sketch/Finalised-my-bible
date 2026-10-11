@@ -24,13 +24,21 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
    a swipe (`ui/versescroll/VerseScrollScreen.kt`, `SceneLayer.kt`).
    *To check:* on every card or only some, and all the time or only after a swipe?
 
-3. **Verse Scroll for one chapter or book**, "to stay on context instead of wandering."
-   Pick a book or chapter (John, Romans 8) and every card comes from there.
-   *To ask:* cards in reading order or shuffled? And may Discover's linked verses still lead
-   outside it, or should everything stay inside?
+3. **Verse Scroll modes: Full, Focused, or one chapter or book.** "Verse scroll for
+   particular chapter or book (to stay on context instead of wandering)", and added 11 Oct:
+   "scroll verse should have modes. like 29k will be full, 2.6k you earlier created will be
+   focused."
+   - *Full:* every verse that cross references point to — 29,227 verses, today's Discover
+     pool (`assets/verse_scroll/discover.tsv`).
+   - *Focused:* only the best-known verses. Today that's the pool's "familiar" tier of 2,000
+     verses, dealt two cards in three (the first Verse Scroll used 1,600).
+   - *One chapter or book:* pick John or Romans 8 and every card comes from there.
+   Items 4 and 9 are more modes of the same kind.
+   *To ask:* Focused at 2,000, or about 2,600 as remembered? For a chapter or book, cards in
+   reading order or shuffled, and may Discover's linked verses still lead outside it?
 
 4. **Verse Scroll of highlighted or studied verses**, "to revisit instead of discovering by
-   wandering."
+   wandering." Another mode (see 3).
    A feed made only of your highlighted verses, or only your studied ones.
    *To ask:* by colour too (only "Promise")? Newest first, Bible order, or shuffled?
 
@@ -47,3 +55,50 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
    already built in, so the word pages and "Find every verse with this word" use it.
    *To ask:* Greek ↔ Hebrew only, or also an English word in a verse ↔ a Greek or Hebrew word?
    Should your links be backed up to Drive with notes and highlights?
+
+## Noted 11 Oct 2026
+
+7. **Audio Bible, KJV and Telugu BSI.** "Is it possible for audio bible for kjv and telugu bsi?"
+   Possible, in two ways:
+   - *The phone's own voice (text-to-speech)* reads the exact text on screen, verse by verse,
+     following along in the Reader. Free and offline, no files to download, but it sounds
+     synthetic. English works on any phone; Telugu needs a Telugu voice installed (Google's
+     speech engine offers one in the phone's settings).
+   - *Recorded narration* sounds far better, but the recordings are copyrighted and large
+     (a whole Bible is about 70 hours of audio, a gigabyte or more per language, so it would
+     stream or download a book at a time).
+     - KJV: LibriVox volunteers' KJV readings are public domain in the US, but they're 73
+       separate projects by different readers; whether every book is covered needs checking.
+     - Telugu BSI: the Bible Society of India's published terms (seen for its Tamil Bible)
+       allow only short audio excerpts without written permission, so their recordings would
+       need their permission. A Telugu audio Bible under an open licence (CC BY-SA) does exist,
+       but for a different translation (Indian Revised Version), so its wording wouldn't match
+       the app's Telugu text.
+     - Faith Comes By Hearing's Bible Brain gives free audio access to approved apps
+       (reportedly only apps that are free to users); whether it has Telugu wasn't confirmed.
+   *To ask:* is the phone's voice good enough to start with, or only real narration? Play a
+   chapter, or continue through the book?
+   Sources: [LibriVox KJV group](https://librivox.org/group/360),
+   [Telugu IRV audio on Bible.com](https://my.bible.com/audio-bible/1895/JHN.3.IRVTEL),
+   [Bible Society of India](https://www.bsind.org/category/uncategorized/page/32/),
+   [Bible Brain](https://www.faithcomesbyhearing.com/audio-bible-resources/bible-brain),
+   [a review of Bible Brain's terms](https://learnofchrist.com/resources/bible-brain-api).
+
+8. **Pronunciation for Greek and Hebrew words.** "Can pronunciation be included for greek and
+   hebrew?"
+   Possible, in two ways:
+   - *Written:* a sounds-like guide next to the transliteration the word pages already show
+     (from STEPBible). For Hebrew it's ready: Open Scriptures' Strong's data, which the app's
+     data tools already read for King James renderings, has one for 8,674 words ("awb" for
+     אָב, H1). For Greek that data has only the transliteration ("agápē"), so the guide
+     ("ag-ah'-pay") needs another source, or rules that turn the transliteration into one.
+   - *Spoken:* a speaker button using the phone's Greek or Hebrew voice. Those voices speak
+     modern Greek and modern Hebrew, which differ from how Koine Greek and Biblical Hebrew are
+     usually taught.
+   *To ask:* written only, or a speaker button too?
+
+9. **Verse Scroll from a word search or a topic.** "Can scroll verse take up the word search,
+   topic search?" Another mode (see 3): after searching for "love", or opening Nave's topic
+   "Faith", scroll through just those verses.
+   *To ask:* a button on the results ("Scroll these"), in result order or shuffled? Greek and
+   Hebrew word searches too?
