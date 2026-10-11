@@ -92,6 +92,12 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
          Version is closest, about 64% alike; the others 51% and 59%). Verse numbers do line
          up. The BSI Old Version does have audio on YouVersion (Bible.com, `TELUBSI`, there
          by BSI's permission) — that's YouVersion, not Bible Brain.
+         **Found 11 Oct (link from you):** Bible Brain *does* have the Old Version as audio —
+         Bible.is `TCWOVV`, "Old Version", recordings `TCWOVVN2DA` (MP3, 64 kbps) and
+         `TCWOVVN2DA-opus16`. It's the New Testament only (27 books, 260 chapters), dramatised
+         (several voices), with no text there, so it couldn't be compared word for word here;
+         you listened and found it matches the app's Telugu text. The Old Testament would need
+         the phone's voice. Still to check through the API: whether it has verse timings.
        - *Delivery:* streamed a chapter at a time (MP3 at 64 kbps, about half a megabyte a
          minute; also smaller Opus and HLS streams). Listening offline is allowed only for
          recordings the API marks as downloadable, kept inside the app.
