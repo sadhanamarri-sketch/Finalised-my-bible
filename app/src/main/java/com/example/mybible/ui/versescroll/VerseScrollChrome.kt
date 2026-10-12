@@ -732,6 +732,10 @@ internal fun VerseScrollSettingsSheet(
                 checked = continueReading,
                 onCheckedChange = onContinueReading
             )
+            DsNote(
+                "Earbuds and headsets: a tap pauses or plays; next and previous (often a double and a triple tap) go a card on or back.",
+                modifier = Modifier.padding(top = 10.dp)
+            )
             Spacer(Modifier.height(14.dp))
             DsOutlineAccentButton(text = "Language, voice and speed", onClick = onReadAloudSettings)
         }

@@ -358,3 +358,14 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     *Built:* the Telugu under each verse is 18 (it was 15), the Reader's own Telugu size, and
     can be set from 14 to 24 in Verse Scroll's settings, under the Telugu switch. It runs to
     six lines before "…" (it was four), so most verses show it whole.
+
+15. **Done 12 Oct.** **Earbuds' gestures for reading aloud.** "Can the scroll verse continue reading
+    sync earbuds gestures?"
+    *Built:* reading aloud answers a headset's or earbuds' media controls, as a music app does.
+    A tap pauses or plays (this already worked). "Next" (a double tap on most earbuds; a wired
+    headset's button pressed twice) goes on to the next card in Verse Scroll, with the screen
+    moving to it, or the next verse in the Reader. "Previous" (usually a triple tap) starts the
+    card or verse again, or, in its first three seconds, goes back to the one before. Continue
+    reading carries on from wherever a skip lands; paused, a skip waits there. The notification
+    and the lock screen have Previous and Next buttons too, and Stop shows on newer Android's
+    lock-screen controls. Which tap does what is set by the earbuds themselves (or their app).

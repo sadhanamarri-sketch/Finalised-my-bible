@@ -48,6 +48,18 @@ interface ReadingSession {
     /** The verse to read after [after] — the first, given null — or null when there are no more. */
     suspend fun next(after: VerseToRead?): VerseToRead?
 
+    /**
+     * Where a headset's "next" goes from [current]: by default the verse after it; Verse Scroll's, the
+     * next card. Null when there's nothing after it, which ends the reading.
+     */
+    suspend fun skip(current: VerseToRead): VerseToRead? = next(current)
+
+    /**
+     * Where a headset's "previous" goes from [current]: the verse before it, or null when there's none
+     * (then [current] starts again). None by default.
+     */
+    suspend fun back(current: VerseToRead): VerseToRead? = null
+
     /** It ended: [finished] when it came to its end, otherwise stopped (a tap, another reading starting). */
     fun onStopped(finished: Boolean) {}
 
@@ -153,7 +165,9 @@ class ReadAloud(
     /** It started or went on playing: the notification and audio focus go with it. */
     private val onPlaying: () -> Unit = {},
     /** How deep each of the phone's voices is, to read in the deepest unless one was chosen. */
-    private val depths: VoiceDepths = VoiceDepths()
+    private val depths: VoiceDepths = VoiceDepths(),
+    /** The time in milliseconds, to tell a headset's "previous" early in a verse from later on. */
+    private val clock: () -> Long = { System.nanoTime() / 1_000_000 }
 ) : Speaker.Listener {
 
     private val _state = MutableStateFlow(ReadAloudState())
@@ -172,6 +186,9 @@ class ReadAloud(
 
     // Where in the part the text last given to the speaker starts, to place the words it reports.
     private var spokenFrom = 0
+
+    // When the verse being read came up, or was last said from its beginning (see skipToPrevious).
+    private var verseStartedAt = 0L
 
     // Each thing said gets a new id; anything the speaker reports about an older one is ignored.
     private var utterances = 0L
@@ -304,6 +321,42 @@ class ReadAloud(
         measureSoon()
     }
 
+    /**
+     * A headset's "next" (a double tap on most earbuds), or the notification's: on to the next verse —
+     * in Verse Scroll, the next card — from its start. Paused, it waits there to be played.
+     */
+    fun skipToNext() {
+        val verse = skippableVerse() ?: return
+        advance(after = verse) { reading, from -> from?.let { reading.skip(it) } }
+    }
+
+    /**
+     * A headset's "previous" (a triple tap on most earbuds), or the notification's: the verse being read
+     * again from its start — or, in its first few seconds, the verse before it (in Verse Scroll, the
+     * card before), as a music player's "previous" goes back a song.
+     */
+    fun skipToPrevious() {
+        val verse = skippableVerse() ?: return
+        if (clock() - verseStartedAt > BACK_WITHIN_MS) {
+            partIndex = 0
+            resumeAt = 0
+            if (_state.value.status == ReadAloudState.Status.PLAYING) speakPart()
+            return
+        }
+        // Nothing before it: this one again.
+        advance(after = verse) { reading, from -> from?.let { reading.back(it) ?: it } }
+    }
+
+    // The verse being read, stopped where it is for a skip; null when there's nothing to skip from
+    // (no reading, or still finding the next verse).
+    private fun skippableVerse(): VerseToRead? {
+        if (session == null || advancing?.isActive == true) return null
+        val verse = _state.value.verse ?: return null
+        utterances++
+        speaker.stop()
+        return verse
+    }
+
     /** A setting changed (the speed, a voice): what's being said starts again, from the word it got to. */
     fun refresh() {
         if (_state.value.status != ReadAloudState.Status.PLAYING || parts.isEmpty() || advancing?.isActive == true) return
@@ -322,8 +375,12 @@ class ReadAloud(
         resumeAt = 0
     }
 
-    // Reads the verse after [after] in the reading (its first, without one), or ends the reading.
-    private fun advance(after: VerseToRead?) {
+    // Reads the verse after [after] in the reading (its first, without one), or ends the reading. [step]
+    // finds it: the reading's next verse, or for a headset's next or previous, the one to skip to.
+    private fun advance(
+        after: VerseToRead?,
+        step: suspend (ReadingSession, VerseToRead?) -> VerseToRead? = { reading, from -> reading.next(from) }
+    ) {
         val current = session ?: return
         parts = emptyList()
         partIndex = 0
@@ -332,7 +389,7 @@ class ReadAloud(
             var previous = after
             var skipped = 0
             while (true) {
-                val verse = current.next(previous)
+                val verse = step(current, previous)
                 if (session !== current) return@launch
                 if (verse == null) {
                     end(current, finished = true)
@@ -354,6 +411,7 @@ class ReadAloud(
                     return@launch
                 }
                 parts = read
+                verseStartedAt = clock()
                 _state.update { it.copy(verse = verse, telugu = read[0].telugu) }
                 break
             }
@@ -396,6 +454,7 @@ class ReadAloud(
     private fun speakPart() {
         val part = parts.getOrNull(partIndex) ?: return
         val from = resumeAt.coerceIn(0, part.text.length)
+        if (partIndex == 0 && from == 0) verseStartedAt = clock()
         spokenFrom = from
         utterances++
         _state.update { it.copy(telugu = part.telugu) }
@@ -440,6 +499,10 @@ class ReadAloud(
 
     private companion object {
         const val MEASURE_AFTER_MS = 2_000L
+
+        // A headset's "previous" this soon after a verse began goes back to the one before; later, it
+        // starts the verse again.
+        const val BACK_WITHIN_MS = 3_000L
 
         // Verses in a row with nothing to read before giving up (a list of verses with no Telugu at all).
         const val MAX_SKIPPED = 50

@@ -18,6 +18,7 @@ import android.media.MediaMetadata
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.os.Build
+import android.os.Bundle
 import android.os.IBinder
 import android.os.PowerManager
 import androidx.core.content.ContextCompat
@@ -29,9 +30,10 @@ import kotlinx.coroutines.launch
 
 /**
  * Keeps a reading aloud going with the screen off or the app out of view: a notification (and the lock
- * screen's media controls, and a headset's buttons) to pause, play and stop. It runs while something is
- * being read and stops itself once nothing is. It also gives way to other sound: a call or another
- * app's audio pauses the reading (picking up after a short interruption), as do headphones coming out.
+ * screen's media controls, and a headset's buttons or earbuds' taps) to pause, play, go to the next or
+ * previous verse (Verse Scroll's next or previous card) and stop. It runs while something is being read
+ * and stops itself once nothing is. It also gives way to other sound: a call or another app's audio
+ * pauses the reading (picking up after a short interruption), as do headphones coming out.
  */
 class ReadAloudService : Service() {
     private val engine by lazy { ReadAloudHub.get(this) }
@@ -82,10 +84,17 @@ class ReadAloudService : Service() {
         super.onCreate()
         ensureChannel(this)
         media = MediaSession(this, "ReadAloud").apply {
+            // Earbuds' taps arrive as these: most send "next" for a double tap and "previous" for a
+            // triple; a wired headset's double press is taken as "next".
             setCallback(object : MediaSession.Callback() {
                 override fun onPlay() = engine.resume()
                 override fun onPause() = engine.pause()
                 override fun onStop() = engine.stop()
+                override fun onSkipToNext() = engine.skipToNext()
+                override fun onSkipToPrevious() = engine.skipToPrevious()
+                override fun onCustomAction(action: String, extras: Bundle?) {
+                    if (action == ACTION_STOP) engine.stop()
+                }
             })
             setSessionActivity(openApp())
             isActive = true
@@ -100,6 +109,8 @@ class ReadAloudService : Service() {
             ACTION_PLAY -> engine.resume()
             ACTION_PAUSE -> engine.pause()
             ACTION_STOP -> engine.stop()
+            ACTION_NEXT -> engine.skipToNext()
+            ACTION_PREVIOUS -> engine.skipToPrevious()
         }
         render(engine.state.value)
         return START_NOT_STICKY
@@ -216,8 +227,14 @@ class ReadAloudService : Service() {
         }
     }
 
+    // What the reading answers to: from a headset, the notification, and the lock screen's controls, which
+    // on newer Android are drawn from these (Stop among them as an action of the app's own).
     private fun playbackState(state: ReadAloudState): PlaybackState = PlaybackState.Builder()
-        .setActions(PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PAUSE or PlaybackState.ACTION_PLAY_PAUSE or PlaybackState.ACTION_STOP)
+        .setActions(
+            PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PAUSE or PlaybackState.ACTION_PLAY_PAUSE or PlaybackState.ACTION_STOP or
+                PlaybackState.ACTION_SKIP_TO_NEXT or PlaybackState.ACTION_SKIP_TO_PREVIOUS
+        )
+        .addCustomAction(PlaybackState.CustomAction.Builder(ACTION_STOP, "Stop", R.drawable.ic_read_stop).build())
         .setState(
             when (state.status) {
                 ReadAloudState.Status.PLAYING -> PlaybackState.STATE_PLAYING
@@ -239,6 +256,8 @@ class ReadAloudService : Service() {
             command(if (playing) ACTION_PAUSE else ACTION_PLAY)
         ).build()
         val stop = Notification.Action.Builder(Icon.createWithResource(this, R.drawable.ic_read_stop), "Stop", command(ACTION_STOP)).build()
+        val previous = Notification.Action.Builder(Icon.createWithResource(this, R.drawable.ic_read_previous), "Previous", command(ACTION_PREVIOUS)).build()
+        val next = Notification.Action.Builder(Icon.createWithResource(this, R.drawable.ic_read_next), "Next", command(ACTION_NEXT)).build()
         return Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(titleOf(state))
@@ -256,9 +275,11 @@ class ReadAloudService : Service() {
             .setOngoing(playing)
             .setShowWhen(false)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
+            .addAction(previous)
             .addAction(toggle)
+            .addAction(next)
             .addAction(stop)
-            .setStyle(Notification.MediaStyle().setMediaSession(media.sessionToken).setShowActionsInCompactView(0, 1))
+            .setStyle(Notification.MediaStyle().setMediaSession(media.sessionToken).setShowActionsInCompactView(0, 1, 2))
             .build()
     }
 
@@ -289,6 +310,8 @@ class ReadAloudService : Service() {
         private const val ACTION_PLAY = "com.example.mybible.audio.PLAY"
         private const val ACTION_PAUSE = "com.example.mybible.audio.PAUSE"
         private const val ACTION_STOP = "com.example.mybible.audio.STOP"
+        private const val ACTION_NEXT = "com.example.mybible.audio.NEXT"
+        private const val ACTION_PREVIOUS = "com.example.mybible.audio.PREVIOUS"
 
         /** Something started playing: show the notification and keep the reading going. */
         fun start(context: Context) {

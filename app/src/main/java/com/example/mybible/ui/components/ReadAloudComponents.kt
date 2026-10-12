@@ -295,7 +295,7 @@ fun ReadAloudSheet(
             }
             DsSectionDivider()
             DsNote(
-                "Read in your phone's own voice, offline. It keeps reading with the screen off; pause or stop it from the notification.",
+                "Read in your phone's own voice, offline. It keeps reading with the screen off; pause, skip or stop it from the notification or your earbuds (next and previous go a verse on or back, in Verse Scroll a card).",
                 modifier = Modifier.padding(top = 14.dp)
             )
         }

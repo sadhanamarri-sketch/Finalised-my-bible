@@ -2,7 +2,8 @@ package com.example.mybible.audio
 
 /**
  * The Reader's chapter, read aloud from verse [from] to the chapter's end — where it stops (it doesn't
- * go on to the next chapter). Its verses are loaded as it starts, by [load].
+ * go on to the next chapter); a headset's next and previous go a verse on or back. Its verses are
+ * loaded as it starts, by [load].
  */
 class ChapterReading(
     val book: String,
@@ -20,5 +21,12 @@ class ChapterReading(
         if (after == null) return all.firstOrNull { it.verse >= from }
         val i = all.indexOfFirst { it.verse == after.verse }
         return if (i < 0) null else all.getOrNull(i + 1)
+    }
+
+    // A headset's "previous": the verse before, back to the chapter's first (even before [from]).
+    override suspend fun back(current: VerseToRead): VerseToRead? {
+        val all = verses ?: load().also { verses = it }
+        val i = all.indexOfFirst { it.verse == current.verse }
+        return if (i <= 0) null else all[i - 1]
     }
 }

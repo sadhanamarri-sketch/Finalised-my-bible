@@ -474,7 +474,8 @@ class VerseScrollController(
     /**
      * Cards read aloud: a card's verses one at a time, then, with Continue reading, on to the next verse
      * card (past a check-in) — moving the screen along with it, or with the screen off, just the feed,
-     * which the screen catches up with when it's back.
+     * which the screen catches up with when it's back. A headset's next and previous go a card on or
+     * back, the same way.
      */
     private inner class CardReading(var index: Int, var uid: Long) : ReadingSession {
         override val place = ReadingPlace.VERSE_SCROLL
@@ -490,14 +491,29 @@ class VerseScrollController(
                 return toRead(card, line)
             }
             if (after == null || !readAloud.prefs.continueReading) return null
-            val nextIndex = nextVerseCard(index) ?: return null
-            val nextCard = cards[nextIndex] as VerseFeedCard
-            index = nextIndex
-            uid = nextCard.uid
+            return moveTo(nextVerseCard(index) ?: return null)
+        }
+
+        // The next card, whatever's left of this one and with Continue reading on or off.
+        override suspend fun skip(current: VerseToRead): VerseToRead? {
+            return moveTo(nextVerseCard(index) ?: return null)
+        }
+
+        // The verse card before this one, past check-ins; none before the feed's first.
+        override suspend fun back(current: VerseToRead): VerseToRead? {
+            val before = (index - 1 downTo 0).firstOrNull { cards.getOrNull(it) is VerseFeedCard } ?: return null
+            return moveTo(before)
+        }
+
+        // On to the verse card at [to], from its first verse, the screen going with it.
+        private suspend fun moveTo(to: Int): VerseToRead {
+            val card = cards[to] as VerseFeedCard
+            index = to
+            uid = card.uid
             line = 0
-            onCardShown(nextIndex)
-            scrollRequest = ScrollRequest(nextIndex, ++scrollIds)
-            return toRead(nextCard, 0)
+            onCardShown(to)
+            scrollRequest = ScrollRequest(to, ++scrollIds)
+            return toRead(card, 0)
         }
 
         override fun onStopped(finished: Boolean) {

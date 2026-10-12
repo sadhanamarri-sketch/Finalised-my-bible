@@ -59,6 +59,8 @@ class ReadAloudTest {
         override suspend fun next(after: VerseToRead?): VerseToRead? =
             if (after == null) verses.firstOrNull { it.verse == from } else verses.getOrNull(verses.indexOf(after) + 1)
 
+        override suspend fun back(current: VerseToRead): VerseToRead? = verses.getOrNull(verses.indexOf(current) - 1)
+
         override fun onStopped(finished: Boolean) { stopped = finished }
         override fun onPaused() { paused++ }
         override fun onResumed() { resumed++ }
@@ -70,8 +72,8 @@ class ReadAloudTest {
         VerseToRead("John", 3, 18, "He that believeth on him is not condemned", "ఆయనయందు విశ్వాసముంచువానికి తీర్పు తీర్చబడదు")
     )
 
-    private fun reader(speaker: FakeSpeaker, prefs: FakePrefs = FakePrefs(), depths: VoiceDepths = VoiceDepths()) =
-        ReadAloud(speaker, prefs, CoroutineScope(Dispatchers.Unconfined), depths = depths)
+    private fun reader(speaker: FakeSpeaker, prefs: FakePrefs = FakePrefs(), depths: VoiceDepths = VoiceDepths(), clock: () -> Long = { 0L }) =
+        ReadAloud(speaker, prefs, CoroutineScope(Dispatchers.Unconfined), depths = depths, clock = clock)
 
     @Test
     fun readInTheVoiceChosenElseTheDeepestAtThePitchChosen() {
@@ -236,6 +238,72 @@ class ReadAloudTest {
         reader.refresh()
         assertEquals("so loved the world", speaker.said.last().text)
         assertEquals(1.5f, speaker.said.last().rate)
+    }
+
+    @Test
+    fun aHeadsetsNextGoesOnToTheNextVerse() {
+        val speaker = FakeSpeaker()
+        val reader = reader(speaker, FakePrefs(ReadLanguage.BOTH))
+        val chapter = Chapter(john3, from = 16)
+        reader.start(chapter)
+        speaker.reachWord(8)
+        reader.skipToNext()
+        // 3:17 from its start, the rest of 3:16 and its Telugu left out; what the voice says of 3:16 counts for nothing.
+        assertEquals("John 3:17", reader.state.value.verse?.label)
+        assertEquals(false to "For God sent not his Son", speaker.said.last().let { it.telugu to it.text })
+        speaker.listener!!.onDone(speaker.said[0].id)
+        assertEquals("John 3:17", reader.state.value.verse?.label)
+        // Paused, it moves on and waits there.
+        reader.pause()
+        val said = speaker.said.size
+        reader.skipToNext()
+        assertEquals("John 3:18", reader.state.value.verse?.label)
+        assertEquals(ReadAloudState.Status.PAUSED, reader.state.value.status)
+        assertEquals(said, speaker.said.size)
+        reader.resume()
+        assertEquals("He that believeth on him is not condemned", speaker.said.last().text)
+        // Past the last verse, the reading ends, as at the chapter's end.
+        reader.skipToNext()
+        assertEquals(ReadAloudState.Status.IDLE, reader.state.value.status)
+        assertEquals(true, chapter.stopped)
+    }
+
+    @Test
+    fun aHeadsetsPreviousStartsTheVerseAgainOrGoesBack() {
+        val speaker = FakeSpeaker()
+        var now = 0L
+        val reader = reader(speaker, clock = { now })
+        reader.start(Chapter(john3, from = 17))
+        speaker.reachWord(8)
+        // Well into 3:17: it starts again.
+        now += 5_000
+        reader.skipToPrevious()
+        assertEquals("John 3:17", reader.state.value.verse?.label)
+        assertEquals("For God sent not his Son", speaker.said.last().text)
+        // Pressed again straight away: back to 3:16.
+        now += 500
+        reader.skipToPrevious()
+        assertEquals("John 3:16", reader.state.value.verse?.label)
+        assertEquals("For God so loved the world", speaker.said.last().text)
+        // Nothing before the first verse: it starts again.
+        now += 500
+        val said = speaker.said.size
+        reader.skipToPrevious()
+        assertEquals("John 3:16", reader.state.value.verse?.label)
+        assertEquals(said + 1, speaker.said.size)
+        assertEquals(ReadAloudState.Status.PLAYING, reader.state.value.status)
+    }
+
+    @Test
+    fun theReadersChapterGoesBackEvenBeforeTheVerseItStartedFrom() {
+        val speaker = FakeSpeaker()
+        val reader = reader(speaker)
+        reader.start(ChapterReading("John", 3, from = 17) { john3 })
+        reader.skipToPrevious()
+        assertEquals("John 3:16", reader.state.value.verse?.label)
+        repeat(2) { reader.skipToNext() }
+        assertEquals("John 3:18", reader.state.value.verse?.label)
+        assertEquals("He that believeth on him is not condemned", speaker.said.last().text)
     }
 
     @Test
