@@ -569,6 +569,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun stopReading() = readAloud.stop()
 
+    /** The reading bar's previous: the verse again, or (early in it) the one before. */
+    fun readPreviousVerse() = readAloud.skipToPrevious()
+
+    fun readNextVerse() = readAloud.skipToNext()
+
+    /** The reading bar's previous, held: the chapter from its first verse. */
+    fun readFromChapterStart() = readAloud.skipToStart()
+
     private companion object {
         val GREEK_VOICE: java.util.Locale = java.util.Locale("el", "GR")
         val HEBREW_VOICE: java.util.Locale = java.util.Locale("he", "IL")

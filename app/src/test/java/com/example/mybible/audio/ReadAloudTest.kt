@@ -307,6 +307,29 @@ class ReadAloudTest {
     }
 
     @Test
+    fun holdingPreviousReadsTheChapterFromItsFirstVerse() {
+        val speaker = FakeSpeaker()
+        val reader = reader(speaker)
+        reader.start(ChapterReading("John", 3, from = 18) { john3 })
+        reader.skipToStart()
+        assertEquals("John 3:16", reader.state.value.verse?.label)
+        assertEquals("For God so loved the world", speaker.said.last().text)
+        // Paused, it goes there and waits.
+        speaker.finish()
+        reader.pause()
+        reader.skipToStart()
+        assertEquals("John 3:16", reader.state.value.verse?.label)
+        assertEquals(ReadAloudState.Status.PAUSED, reader.state.value.status)
+        // Read in Telugu, a first verse without any: on to the first with it.
+        val telugu = FakeSpeaker()
+        val inTelugu = reader(telugu, FakePrefs(ReadLanguage.TELUGU))
+        inTelugu.start(ChapterReading("John", 3, from = 18) { john3.drop(1) })
+        inTelugu.skipToStart()
+        assertEquals("John 3:18", inTelugu.state.value.verse?.label)
+        assertEquals(ReadAloudState.Status.PLAYING, inTelugu.state.value.status)
+    }
+
+    @Test
     fun startingAnotherReadingStopsTheFirst() {
         val speaker = FakeSpeaker()
         val reader = reader(speaker)

@@ -60,6 +60,9 @@ interface ReadingSession {
      */
     suspend fun back(current: VerseToRead): VerseToRead? = null
 
+    /** Where touching and holding "previous" goes: the reading's first verse (the Reader's, its chapter's first). None by default. */
+    suspend fun first(): VerseToRead? = null
+
     /** It ended: [finished] when it came to its end, otherwise stopped (a tap, another reading starting). */
     fun onStopped(finished: Boolean) {}
 
@@ -345,6 +348,24 @@ class ReadAloud(
         }
         // Nothing before it: this one again.
         advance(after = verse) { reading, from -> from?.let { reading.back(it) ?: it } }
+    }
+
+    /**
+     * Touching and holding "previous": back to the reading's first verse — in the Reader, the chapter's
+     * first — from its start. Paused, it waits there to be played.
+     */
+    fun skipToStart() {
+        val verse = skippableVerse() ?: return
+        // There, then on as usual should that verse have nothing to read (no Telugu, read in Telugu).
+        var there = false
+        advance(after = verse) { reading, from ->
+            if (there) {
+                reading.next(from)
+            } else {
+                there = true
+                reading.first() ?: from
+            }
+        }
     }
 
     // The verse being read, stopped where it is for a skip; null when there's nothing to skip from

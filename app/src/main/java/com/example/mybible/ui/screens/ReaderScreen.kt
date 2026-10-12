@@ -1500,6 +1500,9 @@ fun ReaderScreen(
                     onPlayPause = {
                         if (readAloudState.status == ReadAloudState.Status.PLAYING) viewModel.pauseReading() else viewModel.resumeReading()
                     },
+                    onPrevious = { viewModel.readPreviousVerse() },
+                    onNext = { viewModel.readNextVerse() },
+                    onChapterStart = { viewModel.readFromChapterStart() },
                     onOpenVerse = {
                         val reading = readAloudState.verse
                         if (reading != null && reading.book == currentBook && reading.chapter == currentChapter) {

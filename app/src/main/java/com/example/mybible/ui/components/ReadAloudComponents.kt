@@ -7,6 +7,9 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.speech.tts.TextToSpeech
 import android.provider.Settings
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.material3.Slider
 import androidx.compose.ui.semantics.contentDescription
@@ -40,6 +43,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -58,7 +63,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
@@ -76,19 +83,25 @@ import com.example.mybible.ui.theme.WorkSansFontFamily
 import kotlinx.coroutines.delay
 
 /**
- * The Reader's reading-aloud bar, over its bottom pill while a chapter is read aloud: play or pause, the
- * verse being read (tap it to go to it), the settings, and stop.
+ * The Reader's reading-aloud bar, over its bottom pill while a chapter is read aloud: previous (held, back
+ * to the chapter's first verse), play or pause, next, the verse being read (tap it to go to it), the
+ * settings, and stop.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ReadAloudBar(
     state: ReadAloudState,
     onPlayPause: () -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onChapterStart: () -> Unit,
     onOpenVerse: () -> Unit,
     onSettings: () -> Unit,
     onStop: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val playing = state.status == ReadAloudState.Status.PLAYING
+    val haptics = LocalHapticFeedback.current
     Surface(
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f),
@@ -99,6 +112,25 @@ fun ReadAloudBar(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
         ) {
+            // Previous: the verse again, or early in it the one before; held, the chapter from its first verse.
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .combinedClickable(
+                        role = Role.Button,
+                        onClickLabel = "Previous verse",
+                        onLongClickLabel = "Read from the start of the chapter",
+                        onLongClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onChapterStart()
+                        },
+                        onClick = onPrevious
+                    )
+            ) {
+                Icon(Icons.Default.SkipPrevious, contentDescription = "Previous verse", tint = MaterialTheme.colorScheme.onSurface)
+            }
             IconButton(onClick = onPlayPause, modifier = Modifier.size(38.dp)) {
                 Icon(
                     imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
@@ -106,9 +138,12 @@ fun ReadAloudBar(
                     tint = MaterialTheme.colorScheme.primary
                 )
             }
+            IconButton(onClick = onNext, modifier = Modifier.size(38.dp)) {
+                Icon(Icons.Default.SkipNext, contentDescription = "Next verse", tint = MaterialTheme.colorScheme.onSurface)
+            }
             Column(
                 modifier = Modifier
-                    .widthIn(max = 180.dp)
+                    .widthIn(max = 132.dp)
                     .clip(CircleShape)
                     .clickable(onClick = onOpenVerse)
                     .padding(horizontal = 8.dp, vertical = 2.dp)
@@ -295,7 +330,7 @@ fun ReadAloudSheet(
             }
             DsSectionDivider()
             DsNote(
-                "Read in your phone's own voice, offline. It keeps reading with the screen off; pause, skip or stop it from the notification or your earbuds (next and previous go a verse on or back, in Verse Scroll a card).",
+                "Read in your phone's own voice, offline. It keeps reading with the screen off; pause, skip or stop it from the notification or your earbuds (next and previous go a verse on or back, in Verse Scroll a card). In the Reader, hold the previous button to go back to the chapter's first verse.",
                 modifier = Modifier.padding(top = 14.dp)
             )
         }

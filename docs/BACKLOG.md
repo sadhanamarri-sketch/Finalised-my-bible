@@ -376,11 +376,13 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     the buttons still come here to play again. It also keeps a Bluetooth headset's sound open
     between verses, so a verse's first word isn't clipped.
 
-16. **Next, after testing the build from 12 Oct.** **The Reader's own controls for reading aloud.**
-    "I will test and then we can bring it to reader as well with addition control and touch and
-    hold to go to start of the chapter."
-    Earbuds' next and previous already go a verse on or back in the Reader (item 15). Still to
-    build, once you've tried that: Previous and Next buttons on the Reader's reading-aloud bar
-    (beside play and pause), and touching and holding Previous to go back to the chapter's first
-    verse. To confirm then: whether holding should also work from the earbuds — most earbuds keep
-    their own touch-and-hold for the voice assistant or noise control, which apps can't receive.
+16. **Done 12 Oct.** **The Reader's own controls for reading aloud.** "I will test and then we can
+    bring it to reader as well with addition control and touch and hold to go to start of the
+    chapter." (After testing the earbuds: "it worked.")
+    *Built:* the Reader's reading-aloud bar has Previous and Next beside play and pause. Previous
+    starts the verse again, or in its first three seconds goes back a verse, as the earbuds'
+    does; touching and holding it reads the chapter from its first verse, wherever the reading
+    began (with a buzz to say it took). Paused, these move there and wait. Your earbuds' own
+    touch-and-hold is noise cancellation, set in their app, and never reaches other apps, so the
+    hold is on the screen's button; their tap, double tap and triple tap are play and pause, next
+    and previous, which the Reader and Verse Scroll answer.
