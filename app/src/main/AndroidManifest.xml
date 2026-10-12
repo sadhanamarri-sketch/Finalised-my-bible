@@ -13,6 +13,19 @@
          "dataSync" on Android 14+ (API 34). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Reading aloud (audio/ReadAloudService.kt) keeps playing with the screen off as a foreground
+         service of type "mediaPlayback", which Android 14+ (API 34) asks for by name. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- ...and keeps the phone from dozing off between verses while it does. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Android 11+ (API 30) only lets the app see the phone's speech engine (for reading aloud) when
+         it says it looks for one. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
 
     <application
         android:allowBackup="true"
@@ -69,6 +82,12 @@
              (API 34) also requires the type to be declared here — this
              overrides (merges into) WorkManager's entry rather than
              replacing it. -->
+        <!-- Reading aloud with the screen off: its notification, lock-screen and headset controls. -->
+        <service
+            android:name=".audio.ReadAloudService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+
         <service
             android:name="androidx.work.impl.foreground.SystemForegroundService"
             android:foregroundServiceType="dataSync"

@@ -72,7 +72,23 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
 
 ## Noted 11 Oct 2026
 
-7. **Audio Bible, KJV and Telugu BSI.** "Is it possible for audio bible for kjv and telugu bsi?"
+7. **Step 1 done 12 Oct.** **Audio Bible, KJV and Telugu BSI.**
+   *Built (step 1, the phone's own voice):* reading aloud in English, Telugu or both (each verse
+   in English, then in Telugu).
+   - *Reader:* "Read aloud" in the menu reads the chapter from the verse at the top of the
+     screen; the headphones on a verse's sheet read from that verse. The verse being read is
+     marked and kept on screen, and it stops at the chapter's end. A bar over the bottom pill
+     pauses, goes on, opens the settings and stops; tapping its verse goes back to it.
+   - *Verse Scroll:* the speaker at the top reads each card as it comes up. "Continue reading"
+     (in its settings) moves on to the next card by itself, hands-free, skipping check-ins.
+   - *Screen off:* it keeps reading, with a notification (and the lock screen's and a headset's
+     controls) to pause, play and stop. A call or another app's sound pauses it, as does
+     unplugging headphones.
+   - *Settings:* the language, the speed (0.75× to 1.5×), and a voice for English and for
+     Telugu, each tried as it's picked. A phone without a Telugu voice is told so, with a button
+     to get one.
+   *Still to come (step 2):* Bible Brain's narrated KJV, once the API key arrives.
+   "Is it possible for audio bible for kjv and telugu bsi?"
    Possible, in two ways:
    - *The phone's own voice (text-to-speech)* reads the exact text on screen, verse by verse,
      following along in the Reader. Free and offline, no files to download, but it sounds

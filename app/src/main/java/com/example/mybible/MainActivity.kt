@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.mybible.audio.ReadAloudService
 import com.example.mybible.model.SavedWordItem
 import com.example.mybible.model.SavedWordLanguage
 import com.example.mybible.ui.MainViewModel
@@ -78,6 +79,9 @@ class MainActivity : ComponentActivity() {
     // for. Resolved from Compose instead, it landed a frame or more later,
     // after the page left open had been drawn again.
     private fun handleLaunchIntent(intent: android.content.Intent) {
+        // Reading aloud's notification: back to the app as it was, nothing to clear or open.
+        if (intent.getBooleanExtra(ReadAloudService.EXTRA_FROM_READ_ALOUD, false)) return
+
         // Continue Reading is checked first and handled on its own:
         // it still needs the other five detour flags cleared (same
         // "stale banner hijacks the first back press" reasoning as

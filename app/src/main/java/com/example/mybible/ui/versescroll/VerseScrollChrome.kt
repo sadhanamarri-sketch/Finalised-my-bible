@@ -103,10 +103,10 @@ private fun bottomScrim(colors: VsColors, scenes: Boolean): Brush =
     else Brush.verticalGradient(0f to Color(0x00FAF7F0), 0.65f to Color(0xCCFAF7F0), 1f to Color(0xCCFAF7F0))
 
 /**
- * Back, the feed's two tabs, and settings. The first tab is the mode, named for where its verses come
- * from ("Full", "Romans 8", "Highlighted"): tapped while showing, it opens the choice of verses. Inside
- * a Rabbit hole, past its first verse, a "Back to …" button underneath returns to the verse it started
- * from.
+ * Back, the feed's two tabs, the speaker and settings. The first tab is the mode, named for where its
+ * verses come from ("Full", "Romans 8", "Highlighted"): tapped while showing, it opens the choice of
+ * verses. The speaker reads each card aloud as it comes up. Inside a Rabbit hole, past its first verse,
+ * a "Back to …" button underneath returns to the verse it started from.
  */
 @Composable
 internal fun BoxScope.VerseScrollTopBar(
@@ -115,10 +115,12 @@ internal fun BoxScope.VerseScrollTopBar(
     rabbitHole: Boolean,
     backTo: String?,
     modeLabel: String,
+    speakerOn: Boolean,
     onBack: () -> Unit,
     onDiscover: () -> Unit,
     onRabbitHole: () -> Unit,
     onBackTo: () -> Unit,
+    onSpeaker: () -> Unit,
     onSettings: () -> Unit
 ) {
     Column(
@@ -144,6 +146,12 @@ internal fun BoxScope.VerseScrollTopBar(
                 Tab(modeLabel, selected = !rabbitHole, colors = colors, menu = !rabbitHole, onClick = onDiscover)
                 Tab("Rabbit hole", selected = rabbitHole, colors = colors, onClick = onRabbitHole)
             }
+            RoundIconButton(
+                if (speakerOn) VerseScrollIcons.Speaker else VerseScrollIcons.SpeakerOff,
+                if (speakerOn) "Stop reading aloud" else "Read aloud",
+                if (speakerOn) colors.gold else colors.ink,
+                onSpeaker
+            )
             RoundIconButton(VerseScrollIcons.Settings, "Verse Scroll settings", colors.ink, onSettings)
         }
         if (backTo != null) {
@@ -604,10 +612,13 @@ internal fun VerseScrollSettingsSheet(
     doubleTapColor: String,
     showTelugu: Boolean,
     sceneCount: Int,
+    continueReading: Boolean,
     onPhotos: (Boolean) -> Unit,
     onMotion: (Boolean) -> Unit,
     onDoubleTapColor: (String) -> Unit,
     onShowTelugu: (Boolean) -> Unit,
+    onContinueReading: (Boolean) -> Unit,
+    onReadAloudSettings: () -> Unit,
     onDismiss: () -> Unit
 ) {
     ModalBottomSheet(
@@ -619,6 +630,8 @@ internal fun VerseScrollSettingsSheet(
             verticalArrangement = Arrangement.spacedBy(18.dp),
             modifier = Modifier
                 .fillMaxWidth()
+                // Taller than some screens.
+                .verticalScroll(rememberScrollState())
                 .navigationBarsPadding()
                 .padding(start = 20.dp, end = 20.dp, bottom = 16.dp)
         ) {
@@ -673,6 +686,19 @@ internal fun VerseScrollSettingsSheet(
             SettingGroup("Telugu under each verse", colors) {
                 OptionPill("Off", !showTelugu, colors) { onShowTelugu(false) }
                 OptionPill("On", showTelugu, colors) { onShowTelugu(true) }
+            }
+            SettingGroup("Reading aloud: continue reading", colors) {
+                OptionPill("Off", !continueReading, colors) { onContinueReading(false) }
+                OptionPill("On", continueReading, colors) { onContinueReading(true) }
+            }
+            SettingNote(
+                "With the speaker at the top on, each card is read aloud as it comes up" +
+                    if (continueReading) ", then Verse Scroll moves on to the next by itself, hands-free, even with the screen off."
+                    else "; swipe on for the next. Continue reading moves on by itself, hands-free.",
+                colors
+            )
+            SettingGroup("Language, voice and speed", colors) {
+                OptionPill("Reading aloud settings", false, colors, onReadAloudSettings)
             }
         }
     }

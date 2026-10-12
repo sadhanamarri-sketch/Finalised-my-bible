@@ -18,6 +18,13 @@ import com.example.mybible.data.DriveSyncWorker
 import com.example.mybible.reminders.ReminderFrequency
 import com.example.mybible.reminders.ReminderScheduler
 import com.example.mybible.reminders.ReminderTheme
+import com.example.mybible.audio.ChapterReading
+import com.example.mybible.audio.ReadAloud
+import com.example.mybible.audio.ReadAloudHub
+import com.example.mybible.audio.ReadAloudSettings
+import com.example.mybible.audio.ReadAloudState
+import com.example.mybible.audio.ReadingPlace
+import com.example.mybible.audio.VerseToRead
 import com.example.mybible.versescroll.VerseRef
 import com.example.mybible.versescroll.VerseScrollController
 import com.example.mybible.data.resolveBookName
@@ -527,12 +534,42 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         resetHighlightsPage()
     }
 
+    // ---- Reading aloud ----
+
+    // The phone's own voice reading the Reader's chapter or Verse Scroll's cards: one reader for the whole
+    // app, kept going with the screen off by its service (see audio/ReadAloudService).
+    val readAloud: ReadAloud = ReadAloudHub.get(application)
+    val readAloudSettings: ReadAloudSettings = ReadAloudHub.settings(application)
+    val readAloudState: StateFlow<ReadAloudState> = readAloud.state
+
+    /** The Reader's chapter, read aloud from [fromVerse] to the chapter's end. */
+    fun readChapterAloud(book: String, chapter: Int, fromVerse: Int) {
+        readAloud.start(ChapterReading(book, chapter, fromVerse) {
+            val verses = repository.getChapterVerses(book, chapter, includeTelugu = true)
+            // The bundled Telugu text for any verse the database doesn't have it for yet.
+            val telugu = if (verses.any { it.teluguText.isNullOrBlank() }) repository.getTeluguChapterVerses(book, chapter) else emptyMap()
+            verses.map { v -> VerseToRead(v.book, v.chapter, v.number, v.text, v.teluguText?.takeIf { it.isNotBlank() } ?: telugu[v.number]) }
+        })
+    }
+
+    fun pauseReading() = readAloud.pause()
+
+    fun resumeReading() = readAloud.resume()
+
+    fun stopReading() = readAloud.stop()
+
+    override fun onCleared() {
+        // Verse Scroll's reading needs its feed, which goes with this; the Reader's chapter can read on.
+        if (readAloud.session?.place == ReadingPlace.VERSE_SCROLL) readAloud.stop()
+        super.onCleared()
+    }
+
     // ---- Verse Scroll ----
 
     // The feed, its settings and today's count — kept here rather than in
     // the screen so a trip to the Reader ("Read") and back lands on the
     // same card.
-    val verseScroll = VerseScrollController(application, repository, viewModelScope)
+    val verseScroll = VerseScrollController(application, repository, viewModelScope, readAloud)
 
     // Same detour pattern as Highlights/Studied above: "Read" on a Verse
     // Scroll card opens that verse in the Reader with a "Return to Verse
@@ -1123,6 +1160,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun selectTab(tab: NavTab) {
         finishReaderRestore()
+        // Verse Scroll's cards read aloud stop once they're off screen (not when the app is: they read on).
+        if (_activeTab.value == NavTab.VERSE_SCROLL && tab != NavTab.VERSE_SCROLL) verseScroll.stopReading()
         _activeTab.value = if (tab == NavTab.GREEK_WORD || tab == NavTab.HEBREW_WORD) wordPageTab(tab) else tab
     }
 

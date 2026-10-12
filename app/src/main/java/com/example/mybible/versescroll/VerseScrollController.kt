@@ -12,6 +12,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import com.example.mybible.audio.ReadAloud
+import com.example.mybible.audio.ReadAloudState
+import com.example.mybible.audio.ReadingPlace
+import com.example.mybible.audio.ReadingSession
+import com.example.mybible.audio.VerseToRead
 import com.example.mybible.data.BibleRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,7 +39,8 @@ import java.util.Locale
 class VerseScrollController(
     private val context: Context,
     private val repository: BibleRepository,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    private val readAloud: ReadAloud
 ) {
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val json = Json { ignoreUnknownKeys = true }
@@ -250,6 +256,11 @@ class VerseScrollController(
         sourceEmpty = false
         deck = null
         endShown = false
+        // The card being read aloud is gone; with the speaker on, the new feed's first card is read instead.
+        reading?.let { current ->
+            reading = null
+            if (readAloud.session === current) readAloud.stop()
+        }
     }
 
     /** A card settled on screen. */
@@ -272,6 +283,9 @@ class VerseScrollController(
             }
         }
         if (cards.size - index < CARDS_AHEAD) generateMore()
+        // The speaker on: the card that came up is read aloud (unless it's the one already being read,
+        // moved to by Continue reading).
+        if (speakerOn && card != null && reading?.uid != card.uid) readCard(index)
     }
 
     fun noteHighlighted(keys: List<String>, on: Boolean) {
@@ -401,6 +415,132 @@ class VerseScrollController(
             inOrder.continueAfter(last?.chapter, last?.verse)
             endShown = cards.any { it is EndFeedCard }
         }
+    }
+
+    // ---- reading aloud ----
+
+    /** The speaker button: each card is read aloud as it comes up (and with Continue reading, it moves on). */
+    var speakerOn by mutableStateOf(false)
+        private set
+
+    // The cards' reading going on (or just finished, the speaker still on), if any.
+    private var reading: CardReading? = null
+
+    fun toggleSpeaker() {
+        if (speakerOn) {
+            stopReading()
+            return
+        }
+        speakerOn = true
+        // Paused on the card still on screen: on from where it stopped. Otherwise the card on screen.
+        val paused = reading?.takeIf {
+            readAloud.session === it && readAloud.state.value.status == ReadAloudState.Status.PAUSED &&
+                it.uid == cards.getOrNull(currentIndex)?.uid
+        }
+        if (paused != null) readAloud.resume() else readCard(currentIndex)
+    }
+
+    /** The speaker off: stops reading the cards aloud. */
+    fun stopReading() {
+        speakerOn = false
+        val current = reading ?: return
+        reading = null
+        if (readAloud.session === current) readAloud.stop()
+    }
+
+    // Reads the card at [index] aloud; one that isn't a verse (a check-in, the end) stops the one before.
+    private fun readCard(index: Int) {
+        val previous = reading
+        reading = null
+        val card = cards.getOrNull(index) as? VerseFeedCard
+        if (card == null) {
+            if (previous != null && readAloud.session === previous) readAloud.stop()
+            return
+        }
+        val next = CardReading(index, card.uid)
+        reading = next
+        readAloud.start(next)
+    }
+
+    /**
+     * Cards read aloud: a card's verses one at a time, then, with Continue reading, on to the next verse
+     * card (past a check-in) — moving the screen along with it, or with the screen off, just the feed,
+     * which the screen catches up with when it's back.
+     */
+    private inner class CardReading(var index: Int, var uid: Long) : ReadingSession {
+        override val place = ReadingPlace.VERSE_SCROLL
+        override val title = "Verse Scroll \u00b7 ${source.label}"
+
+        // Which of the card's verses (a passage has several) is being read.
+        private var line = -1
+
+        override suspend fun next(after: VerseToRead?): VerseToRead? {
+            val card = cards.getOrNull(index) as? VerseFeedCard
+            if (card != null && card.uid == uid && line + 1 < card.content.lines.size) {
+                line++
+                return toRead(card, line)
+            }
+            if (after == null || !readAloud.prefs.continueReading) return null
+            val nextIndex = nextVerseCard(index) ?: return null
+            val nextCard = cards[nextIndex] as VerseFeedCard
+            index = nextIndex
+            uid = nextCard.uid
+            line = 0
+            onCardShown(nextIndex)
+            scrollRequest = ScrollRequest(nextIndex, ++scrollIds)
+            return toRead(nextCard, 0)
+        }
+
+        override fun onStopped(finished: Boolean) {
+            // Read to the end of its card (Continue reading off): the speaker stays on for the next one.
+            if (reading !== this || finished) return
+            reading = null
+            speakerOn = false
+        }
+
+        override fun onPaused() {
+            if (reading === this) speakerOn = false
+        }
+
+        override fun onResumed() {
+            if (reading === this) speakerOn = true
+        }
+    }
+
+    private suspend fun toRead(card: VerseFeedCard, line: Int): VerseToRead {
+        val ref = card.content.ref
+        val verse = card.content.lines[line]
+        val telugu = verse.telugu ?: repository.getTeluguChapterVerses(ref.book, ref.chapter)[verse.number]
+        return VerseToRead(ref.book, ref.chapter, verse.number, verse.text, telugu)
+    }
+
+    // The next verse card after [from], past check-ins, dealing more if the feed hasn't got that far; null
+    // at the end of a book or chapter (whose end card the screen moves to) or when no more come.
+    private suspend fun nextVerseCard(from: Int): Int? {
+        var i = from + 1
+        while (true) {
+            when (val card = cardAt(i) ?: return null) {
+                is VerseFeedCard -> return i
+                is EndFeedCard -> {
+                    scrollRequest = ScrollRequest(i, ++scrollIds)
+                    return null
+                }
+                else -> i++
+            }
+        }
+    }
+
+    // The card at [index], dealing more cards first if need be; null when no more come.
+    private suspend fun cardAt(index: Int): FeedCard? {
+        while (index >= cards.size) {
+            val before = cards.size
+            generating?.join()
+            if (index < cards.size) break
+            generateMore()
+            generating?.join()
+            if (cards.size == before) return null
+        }
+        return cards[index]
     }
 
     // ---- the Rabbit hole ----

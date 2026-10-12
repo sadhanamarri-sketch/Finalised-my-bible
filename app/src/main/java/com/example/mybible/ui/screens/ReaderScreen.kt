@@ -47,6 +47,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import com.example.mybible.audio.ReadAloudState
+import com.example.mybible.audio.ReadingPlace
 import com.example.mybible.model.CompletedVerseItem
 import com.example.mybible.model.HighlightColorDef
 import com.example.mybible.model.HighlightItem
@@ -55,6 +58,9 @@ import com.example.mybible.ui.components.RenameHighlightColorDialog
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.ReaderPickMode
+import com.example.mybible.ui.components.ReadAloudBar
+import com.example.mybible.ui.components.ReadAloudSheet
+import com.example.mybible.ui.components.rememberReadAloudNotificationAsk
 import com.example.mybible.ui.components.VerseActionToolbar
 import com.example.mybible.ui.components.VerseCard
 import com.example.mybible.ui.components.PickModeBanner
@@ -148,6 +154,25 @@ fun ReaderScreen(
     val pickBannerMessage by viewModel.pickBannerMessage.collectAsState()
     val pickedNoteRefs by viewModel.pickedNoteRefs.collectAsState()
     val noteToEdit by viewModel.noteToEdit.collectAsState()
+
+    // Reading aloud: a chapter being read in the Reader, the verse being read, and the settings sheet.
+    val readAloudState by viewModel.readAloudState.collectAsState()
+    val readingInReader = readAloudState.active && readAloudState.place == ReadingPlace.READER
+    // The verse being read, when it's in the chapter on screen.
+    val verseBeingRead = readAloudState.verse
+        ?.takeIf { readingInReader && it.book == currentBook && it.chapter == currentChapter }?.verse
+    var readAloudSheetOpen by remember { mutableStateOf(false) }
+    var readAloudBarHeightPx by remember { mutableStateOf(0) }
+    val readerScope = rememberCoroutineScope()
+    val askForNotifications = rememberReadAloudNotificationAsk()
+    // Reads the chapter on screen aloud from [verse]; with nothing to read with (Telugu alone, and no
+    // Telugu voice), the settings say why.
+    fun readAloudFrom(verse: Int) {
+        viewModel.readChapterAloud(currentBook, currentChapter, verse)
+        val now = viewModel.readAloudState.value
+        if (!now.active && (now.noTeluguVoice || now.noVoice)) readAloudSheetOpen = true
+        if (now.active) askForNotifications()
+    }
 
     // Seeds the list's first rendered frame near the target verse instead
     // of always starting at index 0 (the chapter header) — the real
@@ -544,7 +569,28 @@ fun ReaderScreen(
     // which measures the real header/nav height rather than hardcoding it.
     var bottomOverlayHeightPx by remember { mutableStateOf(0) }
     val bottomOverlayPaddingDp = with(androidx.compose.ui.platform.LocalDensity.current) {
-        (bottomOverlayHeightPx.toDp() + 24.dp).coerceAtLeast(24.dp)
+        (bottomOverlayHeightPx.toDp() + 24.dp).coerceAtLeast(24.dp) +
+            // Reading aloud's bar, just over the pill.
+            if (readingInReader) readAloudBarHeightPx.toDp() + 10.dp else 0.dp
+    }
+
+    // Reading aloud: the verse being read is kept on screen as the reading moves on — while it's being
+    // followed (the verse before it was in view), so scrolling off to look at something else isn't
+    // undone with every verse.
+    var lastReadVerse by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(verseBeingRead) {
+        val number = verseBeingRead
+        val previous = lastReadVerse
+        lastReadVerse = number
+        if (number == null) return@LaunchedEffect
+        val index = verses.indexOfFirst { it.number == number }.takeIf { it >= 0 }?.plus(1) ?: return@LaunchedEffect
+        val layout = listState.layoutInfo
+        val bottomEdge = layout.viewportEndOffset - with(density) { bottomOverlayPaddingDp.roundToPx() }
+        val item = layout.visibleItemsInfo.firstOrNull { it.index == index }
+        val inView = item != null && item.offset >= layout.viewportStartOffset && item.offset + item.size <= bottomEdge
+        val following = previous == null ||
+            verses.indexOfFirst { it.number == previous }.let { p -> p >= 0 && layout.visibleItemsInfo.any { it.index == p + 1 } }
+        if (following && !inView) listState.animateScrollToItem(index, -(layout.viewportSize.height / 6))
     }
 
     // Reader owns the whole screen edge-to-edge now (no Scaffold bars to
@@ -1259,6 +1305,7 @@ fun ReaderScreen(
                             hasXref = verse.number in verseNumbersWithXrefs,
                             isBlurModeEnabled = effectiveBlurEnabled,
                             isFocusedVerse = isFocused,
+                            isBeingRead = verse.number == verseBeingRead,
                             verseSpacingDp = verseSpacingDp,
                             englishLineHeightMultiplier = englishLineHeightMultiplier,
                             teluguLineHeightMultiplier = teluguLineHeightMultiplier,
@@ -1335,6 +1382,15 @@ fun ReaderScreen(
         // toolbar branch below so it isn't torn down if the toolbar itself
         // closes while the rename dialog is still open.
         var colorToRename by remember { mutableStateOf<HighlightColorDef?>(null) }
+
+        if (readAloudSheetOpen) {
+            ReadAloudSheet(
+                readAloud = viewModel.readAloud,
+                settings = viewModel.readAloudSettings,
+                inVerseScroll = false,
+                onDismiss = { readAloudSheetOpen = false }
+            )
+        }
         colorToRename?.let { def ->
             RenameHighlightColorDialog(
                 colorDef = def,
@@ -1412,9 +1468,47 @@ fun ReaderScreen(
                 onDismiss = {
                     viewModel.setSelectedVerse(null)
                 },
-                onRenameColor = { def -> colorToRename = def }
+                onRenameColor = { def -> colorToRename = def },
+                onReadAloud = {
+                    viewModel.setSelectedVerse(null)
+                    readAloudFrom(verse.number)
+                }
             )
         } else {
+            // Reading aloud: its bar just over the pill, hiding and showing with it.
+            if (readingInReader) {
+                val pillHeight = with(density) { bottomOverlayHeightPx.toDp() }
+                ReadAloudBar(
+                    state = readAloudState,
+                    onPlayPause = {
+                        if (readAloudState.status == ReadAloudState.Status.PLAYING) viewModel.pauseReading() else viewModel.resumeReading()
+                    },
+                    onOpenVerse = {
+                        val reading = readAloudState.verse
+                        if (reading != null && reading.book == currentBook && reading.chapter == currentChapter) {
+                            val index = verses.indexOfFirst { it.number == reading.verse }
+                            if (index >= 0) {
+                                readerScope.launch { listState.animateScrollToItem(index + 1, -(listState.layoutInfo.viewportSize.height / 6)) }
+                            }
+                        } else if (reading != null) {
+                            viewModel.jumpToVerse(reading.book, reading.chapter, reading.verse, focusVerse = false)
+                        }
+                    },
+                    onSettings = { readAloudSheetOpen = true },
+                    onStop = { viewModel.stopReading() },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(bottom = 16.dp + pillHeight + 10.dp)
+                        .graphicsLayer {
+                            translationY = barsHiddenProgress * (size.height + pillHeight.toPx() + 140.dp.toPx())
+                            alpha = 1f - barsHiddenProgress
+                        }
+                        .onGloballyPositioned { readAloudBarHeightPx = it.size.height }
+                        .testTag("read_aloud_bar")
+                )
+            }
+
             // The only chrome Reader has now — book label plus quick
             // toggles, full settings, and a menu into Notes/Studied/Search.
             // Chapter navigation is chevron-free: swipe left/right on the
@@ -1543,7 +1637,7 @@ fun ReaderScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Menu,
-                                contentDescription = "Notes, Studied, Search, Highlighted Verses, Verse Scroll",
+                                contentDescription = "Read aloud, Notes, Studied, Search, Highlighted Verses, Verse Scroll",
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
@@ -1551,6 +1645,15 @@ fun ReaderScreen(
                             expanded = showReaderMenu,
                             onDismissRequest = { showReaderMenu = false }
                         ) {
+                            // The chapter read aloud in the phone's voice, from the verse at the top of the screen.
+                            DropdownMenuItem(
+                                text = { Text("Read aloud") },
+                                leadingIcon = { Icon(Icons.Default.Headphones, contentDescription = null) },
+                                onClick = {
+                                    showReaderMenu = false
+                                    readAloudFrom(verses.getOrNull(listState.firstVisibleItemIndex - 1)?.number ?: 1)
+                                }
+                            )
                             DropdownMenuItem(
                                 text = { Text("Notes") },
                                 leadingIcon = { Icon(Icons.Default.EditNote, contentDescription = null) },

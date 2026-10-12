@@ -10,6 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -116,6 +117,8 @@ fun VerseCard(
     onCrossReferenceMarkerClick: (() -> Unit)? = null,
     isBlurModeEnabled: Boolean = false,
     isFocusedVerse: Boolean = false,
+    // Being read aloud right now: softly marked, and clear of Blur Mode's dimming.
+    isBeingRead: Boolean = false,
     englishFontFamilyName: String = "Serif",
     teluguFontSizeSp: Int = 16,
     greekFontSizeSp: Int = 15,
@@ -145,7 +148,12 @@ fun VerseCard(
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val redLetterColor = if (isDark) DarkRedLetter else PaperRedLetter
     val textColor = MaterialTheme.colorScheme.onBackground
-    val isDimmedByBlur = isBlurModeEnabled && !isFocusedVerse && !isSelected
+    val isDimmedByBlur = isBlurModeEnabled && !isFocusedVerse && !isSelected && !isBeingRead
+    val readTint by animateColorAsState(
+        targetValue = if (isBeingRead) MaterialTheme.colorScheme.primary.copy(alpha = 0.09f) else Color.Transparent,
+        animationSpec = tween(durationMillis = 300),
+        label = "verseBeingRead"
+    )
 
     // Eased rather than instant — the focused verse can jump by more than
     // one position in a single frame right near the top of a chapter (the
@@ -190,7 +198,7 @@ fun VerseCard(
             )
             .background(
                 if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                else Color.Transparent
+                else readTint
             )
             .combinedClickable(
                 onClick = onVerseClick,
@@ -545,7 +553,9 @@ fun VerseActionToolbar(
     // Long-press a swatch to rename it — see RenameHighlightColorDialog.
     // Null hides nothing (there's no separate affordance to hide), it just
     // makes long-press a no-op.
-    onRenameColor: ((HighlightColorDef) -> Unit)? = null
+    onRenameColor: ((HighlightColorDef) -> Unit)? = null,
+    // Reads the chapter aloud from this verse; null hides the button.
+    onReadAloud: (() -> Unit)? = null
 ) {
     // A real modal bottom sheet (dimmed scrim, swipe-down-to-dismiss, drag
     // handle) rather than a floating Surface pinned above the nav bar —
@@ -626,8 +636,18 @@ fun VerseActionToolbar(
                         )
                     }
                 }
-                IconButton(onClick = dismiss, modifier = Modifier.size(24.dp)) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (onReadAloud != null) {
+                        IconButton(onClick = onReadAloud, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Default.Headphones, contentDescription = "Read aloud from here", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    IconButton(onClick = dismiss, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
 

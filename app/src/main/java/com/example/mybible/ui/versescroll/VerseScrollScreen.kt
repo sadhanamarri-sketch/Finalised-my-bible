@@ -51,12 +51,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import com.example.mybible.audio.ReadingPlace
 import com.example.mybible.model.HIGHLIGHT_COLOR_DEFS
 import com.example.mybible.model.HighlightItem
 import com.example.mybible.model.NoteItem
 import com.example.mybible.model.Verse
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
+import com.example.mybible.ui.components.ReadAloudSheet
+import com.example.mybible.ui.components.rememberReadAloudNotificationAsk
 import com.example.mybible.ui.components.VerseActionToolbar
 import com.example.mybible.ui.theme.WorkSansFontFamily
 import com.example.mybible.versescroll.CheckInFeedCard
@@ -177,6 +180,9 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
     var linksCard by remember { mutableStateOf<Pair<Int, VerseFeedCard>?>(null) }
     var settingsOpen by remember { mutableStateOf(false) }
     var sourcesOpen by remember { mutableStateOf(false) }
+    var readAloudOpen by remember { mutableStateOf(false) }
+    val readAloudState by viewModel.readAloudState.collectAsState()
+    val askForNotifications = rememberReadAloudNotificationAsk()
     val feedAlpha = remember { Animatable(1f) }
     val sweeps = remember { mutableStateMapOf<Long, Int>() }
 
@@ -206,6 +212,11 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
             delay(TOAST_MS)
             toast = null
         }
+    }
+    // Both languages but no Telugu voice: said once, as the cards are read on in English.
+    val englishOnly = readAloudState.active && readAloudState.place == ReadingPlace.VERSE_SCROLL && readAloudState.noTeluguVoice
+    LaunchedEffect(englishOnly) {
+        if (englishOnly) showToast("No Telugu voice on this phone yet, so just the English", "Settings") { readAloudOpen = true }
     }
 
     // ---- highlights (stored per verse, the same highlights as everywhere else in the app) ----
@@ -392,6 +403,7 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                 rabbitHole = inRabbitHole,
                 backTo = controller.rabbitHoleRoot(pagerState.settledPage)?.content?.label,
                 modeLabel = controller.source.label,
+                speakerOn = controller.speakerOn,
                 onBack = {
                     if (inRabbitHole) {
                         leave(toRoot = true) { root -> if (root != null) "Out of the Rabbit hole \u00b7 back at $root" else "Out of the Rabbit hole" }
@@ -420,6 +432,14 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                 },
                 onBackTo = {
                     leave(toRoot = true) { root -> if (root != null) "Out of the Rabbit hole \u00b7 back at $root" else "Out of the Rabbit hole" }
+                },
+                onSpeaker = {
+                    hidePicker()
+                    controller.toggleSpeaker()
+                    // Nothing to read with (Telugu alone, and no Telugu voice): the settings say why.
+                    val now = viewModel.readAloudState.value
+                    if (!now.active && (now.noTeluguVoice || now.noVoice)) readAloudOpen = true
+                    if (controller.speakerOn) askForNotifications()
                 },
                 onSettings = {
                     hidePicker()
@@ -631,7 +651,22 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
             onMotion = controller::updateMotion,
             onDoubleTapColor = controller::updateDoubleTapColor,
             onShowTelugu = controller::updateShowTelugu,
+            continueReading = viewModel.readAloudSettings.continueReading,
+            onContinueReading = viewModel.readAloudSettings::updateContinueReading,
+            onReadAloudSettings = {
+                settingsOpen = false
+                readAloudOpen = true
+            },
             onDismiss = { settingsOpen = false }
+        )
+    }
+
+    if (readAloudOpen) {
+        ReadAloudSheet(
+            readAloud = viewModel.readAloud,
+            settings = viewModel.readAloudSettings,
+            inVerseScroll = true,
+            onDismiss = { readAloudOpen = false }
         )
     }
 }
