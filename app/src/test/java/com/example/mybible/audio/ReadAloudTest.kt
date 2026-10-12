@@ -10,7 +10,7 @@ import org.junit.Test
 
 class ReadAloudTest {
 
-    private class Said(val id: String, val text: String, val telugu: Boolean, val rate: Float, val voice: String?)
+    private class Said(val id: String, val text: String, val telugu: Boolean, val rate: Float, val voice: String?, val pitch: Float = 1f)
 
     // Says nothing: records what it's given, and the test says when it's done.
     private class FakeSpeaker(var teluguVoice: Boolean? = true, override var ready: Boolean? = true) : Speaker {
@@ -19,13 +19,13 @@ class ReadAloudTest {
         var stops = 0
 
         override fun hasTelugu() = teluguVoice
-        override fun speak(id: String, text: String, telugu: Boolean, rate: Float, voice: String?) {
-            said += Said(id, text, telugu, rate, voice)
+        override fun speak(id: String, text: String, telugu: Boolean, rate: Float, voice: String?, pitch: Float) {
+            said += Said(id, text, telugu, rate, voice, pitch)
         }
         val words = mutableListOf<Pair<String, java.util.Locale>>()
         var otherVoices: Boolean? = true
         override fun hasVoiceFor(locale: java.util.Locale) = otherVoices
-        override fun speakIn(id: String, text: String, locale: java.util.Locale, rate: Float) { words += text to locale }
+        override fun speakIn(id: String, text: String, locale: java.util.Locale, rate: Float, pitch: Float) { words += text to locale }
         override fun stop() { stops++ }
         override fun voices(telugu: Boolean) = emptyList<VoiceOption>()
 
@@ -38,7 +38,8 @@ class ReadAloudTest {
         override var language: ReadLanguage = ReadLanguage.ENGLISH,
         override var speed: Float = 1f,
         var teluguVoice: String? = null,
-        override var continueReading: Boolean = false
+        override var continueReading: Boolean = false,
+        override var pitch: Float = 1f
     ) : ReadAloudPrefs {
         override fun voice(telugu: Boolean) = if (telugu) teluguVoice else null
     }
@@ -64,8 +65,43 @@ class ReadAloudTest {
         VerseToRead("John", 3, 18, "He that believeth on him is not condemned", "ఆయనయందు విశ్వాసముంచువానికి తీర్పు తీర్చబడదు")
     )
 
-    private fun reader(speaker: FakeSpeaker, prefs: FakePrefs = FakePrefs()) =
-        ReadAloud(speaker, prefs, CoroutineScope(Dispatchers.Unconfined))
+    private fun reader(speaker: FakeSpeaker, prefs: FakePrefs = FakePrefs(), depths: VoiceDepths = VoiceDepths()) =
+        ReadAloud(speaker, prefs, CoroutineScope(Dispatchers.Unconfined), depths = depths)
+
+    @Test
+    fun readInTheVoiceChosenElseTheDeepestAtThePitchChosen() {
+        val speaker = FakeSpeaker()
+        val prefs = FakePrefs(ReadLanguage.BOTH, pitch = 0.85f)
+        // Measured before: the deepest offline voice for each language.
+        val depths = VoiceDepths(mapOf("deepest:en" to "en-in-x-end-local", "deepest:te" to "te-in-x-tem-local"))
+        val reader = reader(speaker, prefs, depths)
+        reader.start(Chapter(john3, from = 16))
+        speaker.finish()
+        assertEquals(listOf("en-in-x-end-local", "te-in-x-tem-local"), speaker.said.map { it.voice })
+        assertTrue(speaker.said.all { it.pitch == 0.85f })
+        // One chosen is read in instead: 3:17 has no Telugu, so 3:18's.
+        prefs.teluguVoice = "te-in-x-tef-local"
+        repeat(3) { speaker.finish() }
+        assertEquals("John 3:18", reader.state.value.verse?.label)
+        assertEquals(true to "te-in-x-tef-local", speaker.said.last().let { it.telugu to it.voice })
+        // Nothing measured, nothing chosen: the phone's usual voice.
+        assertNull(reader(FakeSpeaker()).voiceFor(telugu = false))
+    }
+
+    @Test
+    fun aVoiceIsHeardOnItsOwnPausingWhatsBeingRead() {
+        val speaker = FakeSpeaker()
+        val reader = reader(speaker, FakePrefs(pitch = 0.75f))
+        reader.start(Chapter(john3, from = 16))
+        reader.previewVoice("For God so loved the world.", telugu = false, voice = "en-us-x-iom-local")
+        assertEquals(ReadAloudState.Status.PAUSED, reader.state.value.status)
+        val heard = speaker.said.last()
+        assertEquals(Triple("For God so loved the world.", "en-us-x-iom-local", 0.75f), Triple(heard.text, heard.voice, heard.pitch))
+        // Its words ending isn't the verse ending.
+        speaker.finish()
+        assertEquals(ReadAloudState.Status.PAUSED, reader.state.value.status)
+        assertEquals("John 3:16", reader.state.value.verse?.label)
+    }
 
     @Test
     fun readsAChapterVerseByVerseAndStopsAtItsEnd() {

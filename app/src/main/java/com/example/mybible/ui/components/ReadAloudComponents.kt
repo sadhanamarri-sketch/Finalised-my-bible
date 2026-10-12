@@ -6,6 +6,19 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.speech.tts.TextToSpeech
+import android.provider.Settings
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.RadioButton
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.example.mybible.audio.VoiceDepths
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -149,13 +162,29 @@ fun ReadAloudSheet(
 ) {
     val context = LocalContext.current
     val state by readAloud.state.collectAsState()
-    // The phone's voices, once its speech engine has started (on first use, so it can take a moment).
-    val voices by produceState(PhoneVoices.of(readAloud)) {
+    val depthChanges by readAloud.voiceDepthChanges.collectAsState()
+    val measuring by readAloud.measuringVoices.collectAsState()
+    // Back from the phone's settings (voices added there, say): its voices again.
+    var resumed by remember { mutableIntStateOf(0) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) resumed++ }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    // The phone's voices, once its speech engine has started (on first use, so it can take a moment),
+    // the deepest first as they're measured.
+    val voices by produceState(PhoneVoices.of(readAloud), depthChanges, resumed) {
+        value = PhoneVoices.of(readAloud)
         repeat(40) {
             if (value.known) return@produceState
             delay(250)
             value = PhoneVoices.of(readAloud)
         }
+    }
+    // Each voice measured once, while nothing is being said.
+    LaunchedEffect(voices.known, state.status, resumed) {
+        if (voices.known && state.status != ReadAloudState.Status.PLAYING) readAloud.measureVoices()
     }
     val englishVoices = voices.english
     val teluguVoices = voices.telugu
@@ -221,33 +250,52 @@ fun ReadAloudSheet(
                 }
             }
 
-            if (englishVoices.size > 1) {
-                Group("English voice") {
-                    Choice("Usual", settings.englishVoice == null) {
-                        settings.updateVoice(telugu = false, name = null)
-                        changed(telugu = false)
-                    }
-                    englishVoices.forEach { voice ->
-                        Choice(voice.label + if (voice.online) " · online" else "", settings.englishVoice == voice.name) {
-                            settings.updateVoice(telugu = false, name = voice.name)
-                            changed(telugu = false)
-                        }
+            Group("Pitch") {
+                ReadAloudSettings.PITCHES.forEach { (pitch, label) ->
+                    Choice(label, settings.pitch == pitch) {
+                        settings.updatePitch(pitch)
+                        changed(telugu = settings.language == ReadLanguage.TELUGU)
                     }
                 }
             }
-            if (teluguVoices.size > 1) {
-                Group("Telugu voice") {
-                    Choice("Usual", settings.teluguVoice == null) {
-                        settings.updateVoice(telugu = true, name = null)
+
+            if (englishVoices.isNotEmpty()) {
+                VoiceList(
+                    title = "English voice",
+                    voices = englishVoices,
+                    selected = readAloud.voiceFor(telugu = false),
+                    measuring = measuring,
+                    onPick = { voice ->
+                        settings.updateVoice(telugu = false, name = voice.name)
+                        changed(telugu = false)
+                    },
+                    onPlay = { voice -> readAloud.previewVoice(ENGLISH_SAMPLE, telugu = false, voice = voice.name) }
+                )
+            }
+            if (teluguVoices.isNotEmpty()) {
+                VoiceList(
+                    title = "Telugu voice",
+                    voices = teluguVoices,
+                    selected = readAloud.voiceFor(telugu = true),
+                    measuring = measuring,
+                    onPick = { voice ->
+                        settings.updateVoice(telugu = true, name = voice.name)
                         changed(telugu = true)
-                    }
-                    teluguVoices.forEach { voice ->
-                        Choice(voice.label + if (voice.online) " · online" else "", settings.teluguVoice == voice.name) {
-                            settings.updateVoice(telugu = true, name = voice.name)
-                            changed(telugu = true)
-                        }
-                    }
+                    },
+                    onPlay = { voice -> readAloud.previewVoice(TELUGU_SAMPLE, telugu = true, voice = voice.name) }
+                )
+            }
+            when {
+                measuring -> Note("Listening to each voice to sort them from the deepest…")
+                state.status == ReadAloudState.Status.PLAYING && readAloud.voicesUnmeasured(englishVoices + teluguVoices) ->
+                    Note("Pause the reading to sort the voices from the deepest.")
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Group("More voices") {
+                    Choice("Get more voices", selected = false) { openVoiceInstaller(context) }
+                    Choice("Phone speech settings", selected = false) { openSpeechSettings(context) }
                 }
+                Note("Google's speech engine has more voices to download, some of them men's. The phone's speech settings choose its speech engine.")
             }
 
             if (inVerseScroll) {
@@ -319,6 +367,96 @@ fun openVoiceInstaller(context: Context) {
         }
     }
 }
+
+/** The phone's text-to-speech settings: its speech engine, and its pitch and speed for other apps. */
+fun openSpeechSettings(context: Context) {
+    val tries = listOf(
+        Intent("com.android.settings.TTS_SETTINGS"),
+        Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS),
+        Intent(Settings.ACTION_SETTINGS)
+    )
+    for (intent in tries) {
+        try {
+            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            return
+        } catch (e: Exception) {
+            // Not on this phone: the next.
+        }
+    }
+}
+
+// A language's voices, the deepest first, each with how it sounds and a button to hear it; the one
+// read in is marked. Past a few, the rest behind "All N voices".
+@Composable
+private fun VoiceList(
+    title: String,
+    voices: List<VoiceOption>,
+    selected: String?,
+    measuring: Boolean,
+    onPick: (VoiceOption) -> Unit,
+    onPlay: (VoiceOption) -> Unit
+) {
+    var all by remember(voices.size) { mutableStateOf(false) }
+    val shown = if (all || voices.size <= SHOWN_VOICES + 1) voices else {
+        voices.filterIndexed { i, voice -> i < SHOWN_VOICES || voice.name == selected }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(title, color = MaterialTheme.colorScheme.onSurface, fontFamily = WorkSansFontFamily, fontWeight = FontWeight.Medium, fontSize = 13.5.sp)
+        for (voice in shown) {
+            VoiceRow(voice, selected = voice.name == selected, measuring = measuring, onPick = { onPick(voice) }, onPlay = { onPlay(voice) })
+        }
+        if (shown.size < voices.size) {
+            Text(
+                text = "All ${voices.size} voices",
+                color = MaterialTheme.colorScheme.primary,
+                fontFamily = WorkSansFontFamily,
+                fontWeight = FontWeight.Medium,
+                fontSize = 13.sp,
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .clickable { all = true }
+                    .padding(horizontal = 10.dp, vertical = 8.dp)
+            )
+        }
+        if (selected == null) {
+            Note("Read in the phone's usual voice until the voices are measured.")
+        }
+    }
+}
+
+@Composable
+private fun VoiceRow(voice: VoiceOption, selected: Boolean, measuring: Boolean, onPick: () -> Unit, onPlay: () -> Unit) {
+    val about = listOfNotNull(
+        voice.depth?.let(VoiceDepths::describe) ?: if (measuring && !voice.online) "Measuring…" else null,
+        if (voice.online) "needs internet" else null
+    ).joinToString(" · ")
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onPick)
+            .padding(start = 2.dp)
+    ) {
+        RadioButton(selected = selected, onClick = null)
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 6.dp, top = 6.dp, bottom = 6.dp)
+        ) {
+            Text(voice.label, color = MaterialTheme.colorScheme.onSurface, fontFamily = WorkSansFontFamily, fontSize = 14.sp)
+            if (about.isNotEmpty()) {
+                Text(about, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = WorkSansFontFamily, fontSize = 12.sp)
+            }
+        }
+        IconButton(onClick = onPlay) {
+            Icon(Icons.Default.PlayArrow, contentDescription = "Hear ${voice.label}", tint = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+// Voices shown before "All N voices".
+private const val SHOWN_VOICES = 4
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

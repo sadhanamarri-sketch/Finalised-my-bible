@@ -287,3 +287,26 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     *Fix:* give the page fading in its own background, so the dark (or paper) page itself
     fades in over the photo and the words with it — a true dissolve, nothing doubled and no
     cut at the end. A small change; check it frame by frame afterwards.
+
+11. **Done 12 Oct.** **The reading voice sounds shrill, and the voices sound alike.** "The speech
+    of both english and telugu seems like a girl child screaming", and "almost all the voices
+    seemed same too."
+    *Why:* reading aloud uses the phone's own speech voices, and on most phones the usual
+    English (India) and Telugu voices are women's, fairly high. The app never set a pitch, so
+    a pitch raised in the phone's own speech settings carried over. The voice list showed
+    most voices twice — once to use offline, once online — which are the same voice, under
+    names ("India 1", "India 2") that said nothing about how each sounds.
+    *Built (decided 12 Oct: all three of the phone-voice fixes; Telugu stays the phone's voice):*
+    - *Pitch:* Deep, Lower or Usual in the read-aloud settings, starting on Lower. The app
+      sets it itself, for reading, a voice's sample and the Greek and Hebrew word speaker.
+    - *Deepest voice first:* each of the phone's offline voices says a sentence into a file
+      once, and the app measures how deep it speaks (a man's voice about 85–155 Hz, a woman's
+      165–255). The voices are listed from the deepest, each marked Deep, Medium or High
+      with a play button, and reading is in the deepest one unless another is picked — a
+      man's voice, if the phone has one. Measured while nothing is being said (paused, or
+      after a reading); the results are kept. An online voice is listed only when it has no
+      offline copy.
+    - *More voices:* "Get more voices" opens the speech engine's voice downloads (Google's
+      has more, some of them men's), and "Phone speech settings" the phone's own.
+    *Still to come:* Bible Brain's recorded KJV (a man's voice, narrated), once the API key
+    arrives (item 7).

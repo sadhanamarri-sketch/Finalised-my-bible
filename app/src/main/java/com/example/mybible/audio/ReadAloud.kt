@@ -2,6 +2,7 @@ package com.example.mybible.audio
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -62,15 +63,21 @@ interface ReadAloudPrefs {
     /** 1 is the voice's own pace. */
     val speed: Float
 
-    /** The voice chosen for a language, or null for the phone's usual one. */
+    /** 1 is the voice's own pitch; lower is deeper. */
+    val pitch: Float get() = 1f
+
+    /** The voice chosen for a language, or null when none was (then the deepest; see ReadAloud.voiceFor). */
     fun voice(telugu: Boolean): String?
 
     /** Verse Scroll: once a card has been read, move on to the next and read that. */
     val continueReading: Boolean
 }
 
-/** One of the phone's voices: its name for the speech engine, and how to show it. */
-data class VoiceOption(val name: String, val label: String, val online: Boolean)
+/**
+ * One of the phone's voices: its name for the speech engine, how to show it, and how deep it speaks
+ * (its pitch in Hz, once measured; see VoiceDepths).
+ */
+data class VoiceOption(val name: String, val label: String, val online: Boolean, val depth: Float? = null)
 
 /** The phone's speech engine, behind an interface so tests can stand in for it. */
 interface Speaker {
@@ -91,17 +98,27 @@ interface Speaker {
     /** Whether it has a Telugu voice: null while its speech engine is starting. */
     fun hasTelugu(): Boolean?
 
-    fun speak(id: String, text: String, telugu: Boolean, rate: Float, voice: String?)
+    /** Says [text] in [voice] (null: the language's usual one), at [rate] and [pitch] (1: the voice's own). */
+    fun speak(id: String, text: String, telugu: Boolean, rate: Float, voice: String?, pitch: Float)
 
     /** Whether it has a voice for [locale] (Greek, Hebrew): null while its speech engine is starting. */
     fun hasVoiceFor(locale: Locale): Boolean?
 
     /** Says [text] in [locale]'s voice: a Greek or Hebrew word, on its page. */
-    fun speakIn(id: String, text: String, locale: Locale, rate: Float)
+    fun speakIn(id: String, text: String, locale: Locale, rate: Float, pitch: Float)
 
     fun stop()
 
     fun voices(telugu: Boolean): List<VoiceOption>
+
+    /**
+     * Says [text] in the voice named [voice] into [file] rather than aloud, at its own pitch and pace,
+     * to measure how deep it is; [onSaid] is told whether it worked, on the main thread.
+     */
+    fun record(text: String, voice: String, file: java.io.File, onSaid: (Boolean) -> Unit) = onSaid(false)
+
+    /** Done recording for now. */
+    fun doneRecording() {}
 }
 
 data class ReadAloudState(
@@ -134,7 +151,9 @@ class ReadAloud(
     val prefs: ReadAloudPrefs,
     private val scope: CoroutineScope,
     /** It started or went on playing: the notification and audio focus go with it. */
-    private val onPlaying: () -> Unit = {}
+    private val onPlaying: () -> Unit = {},
+    /** How deep each of the phone's voices is, to read in the deepest unless one was chosen. */
+    private val depths: VoiceDepths = VoiceDepths()
 ) : Speaker.Listener {
 
     private val _state = MutableStateFlow(ReadAloudState())
@@ -169,8 +188,39 @@ class ReadAloud(
         speaker.listener = this
     }
 
-    /** The phone's voices for a language, for the settings. */
-    fun voices(telugu: Boolean): List<VoiceOption> = speaker.voices(telugu)
+    /** The phone's voices for a language, for the settings: the deepest first, once they're measured. */
+    fun voices(telugu: Boolean): List<VoiceOption> = depths.sorted(speaker.voices(telugu))
+
+    /** Goes up each time one of the phone's voices has been measured (see VoiceDepths). */
+    val voiceDepthChanges: StateFlow<Int> get() = depths.changes
+
+    /** Whether the phone's voices are being measured. */
+    val measuringVoices: StateFlow<Boolean> get() = depths.measuring
+
+    /** The voice a language is read in: the one chosen, else the deepest offline one, else the phone's usual one (null). */
+    fun voiceFor(telugu: Boolean): String? = prefs.voice(telugu) ?: depths.deepest(telugu)
+
+    /**
+     * Measures how deep each of the phone's voices is that hasn't been yet, for listing them from the
+     * deepest and reading in the deepest. Not while something is being said: it stops if a reading
+     * plays, to go on another time.
+     */
+    fun measureVoices() {
+        if (_state.value.status == ReadAloudState.Status.PLAYING || speaker.ready != true) return
+        depths.measure(speaker, speaker.voices(telugu = false), speaker.voices(telugu = true), scope) {
+            _state.value.status != ReadAloudState.Status.PLAYING
+        }
+    }
+
+    /** Whether some of [voices] (the phone's, from [voices]) haven't been measured yet. */
+    fun voicesUnmeasured(voices: List<VoiceOption>): Boolean = depths.unmeasured(voices)
+
+    /** A few words in [voice], to hear it: pausing a reading that's playing. */
+    fun previewVoice(text: String, telugu: Boolean, voice: String) {
+        if (_state.value.status == ReadAloudState.Status.PLAYING) pause()
+        utterances++
+        speaker.speak("try-$utterances", text, telugu, prefs.speed, voice, prefs.pitch)
+    }
 
     /** Whether the phone has a Telugu voice (null: not known yet). */
     fun hasTeluguVoice(): Boolean? = if (teluguFailed) false else speaker.hasTelugu()
@@ -188,15 +238,15 @@ class ReadAloud(
         if (voice == false) return false
         if (_state.value.status == ReadAloudState.Status.PLAYING) pause()
         utterances++
-        speaker.speakIn("word-$utterances", text, locale, WORD_RATE)
+        speaker.speakIn("word-$utterances", text, locale, WORD_RATE, prefs.pitch)
         return voice
     }
 
-    /** A few words in the voice and speed chosen, to hear them: only while nothing is being read. */
+    /** A few words in the voice, speed and pitch chosen, to hear them: only while nothing is being read. */
     fun trySpeaking(text: String, telugu: Boolean) {
         if (_state.value.active) return
         utterances++
-        speaker.speak("try-$utterances", text, telugu, prefs.speed, prefs.voice(telugu))
+        speaker.speak("try-$utterances", text, telugu, prefs.speed, voiceFor(telugu), prefs.pitch)
     }
 
     /** Starts reading [next] from its first verse, stopping whatever was being read. */
@@ -251,6 +301,7 @@ class ReadAloud(
         session = null
         _state.value = ReadAloudState()
         current?.onStopped(finished = false)
+        measureSoon()
     }
 
     /** A setting changed (the speed, a voice): what's being said starts again, from the word it got to. */
@@ -315,6 +366,16 @@ class ReadAloud(
         session = null
         _state.value = ReadAloudState(noTeluguVoice = noTeluguVoice || _state.value.noTeluguVoice)
         current.onStopped(finished)
+        measureSoon()
+    }
+
+    // A reading over: the voices not yet measured are, a moment later, so the next is in the deepest.
+    private fun measureSoon() {
+        if (!depths.canMeasure) return
+        scope.launch {
+            delay(MEASURE_AFTER_MS)
+            if (!_state.value.active) measureVoices()
+        }
     }
 
     // The verse's text in each language it's read in, in order; null when it's Telugu alone and there's no
@@ -338,7 +399,7 @@ class ReadAloud(
         spokenFrom = from
         utterances++
         _state.update { it.copy(telugu = part.telugu) }
-        speaker.speak(currentId, part.text.substring(from), part.telugu, prefs.speed, prefs.voice(part.telugu))
+        speaker.speak(currentId, part.text.substring(from), part.telugu, prefs.speed, voiceFor(part.telugu), prefs.pitch)
     }
 
     override fun onRange(id: String, start: Int) {
@@ -378,6 +439,8 @@ class ReadAloud(
     }
 
     private companion object {
+        const val MEASURE_AFTER_MS = 2_000L
+
         // Verses in a row with nothing to read before giving up (a list of verses with no Telugu at all).
         const val MAX_SKIPPED = 50
 

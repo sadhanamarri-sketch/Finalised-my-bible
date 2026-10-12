@@ -18,14 +18,23 @@ object ReadAloudHub {
 
     fun get(context: Context): ReadAloud = engine ?: synchronized(this) {
         engine ?: context.applicationContext.let { app ->
+            val kept = app.getSharedPreferences(VOICE_DEPTHS, Context.MODE_PRIVATE)
             ReadAloud(
                 speaker = speakerFactory(app),
                 prefs = ReadAloudSettings(app),
                 scope = MainScope(),
-                onPlaying = { ReadAloudService.start(app) }
+                onPlaying = { ReadAloudService.start(app) },
+                depths = VoiceDepths(
+                    saved = kept.all.mapValues { it.value.toString() },
+                    save = { all -> kept.edit().clear().apply { all.forEach { (k, v) -> putString(k, v) } }.apply() },
+                    workDir = app.cacheDir
+                )
             )
         }.also { engine = it }
     }
+
+    // How deep each of the phone's voices is, once measured (see VoiceDepths).
+    private const val VOICE_DEPTHS = "voice_depths"
 
     /** The settings, for the settings sheets. */
     fun settings(context: Context): ReadAloudSettings = get(context).prefs as ReadAloudSettings
