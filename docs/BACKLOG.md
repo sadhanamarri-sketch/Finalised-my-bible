@@ -135,7 +135,8 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
        Max McLean (Listener's Bible), David Cochran Heath (New Testament and Psalms), Paul
        Mims, James Earl Jones (New Testament) — are all sold commercially, with no app
        licence or verse timings on offer, so Bible Brain stays the choice.
-   *Still to ask:* KJV narrated, dramatised, or the reader's choice?
+     - *KJV style (decided 12 Oct):* the reader's choice — a setting with Narrated and
+       Dramatised, starting on Narrated, the closer of the two to reading along.
    Sources: [LibriVox KJV group](https://librivox.org/group/360),
    [Telugu IRV audio on Bible.com](https://my.bible.com/audio-bible/1895/JHN.3.IRVTEL),
    [Bible Society of India](https://www.bsind.org/category/uncategorized/page/32/),
