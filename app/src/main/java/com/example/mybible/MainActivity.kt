@@ -483,6 +483,15 @@ class MainActivity : ComponentActivity() {
                         },
                         label = "TabTransition"
                     ) { tab ->
+                        // Each page on its own background, so the one coming in covers the one going
+                        // out as it fades in. The Reader draws none of its own: without this, coming
+                        // from Verse Scroll its words faded in over the photo, and its page appeared
+                        // all at once, when the photo was taken away at the end.
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.background)
+                        ) {
                         when (tab) {
                             NavTab.READER -> ReaderScreen(viewModel = viewModel)
                             NavTab.STUDIED -> StudiedScreen(viewModel = viewModel)
@@ -514,6 +523,7 @@ class MainActivity : ComponentActivity() {
                                 onDriveBackup = { runDriveBackup() },
                                 onDriveRestore = { runDriveRestore() }
                             )
+                        }
                         }
                     }
                     }

@@ -16,7 +16,10 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
    *To ask:* how should two or three colours show on the verse in the Reader (split
    background, stripes, small colour marks)? Is there a limit on how many?
 
-2. **Bug — Verse Scroll: part of the next photo shows at the bottom of the current one.**
+2. **Done 12 Oct.** **Bug — Verse Scroll: part of the next photo shows at the bottom of the current one.**
+   *Fixed:* each card's photo is now clipped to its card (`SceneLayer.kt`); its slow zoom made it
+   a little larger than the card, and the next card's photo, laid out just below the screen,
+   drew up into the bottom of the card on screen.
    "Verse scroll bottom (next picture)", clarified as "a part of next image is seen at the
    bottom of current image in verse scroll." The card's own photo should fill it, with nothing
    of the next card's photo showing.
@@ -185,7 +188,10 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
 
 ## Noted 12 Oct 2026
 
-10. **Bug — going from Verse Scroll to the Reader still isn't smooth.** "The transition from
+10. **Done 12 Oct.** **Bug — going from Verse Scroll to the Reader still isn't smooth.**
+    *Fixed:* every page now sits on its own background inside the tab switch (`MainActivity.kt`),
+    so the Reader's page fades in over the photo with its words: checked frame by frame, the
+    switch now spreads over 0.3 seconds with no jump at the end. "The transition from
     verse scroll to reader is still not smooth." On 7 Oct the switch became a 0.3-second
     dissolve, the Reader fading in over Verse Scroll (`VERSE_SCROLL_DISSOLVE_MS` in
     `MainActivity.kt`), and the old chapter's flash was removed; something still looks

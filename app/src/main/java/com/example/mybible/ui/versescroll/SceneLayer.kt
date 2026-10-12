@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -75,7 +76,10 @@ internal fun SceneLayer(
     }
     val shown by animateFloatAsState(if (image != null) 1f else 0f, tween(350), label = "sceneFadeIn")
 
-    Box(modifier.fillMaxSize()) {
+    // Clipped to the card: the drift and zoom make the photo a little larger than the card, and
+    // unclipped, the next card's photo (laid out just below the screen) showed along the bottom of
+    // the card on screen.
+    Box(modifier.fillMaxSize().clipToBounds()) {
         Box(
             Modifier
                 .fillMaxSize()
