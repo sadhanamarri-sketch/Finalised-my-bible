@@ -56,6 +56,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -152,9 +153,9 @@ fun ReadAloudBar(
 }
 
 /**
- * Reading aloud's settings: the language, the speed and pitch, the speech engine and voice for English
- * and for Telugu (each tried as it's picked), and, from Verse Scroll ([inVerseScroll]), whether to go
- * on to the next card by itself.
+ * Reading aloud's settings: the language, then for each language read its own speed, pitch and voice
+ * (each tried as it's changed), and, from Verse Scroll ([inVerseScroll]), whether to go on to the next
+ * card by itself.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -176,12 +177,9 @@ fun ReadAloudSheet(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
-    // The phone's speech engines (an AI voice app like VoxSherpa, installed since, too).
-    val engines by produceState(readAloud.engines(), resumed) { value = readAloud.engines() }
-    val usualEngine = engines.firstOrNull { it.usual }
-    // The voices of each language's engine, once it has started (on first use, so it can take a
-    // moment), the deepest first as they're measured.
-    val voices by produceState(PhoneVoices.of(readAloud), depthChanges, resumed, settings.englishEngine, settings.teluguEngine) {
+    // The phone's voices, once its speech engine has started (on first use, so it can take a moment),
+    // the deepest first as they're measured.
+    val voices by produceState(PhoneVoices.of(readAloud), depthChanges, resumed) {
         value = PhoneVoices.of(readAloud)
         repeat(40) {
             if (value.known) return@produceState
@@ -190,16 +188,20 @@ fun ReadAloudSheet(
         }
     }
     // Each voice measured once, while nothing is being said.
-    LaunchedEffect(voices.known, state.status, resumed, settings.englishEngine, settings.teluguEngine) {
+    LaunchedEffect(voices.known, state.status, resumed) {
         if (voices.known && state.status != ReadAloudState.Status.PLAYING) readAloud.measureVoices()
     }
     val englishVoices = voices.english
     val teluguVoices = voices.telugu
     val noTeluguVoice = voices.hasTelugu == false || state.noTeluguVoice
 
-    // A voice or speed picked while reading applies at once; otherwise a few words let you hear it.
+    // A language's voice, speed or pitch changed while it's being read applies at once (the other's as
+    // it comes up); with nothing being read, a few words let you hear it.
     fun changed(telugu: Boolean) {
-        if (state.active) readAloud.refresh() else readAloud.trySpeaking(if (telugu) TELUGU_SAMPLE else ENGLISH_SAMPLE, telugu)
+        when {
+            !state.active -> readAloud.trySpeaking(if (telugu) TELUGU_SAMPLE else ENGLISH_SAMPLE, telugu)
+            state.telugu == telugu -> readAloud.refresh()
+        }
     }
 
     ModalBottomSheet(
@@ -238,73 +240,25 @@ fun ReadAloudSheet(
                     ReadLanguage.BOTH -> "Each verse in English, then in Telugu."
                 }
             )
-            if (noTeluguVoice && settings.language != ReadLanguage.ENGLISH) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Note(
-                        if (settings.language == ReadLanguage.BOTH) "This phone has no Telugu voice yet, so only the English is read."
-                        else "This phone has no Telugu voice yet, so nothing can be read in Telugu."
-                    )
-                    Choice("Get a Telugu voice", selected = false) { openVoiceInstaller(context) }
-                }
+            // Each language read, with its own speed, pitch and voice.
+            val read = when (settings.language) {
+                ReadLanguage.ENGLISH -> listOf(false)
+                ReadLanguage.TELUGU -> listOf(true)
+                ReadLanguage.BOTH -> listOf(false, true)
             }
-
-            val readingLanguage = settings.language == ReadLanguage.TELUGU
-            SliderSetting(
-                label = "Speed",
-                value = settings.speed,
-                range = ReadAloudSettings.MIN_SPEED..ReadAloudSettings.MAX_SPEED,
-                usual = ReadAloudSettings.DEFAULT_SPEED,
-                ends = "Slower" to "Faster",
-                onChange = { speed ->
-                    settings.updateSpeed(speed)
-                    changed(telugu = readingLanguage)
-                }
-            )
-            SliderSetting(
-                label = "Pitch",
-                value = settings.pitch,
-                range = ReadAloudSettings.MIN_PITCH..ReadAloudSettings.MAX_PITCH,
-                usual = ReadAloudSettings.DEFAULT_PITCH,
-                ends = "Deeper" to "Higher",
-                onChange = { pitch ->
-                    settings.updatePitch(pitch)
-                    changed(telugu = readingLanguage)
-                }
-            )
-
-            for (telugu in listOf(false, true)) {
-                val language = if (telugu) "Telugu" else "English"
-                val engine = settings.engine(telugu)
-                val engineName = engines.firstOrNull { it.name == engine }?.label
-                val languageVoices = if (telugu) teluguVoices else englishVoices
-                if (engines.size > 1) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Group("$language speech engine") {
-                            engines.forEach { option ->
-                                Choice(option.label, selected = option.name == (engine ?: usualEngine?.name)) {
-                                    settings.updateEngine(telugu, if (option.usual) null else option.name)
-                                    changed(telugu)
-                                }
-                            }
-                        }
-                        if (engine != null) {
-                            Note("An AI voice app can take a moment to start each verse, and may not change the pitch.")
-                        }
-                    }
-                }
-                if (languageVoices.isNotEmpty()) {
-                    VoiceList(
-                        title = "$language voice",
-                        voices = languageVoices,
+            for (telugu in read) {
+                key(telugu) {
+                    LanguageSettings(
+                        language = if (telugu) "Telugu" else "English",
+                        settings = settings,
+                        telugu = telugu,
+                        voices = if (telugu) teluguVoices else englishVoices,
                         selected = readAloud.voiceFor(telugu),
-                        measuring = measuring && engine == null,
-                        nothingChosen = if (engine == null) "Read in the phone's usual voice until the voices are measured."
-                        else "Read in ${engineName ?: "the app"}'s own voice unless you pick one.",
-                        onPick = { voice ->
-                            settings.updateVoice(telugu, name = voice.name)
-                            changed(telugu)
-                        },
-                        onPlay = { voice -> readAloud.previewVoice(if (telugu) TELUGU_SAMPLE else ENGLISH_SAMPLE, telugu, voice = voice.name) }
+                        measuring = measuring,
+                        noVoice = telugu && noTeluguVoice,
+                        onChanged = { changed(telugu) },
+                        onPlay = { voice -> readAloud.previewVoice(if (telugu) TELUGU_SAMPLE else ENGLISH_SAMPLE, telugu, voice = voice.name) },
+                        onGetVoice = { openVoiceInstaller(context) }
                     )
                 }
             }
@@ -315,13 +269,10 @@ fun ReadAloudSheet(
             }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Group("More voices") {
-                    Choice("Get more voices", selected = false) { openVoiceInstaller(context, engine = settings.englishEngine) }
+                    Choice("Get more voices", selected = false) { openVoiceInstaller(context) }
                     Choice("Phone speech settings", selected = false) { openSpeechSettings(context) }
                 }
-                Note(
-                    if (engines.size > 1) "Get more voices opens the English speech engine's own voices to download."
-                    else "Google's speech engine has more voices to download, some of them men's. For a natural AI voice in English, install an AI voice app like VoxSherpa TTS, then choose it here."
-                )
+                Note("Google's speech engine has more voices to download, some of them men's. The phone's speech settings choose its speech engine.")
             }
 
             if (inVerseScroll) {
@@ -334,7 +285,7 @@ fun ReadAloudSheet(
                     else "Each card is read as it comes up; swipe on for the next."
                 )
             }
-            Note("Read by your phone's own speech engines, offline. It keeps reading with the screen off; pause or stop it from the notification.")
+            Note("Read in your phone's own voice, offline. It keeps reading with the screen off; pause or stop it from the notification.")
         }
     }
 }
@@ -376,9 +327,8 @@ private const val KEY_ASKED_NOTIFICATIONS = "asked_notifications"
  * The phone's speech engine's own page for adding voices (Google's lists its languages), or failing
  * that, the phone's text-to-speech settings.
  */
-fun openVoiceInstaller(context: Context, engine: String? = null) {
-    val tries = listOfNotNull(
-        engine?.let { Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA).setPackage(it) },
+fun openVoiceInstaller(context: Context) {
+    val tries = listOf(
         Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA),
         Intent("com.android.settings.TTS_SETTINGS")
     )
@@ -409,6 +359,86 @@ fun openSpeechSettings(context: Context) {
     }
 }
 
+// One language's own settings, in a panel of their own: its speed, its pitch and its voice. Without a
+// voice for it on the phone ([noVoice]), a way to get one instead.
+@Composable
+private fun LanguageSettings(
+    language: String,
+    settings: ReadAloudSettings,
+    telugu: Boolean,
+    voices: List<VoiceOption>,
+    selected: String?,
+    measuring: Boolean,
+    noVoice: Boolean,
+    onChanged: () -> Unit,
+    onPlay: (VoiceOption) -> Unit,
+    onGetVoice: () -> Unit
+) {
+    Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.background) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 10.dp)
+        ) {
+            Text(language, color = MaterialTheme.colorScheme.onSurface, fontFamily = WorkSansFontFamily, fontWeight = FontWeight.SemiBold, fontSize = 15.5.sp)
+            if (noVoice) {
+                Note(
+                    if (settings.language == ReadLanguage.BOTH) "This phone has no Telugu voice yet, so only the English is read."
+                    else "This phone has no Telugu voice yet, so nothing can be read in Telugu."
+                )
+                Row(modifier = Modifier.padding(bottom = 4.dp)) {
+                    Choice("Get a Telugu voice", selected = false, onClick = onGetVoice)
+                }
+            } else {
+                SpeedAndPitch(language, settings, telugu, onChanged)
+                if (voices.isNotEmpty()) {
+                    VoiceList(
+                        title = "Voice",
+                        voices = voices,
+                        selected = selected,
+                        measuring = measuring,
+                        onPick = { voice ->
+                            settings.updateVoice(telugu, name = voice.name)
+                            onChanged()
+                        },
+                        onPlay = onPlay
+                    )
+                }
+            }
+        }
+    }
+}
+
+// A language's speed and pitch, each a slider.
+@Composable
+private fun SpeedAndPitch(language: String, settings: ReadAloudSettings, telugu: Boolean, onChanged: () -> Unit) {
+    SliderSetting(
+        label = "Speed",
+        description = "$language speed",
+        value = settings.speed(telugu),
+        range = ReadAloudSettings.MIN_SPEED..ReadAloudSettings.MAX_SPEED,
+        usual = ReadAloudSettings.DEFAULT_SPEED,
+        ends = "Slower" to "Faster",
+        onChange = { speed ->
+            settings.updateSpeed(telugu, speed)
+            onChanged()
+        }
+    )
+    SliderSetting(
+        label = "Pitch",
+        description = "$language pitch",
+        value = settings.pitch(telugu),
+        range = ReadAloudSettings.MIN_PITCH..ReadAloudSettings.MAX_PITCH,
+        usual = ReadAloudSettings.DEFAULT_PITCH,
+        ends = "Deeper" to "Higher",
+        onChange = { pitch ->
+            settings.updatePitch(telugu, pitch)
+            onChanged()
+        }
+    )
+}
+
 // A language's voices, the deepest first, each with how it sounds and a button to hear it; the one
 // read in is marked. Past a few, the rest behind "All N voices".
 @Composable
@@ -417,8 +447,6 @@ private fun VoiceList(
     voices: List<VoiceOption>,
     selected: String?,
     measuring: Boolean,
-    // What's read in when no voice is marked.
-    nothingChosen: String,
     onPick: (VoiceOption) -> Unit,
     onPlay: (VoiceOption) -> Unit
 ) {
@@ -444,7 +472,7 @@ private fun VoiceList(
                     .padding(horizontal = 10.dp, vertical = 8.dp)
             )
         }
-        if (selected == null || voices.none { it.name == selected }) Note(nothingChosen)
+        if (selected == null || voices.none { it.name == selected }) Note("Read in the phone's usual voice until the voices are measured.")
     }
 }
 
@@ -483,10 +511,12 @@ private fun VoiceRow(voice: VoiceOption, selected: Boolean, measuring: Boolean, 
 private const val SHOWN_VOICES = 4
 
 // A setting along a range ([usual] in it): dragged in steps of 0.05, set as it's let go, its value
-// shown beside its name ("1.25×"), with Reset when it's moved off the usual.
+// shown beside its name ("1.25×"), with Reset when it's moved off the usual. [description] names it
+// for a screen reader.
 @Composable
 private fun SliderSetting(
     label: String,
+    description: String,
     value: Float,
     range: ClosedFloatingPointRange<Float>,
     usual: Float,
@@ -532,7 +562,7 @@ private fun SliderSetting(
                 dragged = null
             },
             valueRange = range,
-            modifier = Modifier.semantics { contentDescription = label }
+            modifier = Modifier.semantics { contentDescription = description }
         )
         Row {
             Text(ends.first, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = WorkSansFontFamily, fontSize = 12.sp)

@@ -12,17 +12,16 @@ object ReadAloudHub {
     @Volatile
     private var engine: ReadAloud? = null
 
-    /** Tests stand in for the phone's speech engines. */
+    /** Tests stand in for the phone's speech engine. */
     @VisibleForTesting
-    var speakerFactory: (Context, ReadAloudSettings) -> Speaker = { app, settings -> TtsSpeaker(app, settings::engine) }
+    var speakerFactory: (Context) -> Speaker = ::TtsSpeaker
 
     fun get(context: Context): ReadAloud = engine ?: synchronized(this) {
         engine ?: context.applicationContext.let { app ->
             val kept = app.getSharedPreferences(VOICE_DEPTHS, Context.MODE_PRIVATE)
-            val settings = ReadAloudSettings(app)
             ReadAloud(
-                speaker = speakerFactory(app, settings),
-                prefs = settings,
+                speaker = speakerFactory(app),
+                prefs = ReadAloudSettings(app),
                 scope = MainScope(),
                 onPlaying = { ReadAloudService.start(app) },
                 depths = VoiceDepths(

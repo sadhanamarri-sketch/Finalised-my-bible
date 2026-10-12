@@ -30,7 +30,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -187,7 +186,6 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
     val readAloudState by viewModel.readAloudState.collectAsState()
     val askForNotifications = rememberReadAloudNotificationAsk()
     val feedAlpha = remember { Animatable(1f) }
-    val sweeps = remember { mutableStateMapOf<Long, Int>() }
 
     fun showToast(message: String, action: String? = null, onAction: (() -> Unit)? = null) {
         toast = VsToast(System.nanoTime(), message, action, onAction)
@@ -235,7 +233,6 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
         if (room.isEmpty()) return
         room.forEach { viewModel.addHighlightColor(it.book, it.chapter, it.verse, hex) }
         controller.noteHighlighted(room.map { it.key }, on = true)
-        sweeps[card.uid] = (sweeps[card.uid] ?: 0) + 1
     }
     // A color in the color box or the verse sheet: off the card when all of it has the color, else on.
     fun toggleColor(card: VerseFeedCard, hex: String) {
@@ -264,8 +261,7 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
         val missing = card.content.refs.filter { hexesOf(it).isEmpty() }
         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
         if (missing.isEmpty()) {
-            // Already highlighted: the highlight sweeps in again, and the color box offers more or a change.
-            sweeps[card.uid] = (sweeps[card.uid] ?: 0) + 1
+            // Already highlighted: the color box offers more or a change.
             showPicker(index)
             return hexesOf(card.content.refs.first()).firstOrNull() ?: controller.doubleTapColor
         }
@@ -355,7 +351,6 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                             highlightHexes = ::hexesOf,
                             colorLabel = ::labelOf,
                             notePreview = firstNote?.let(::notePreview),
-                            sweepToken = sweeps[card.uid] ?: 0,
                             onPress = { hidePicker() },
                             onDoubleTap = { doubleTap(page, card) },
                             onLongPress = {

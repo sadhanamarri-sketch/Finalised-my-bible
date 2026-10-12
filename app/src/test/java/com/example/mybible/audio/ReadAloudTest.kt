@@ -34,16 +34,19 @@ class ReadAloudTest {
         fun reachWord(start: Int) = listener!!.onRange(said.last().id, start)
     }
 
+    // English's speed and pitch, and Telugu's when given (else the same).
     private class FakePrefs(
         override var language: ReadLanguage = ReadLanguage.ENGLISH,
-        override var speed: Float = 1f,
+        var speed: Float = 1f,
         var teluguVoice: String? = null,
         override var continueReading: Boolean = false,
-        override var pitch: Float = 1f,
-        var englishEngine: String? = null
+        var pitch: Float = 1f,
+        var teluguSpeed: Float? = null,
+        var teluguPitch: Float? = null
     ) : ReadAloudPrefs {
+        override fun speed(telugu: Boolean) = (if (telugu) teluguSpeed else null) ?: speed
+        override fun pitch(telugu: Boolean) = (if (telugu) teluguPitch else null) ?: pitch
         override fun voice(telugu: Boolean) = if (telugu) teluguVoice else null
-        override fun engine(telugu: Boolean) = if (telugu) null else englishEngine
     }
 
     private class Chapter(val verses: List<VerseToRead>, val from: Int = 1) : ReadingSession {
@@ -91,13 +94,19 @@ class ReadAloudTest {
     }
 
     @Test
-    fun anAiVoiceAppReadsInItsOwnVoiceUnlessOneIsChosen() {
-        val depths = VoiceDepths(mapOf("deepest:en" to "en-in-x-end-local", "deepest:te" to "te-in-x-tem-local"))
-        val prefs = FakePrefs(ReadLanguage.BOTH, englishEngine = "com.example.voxsherpa")
-        val reader = reader(FakeSpeaker(), prefs, depths)
-        // English by the app (its own voice); Telugu still by the phone's usual engine, in its deepest.
-        assertNull(reader.voiceFor(telugu = false))
-        assertEquals("te-in-x-tem-local", reader.voiceFor(telugu = true))
+    fun eachLanguageIsReadAtItsOwnSpeedAndPitch() {
+        val speaker = FakeSpeaker()
+        val prefs = FakePrefs(ReadLanguage.BOTH, speed = 1.25f, pitch = 0.85f, teluguSpeed = 0.9f, teluguPitch = 0.7f)
+        val reader = reader(speaker, prefs)
+        reader.start(Chapter(john3, from = 16))
+        speaker.finish()
+        assertEquals(listOf(Triple(false, 1.25f, 0.85f), Triple(true, 0.9f, 0.7f)), speaker.said.map { Triple(it.telugu, it.rate, it.pitch) })
+        // A voice heard on its own is at its language's too.
+        reader.previewVoice("దేవుడు లోకమును ఎంతో ప్రేమించెను.", telugu = true, voice = "te-in-x-tef-local")
+        assertEquals(0.9f to 0.7f, speaker.said.last().let { it.rate to it.pitch })
+        reader.stop()
+        reader.trySpeaking("For God so loved the world.", telugu = false)
+        assertEquals(1.25f to 0.85f, speaker.said.last().let { it.rate to it.pitch })
     }
 
     @Test
@@ -266,7 +275,7 @@ class ReadAloudTest {
     @Test
     fun theChosenVoiceAndSpeedAreUsed() {
         val speaker = FakeSpeaker()
-        val reader = reader(speaker, FakePrefs(ReadLanguage.TELUGU, speed = 0.75f, teluguVoice = "te-in-x-tef-local"))
+        val reader = reader(speaker, FakePrefs(ReadLanguage.TELUGU, teluguSpeed = 0.75f, teluguVoice = "te-in-x-tef-local"))
         reader.start(Chapter(john3, from = 16))
         assertEquals("te-in-x-tef-local", speaker.said.last().voice)
         assertEquals(0.75f, speaker.said.last().rate)

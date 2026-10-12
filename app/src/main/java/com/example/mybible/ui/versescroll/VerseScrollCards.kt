@@ -33,15 +33,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -59,7 +56,6 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
@@ -121,15 +117,25 @@ internal fun genreOf(book: String): String {
     }
 }
 
-/** A highlight's band behind the text: see-through on dark themes (more so over a scene), solid on light ones. */
-internal fun bandColor(hex: String, dark: Boolean, onScene: Boolean): Color =
-    hexToColor(hex).copy(alpha = if (dark) (if (onScene) 0.38f else 0.3f) else 0.88f)
+/** A highlight color on a card: [verses], the numbers of those it's on, when it isn't on all of them. */
+internal data class CardColor(val hex: String, val verses: List<Int>?)
+
+/**
+ * The highlight colors of a card's verses ([hexes], one list per verse, numbered [verses]), for the
+ * chips beside its reference: each color once, in the order they come, verse by verse.
+ */
+internal fun cardColors(verses: List<Int>, hexes: List<List<String>>): List<CardColor> {
+    val on = LinkedHashMap<String, Pair<String, MutableSet<Int>>>()
+    hexes.forEachIndexed { i, colors ->
+        for (hex in colors) on.getOrPut(hex.lowercase()) { hex to LinkedHashSet() }.second += verses[i]
+    }
+    return on.values.map { (hex, those) -> CardColor(hex, those.toList().takeIf { it.size < verses.size }) }
+}
 
 internal fun hexToColor(hex: String): Color =
     Color(0xFF000000 or (hex.removePrefix("#").toLongOrNull(16) ?: 0xCCCCCC))
 
-// Easing for the highlighter sweep and the double-tap burst, as tuned in the design preview.
-private val SweepEasing = CubicBezierEasing(0.2f, 0.7f, 0.3f, 1f)
+// Easing for the double-tap burst, as tuned in the design preview.
 private val BurstEasing = CubicBezierEasing(0f, 0f, 0.58f, 1f)
 
 private data class Burst(val id: Long, val at: Offset, val color: Color)
@@ -140,7 +146,6 @@ private data class Burst(val id: Long, val at: Offset, val color: Color)
  * the full verse sheet.
  *
  * @param highlightHexes a verse's highlight colors (up to three), in the order they were put on.
- * @param sweepToken goes up each time this card's highlight should sweep in (again).
  * @param onDoubleTap highlights the card; returns the color for the burst under the finger.
  */
 @Composable
@@ -156,7 +161,6 @@ internal fun VerseCardPage(
     highlightHexes: (VerseRef) -> List<String>,
     colorLabel: (String) -> String,
     notePreview: String?,
-    sweepToken: Int,
     onPress: () -> Unit,
     onDoubleTap: () -> String?,
     onLongPress: () -> Unit,
@@ -167,13 +171,6 @@ internal fun VerseCardPage(
     val onScene = scene != null
     val c = if (onScene) colors.onScene() else colors
     val haptics = LocalHapticFeedback.current
-    val sweep = remember(card.uid) { Animatable(1f) }
-    LaunchedEffect(sweepToken) {
-        if (sweepToken > 0) {
-            sweep.snapTo(0f)
-            sweep.animateTo(1f, tween(650, easing = SweepEasing))
-        }
-    }
     val bursts = remember { mutableStateListOf<Burst>() }
     val currentOnPress by rememberUpdatedState(onPress)
     val currentOnDoubleTap by rememberUpdatedState(onDoubleTap)
@@ -230,8 +227,7 @@ internal fun VerseCardPage(
                 showTelugu = showTelugu,
                 highlightHexes = highlightHexes,
                 colorLabel = colorLabel,
-                notePreview = notePreview,
-                sweep = { sweep.value }
+                notePreview = notePreview
             )
         }
         bursts.forEach { burst ->
@@ -247,6 +243,7 @@ private fun cardPadding(top: Dp = CardTopPadding): PaddingValues {
     return PaddingValues(start = 24.dp, end = 24.dp, top = top + statusBar, bottom = CardBottomPadding + bottom)
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun VerseStack(
     eyebrow: @Composable () -> Unit,
@@ -259,14 +256,13 @@ private fun VerseStack(
     showTelugu: Boolean,
     highlightHexes: (VerseRef) -> List<String>,
     colorLabel: (String) -> String,
-    notePreview: String?,
-    sweep: () -> Float
+    notePreview: String?
 ) {
     val telugu = if (showTelugu) lines.mapNotNull { it.telugu }.joinToString(" ") else ""
-    val hexes = refs.map(highlightHexes)
     val style = verseStyle(colors, onScene)
-    // The chips next to the reference name the colors the whole card is highlighted in.
-    val allColors = hexes.firstOrNull().orEmpty().filter { hex -> hexes.all { verse -> verse.any { it.equals(hex, ignoreCase = true) } } }
+    // The chips next to the reference say how the card's verses are highlighted: the verse's text
+    // itself is left plain.
+    val chips = cardColors(refs.map { it.verse }, refs.map(highlightHexes))
 
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
         Layout(
@@ -278,8 +274,8 @@ private fun VerseStack(
                         text = { i, words -> verseString(lines[i], showNumber = lines.size > 1, colors.soft, words) },
                         words = { i -> wordsOf(lines[i].text).size },
                         style = style
-                    ) { i, text ->
-                        VerseText(text, style, bands = hexes[i].map { bandColor(it, colors.dark, onScene) }, sweep = sweep)
+                    ) { text ->
+                        Text(text = text, style = style)
                     }
                 },
                 {
@@ -294,18 +290,21 @@ private fun VerseStack(
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(
                                 text = label.uppercase(),
                                 color = colors.gold,
                                 fontFamily = WorkSansFontFamily,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 12.5.sp,
-                                letterSpacing = 0.12.em
+                                letterSpacing = 0.12.em,
+                                modifier = Modifier
+                                    .align(Alignment.CenterVertically)
+                                    .padding(end = 5.dp)
                             )
-                            allColors.forEachIndexed { i, allColor ->
+                            for (chip in chips) {
                                 Text(
-                                    text = colorLabel(allColor).uppercase(),
+                                    text = colorLabel(chip.hex).uppercase() + chip.verses?.joinToString(", ", prefix = " \u00b7 ").orEmpty(),
                                     color = Color(0xFF2C221E),
                                     fontFamily = WorkSansFontFamily,
                                     fontWeight = FontWeight.SemiBold,
@@ -313,9 +312,9 @@ private fun VerseStack(
                                     letterSpacing = 0.1.em,
                                     maxLines = 1,
                                     modifier = Modifier
-                                        .padding(start = if (i == 0) 10.dp else 5.dp)
+                                        .align(Alignment.CenterVertically)
                                         .clip(CircleShape)
-                                        .background(hexToColor(allColor))
+                                        .background(hexToColor(chip.hex))
                                         .padding(start = 9.dp, end = 9.dp, top = 5.dp, bottom = 4.dp)
                                 )
                             }
@@ -381,7 +380,7 @@ private fun VerseLines(
     text: (index: Int, words: Int?) -> AnnotatedString,
     words: (index: Int) -> Int,
     style: TextStyle,
-    verse: @Composable (index: Int, text: AnnotatedString) -> Unit
+    verse: @Composable (text: AnnotatedString) -> Unit
 ) {
     val measurer = rememberTextMeasurer()
     SubcomposeLayout(Modifier.fillMaxWidth()) { constraints ->
@@ -417,7 +416,7 @@ private fun VerseLines(
             else if (shown.isNotEmpty()) shown[shown.lastIndex] = cut(shown.lastIndex, heights.last())
             break
         }
-        val placed = shown.mapIndexed { i, t -> subcompose(i) { verse(i, t) }.first().measure(Constraints(maxWidth = width)) }
+        val placed = shown.mapIndexed { i, t -> subcompose(i) { verse(t) }.first().measure(Constraints(maxWidth = width)) }
         val height = placed.sumOf { it.height } + gap * (placed.size - 1).coerceAtLeast(0)
         layout(width, height) {
             var y = 0
@@ -528,53 +527,6 @@ private fun LinkedFromEyebrow(from: LinkedFrom, colors: VsColors, onClick: () ->
             )
         }
     }
-}
-
-// Gelasio's ascent and descent (1900 and 700 of 2048 units), plus a little padding: the height of the
-// highlighter band around each line of text.
-private const val BAND_ABOVE = 0.958f
-private const val BAND_BELOW = 0.372f
-
-/**
- * One verse in the card's big type. A highlight is a highlighter band behind each line, which sweeps
- * in from the left ([sweep] 0..1) when it's applied. A verse in more than one color gets a thinner band
- * per color, each under the one before, a quarter of a band apart.
- */
-@Composable
-private fun VerseText(text: AnnotatedString, style: TextStyle, bands: List<Color>, sweep: () -> Float) {
-    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
-    Text(
-        text = text,
-        onTextLayout = { layout = it },
-        style = style,
-        modifier = Modifier.drawBehind {
-            val l = layout ?: return@drawBehind
-            // Read here, while drawing, so the sweep redraws the band without re-laying out the card.
-            val progress = sweep()
-            if (bands.isEmpty() || progress <= 0f) return@drawBehind
-            val em = VERSE_SIZE.sp.toPx()
-            val n = bands.size
-            val height = (BAND_ABOVE + BAND_BELOW) * em
-            val band = height / (n + (n - 1) / 4f)
-            val corner = minOf(0.2f * em, band / 2f)
-            for (i in 0 until l.lineCount) {
-                val baseline = l.getLineBaseline(i)
-                val left = l.getLineLeft(i) - 0.1f * em
-                // Ends at the last visible character, not after a trailing space.
-                val end = l.getLineEnd(i, visibleEnd = true)
-                val right = (if (end > l.getLineStart(i)) l.getHorizontalPosition(end, true) else l.getLineRight(i)) + 0.1f * em
-                val top = baseline - BAND_ABOVE * em
-                bands.forEachIndexed { b, color ->
-                    drawRoundRect(
-                        color = color,
-                        topLeft = Offset(left, top + b * band * 1.25f),
-                        size = Size((right - left) * progress, band),
-                        cornerRadius = CornerRadius(corner)
-                    )
-                }
-            }
-        }
-    )
 }
 
 /**

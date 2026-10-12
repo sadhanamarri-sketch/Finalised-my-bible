@@ -321,3 +321,21 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     that engine's voices to pick from; Telugu and the Greek and Hebrew word speaker stay on
     the phone's usual engine unless changed. Speed and pitch are sliders, speed 0.5× to 3×
     and pitch 0.5× to 1.5×, in steps of 0.05, with Reset.
+    **Changed 12 Oct — "voxsherpa is too slow to load... let's get rid of it... the speed and
+    pitch should be separate for english and telugu."**
+    *Built:* the speech engine choice is gone: reading is by the phone's usual engine again,
+    in the deepest voice unless one is picked (a voice picked from the AI voice app is
+    cleared). English and Telugu each have their own panel in the read-aloud settings, with
+    their own speed and pitch sliders and their own voice; a panel shows for each language
+    being read. The one speed and pitch kept before start both languages' settings. A change
+    applies at once to the language being read, and to the other when it comes up; with
+    nothing being read, a few words let you hear it. Greek and Hebrew words are said at
+    English's pitch.
+
+12. **Done 12 Oct.** **Verse Scroll: no highlighter behind the verse.** "There's no need to
+    highlight the verse in verse scroll as we already show the tags below."
+    *Built:* the verse's words stay plain on the card; the colour tags beside the reference
+    show every colour on it. On a passage, a colour on only some of its verses names them
+    ("SUNSHINE · 4"), so a verse highlighted in the Reader still shows when it comes up in
+    a passage; tags that don't fit go on to a second line. A double-tap still pops the ring
+    under your finger and opens the colour box.
