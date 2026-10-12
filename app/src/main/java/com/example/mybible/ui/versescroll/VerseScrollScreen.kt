@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.example.mybible.audio.ReadingPlace
+import com.example.mybible.data.MAX_VERSE_COLORS
 import com.example.mybible.model.HIGHLIGHT_COLOR_DEFS
 import com.example.mybible.model.HighlightItem
 import com.example.mybible.model.NoteItem
@@ -157,7 +158,9 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
 
-    val highlightByKey = remember(highlights) { highlights.associateBy { VerseRef(it.book, it.chapter, it.verse).key } }
+    // Each verse's highlight colors, in the order they were put on (up to three).
+    val highlightsByKey = remember(highlights) { highlights.groupBy { VerseRef(it.book, it.chapter, it.verse).key } }
+    fun hexesOf(ref: VerseRef): List<String> = highlightsByKey[ref.key].orEmpty().map { it.colorHex }
     val labelByHex = remember(colorDefs) { colorDefs.associate { it.colorHex.uppercase() to it.label } }
     fun labelOf(hex: String) = labelByHex[hex.uppercase()] ?: hex
     val notesByKey = remember(notes) {
@@ -219,36 +222,52 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
         if (englishOnly) showToast("No Telugu voice on this phone yet, so just the English", "Settings") { readAloudOpen = true }
     }
 
-    // ---- highlights (stored per verse, the same highlights as everywhere else in the app) ----
-    fun colorOf(card: VerseFeedCard): String? {
-        val hexes = card.content.refs.map { highlightByKey[it.key]?.colorHex }
-        val first = hexes.first() ?: return null
-        return if (hexes.all { it == first }) first else null
+    // ---- highlights (stored per verse and color, the same highlights as everywhere else in the app) ----
+    // The colors every verse of the card is highlighted in, in the first verse's order.
+    fun colorsOf(card: VerseFeedCard): List<String> {
+        val perVerse = card.content.refs.map(::hexesOf)
+        return perVerse.first().filter { hex -> perVerse.all { verse -> verse.any { it.equals(hex, ignoreCase = true) } } }
     }
+    // Puts [hex] on [refs] (verses of the card that don't have it): not on one already in three colors.
     fun setColor(card: VerseFeedCard, refs: List<VerseRef>, hex: String) {
-        refs.forEach { viewModel.setHighlightColor(it.book, it.chapter, it.verse, hex) }
-        controller.noteHighlighted(refs.map { it.key }, on = true)
+        val room = refs.filter { hexesOf(it).size < MAX_VERSE_COLORS }
+        if (room.size < refs.size) showToast("A verse can have up to $MAX_VERSE_COLORS colors")
+        if (room.isEmpty()) return
+        room.forEach { viewModel.addHighlightColor(it.book, it.chapter, it.verse, hex) }
+        controller.noteHighlighted(room.map { it.key }, on = true)
         sweeps[card.uid] = (sweeps[card.uid] ?: 0) + 1
     }
+    // A color in the color box or the verse sheet: off the card when all of it has the color, else on.
+    fun toggleColor(card: VerseFeedCard, hex: String) {
+        if (colorsOf(card).any { it.equals(hex, ignoreCase = true) }) {
+            card.content.refs.forEach { viewModel.removeHighlightColor(it.book, it.chapter, it.verse, hex) }
+            // A verse left with no color at all no longer counts as highlighted this visit.
+            controller.noteHighlighted(card.content.refs.filter { hexesOf(it).size == 1 }.map { it.key }, on = false)
+        } else {
+            setColor(card, card.content.refs.filter { ref -> hexesOf(ref).none { it.equals(hex, ignoreCase = true) } }, hex)
+        }
+    }
+    // Remove: every color off the card, with Undo.
     fun removeColor(card: VerseFeedCard) {
-        val previous: List<HighlightItem> = card.content.refs.mapNotNull { highlightByKey[it.key] }
+        val previous: List<HighlightItem> = card.content.refs.flatMap { highlightsByKey[it.key].orEmpty() }
         if (previous.isEmpty()) return
-        previous.forEach { viewModel.setHighlightColor(it.book, it.chapter, it.verse, "") }
-        controller.noteHighlighted(previous.map { VerseRef(it.book, it.chapter, it.verse).key }, on = false)
+        val keys = previous.map { VerseRef(it.book, it.chapter, it.verse).key }.distinct()
+        card.content.refs.forEach { viewModel.clearHighlight(it.book, it.chapter, it.verse) }
+        controller.noteHighlighted(keys, on = false)
         showToast("Highlight removed", "Undo") {
-            previous.forEach { viewModel.restoreHighlight(it) }
-            controller.noteHighlighted(previous.map { VerseRef(it.book, it.chapter, it.verse).key }, on = true)
+            viewModel.restoreHighlights(previous)
+            controller.noteHighlighted(keys, on = true)
         }
     }
     fun doubleTap(index: Int, card: VerseFeedCard): String {
         controller.dismissHint()
-        val missing = card.content.refs.filter { highlightByKey[it.key] == null }
+        val missing = card.content.refs.filter { hexesOf(it).isEmpty() }
         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
         if (missing.isEmpty()) {
-            // Already highlighted: the highlight sweeps in again, and the color box offers a change.
+            // Already highlighted: the highlight sweeps in again, and the color box offers more or a change.
             sweeps[card.uid] = (sweeps[card.uid] ?: 0) + 1
             showPicker(index)
-            return highlightByKey[card.content.refs.first().key]?.colorHex ?: controller.doubleTapColor
+            return hexesOf(card.content.refs.first()).firstOrNull() ?: controller.doubleTapColor
         }
         val color = controller.doubleTapColor
         setColor(card, missing, color)
@@ -333,7 +352,7 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                             reduceMotion = reduceMotion,
                             isCurrent = pagerState.settledPage == page,
                             showTelugu = controller.showTelugu,
-                            highlightHex = { highlightByKey[it.key]?.colorHex },
+                            highlightHexes = ::hexesOf,
                             colorLabel = ::labelOf,
                             notePreview = firstNote?.let(::notePreview),
                             sweepToken = sweeps[card.uid] ?: 0,
@@ -452,12 +471,14 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                 VerseScrollBottomBar(
                     colors = colors,
                     scenes = scenes,
-                    highlight = colorOf(verseCard)?.let { BarHighlight(it, labelOf(it)) },
+                    highlight = colorsOf(verseCard).takeIf { it.isNotEmpty() }?.let { hexes ->
+                        BarHighlight(hexes, labelOf(hexes.first()) + if (hexes.size > 1) " +${hexes.size - 1}" else "")
+                    },
                     linkCount = verseCard.content.linkCount,
                     onHighlight = {
                         // Highlights if needed, then opens the color box, where Remove lives.
-                        val missing = verseCard.content.refs.filter { highlightByKey[it.key] == null }
-                        if (colorOf(verseCard) == null && missing.isNotEmpty()) setColor(verseCard, missing, controller.doubleTapColor)
+                        val missing = verseCard.content.refs.filter { hexesOf(it).isEmpty() }
+                        if (colorsOf(verseCard).isEmpty() && missing.isNotEmpty()) setColor(verseCard, missing, controller.doubleTapColor)
                         showPicker(pagerState.settledPage)
                     },
                     onNote = { viewModel.openNoteEditor(defaultVerse = asVerse(verseCard)) },
@@ -485,10 +506,10 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                     ColorBox(
                         colors = colors,
                         defs = colorDefs,
-                        current = colorOf(boxCard),
+                        current = colorsOf(boxCard),
                         onTouch = { armPicker() },
                         onPick = { hex ->
-                            setColor(boxCard, boxCard.content.refs, hex)
+                            toggleColor(boxCard, hex)
                             armPicker(PICKER_AFTER_PICK_MS)
                         },
                         onNote = {
@@ -557,14 +578,14 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
 
     sheetCard?.let { card ->
         val verse = asVerse(card)
-        val highlight = highlightByKey[card.content.ref.key]
+        // A quick note goes with the color put on last.
+        val highlight = highlightsByKey[card.content.ref.key]?.lastOrNull()
         VerseActionToolbar(
             verse = verse,
             highlightColorDefs = colorDefs,
-            currentHighlightColorHex = highlight?.colorHex,
-            onSetHighlight = { hex ->
-                if (hex.isEmpty()) removeColor(card) else setColor(card, card.content.refs, hex)
-            },
+            currentHighlightColorHexes = colorsOf(card),
+            onToggleHighlight = { hex -> toggleColor(card, hex) },
+            onClearHighlight = { removeColor(card) },
             onAddNote = {
                 sheetCard = null
                 viewModel.openNoteEditor(defaultVerse = verse)
@@ -595,7 +616,7 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
             label = card.content.label,
             total = card.content.linkCount,
             previews = previews,
-            highlightHex = { highlightByKey[it.key]?.colorHex },
+            highlightHexes = ::hexesOf,
             colorLabel = ::labelOf,
             onPick = { preview ->
                 linksCard = null
@@ -624,7 +645,8 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
             current = controller.source,
             fullCount = controller.fullCount,
             focusedCount = controller.focusedCount,
-            highlightedCount = highlights.size,
+            // Verses, not colors: a verse can be highlighted in more than one.
+            highlightedCount = highlightsByKey.size,
             studiedCount = studied.size,
             readerBook = readerBook,
             readerChapter = readerChapter,

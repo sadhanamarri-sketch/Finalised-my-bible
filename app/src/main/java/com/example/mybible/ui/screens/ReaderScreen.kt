@@ -50,6 +50,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.example.mybible.audio.ReadAloudState
 import com.example.mybible.audio.ReadingPlace
+import com.example.mybible.data.onVerse
 import com.example.mybible.model.CompletedVerseItem
 import com.example.mybible.model.HighlightColorDef
 import com.example.mybible.model.HighlightItem
@@ -1239,9 +1240,8 @@ fun ReaderScreen(
 
                     itemsIndexed(verses) { idx, verse ->
                         val isCompleted = verse.number in studiedHere
-                        val highlightObj = highlights.find {
-                            it.book == verse.book && it.chapter == verse.chapter && it.verse == verse.number
-                        }
+                        // Its colors, in the order they were put on (up to three).
+                        val highlightHexes = highlights.onVerse(verse.book, verse.chapter, verse.number).map { it.colorHex }
                         val hasNote = notes.any { it.matchesVerse(verse.book, verse.chapter, verse.number) }
 
                         // Auto-focus (bold) the vertically-centered verse — but
@@ -1312,7 +1312,7 @@ fun ReaderScreen(
                             verse = verse,
                             isSelected = if (readerPickMode != ReaderPickMode.NONE) isPicked else selectedVerse?.number == verse.number,
                             isCompleted = isCompleted,
-                            highlightColorHex = highlightObj?.colorHex,
+                            highlightColorHexes = highlightHexes,
                             redLetterEnabled = redLetterEnabled,
                             showInterlinear = showInterlinear,
                             fontSizeSp = fontSizeSp,
@@ -1425,18 +1425,21 @@ fun ReaderScreen(
         if (selectedVerse != null) {
             val verse = selectedVerse!!
             val notesOnVerse = notes.filter { it.matchesVerse(verse.book, verse.chapter, verse.number) }
-            val currentHighlight = highlights.find {
-                it.book == verse.book && it.chapter == verse.chapter && it.verse == verse.number
-            }
+            val currentHighlights = highlights.onVerse(verse.book, verse.chapter, verse.number)
+            // A quick note goes with the color put on last.
+            val currentHighlight = currentHighlights.lastOrNull()
 
             VerseActionToolbar(
                 verse = verse,
                 highlightColorDefs = highlightColorDefs,
-                currentHighlightColorHex = currentHighlight?.colorHex,
+                currentHighlightColorHexes = currentHighlights.map { it.colorHex },
                 highlightHasLinkedNote = currentHighlight?.noteId != null,
                 existingNotes = notesOnVerse,
-                onSetHighlight = { hex ->
-                    viewModel.setHighlightColor(verse.book, verse.chapter, verse.number, hex)
+                onToggleHighlight = { hex ->
+                    viewModel.toggleHighlightColor(verse.book, verse.chapter, verse.number, hex)
+                },
+                onClearHighlight = {
+                    viewModel.clearHighlight(verse.book, verse.chapter, verse.number)
                 },
                 onAddQuickNote = { noteText ->
                     val currentHex = currentHighlight?.colorHex

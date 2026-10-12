@@ -25,6 +25,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.luminance
@@ -49,6 +52,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import com.example.mybible.data.HebrewMorphology
+import com.example.mybible.data.MAX_VERSE_COLORS
 import com.example.mybible.model.GreekWord
 import com.example.mybible.model.HebrewWord
 import com.example.mybible.model.HighlightColorDef
@@ -104,7 +108,8 @@ fun VerseCard(
     verse: Verse,
     isSelected: Boolean,
     isCompleted: Boolean,
-    highlightColorHex: String?,
+    // The verse's highlight colors, in the order they were added (up to three).
+    highlightColorHexes: List<String>,
     redLetterEnabled: Boolean,
     showInterlinear: Boolean,
     fontSizeSp: Int,
@@ -143,7 +148,7 @@ fun VerseCard(
     // full-opacity color rather than translucent since it's a thin accent,
     // not a wash over text. (Also tinting the verse number was tried and
     // dropped as redundant once the bar was in place.)
-    val highlightColor = highlightColorHex?.let { parseHexColorOrNull(it) }
+    val highlightColors = highlightColorHexes.mapNotNull { parseHexColorOrNull(it) }
 
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val redLetterColor = if (isDark) DarkRedLetter else PaperRedLetter
@@ -486,32 +491,34 @@ fun VerseCard(
             // segments out of whatever height matchParentSize() resolves
             // to, same technique as any weighted Column, just used for
             // spacing rather than visible content.
-            if (highlightColor != null) {
-                Box(modifier = Modifier.matchParentSize()) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .width(2.dp)
-                            .fillMaxHeight()
-                    ) {
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            // Top offset stays proportional (10% of the verse's
-                            // own height) so the bar still starts near the
-                            // English text regardless of how tall the verse
-                            // is — but the bar itself is a fixed 20dp rather
-                            // than scaling with verse height, so the remaining
-                            // space just absorbs whatever's left.
-                            Spacer(modifier = Modifier.weight(0.10f))
-                            Box(
-                                modifier = Modifier
-                                    .height(20.dp)
-                                    .fillMaxWidth()
-                                    .background(highlightColor)
-                            )
-                            Spacer(modifier = Modifier.weight(0.90f))
+            //
+            // Top offset stays proportional (10% of the verse's own height)
+            // so the bar still starts near the English text regardless of how
+            // tall the verse is — but the bar itself is a fixed 20dp rather
+            // than scaling with verse height. A verse in more than one color
+            // gets a bar per color, each under the one before, a quarter of a
+            // bar apart; on a verse too short for them all, the bars shorten
+            // to fit.
+            if (highlightColors.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .drawBehind {
+                            val width = 2.dp.toPx()
+                            val top = size.height * 0.10f
+                            val room = size.height - top - 4.dp.toPx()
+                            val n = highlightColors.size
+                            var bar = 20.dp.toPx()
+                            if (n * bar + (n - 1) * bar / 4f > room && room > 0f) bar = room / (n + (n - 1) / 4f)
+                            highlightColors.forEachIndexed { i, color ->
+                                drawRect(
+                                    color = color,
+                                    topLeft = Offset(size.width - width, top + i * bar * 1.25f),
+                                    size = Size(width, bar)
+                                )
+                            }
                         }
-                    }
-                }
+                )
             }
         }
     }
@@ -522,8 +529,12 @@ fun VerseCard(
 fun VerseActionToolbar(
     verse: Verse,
     highlightColorDefs: List<HighlightColorDef>,
-    currentHighlightColorHex: String?,
-    onSetHighlight: (String) -> Unit,
+    // The verse's highlight colors, in the order they were added (up to
+    // MAX_VERSE_COLORS): a swatch puts its color on or takes it off, and
+    // Clear takes them all off.
+    currentHighlightColorHexes: List<String>,
+    onToggleHighlight: (String) -> Unit,
+    onClearHighlight: () -> Unit,
     onAddNote: () -> Unit,
     // Tapping the reference pill itself toggles the Greek/Hebrew
     // interlinear view — Studied and Cross Ref dropped out of the toolbar
@@ -543,7 +554,8 @@ fun VerseActionToolbar(
     // is applied — see MainViewModel.addHighlightQuickNote. Null when the
     // caller doesn't wire this up, so the row simply doesn't show.
     onAddQuickNote: ((String) -> Unit)? = null,
-    // Whether the *current highlight itself* already has a linked quick
+    // Whether the *current highlight itself* (with several colors, the one
+    // put on last) already has a linked quick
     // note (HighlightItem.noteId != null) — deliberately separate from
     // existingNotes.isEmpty(): a verse can already carry an older, unrelated
     // note (added before this verse was ever highlighted), and that must
@@ -591,7 +603,11 @@ fun VerseActionToolbar(
                 .padding(bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            val currentColorDef = highlightColorDefs.find { it.colorHex == currentHighlightColorHex }
+            val currentColorDefs = currentHighlightColorHexes.mapNotNull { hex ->
+                highlightColorDefs.find { it.colorHex.equals(hex, ignoreCase = true) }
+            }
+            // A fourth color was tapped: says why it didn't go on.
+            var colorsFull by remember(verse.book, verse.chapter, verse.number) { mutableStateOf(false) }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -600,7 +616,10 @@ fun VerseActionToolbar(
             ) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .weight(1f)
+                        .horizontalScroll(rememberScrollState())
                 ) {
                     // Gold outlined pill — matches the reference-chip style
                     // already established in the Notes list/editor/reader
@@ -619,10 +638,10 @@ fun VerseActionToolbar(
                             .padding(horizontal = 10.dp, vertical = 5.dp)
                     )
 
-                    // Filled label pill for the current highlight color —
+                    // Filled label pills for the verse's highlight colors —
                     // replaces the old separate "Highlighted — X" banner
-                    // row; the swatch row below still lets you change it.
-                    if (currentColorDef != null) {
+                    // row; the swatch row below still lets you change them.
+                    currentColorDefs.forEach { currentColorDef ->
                         val swatchTint = parseHexColorOrNull(currentColorDef.colorHex) ?: Color.Gray
                         Text(
                             text = currentColorDef.label,
@@ -638,7 +657,8 @@ fun VerseActionToolbar(
                 }
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(start = 8.dp)
                 ) {
                     if (onReadAloud != null) {
                         IconButton(onClick = onReadAloud, modifier = Modifier.size(24.dp)) {
@@ -714,8 +734,7 @@ fun VerseActionToolbar(
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                     verticalAlignment = Alignment.Top
                 ) {
-                    // Clear swatch — always first, matches removing a
-                    // highlight via onSetHighlight("") elsewhere.
+                    // Clear swatch — always first: every color off.
                     HighlightSwatchItem(
                         label = "Clear",
                         content = {
@@ -726,20 +745,34 @@ fun VerseActionToolbar(
                             )
                         },
                         swatchColor = MaterialTheme.colorScheme.background,
-                        isActive = currentHighlightColorHex.isNullOrEmpty(),
-                        onClick = { onSetHighlight("") }
+                        isActive = currentHighlightColorHexes.isEmpty(),
+                        onClick = {
+                            colorsFull = false
+                            onClearHighlight()
+                        }
                     )
 
                     highlightColorDefs.forEach { def ->
-                        val isActive = currentHighlightColorHex == def.colorHex
+                        val isActive = currentHighlightColorHexes.any { it.equals(def.colorHex, ignoreCase = true) }
                         HighlightSwatchItem(
                             label = def.label,
                             swatchColor = parseHexColorOrNull(def.colorHex) ?: Color.Gray,
                             isActive = isActive,
-                            onClick = { onSetHighlight(if (isActive) "" else def.colorHex) },
+                            onClick = {
+                                colorsFull = !isActive && currentHighlightColorHexes.size >= MAX_VERSE_COLORS
+                                if (!colorsFull) onToggleHighlight(def.colorHex)
+                            },
                             onLongClick = onRenameColor?.let { rename -> { rename(def) } }
                         )
                     }
+                }
+                if (colorsFull) {
+                    Text(
+                        text = "A verse can have up to $MAX_VERSE_COLORS colors. Tap one of its colors to take it off first.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
                 }
             }
 
@@ -747,9 +780,10 @@ fun VerseActionToolbar(
             // highlight is applied, so a one-line "why did I mark this"
             // (doubt / prayer / learning) can be jotted down without
             // leaving the toolbar for the full Note Editor. Only shown
-            // once a color is active and that highlight has no note yet.
-            if (onAddQuickNote != null && !currentHighlightColorHex.isNullOrEmpty() && !highlightHasLinkedNote) {
-                var quickNoteText by remember(verse.book, verse.chapter, verse.number, currentHighlightColorHex) {
+            // once a color is active and the color last put on has no note
+            // yet (the note goes with that color).
+            if (onAddQuickNote != null && currentHighlightColorHexes.isNotEmpty() && !highlightHasLinkedNote) {
+                var quickNoteText by remember(verse.book, verse.chapter, verse.number, currentHighlightColorHexes.last()) {
                     mutableStateOf("")
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))

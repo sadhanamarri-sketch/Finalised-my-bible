@@ -634,11 +634,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Undo for removing a highlight in Verse Scroll — restores the exact
-    // item, quick-note link included, not just the color.
-    fun restoreHighlight(item: HighlightItem) {
-        viewModelScope.launch {
-            repository.setHighlight(item.book, item.chapter, item.verse, item.colorHex, noteId = item.noteId)
-        }
+    // items (every color it had), quick-note links included.
+    fun restoreHighlights(items: List<HighlightItem>) {
+        viewModelScope.launch { repository.restoreHighlights(items) }
     }
 
     // Interactive UI overlays & actions
@@ -2295,21 +2293,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun setHighlightColor(book: String, chapter: Int, verse: Int, colorHex: String) {
+    // A verse can be highlighted in up to three colors (see
+    // data/Highlights.kt). A swatch on the verse toolbar puts its color on
+    // or takes it off; the toolbar deliberately stays open — a fresh color
+    // can optionally be followed by a quick note (see addHighlightQuickNote)
+    // right in the same toolbar, without a separate detour into the full
+    // Note Editor. Dismisses the same way any other verse-selection state
+    // already does: the toolbar's own Close button, or tapping the verse
+    // again.
+    fun toggleHighlightColor(book: String, chapter: Int, verse: Int, colorHex: String) {
+        viewModelScope.launch { repository.toggleHighlightColor(book, chapter, verse, colorHex) }
+    }
+
+    fun addHighlightColor(book: String, chapter: Int, verse: Int, colorHex: String) {
+        viewModelScope.launch { repository.addHighlightColor(book, chapter, verse, colorHex) }
+    }
+
+    fun removeHighlightColor(book: String, chapter: Int, verse: Int, colorHex: String) {
+        viewModelScope.launch { repository.removeHighlightColor(book, chapter, verse, colorHex) }
+    }
+
+    // Clear: every color off the verse, and the toolbar closes.
+    fun clearHighlight(book: String, chapter: Int, verse: Int) {
         viewModelScope.launch {
-            if (colorHex.isEmpty()) {
-                repository.removeHighlight(book, chapter, verse)
-                _selectedVerse.value = null
-            } else {
-                repository.setHighlight(book, chapter, verse, colorHex)
-                // Toolbar deliberately stays open here (unlike Clear above)
-                // — a fresh highlight can optionally be followed by a quick
-                // note (see addHighlightQuickNote) right in the same
-                // toolbar, without a separate detour into the full Note
-                // Editor. Dismisses the same way any other verse-selection
-                // state already does: the toolbar's own Close button, or
-                // tapping the verse again.
-            }
+            repository.removeHighlight(book, chapter, verse)
+            _selectedVerse.value = null
         }
     }
 
@@ -2343,7 +2351,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 refs = listOf(NoteReference(book, chapter, verse, verseText)),
                 tags = listOf("Highlighted Verse", colorLabel)
             )
-            repository.setHighlight(book, chapter, verse, colorHex, noteId = noteId)
+            // The note belongs to that one color of the verse's highlight.
+            repository.addHighlightColor(book, chapter, verse, colorHex, noteId = noteId)
         }
     }
 

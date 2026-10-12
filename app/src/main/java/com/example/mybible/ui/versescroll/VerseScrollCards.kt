@@ -139,7 +139,7 @@ private data class Burst(val id: Long, val at: Offset, val color: Color)
  * as every other (cut short with "…" if it runs out of room). Double-tap highlights, long-press opens
  * the full verse sheet.
  *
- * @param highlightHex the highlight color of a verse, if it has one.
+ * @param highlightHexes a verse's highlight colors (up to three), in the order they were put on.
  * @param sweepToken goes up each time this card's highlight should sweep in (again).
  * @param onDoubleTap highlights the card; returns the color for the burst under the finger.
  */
@@ -153,7 +153,7 @@ internal fun VerseCardPage(
     reduceMotion: Boolean,
     isCurrent: Boolean,
     showTelugu: Boolean,
-    highlightHex: (VerseRef) -> String?,
+    highlightHexes: (VerseRef) -> List<String>,
     colorLabel: (String) -> String,
     notePreview: String?,
     sweepToken: Int,
@@ -228,7 +228,7 @@ internal fun VerseCardPage(
                 colors = c,
                 onScene = onScene,
                 showTelugu = showTelugu,
-                highlightHex = highlightHex,
+                highlightHexes = highlightHexes,
                 colorLabel = colorLabel,
                 notePreview = notePreview,
                 sweep = { sweep.value }
@@ -257,16 +257,16 @@ private fun VerseStack(
     colors: VsColors,
     onScene: Boolean,
     showTelugu: Boolean,
-    highlightHex: (VerseRef) -> String?,
+    highlightHexes: (VerseRef) -> List<String>,
     colorLabel: (String) -> String,
     notePreview: String?,
     sweep: () -> Float
 ) {
     val telugu = if (showTelugu) lines.mapNotNull { it.telugu }.joinToString(" ") else ""
-    val hexes = refs.map(highlightHex)
+    val hexes = refs.map(highlightHexes)
     val style = verseStyle(colors, onScene)
-    // The chip next to the reference names the color once the whole card is highlighted in it.
-    val allColor = hexes.firstOrNull()?.takeIf { first -> hexes.all { it == first } }
+    // The chips next to the reference name the colors the whole card is highlighted in.
+    val allColors = hexes.firstOrNull().orEmpty().filter { hex -> hexes.all { verse -> verse.any { it.equals(hex, ignoreCase = true) } } }
 
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
         Layout(
@@ -279,7 +279,7 @@ private fun VerseStack(
                         words = { i -> wordsOf(lines[i].text).size },
                         style = style
                     ) { i, text ->
-                        VerseText(text, style, band = hexes[i]?.let { bandColor(it, colors.dark, onScene) }, sweep = sweep)
+                        VerseText(text, style, bands = hexes[i].map { bandColor(it, colors.dark, onScene) }, sweep = sweep)
                     }
                 },
                 {
@@ -303,7 +303,7 @@ private fun VerseStack(
                                 fontSize = 12.5.sp,
                                 letterSpacing = 0.12.em
                             )
-                            if (allColor != null) {
+                            allColors.forEachIndexed { i, allColor ->
                                 Text(
                                     text = colorLabel(allColor).uppercase(),
                                     color = Color(0xFF2C221E),
@@ -311,8 +311,9 @@ private fun VerseStack(
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 10.sp,
                                     letterSpacing = 0.1.em,
+                                    maxLines = 1,
                                     modifier = Modifier
-                                        .padding(start = 10.dp)
+                                        .padding(start = if (i == 0) 10.dp else 5.dp)
                                         .clip(CircleShape)
                                         .background(hexToColor(allColor))
                                         .padding(start = 9.dp, end = 9.dp, top = 5.dp, bottom = 4.dp)
@@ -536,10 +537,11 @@ private const val BAND_BELOW = 0.372f
 
 /**
  * One verse in the card's big type. A highlight is a highlighter band behind each line, which sweeps
- * in from the left ([sweep] 0..1) when it's applied.
+ * in from the left ([sweep] 0..1) when it's applied. A verse in more than one color gets a thinner band
+ * per color, each under the one before, a quarter of a band apart.
  */
 @Composable
-private fun VerseText(text: AnnotatedString, style: TextStyle, band: Color?, sweep: () -> Float) {
+private fun VerseText(text: AnnotatedString, style: TextStyle, bands: List<Color>, sweep: () -> Float) {
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     Text(
         text = text,
@@ -549,8 +551,12 @@ private fun VerseText(text: AnnotatedString, style: TextStyle, band: Color?, swe
             val l = layout ?: return@drawBehind
             // Read here, while drawing, so the sweep redraws the band without re-laying out the card.
             val progress = sweep()
-            if (band == null || progress <= 0f) return@drawBehind
+            if (bands.isEmpty() || progress <= 0f) return@drawBehind
             val em = VERSE_SIZE.sp.toPx()
+            val n = bands.size
+            val height = (BAND_ABOVE + BAND_BELOW) * em
+            val band = height / (n + (n - 1) / 4f)
+            val corner = minOf(0.2f * em, band / 2f)
             for (i in 0 until l.lineCount) {
                 val baseline = l.getLineBaseline(i)
                 val left = l.getLineLeft(i) - 0.1f * em
@@ -558,12 +564,14 @@ private fun VerseText(text: AnnotatedString, style: TextStyle, band: Color?, swe
                 val end = l.getLineEnd(i, visibleEnd = true)
                 val right = (if (end > l.getLineStart(i)) l.getHorizontalPosition(end, true) else l.getLineRight(i)) + 0.1f * em
                 val top = baseline - BAND_ABOVE * em
-                drawRoundRect(
-                    color = band,
-                    topLeft = Offset(left, top),
-                    size = Size((right - left) * progress, (BAND_ABOVE + BAND_BELOW) * em),
-                    cornerRadius = CornerRadius(0.2f * em)
-                )
+                bands.forEachIndexed { b, color ->
+                    drawRoundRect(
+                        color = color,
+                        topLeft = Offset(left, top + b * band * 1.25f),
+                        size = Size((right - left) * progress, band),
+                        cornerRadius = CornerRadius(corner)
+                    )
+                }
             }
         }
     )

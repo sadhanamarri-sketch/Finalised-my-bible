@@ -377,7 +377,6 @@ class BibleRepository(private val context: Context) {
     }
 
     private fun noteTombstoneKey(id: Long) = "note:$id"
-    private fun highlightTombstoneKey(book: String, chapter: Int, verse: Int) = "highlight:$book:$chapter:$verse"
     private fun completedTombstoneKey(book: String, chapter: Int, verse: Int) = "completed:$book:$chapter:$verse"
     private fun tagTombstoneKey(name: String) = "tag:${name.lowercase(Locale.US)}"
     private fun savedWordTombstoneKey(dedupeKey: String) = "savedword:$dedupeKey"
@@ -865,21 +864,39 @@ class BibleRepository(private val context: Context) {
         }
     }
 
-    suspend fun setHighlight(book: String, chapter: Int, verse: Int, colorHex: String, noteId: Long? = null) {
-        val current = _highlightsFlow.value.toMutableList()
-        val existing = current.find { it.book == book && it.chapter == chapter && it.verse == verse }
-        current.removeAll { it.book == book && it.chapter == chapter && it.verse == verse }
-        // A color change keeps the highlight's quick note linked (see
-        // HighlightItem.noteId) — only an explicit noteId replaces it.
-        current.add(HighlightItem(book, chapter, verse, colorHex, noteId = noteId ?: existing?.noteId))
-        saveHighlightsToPrefs(current)
+    // A verse can be highlighted in up to MAX_VERSE_COLORS colors, each its own HighlightItem (see
+    // data/Highlights.kt for the rules).
+
+    /**
+     * Adds a color to the verse's highlight (after its others; not when it already has the most it can
+     * take), or, given [noteId], links that color's quick note.
+     */
+    suspend fun addHighlightColor(book: String, chapter: Int, verse: Int, colorHex: String, noteId: Long? = null) {
+        saveHighlightsToPrefs(_highlightsFlow.value.withColor(book, chapter, verse, colorHex, noteId))
     }
 
+    /** A color on the verse's highlight taken off, or put on (when there's room for it). */
+    suspend fun toggleHighlightColor(book: String, chapter: Int, verse: Int, colorHex: String) {
+        val on = _highlightsFlow.value.onVerse(book, chapter, verse).any { it.colorHex.equals(colorHex, ignoreCase = true) }
+        if (on) removeHighlightColor(book, chapter, verse, colorHex) else addHighlightColor(book, chapter, verse, colorHex)
+    }
+
+    /** Takes one color off the verse's highlight. */
+    suspend fun removeHighlightColor(book: String, chapter: Int, verse: Int, colorHex: String) {
+        saveHighlightsToPrefs(_highlightsFlow.value.withoutColor(book, chapter, verse, colorHex))
+        recordTombstone(highlightColorTombstoneKey(book, chapter, verse, colorHex))
+    }
+
+    /** Takes every color off the verse. */
     suspend fun removeHighlight(book: String, chapter: Int, verse: Int) {
-        val current = _highlightsFlow.value.toMutableList()
-        current.removeAll { it.book == book && it.chapter == chapter && it.verse == verse }
-        saveHighlightsToPrefs(current)
+        saveHighlightsToPrefs(_highlightsFlow.value.withoutVerse(book, chapter, verse))
         recordTombstone(highlightTombstoneKey(book, chapter, verse))
+    }
+
+    /** Highlights taken off put back (an undo), quick notes included — dated now, so a sync keeps them. */
+    suspend fun restoreHighlights(items: List<HighlightItem>) {
+        val now = System.currentTimeMillis()
+        saveHighlightsToPrefs(items.fold(_highlightsFlow.value) { list, item -> list.withItem(item.copy(updatedAt = now)) })
     }
 
     // Bookmark toggle for the Save button on a Greek/Hebrew/English word
@@ -1644,29 +1661,13 @@ class BibleRepository(private val context: Context) {
             studiedDao.upsert(changed.values.toList())
         }
 
-        // Highlights: union by (book, chapter, verse). Now that
-        // HighlightItem carries updatedAt, a tombstoned key is skipped
-        // unless the incoming updatedAt postdates the deletion (same rule
-        // notes use), and a non-tombstoned collision is resolved by
-        // whichever copy is newer — not "the backup always wins" as
-        // before — so restoring an old backup can't clobber a recolor
-        // made locally since.
-        val existingHighlights = _highlightsFlow.value
-        var highlightsAdded = 0
-        val mergedHighlights = existingHighlights.toMutableList()
-        for (incoming in data.highlights) {
-            val deletedAt = tombstones[highlightTombstoneKey(incoming.book, incoming.chapter, incoming.verse)]
-            if (deletedAt != null && incoming.updatedAt <= deletedAt) continue
-            val idx = mergedHighlights.indexOfFirst {
-                it.book == incoming.book && it.chapter == incoming.chapter && it.verse == incoming.verse
-            }
-            if (idx < 0) {
-                mergedHighlights.add(incoming)
-                highlightsAdded++
-            } else if (incoming.updatedAt >= mergedHighlights[idx].updatedAt) {
-                mergedHighlights[idx] = incoming
-            }
-        }
+        // Highlights: union by verse and color (a verse can carry up to
+        // MAX_VERSE_COLORS). A highlight cleared or a color taken off is
+        // skipped unless the incoming updatedAt postdates the deletion (same
+        // rule notes use), and a collision is resolved by whichever copy is
+        // newer — not "the backup always wins" — so restoring an old backup
+        // can't clobber a change made locally since. See mergeHighlights.
+        val (mergedHighlights, highlightsAdded) = mergeHighlights(_highlightsFlow.value, data.highlights, tombstones)
         saveHighlightsToPrefs(mergedHighlights)
 
         // Highlight colors are fixed now (see model/HighlightColors.kt) —

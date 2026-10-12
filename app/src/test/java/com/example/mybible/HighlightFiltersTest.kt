@@ -37,6 +37,35 @@ class HighlightFiltersTest {
         all.filtered(place, colors, query, currentBook = "Romans", currentChapter = 8).keys()
 
     @Test
+    fun aVerseInSeveralColorsIsOneItemFoundUnderEachOfThem() = kotlinx.coroutines.runBlocking {
+        val highlights = listOf(
+            com.example.mybible.model.HighlightItem("John", 3, 16, "#F1F1B1", updatedAt = daysAgo(5), noteId = 1),
+            com.example.mybible.model.HighlightItem("Psalms", 23, 1, "#F1B1B1", updatedAt = daysAgo(2)),
+            com.example.mybible.model.HighlightItem("John", 3, 16, "#B1D1F1", updatedAt = daysAgo(1), noteId = 2)
+        )
+        val defs = listOf(
+            com.example.mybible.model.HighlightColorDef("Promise", "#F1F1B1"),
+            com.example.mybible.model.HighlightColorDef("Prayer", "#B1D1F1"),
+            com.example.mybible.model.HighlightColorDef("Praise", "#F1B1B1")
+        )
+        val notes = listOf(
+            com.example.mybible.model.NoteItem(id = 1, title = "", text = "God's love", noteDate = ""),
+            com.example.mybible.model.NoteItem(id = 2, title = "", text = "Pray for the family", noteDate = "")
+        )
+        val items = buildHighlightedVerseItems(highlights, defs, notes) { _, _, _ -> "text" }
+        assertEquals(listOf("Psalms:23:1", "John:3:16"), items.map { it.key })
+        val john = items.last()
+        assertEquals(listOf("Promise", "Prayer"), john.colors.map { it.name })
+        assertEquals(listOf("#f1f1b1", "#b1d1f1"), john.colors.map { it.hex })
+        // Its newest color's date, both notes, and found by either color or either name.
+        assertEquals(daysAgo(1), john.updatedAt)
+        assertEquals("God's love \u00b7 Pray for the family", john.noteText)
+        assertEquals(listOf("John:3:16"), items.filtered(BiblePlace.WholeBible, setOf("#b1d1f1"), "", "John", 3).keys())
+        assertEquals(listOf("John:3:16"), items.filtered(BiblePlace.WholeBible, setOf("#f1f1b1"), "", "John", 3).keys())
+        assertEquals(listOf("John:3:16"), items.filtered(BiblePlace.WholeBible, emptySet(), "prayer", "John", 3).keys())
+    }
+
+    @Test
     fun placesFollowTheReaderAndSplitTheTestaments() {
         assertEquals(all.keys(), shown())
         assertEquals(listOf(romans826.key, romans828.key), shown(BiblePlace.ThisChapter))

@@ -7,7 +7,9 @@ import com.example.mybible.ui.components.BIBLE_BOOKS
 
 /**
  * Joins raw highlight records against the labeled-color defs and resolves
- * each verse's text, producing the list HighlightedVersesScreen renders.
+ * each verse's text, producing the list HighlightedVersesScreen renders: one
+ * item per verse, with every color it's highlighted in (a record per color,
+ * in the order they were put on), its latest date and its colors' notes.
  *
  * [getVerseText] is injected (rather than calling BibleRepository directly)
  * so this stays a plain, testable mapping function — MainViewModel is the
@@ -26,18 +28,22 @@ suspend fun buildHighlightedVerseItems(
     val labelsByHex = colorDefs.associate { it.colorHex.lowercase() to it.label }
     val notesById = notes.associateBy { it.id }
 
-    return highlights.map { highlight ->
-        val text = getVerseText(highlight.book, highlight.chapter, highlight.verse).orEmpty()
+    return highlights.groupBy { Triple(it.book, it.chapter, it.verse) }.map { (place, colors) ->
+        val (book, chapter, verse) = place
+        val text = getVerseText(book, chapter, verse).orEmpty()
+        val tints = colors.map { HighlightTint(it.colorHex.lowercase(), labelsByHex[it.colorHex.lowercase()] ?: "Uncategorized") }
+        val notes = colors.mapNotNull { highlight -> highlight.noteId?.let { notesById[it]?.text } }
         HighlightedVerseItem(
-            key = "${highlight.book}:${highlight.chapter}:${highlight.verse}",
-            book = highlight.book,
-            chapter = highlight.chapter,
-            verse = highlight.verse,
+            key = "$book:$chapter:$verse",
+            book = book,
+            chapter = chapter,
+            verse = verse,
             text = text,
-            colorName = labelsByHex[highlight.colorHex.lowercase()] ?: "Uncategorized",
-            colorHex = highlight.colorHex.lowercase(),
-            updatedAt = highlight.updatedAt,
-            noteText = highlight.noteId?.let { notesById[it]?.text }
+            colorName = tints.first().name,
+            colorHex = tints.first().hex,
+            updatedAt = colors.maxOf { it.updatedAt },
+            noteText = notes.joinToString(" \u00b7 ").ifEmpty { null },
+            colors = tints
         )
     }.sortedWith(compareBy({ BIBLE_BOOKS.indexOf(it.book) }, { it.chapter }, { it.verse }))
 }

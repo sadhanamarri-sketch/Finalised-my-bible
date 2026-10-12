@@ -28,14 +28,14 @@ private val whitespace = Regex("\\s+")
 
 private fun HighlightedVerseItem.hasAll(words: List<String>): Boolean {
     if (words.isEmpty()) return true
-    val searchable = "$book $chapter:$verse $text ${noteText.orEmpty()} $colorName".lowercase()
+    val searchable = "$book $chapter:$verse $text ${noteText.orEmpty()} ${colors.joinToString(" ") { it.name }}".lowercase()
     return words.all { it in searchable }
 }
 
 /**
- * The highlights in [place] with one of [colorHexes] (any color when empty)
- * that have every word of [query] somewhere in the verse, its reference, its
- * note or its color's name. The filter sheet also calls this with another
+ * The highlights in [place] in one of [colorHexes] (any color when empty; a
+ * verse in several colors counts for each) that have every word of [query]
+ * somewhere in the verse, its reference, its notes or its colors' names. The filter sheet also calls this with another
  * place or color in place of the current one, to count what each choice
  * would show.
  */
@@ -49,7 +49,7 @@ fun List<HighlightedVerseItem>.filtered(
     val words = query.lowercase().split(whitespace).filter { it.isNotEmpty() }
     return filter {
         place.includes(it.book, it.chapter, currentBook, currentChapter) &&
-            (colorHexes.isEmpty() || it.colorHex in colorHexes) &&
+            (colorHexes.isEmpty() || it.colors.any { c -> c.hex in colorHexes }) &&
             it.hasAll(words)
     }
 }

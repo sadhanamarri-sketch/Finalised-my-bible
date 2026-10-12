@@ -9,8 +9,24 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
 
 ## Noted 9 Oct 2026
 
-1. **More than one colour on a highlighted verse.** "Multi highlighted verses", clarified as
-   "multi colors to one highlighted verse": one verse can carry, say, both Promise and Prayer.
+1. **Done 12 Oct.** **More than one colour on a highlighted verse.** "Multi highlighted
+   verses", clarified as "multi colors to one highlighted verse": one verse can carry, say,
+   both Promise and Prayer.
+   *Built:* a verse can carry up to 3 colours, kept in the order they were put on.
+   - *Reader:* each colour is its own short mark at the verse's right edge, each under the one
+     before with a gap of a quarter of a mark (decided 12 Oct: "give some gap and include the
+     next color under the first ... quarter to half of the bar"); on a verse too short for
+     them all, the marks shorten to fit.
+   - *Verse sheet:* a swatch puts its colour on or takes it off, and Clear takes them all off.
+     The colours show as labels at the top. A fourth isn't added; the sheet says why. A quick
+     note goes with the colour put on last.
+   - *Highlighted Verses:* one card per verse, with each colour's dot and name; filtering by a
+     colour finds every verse that has it.
+   - *Verse Scroll:* the highlighter band behind the verse splits into a band per colour,
+     with a chip for each by the reference. The Highlight button is filled in the colours
+     ("Rose +1"), and the colour box puts colours on or takes them off.
+   - *Backups:* merged colour by colour; taking one colour off, or clearing a verse, carries
+     over to the other phone. Highlights saved before this still load.
    Today a highlight is one colour per verse (`HighlightItem`, keyed by book, chapter and
    verse), so the stored highlights, Drive backups, the Highlighted Verses page and its colour
    filter, and Verse Scroll's colour box all need to allow several.

@@ -80,16 +80,23 @@ data class HighlightedVerseItem(
     val chapter: Int,
     val verse: Int,
     val text: String,
+    // Its (first) color's name.
     val colorName: String = "Default",
     // The color itself, lowercase — what the color filter goes by, since a
     // label can be renamed.
     val colorHex: String = "",
-    // When it was highlighted (or last recolored), for Newest first.
+    // When it was last highlighted (or a color of it last changed), for Newest first.
     val updatedAt: Long = 0L,
-    // Text of the linked quick-note (see HighlightItem.noteId), when one
-    // exists — shown as a truncated italic preview under the verse.
-    val noteText: String? = null
+    // Text of the linked quick-notes (see HighlightItem.noteId), when there
+    // are any — shown as a truncated italic preview under the verse.
+    val noteText: String? = null,
+    // Every color it's highlighted in, in the order they were put on (up to
+    // three) — the first is colorHex/colorName.
+    val colors: List<HighlightTint> = listOf(HighlightTint(colorHex, colorName))
 )
+
+/** One of a highlighted verse's colors: its hex (lowercase) and its name. */
+data class HighlightTint(val hex: String, val name: String)
 
 // A color in use, as the filter sheet lists it: palette order, current label.
 private data class ColorOption(val hex: String, val label: String)
@@ -287,9 +294,10 @@ fun HighlightedVersesScreen(
 // seen and unpicked), in the palette's order.
 private fun colorOptionsOf(highlights: List<HighlightedVerseItem>, picked: Set<String>): List<ColorOption> {
     val palette = HIGHLIGHT_COLOR_DEFS.map { it.colorHex.lowercase() }
+    val tints = highlights.flatMap { it.colors }
     val labels = HIGHLIGHT_COLOR_DEFS.associate { it.colorHex.lowercase() to it.label } +
-        highlights.associate { it.colorHex to it.colorName }
-    return (highlights.map { it.colorHex } + picked).distinct()
+        tints.associate { it.hex to it.name }
+    return (tints.map { it.hex } + picked).distinct()
         .sortedBy { hex -> palette.indexOf(hex).let { if (it < 0) palette.size else it } }
         .map { hex -> ColorOption(hex, labels[hex] ?: "Uncategorized") }
 }
@@ -697,15 +705,17 @@ private fun HighlightedVerseRow(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
-            // One line: the highlight's own color, its label in small-caps
-            // terracotta (primary), and the reference in small-caps gold
-            // (tertiary) — the reference treatment shared with Search and
-            // Cross References.
+            // One line: the highlight's own colors, their labels in
+            // small-caps terracotta (primary), and the reference in
+            // small-caps gold (tertiary) — the reference treatment shared
+            // with Search and Cross References.
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 6.dp)) {
-                ColorDot(item.colorHex, 10.dp)
+                Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                    item.colors.forEach { ColorDot(it.hex, 10.dp) }
+                }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = item.colorName.uppercase(),
+                    text = item.colors.joinToString(" \u00b7 ") { it.name }.uppercase(),
                     fontSize = 12.5.sp,
                     letterSpacing = 1.5.sp,
                     fontFamily = WorkSansFontFamily,

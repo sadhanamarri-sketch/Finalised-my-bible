@@ -57,6 +57,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -260,7 +261,7 @@ private fun RoundIconButton(icon: ImageVector, label: String, tint: Color, onCli
 }
 
 /** What the bottom bar's Highlight button shows: the card's color and its name, once it has one. */
-internal data class BarHighlight(val hex: String, val label: String)
+internal data class BarHighlight(val hexes: List<String>, val label: String)
 
 /** Acts on whichever verse is on screen. */
 @Composable
@@ -287,18 +288,18 @@ internal fun BoxScope.VerseScrollBottomBar(
             icon = VerseScrollIcons.Highlight,
             label = highlight?.label ?: "Highlight",
             description = if (highlight == null) "Highlight this verse" else "Change or remove the ${highlight.label} highlight",
-            fill = highlight?.let { hexToColor(it.hex) },
+            fill = highlight?.let { h -> h.hexes.map(::hexToColor) }.orEmpty(),
             colors = colors,
             scenes = scenes,
             onClick = onHighlight
         )
-        BarButton(VerseScrollIcons.Note, "Note", "Add a note", null, colors, scenes, onNote)
-        BarButton(VerseScrollIcons.Read, "Read", "Read in context", null, colors, scenes, onRead)
+        BarButton(VerseScrollIcons.Note, "Note", "Add a note", emptyList(), colors, scenes, onNote)
+        BarButton(VerseScrollIcons.Read, "Read", "Read in context", emptyList(), colors, scenes, onRead)
         BarButton(
             icon = VerseScrollIcons.Links,
             label = if (linkCount == 1) "1 link" else "$linkCount links",
             description = "See the verses this one links to ($linkCount)",
-            fill = null,
+            fill = emptyList(),
             colors = colors,
             scenes = scenes,
             onClick = onLinks
@@ -311,18 +312,26 @@ private fun BarButton(
     icon: ImageVector,
     label: String,
     description: String,
-    fill: Color?,
+    // The highlight's colors, top to bottom, filling the circle in bands; none for a plain button.
+    fill: List<Color>,
     colors: VsColors,
     scenes: Boolean,
     onClick: () -> Unit
 ) {
-    val background = fill ?: when {
+    val plain = when {
         !scenes -> colors.surface
         colors.dark -> Color.White.copy(alpha = 0.1f)
         else -> Color.White.copy(alpha = 0.55f)
     }
+    val background: Brush = when (fill.size) {
+        0 -> SolidColor(plain)
+        1 -> SolidColor(fill.first())
+        else -> Brush.verticalGradient(
+            *fill.flatMapIndexed { i, c -> listOf(i.toFloat() / fill.size to c, (i + 1f) / fill.size to c) }.toTypedArray()
+        )
+    }
     val border = when {
-        fill != null -> Color.Transparent
+        fill.isNotEmpty() -> Color.Transparent
         !scenes -> colors.line
         colors.dark -> Color.White.copy(alpha = 0.18f)
         else -> Color.Black.copy(alpha = 0.08f)
@@ -344,7 +353,7 @@ private fun BarButton(
                 .background(background)
                 .border(1.dp, border, CircleShape)
         ) {
-            Icon(icon, contentDescription = null, tint = if (fill != null) OnColorInk else colors.ink, modifier = Modifier.size(22.dp))
+            Icon(icon, contentDescription = null, tint = if (fill.isNotEmpty()) OnColorInk else colors.ink, modifier = Modifier.size(22.dp))
         }
         Text(
             text = label,
@@ -379,13 +388,14 @@ internal fun BoxScope.VersesTodayCounter(count: Int, colors: VsColors) {
 
 /**
  * The color box: after a double-tap it takes the bottom bar's place for a few seconds, with all twelve
- * colors and their names plus Note and Remove. It never dims or covers the verse.
+ * colors and their names plus Note and Remove. A color puts it on the verse or takes it off (a verse
+ * can be in up to three); Remove takes them all off. It never dims or covers the verse.
  */
 @Composable
 internal fun ColorBox(
     colors: VsColors,
     defs: List<HighlightColorDef>,
-    current: String?,
+    current: List<String>,
     onTouch: () -> Unit,
     onPick: (String) -> Unit,
     onNote: () -> Unit,
@@ -395,13 +405,13 @@ internal fun ColorBox(
     val touched by rememberUpdatedState(onTouch)
     val items: List<@Composable (Modifier) -> Unit> = defs.map { def ->
         @Composable { m: Modifier ->
-            val selected = current.equals(def.colorHex, ignoreCase = true)
+            val selected = current.any { it.equals(def.colorHex, ignoreCase = true) }
             BoxItem(
                 label = def.label,
                 selected = selected,
                 colors = colors,
                 modifier = m,
-                description = if (selected) "${def.label}, current color" else def.label,
+                description = if (selected) "${def.label}, on: take it off" else def.label,
                 onClick = { onPick(def.colorHex) }
             ) { Swatch(hexToColor(def.colorHex), selected, colors) }
         }
@@ -936,7 +946,7 @@ internal fun LinksSheet(
     label: String,
     total: Int,
     previews: List<VerseScrollController.LinkPreview>?,
-    highlightHex: (VerseRef) -> String?,
+    highlightHexes: (VerseRef) -> List<String>,
     colorLabel: (String) -> String,
     onPick: (VerseScrollController.LinkPreview) -> Unit,
     onFollow: () -> Unit,
@@ -983,7 +993,7 @@ internal fun LinksSheet(
                 modifier = Modifier.padding(bottom = 6.dp)
             )
             previews.orEmpty().forEach { preview ->
-                LinkItem(preview, colors, highlightHex(preview.link.ref), colorLabel) { onPick(preview) }
+                LinkItem(preview, colors, highlightHexes(preview.link.ref), colorLabel) { onPick(preview) }
             }
             Spacer(Modifier.height(8.dp))
             if (shown > 0) {
@@ -1000,7 +1010,7 @@ internal fun LinksSheet(
 private fun LinkItem(
     preview: VerseScrollController.LinkPreview,
     colors: VsColors,
-    highlight: String?,
+    highlights: List<String>,
     colorLabel: (String) -> String,
     onClick: () -> Unit
 ) {
@@ -1024,7 +1034,7 @@ private fun LinkItem(
                 fontSize = 11.5.sp,
                 letterSpacing = 0.1.em
             )
-            if (highlight != null) {
+            highlights.forEach { highlight ->
                 Box(
                     Modifier
                         .size(9.dp)
