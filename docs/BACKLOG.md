@@ -126,8 +126,16 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
        Hearing and `4.dbt.io` allowed in the build environment to test against.
      - Not doing: Bible Brain's dramatised Telugu Old Version New Testament (`TCWOVV`), a
        pre-recorded AI voice, or asking BSI for their recording.
-   *Still to ask:* play one chapter, or carry on through the book? Keep playing with the
-   screen off (needs a notification with play and pause)?
+     - *Playing (decided 12 Oct):* stops at the end of the chapter. Keeps playing with the
+       screen off or the app in the background, with a notification to pause and play.
+     - *Bible Brain's KJV (checked 12 Oct on Bible.is):* the whole Bible, in two styles —
+       *narrated*, one voice (`ENGKJVO1DA` Old Testament, `ENGKJVN1DA` New Testament), and
+       *dramatised*, a cast with sound effects (`ENGKJVO2DA`, `ENGKJVN2DA`); each as MP3 at
+       64 kbps or Opus at 16 kbps. Better-known KJV readings — Alexander Scourby (1950s),
+       Max McLean (Listener's Bible), David Cochran Heath (New Testament and Psalms), Paul
+       Mims, James Earl Jones (New Testament) — are all sold commercially, with no app
+       licence or verse timings on offer, so Bible Brain stays the choice.
+   *Still to ask:* KJV narrated, dramatised, or the reader's choice?
    Sources: [LibriVox KJV group](https://librivox.org/group/360),
    [Telugu IRV audio on Bible.com](https://my.bible.com/audio-bible/1895/JHN.3.IRVTEL),
    [Bible Society of India](https://www.bsind.org/category/uncategorized/page/32/),
