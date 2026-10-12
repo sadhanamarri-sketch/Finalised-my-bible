@@ -26,7 +26,7 @@ class VoiceDepthsTest {
         override fun stop() = Unit
         override fun voices(telugu: Boolean) = emptyList<VoiceOption>()
 
-        override fun record(text: String, voice: String, file: File, onSaid: (Boolean) -> Unit) {
+        override fun record(text: String, voice: String, telugu: Boolean, file: File, onSaid: (Boolean) -> Unit) {
             recorded += voice to text
             if (voice in broken) return onSaid(false)
             file.writeText(voice)
@@ -112,6 +112,22 @@ class VoiceDepthsTest {
         // Last, as it was, with those not measured.
         assertEquals(listOf("United States 1", "India 1", "India 2", "United Kingdom 1"), depths.sorted(english).map { it.label })
         depths.measure(recorder, english, telugu, unconfined) { true }
+        assertEquals(4, recorder.recorded.size)
+    }
+
+    @Test
+    fun theDeepestFollowsTheVoicesOfTheEngineReadWith() {
+        val recorder = Recorder()
+        val depths = depths()
+        depths.measure(recorder, english, telugu, unconfined) { true }
+        assertEquals("en-in-x-end-local", depths.deepest(telugu = false))
+        // English read by an AI voice app now: its voices aren't measured, and none of these is read in.
+        depths.measure(recorder, emptyList(), telugu, unconfined) { true }
+        assertNull(depths.deepest(telugu = false))
+        assertEquals("te-in-x-tem-local", depths.deepest(telugu = true))
+        // Back to the phone's usual engine: its voices, measured before, aren't said again.
+        depths.measure(recorder, english, telugu, unconfined) { true }
+        assertEquals("en-in-x-end-local", depths.deepest(telugu = false))
         assertEquals(4, recorder.recorded.size)
     }
 

@@ -310,3 +310,14 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
       has more, some of them men's), and "Phone speech settings" the phone's own.
     *Still to come:* Bible Brain's recorded KJV (a man's voice, narrated), once the API key
     arrives (item 7).
+    **Added 12 Oct — "it does sound robotic... can it install new AI voice?"** Looked into:
+    the Free Use Bible API (its only audio is the Berean Standard Bible, not the KJV, and no
+    Telugu audio); AI voice apps that install as a speech engine (VoxSherpa TTS, SherpaTTS —
+    natural English, offline, free; no Telugu); and cloud AI voices (Azure, Google, Sarvam,
+    ElevenLabs — natural Telugu too, with your own key and a monthly limit). You tried
+    VoxSherpa and found it good.
+    *Built:* each language has its own speech engine in the read-aloud settings ("English
+    speech engine": the phone's usual one or VoxSherpa TTS, or any other installed), with
+    that engine's voices to pick from; Telugu and the Greek and Hebrew word speaker stay on
+    the phone's usual engine unless changed. Speed and pitch are sliders, speed 0.5× to 3×
+    and pitch 0.5× to 1.5×, in steps of 0.05, with Reset.

@@ -39,9 +39,11 @@ class ReadAloudTest {
         override var speed: Float = 1f,
         var teluguVoice: String? = null,
         override var continueReading: Boolean = false,
-        override var pitch: Float = 1f
+        override var pitch: Float = 1f,
+        var englishEngine: String? = null
     ) : ReadAloudPrefs {
         override fun voice(telugu: Boolean) = if (telugu) teluguVoice else null
+        override fun engine(telugu: Boolean) = if (telugu) null else englishEngine
     }
 
     private class Chapter(val verses: List<VerseToRead>, val from: Int = 1) : ReadingSession {
@@ -86,6 +88,16 @@ class ReadAloudTest {
         assertEquals(true to "te-in-x-tef-local", speaker.said.last().let { it.telugu to it.voice })
         // Nothing measured, nothing chosen: the phone's usual voice.
         assertNull(reader(FakeSpeaker()).voiceFor(telugu = false))
+    }
+
+    @Test
+    fun anAiVoiceAppReadsInItsOwnVoiceUnlessOneIsChosen() {
+        val depths = VoiceDepths(mapOf("deepest:en" to "en-in-x-end-local", "deepest:te" to "te-in-x-tem-local"))
+        val prefs = FakePrefs(ReadLanguage.BOTH, englishEngine = "com.example.voxsherpa")
+        val reader = reader(FakeSpeaker(), prefs, depths)
+        // English by the app (its own voice); Telugu still by the phone's usual engine, in its deepest.
+        assertNull(reader.voiceFor(telugu = false))
+        assertEquals("te-in-x-tem-local", reader.voiceFor(telugu = true))
     }
 
     @Test

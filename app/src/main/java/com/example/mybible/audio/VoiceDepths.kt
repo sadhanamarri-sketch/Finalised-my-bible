@@ -65,6 +65,14 @@ class VoiceDepths(
     fun measure(speaker: Speaker, english: List<VoiceOption>, telugu: List<VoiceOption>, scope: CoroutineScope, canGoOn: () -> Boolean) {
         val dir = workDir ?: return
         if (_measuring.value) return
+        // The deepest of these, as measured before: the engine read with may have changed since.
+        val before = HashMap(kept)
+        kept.choose(DEEPEST_ENGLISH, english)
+        kept.choose(DEEPEST_TELUGU, telugu)
+        if (kept != before) {
+            save(HashMap(kept))
+            _changes.value++
+        }
         val queue = ArrayDeque(
             (english.map { it to false } + telugu.map { it to true }).filter { (voice, _) -> !voice.online && DEPTH + voice.name !in kept }
         )
@@ -99,7 +107,7 @@ class VoiceDepths(
                     measured(null)
                 }
             }
-            speaker.record(if (isTelugu) TELUGU_SAMPLE else ENGLISH_SAMPLE, voice.name, file) { ok ->
+            speaker.record(if (isTelugu) TELUGU_SAMPLE else ENGLISH_SAMPLE, voice.name, isTelugu, file) { ok ->
                 if (answered) return@record
                 answered = true
                 timeout.cancel()

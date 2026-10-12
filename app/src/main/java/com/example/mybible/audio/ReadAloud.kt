@@ -69,6 +69,9 @@ interface ReadAloudPrefs {
     /** The voice chosen for a language, or null when none was (then the deepest; see ReadAloud.voiceFor). */
     fun voice(telugu: Boolean): String?
 
+    /** The speech engine a language is read with (its package), or null for the phone's usual one. */
+    fun engine(telugu: Boolean): String? = null
+
     /** Verse Scroll: once a card has been read, move on to the next and read that. */
     val continueReading: Boolean
 }
@@ -78,6 +81,9 @@ interface ReadAloudPrefs {
  * (its pitch in Hz, once measured; see VoiceDepths).
  */
 data class VoiceOption(val name: String, val label: String, val online: Boolean, val depth: Float? = null)
+
+/** A speech engine installed on the phone: its package, its name, and whether it's the phone's usual one. */
+data class EngineOption(val name: String, val label: String, val usual: Boolean)
 
 /** The phone's speech engine, behind an interface so tests can stand in for it. */
 interface Speaker {
@@ -112,13 +118,17 @@ interface Speaker {
     fun voices(telugu: Boolean): List<VoiceOption>
 
     /**
-     * Says [text] in the voice named [voice] into [file] rather than aloud, at its own pitch and pace,
-     * to measure how deep it is; [onSaid] is told whether it worked, on the main thread.
+     * Says [text] in the voice named [voice] — one of the language's ([telugu]) — into [file] rather
+     * than aloud, at its own pitch and pace, to measure how deep it is; [onSaid] is told whether it
+     * worked, on the main thread.
      */
-    fun record(text: String, voice: String, file: java.io.File, onSaid: (Boolean) -> Unit) = onSaid(false)
+    fun record(text: String, voice: String, telugu: Boolean, file: java.io.File, onSaid: (Boolean) -> Unit) = onSaid(false)
 
     /** Done recording for now. */
     fun doneRecording() {}
+
+    /** The speech engines installed on the phone. */
+    fun engines(): List<EngineOption> = emptyList()
 }
 
 data class ReadAloudState(
@@ -197,17 +207,25 @@ class ReadAloud(
     /** Whether the phone's voices are being measured. */
     val measuringVoices: StateFlow<Boolean> get() = depths.measuring
 
-    /** The voice a language is read in: the one chosen, else the deepest offline one, else the phone's usual one (null). */
-    fun voiceFor(telugu: Boolean): String? = prefs.voice(telugu) ?: depths.deepest(telugu)
+    /**
+     * The voice a language is read in: the one chosen, else — with the phone's usual speech engine —
+     * the deepest offline one, else the engine's own (null).
+     */
+    fun voiceFor(telugu: Boolean): String? = prefs.voice(telugu) ?: depths.deepest(telugu).takeIf { prefs.engine(telugu) == null }
+
+    /** The speech engines installed on the phone, for the settings. */
+    fun engines(): List<EngineOption> = speaker.engines()
 
     /**
      * Measures how deep each of the phone's voices is that hasn't been yet, for listing them from the
-     * deepest and reading in the deepest. Not while something is being said: it stops if a reading
-     * plays, to go on another time.
+     * deepest and reading in the deepest. Only the phone's usual engine's: an AI voice app's voices
+     * have names to go by, and take long to measure. Not while something is being said: it stops if a
+     * reading plays, to go on another time.
      */
     fun measureVoices() {
         if (_state.value.status == ReadAloudState.Status.PLAYING || speaker.ready != true) return
-        depths.measure(speaker, speaker.voices(telugu = false), speaker.voices(telugu = true), scope) {
+        fun usualVoices(telugu: Boolean) = if (prefs.engine(telugu) == null) speaker.voices(telugu) else emptyList()
+        depths.measure(speaker, usualVoices(telugu = false), usualVoices(telugu = true), scope) {
             _state.value.status != ReadAloudState.Status.PLAYING
         }
     }
