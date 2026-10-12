@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,10 +28,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
@@ -39,7 +46,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -69,8 +79,15 @@ import androidx.compose.ui.unit.sp
 import com.example.mybible.model.HighlightColorDef
 import com.example.mybible.ui.theme.GelasioFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
+import com.example.mybible.ui.components.BIBLE_BOOKS
+import com.example.mybible.ui.components.BookListStep
+import com.example.mybible.ui.components.ChapterGridStep
+import com.example.mybible.ui.components.PickerDarkGold
+import com.example.mybible.ui.components.PickerPaperGold
 import com.example.mybible.versescroll.VerseRef
 import com.example.mybible.versescroll.VerseScrollController
+import com.example.mybible.versescroll.VerseSource
+import java.util.Locale
 
 private val OnColorInk = Color(0xFF2C221E)
 
@@ -86,8 +103,10 @@ private fun bottomScrim(colors: VsColors, scenes: Boolean): Brush =
     else Brush.verticalGradient(0f to Color(0x00FAF7F0), 0.65f to Color(0xCCFAF7F0), 1f to Color(0xCCFAF7F0))
 
 /**
- * Back, the feed's two modes (Discover and Rabbit hole), and settings. Inside a Rabbit hole, past its
- * first verse, a "Back to …" button underneath returns to the verse it started from.
+ * Back, the feed's two tabs, and settings. The first tab is the mode, named for where its verses come
+ * from ("Full", "Romans 8", "Highlighted"): tapped while showing, it opens the choice of verses. Inside
+ * a Rabbit hole, past its first verse, a "Back to …" button underneath returns to the verse it started
+ * from.
  */
 @Composable
 internal fun BoxScope.VerseScrollTopBar(
@@ -95,6 +114,7 @@ internal fun BoxScope.VerseScrollTopBar(
     scenes: Boolean,
     rabbitHole: Boolean,
     backTo: String?,
+    modeLabel: String,
     onBack: () -> Unit,
     onDiscover: () -> Unit,
     onRabbitHole: () -> Unit,
@@ -121,7 +141,7 @@ internal fun BoxScope.VerseScrollTopBar(
                 horizontalArrangement = Arrangement.spacedBy(22.dp, Alignment.CenterHorizontally),
                 modifier = Modifier.weight(1f)
             ) {
-                Tab("Discover", selected = !rabbitHole, colors = colors, onClick = onDiscover)
+                Tab(modeLabel, selected = !rabbitHole, colors = colors, menu = !rabbitHole, onClick = onDiscover)
                 Tab("Rabbit hole", selected = rabbitHole, colors = colors, onClick = onRabbitHole)
             }
             RoundIconButton(VerseScrollIcons.Settings, "Verse Scroll settings", colors.ink, onSettings)
@@ -170,24 +190,43 @@ private fun BackToChip(label: String, colors: VsColors, scenes: Boolean, onClick
     }
 }
 
+// [menu]: a small arrow after the label, for a tab that opens a choice when tapped.
 @Composable
-private fun Tab(label: String, selected: Boolean, colors: VsColors, onClick: () -> Unit) {
+private fun Tab(label: String, selected: Boolean, colors: VsColors, menu: Boolean = false, onClick: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
             .clickable(role = Role.Tab, onClick = onClick)
-            .semantics { this.selected = selected }
+            .semantics {
+                this.selected = selected
+                if (menu) contentDescription = "$label: choose which verses"
+            }
             .padding(horizontal = 2.dp)
     ) {
-        Text(
-            text = label,
-            color = if (selected) colors.ink else colors.soft,
-            fontFamily = WorkSansFontFamily,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 15.sp,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(top = 8.dp, bottom = 10.dp)
-        )
+        ) {
+            Text(
+                text = label,
+                color = if (selected) colors.ink else colors.soft,
+                fontFamily = WorkSansFontFamily,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 15.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 150.dp)
+            )
+            if (menu) {
+                Icon(
+                    Icons.Default.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = if (selected) colors.ink else colors.soft,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
         Box(
             Modifier
                 .height(2.5.dp)
@@ -635,6 +674,181 @@ internal fun VerseScrollSettingsSheet(
                 OptionPill("Off", !showTelugu, colors) { onShowTelugu(false) }
                 OptionPill("On", showTelugu, colors) { onShowTelugu(true) }
             }
+        }
+    }
+}
+
+/**
+ * Which verses Verse Scroll shows: Full, Focused, your highlighted or studied verses, the Reader's
+ * chapter, or any book or chapter, read in order (picked from the books, then the chapters). A
+ * search's or topic's verses show at the top while they're on.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun VerseScrollSourceSheet(
+    colors: VsColors,
+    current: VerseSource,
+    fullCount: Int,
+    focusedCount: Int,
+    highlightedCount: Int,
+    studiedCount: Int,
+    readerBook: String,
+    readerChapter: Int,
+    onChoose: (VerseSource) -> Unit,
+    onDismiss: () -> Unit
+) {
+    // null: the list of choices; a book's name: its chapters; "": the books.
+    var picking by remember { mutableStateOf<String?>(null) }
+    // "1 verse", "2,000 verses"; [kind] goes before it: "5 highlighted verses".
+    fun verses(n: Int, kind: String = "") = if (n == 1) "1 ${kind}verse" else String.format(Locale.US, "%,d ${kind}verses", n)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = colors.surface
+    ) {
+        val book = picking
+        if (book == null) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(bottom = 12.dp)
+            ) {
+                Text(
+                    text = "Verses from",
+                    color = colors.ink,
+                    fontFamily = WorkSansFontFamily,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 18.sp,
+                    modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 8.dp)
+                )
+                if (current is VerseSource.Found) {
+                    SourceRow(current.label, current.blurb.replaceFirstChar { it.uppercase() } + ".", true, true, colors) { onDismiss() }
+                }
+                SourceRow(
+                    "Full",
+                    (if (fullCount > 0) "All ${verses(fullCount)} that other verses point to" else "Every verse that other verses point to") +
+                        ", the best known coming up most.",
+                    current == VerseSource.Full, true, colors
+                ) { onChoose(VerseSource.Full) }
+                SourceRow(
+                    "Focused",
+                    if (focusedCount > 0) "Only the ${verses(focusedCount, "best-known ")}." else "Only the best-known verses.",
+                    current == VerseSource.Focused, true, colors
+                ) { onChoose(VerseSource.Focused) }
+                SourceRow(
+                    "Highlighted",
+                    if (highlightedCount > 0) "Your ${verses(highlightedCount, "highlighted ")}, shuffled." else "No highlighted verses yet.",
+                    current == VerseSource.Highlighted, highlightedCount > 0, colors
+                ) { onChoose(VerseSource.Highlighted) }
+                SourceRow(
+                    "Studied",
+                    if (studiedCount > 0) "Your ${verses(studiedCount, "studied ")}, shuffled." else "No verses marked studied yet.",
+                    current == VerseSource.Studied, studiedCount > 0, colors
+                ) { onChoose(VerseSource.Studied) }
+                val here = VerseSource.Chapter(readerBook, readerChapter)
+                if (readerBook.isNotBlank() && readerChapter > 0) {
+                    SourceRow(
+                        here.label,
+                        "The chapter you're reading, verse by verse.",
+                        current == here, true, colors
+                    ) { onChoose(here) }
+                }
+                val other = current.takeIf { it.inOrder && it != here }
+                SourceRow(
+                    other?.label ?: "A book or chapter",
+                    if (other != null) "In order. Tap to choose another book or chapter." else "Any book or chapter, read in order, verse by verse.",
+                    other != null, true, colors, more = true
+                ) { picking = "" }
+            }
+        } else {
+            val isDark = colors.dark
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.86f)
+                    .navigationBarsPadding()
+            ) {
+                if (book.isEmpty()) {
+                    Column {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clickable { picking = null }
+                                .padding(horizontal = 16.dp, vertical = 10.dp)
+                        ) {
+                            Text("\u2039 Verses from", color = colors.ink, fontFamily = WorkSansFontFamily, fontSize = 15.sp)
+                        }
+                        BookListStep(
+                            listState = rememberLazyListState(),
+                            otCount = BIBLE_BOOKS.indexOf("Matthew"),
+                            currentBook = (current as? VerseSource.Book)?.book ?: (current as? VerseSource.Chapter)?.book ?: readerBook,
+                            goldColor = if (isDark) PickerDarkGold else PickerPaperGold,
+                            onBookSelected = { picking = it }
+                        )
+                    }
+                } else {
+                    ChapterGridStep(
+                        bookName = book,
+                        onBack = { picking = "" },
+                        onChapterSelected = { onChoose(VerseSource.Chapter(book, it)) },
+                        header = {
+                            PillButton(
+                                "All of $book, in order",
+                                primary = true,
+                                colors = colors,
+                                onClick = { onChoose(VerseSource.Book(book)) },
+                                modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 12.dp)
+                            )
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+// One choice of verses: its name, what it holds, a check when it's the one showing.
+@Composable
+private fun SourceRow(
+    title: String,
+    detail: String,
+    selected: Boolean,
+    enabled: Boolean,
+    colors: VsColors,
+    more: Boolean = false,
+    onClick: () -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled, role = Role.RadioButton, onClick = onClick)
+            .semantics { this.selected = selected }
+            .padding(horizontal = 20.dp, vertical = 11.dp)
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = title,
+                color = if (enabled) colors.ink else colors.soft.copy(alpha = 0.6f),
+                fontFamily = WorkSansFontFamily,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 15.5.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = detail,
+                color = if (enabled) colors.soft else colors.soft.copy(alpha = 0.6f),
+                fontFamily = WorkSansFontFamily,
+                fontSize = 13.sp,
+                lineHeight = 1.4.em,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
+        when {
+            selected -> Icon(Icons.Default.Check, contentDescription = "Showing", tint = colors.primary, modifier = Modifier.padding(start = 12.dp).size(20.dp))
+            more -> Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = colors.soft, modifier = Modifier.padding(start = 12.dp).size(20.dp))
         }
     }
 }

@@ -18,6 +18,7 @@ import com.example.mybible.data.DriveSyncWorker
 import com.example.mybible.reminders.ReminderFrequency
 import com.example.mybible.reminders.ReminderScheduler
 import com.example.mybible.reminders.ReminderTheme
+import com.example.mybible.versescroll.VerseRef
 import com.example.mybible.versescroll.VerseScrollController
 import com.example.mybible.data.resolveBookName
 import com.example.mybible.data.LexiconLookupResult
@@ -542,12 +543,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _verseScrollSourceVerse = MutableStateFlow<ReaderScrollAnchor?>(null)
 
+    // Where Verse Scroll's back goes: the Reader, or Search when it was opened with a search's results
+    // or a topic's verses ("Scroll these"), which are still there underneath.
+    private var verseScrollOrigin = NavTab.READER
+
+    /** From the Reader's menu or the widget: Verse Scroll in its chosen mode. */
     fun openVerseScroll() {
+        verseScrollOrigin = NavTab.READER
+        verseScroll.useSavedSource()
+        selectTab(NavTab.VERSE_SCROLL)
+    }
+
+    /**
+     * "Scroll these" on Search's results or a Nave's topic: Verse Scroll through just those verses,
+     * shuffled. [title] names them ("“love”", "Faith"); [from] says where they came from.
+     */
+    fun scrollVerses(title: String, from: String, refs: List<VerseRef>) {
+        if (refs.isEmpty()) return
+        verseScrollOrigin = NavTab.SEARCH
+        verseScroll.showFound(title, from, refs)
         selectTab(NavTab.VERSE_SCROLL)
     }
 
     fun closeVerseScroll() {
-        selectTab(NavTab.READER)
+        val origin = verseScrollOrigin
+        verseScrollOrigin = NavTab.READER
+        selectTab(origin)
     }
 
     fun readFromVerseScroll(book: String, chapter: Int, verse: Int) {

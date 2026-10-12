@@ -48,6 +48,7 @@ import com.example.mybible.ui.OpenTopic
 import com.example.mybible.ui.components.BackTopBar
 import com.example.mybible.ui.theme.SourceSerif4FontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
+import com.example.mybible.versescroll.VerseRef
 
 /**
  * A Nave's Topical Bible topic, opened from Search's topic cards: its main headings, each folding
@@ -99,15 +100,30 @@ fun TopicScreen(topic: OpenTopic, viewModel: MainViewModel, modifier: Modifier =
                 .padding(padding)
         ) {
             item(key = "subtitle") {
-                Text(
-                    text = "Nave’s Topical Bible · " +
-                        if (page.referenceCount == 1) "1 reference" else "${page.referenceCount} references",
-                    fontSize = 13.sp,
-                    fontFamily = WorkSansFontFamily,
-                    letterSpacing = 0.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp)
-                )
+                ) {
+                    Text(
+                        text = "Nave’s Topical Bible · " +
+                            if (page.referenceCount == 1) "1 reference" else "${page.referenceCount} references",
+                        fontSize = 13.sp,
+                        fontFamily = WorkSansFontFamily,
+                        letterSpacing = 0.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    )
+                    // Every verse the topic names, as a Verse Scroll (a passage by its first verse).
+                    val refs = remember(page.topicId) {
+                        page.items.filterIsInstance<TopicItem.Section>()
+                            .flatMap { it.rows.filterIsInstance<TopicRow.Reference>() }
+                            .map { VerseRef(it.verse.book, it.verse.chapter, it.verse.number) }
+                            .distinct()
+                    }
+                    if (refs.isNotEmpty()) {
+                        ScrollTheseButton { viewModel.scrollVerses(page.name, "Nave\u2019s topic", refs) }
+                    }
+                }
             }
             for ((i, item) in page.items.withIndex()) {
                 when (item) {

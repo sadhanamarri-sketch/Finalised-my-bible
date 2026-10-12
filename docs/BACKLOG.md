@@ -1,7 +1,8 @@
 # To build later
 
-Changes and bugs noted for a later build. Nothing here is built yet. Each item keeps the
-original note in quotes, then what it most likely means and what still needs asking.
+Changes and bugs noted for a later build. Items marked **Done** are built; the rest aren't yet.
+Each item keeps the original note in quotes, then what it most likely means and what still
+needs asking.
 
 Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGESTIONS.md)
 (8 Oct 2026).
@@ -27,7 +28,15 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
    a swipe (`ui/versescroll/VerseScrollScreen.kt`, `SceneLayer.kt`).
    *To check:* on every card or only some, and all the time or only after a swipe?
 
-3. **Verse Scroll modes: Full, Focused, or one chapter or book.** "Verse scroll for
+3. **Done 12 Oct.** **Verse Scroll modes: Full, Focused, or one chapter or book.**
+   *Built:* the first tab at the top of Verse Scroll now names the mode (Full, Focused,
+   Romans 8, …); tap it to choose another. Full deals from all 29,227 verses, Focused from the
+   2,000 best known alone. A book or chapter goes through in reading order, picks up where it
+   was left (even after the app is closed), and ends on a card with "Start again" and "Other
+   verses"; the chapter open in the Reader is a one-tap choice. The Rabbit hole works in every
+   mode, and coming back from one carries on in order, with nothing skipped. The mode chosen
+   is kept for next time. *Decided:* Focused at 2,000; a book or chapter in reading order.
+   "Verse scroll for
    particular chapter or book (to stay on context instead of wandering)", and added 11 Oct:
    "scroll verse should have modes. like 29k will be full, 2.6k you earlier created will be
    focused."
@@ -40,8 +49,10 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
    *To ask:* Focused at 2,000, or about 2,600 as remembered? For a chapter or book, cards in
    reading order or shuffled, and may Discover's linked verses still lead outside it?
 
-4. **Verse Scroll of highlighted or studied verses**, "to revisit instead of discovering by
-   wandering." Another mode (see 3).
+4. **Done 12 Oct.** **Verse Scroll of highlighted or studied verses**, "to revisit instead of
+   discovering by wandering." Another mode (see 3).
+   *Built:* Highlighted and Studied modes, each your verses shuffled: every one once before
+   any comes round again. All colours together for now; one colour alone could come later.
    A feed made only of your highlighted verses, or only your studied ones.
    *To ask:* by colour too (only "Promise")? Newest first, Bible order, or shuffled?
 
@@ -180,7 +191,13 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
      usually taught.
    *To ask:* written only, or a speaker button too?
 
-9. **Verse Scroll from a word search or a topic.** "Can scroll verse take up the word search,
+9. **Done 12 Oct.** **Verse Scroll from a word search or a topic.**
+   *Built:* a "Scroll these" button beside Search's result count and under a Nave's topic's
+   title shows those verses in Verse Scroll, shuffled; back returns to the search or topic.
+   Greek and Hebrew word searches have it too ("Find every verse with this word": the top bar
+   says "agapē", not "G26"). A search's or topic's verses aren't kept as the mode: opening
+   Verse Scroll from the Reader goes back to the mode chosen before.
+   "Can scroll verse take up the word search,
    topic search?" Another mode (see 3): after searching for "love", or opening Nave's topic
    "Faith", scroll through just those verses.
    *To ask:* a button on the results ("Scroll these"), in result order or shuffled? Greek and

@@ -10,7 +10,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.PagerDefaults
@@ -58,10 +60,12 @@ import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.components.VerseActionToolbar
 import com.example.mybible.ui.theme.WorkSansFontFamily
 import com.example.mybible.versescroll.CheckInFeedCard
+import com.example.mybible.versescroll.EndFeedCard
 import com.example.mybible.versescroll.FeedMode
 import com.example.mybible.versescroll.VerseFeedCard
 import com.example.mybible.versescroll.VerseRef
 import com.example.mybible.versescroll.VerseScrollController
+import com.example.mybible.versescroll.VerseSource
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -172,6 +176,7 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
     var sheetCard by remember { mutableStateOf<VerseFeedCard?>(null) }
     var linksCard by remember { mutableStateOf<Pair<Int, VerseFeedCard>?>(null) }
     var settingsOpen by remember { mutableStateOf(false) }
+    var sourcesOpen by remember { mutableStateOf(false) }
     val feedAlpha = remember { Animatable(1f) }
     val sweeps = remember { mutableStateMapOf<Long, Int>() }
 
@@ -350,11 +355,18 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                             onKeepGoing = { scope.launch { pagerState.animateScrollToPage(page + 1) } },
                             rabbitHoleFrom = root?.let { (cards.getOrNull(it) as? VerseFeedCard)?.content?.label },
                             rabbitHoleDepth = root?.let { r -> cards.subList(r + 1, page).count { it is VerseFeedCard } } ?: 0,
+                            backToLabel = controller.source.label,
                             onBackToDiscover = {
-                                if (controller.leaveRabbitHole(toRoot = false, advance = true) != null) showToast("Back to Discover")
+                                if (controller.leaveRabbitHole(toRoot = false, advance = true) != null) showToast("Back to ${controller.source.label}")
                             }
                         )
                     }
+                    is EndFeedCard -> EndPage(
+                        colors = colors,
+                        label = card.label,
+                        onStartAgain = { controller.startAgain() },
+                        onOtherVerses = { sourcesOpen = true }
+                    )
                     null -> Box(Modifier.fillMaxSize())
                 }
             }
@@ -379,6 +391,7 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                 scenes = scenes && verseCard != null,
                 rabbitHole = inRabbitHole,
                 backTo = controller.rabbitHoleRoot(pagerState.settledPage)?.content?.label,
+                modeLabel = controller.source.label,
                 onBack = {
                     if (inRabbitHole) {
                         leave(toRoot = true) { root -> if (root != null) "Out of the Rabbit hole \u00b7 back at $root" else "Out of the Rabbit hole" }
@@ -387,7 +400,12 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                     }
                 },
                 onDiscover = {
-                    if (inRabbitHole) leave(toRoot = false) { "Discover \u00b7 widely-referenced verses from across the Bible" }
+                    if (inRabbitHole) {
+                        leave(toRoot = false) { "${controller.source.label} \u00b7 ${controller.source.blurb}" }
+                    } else {
+                        hidePicker()
+                        sourcesOpen = true
+                    }
                 },
                 onRabbitHole = {
                     if (!inRabbitHole) {
@@ -463,6 +481,30 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                         }
                     )
                 }
+            }
+        }
+
+        if (controller.sourceEmpty) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(horizontal = 40.dp)
+            ) {
+                Text(
+                    text = when (controller.source) {
+                        VerseSource.Highlighted -> "No highlighted verses yet. Highlight a verse and it will come up here."
+                        VerseSource.Studied -> "No verses marked studied yet."
+                        else -> "No verses here."
+                    },
+                    color = colors.soft,
+                    fontFamily = WorkSansFontFamily,
+                    fontSize = 15.sp,
+                    lineHeight = 1.5.em,
+                    textAlign = TextAlign.Center
+                )
+                PillButton("Other verses", primary = true, colors = colors, onClick = { sourcesOpen = true })
             }
         }
 
@@ -550,6 +592,28 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                 viewModel.openCrossReferences(asVerse(card), origin = NavTab.VERSE_SCROLL)
             },
             onDismiss = { linksCard = null }
+        )
+    }
+
+    if (sourcesOpen) {
+        val studied by viewModel.completedVerses.collectAsState()
+        val readerBook by viewModel.currentBook.collectAsState()
+        val readerChapter by viewModel.currentChapter.collectAsState()
+        VerseScrollSourceSheet(
+            colors = colors,
+            current = controller.source,
+            fullCount = controller.fullCount,
+            focusedCount = controller.focusedCount,
+            highlightedCount = highlights.size,
+            studiedCount = studied.size,
+            readerBook = readerBook,
+            readerChapter = readerChapter,
+            onChoose = { chosen ->
+                sourcesOpen = false
+                hidePicker()
+                controller.choose(chosen)
+            },
+            onDismiss = { sourcesOpen = false }
         )
     }
 

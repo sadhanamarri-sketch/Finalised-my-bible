@@ -16,6 +16,7 @@ import com.example.mybible.data.BibleRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -109,6 +110,63 @@ class VerseScrollController(
                 pool.restoreRecent(prefs.getString(KEY_RECENT, "").orEmpty().split('|').filter { it.isNotBlank() })
             }
         }
+        discover?.let { pool ->
+            fullCount = pool.size
+            focusedCount = pool.familiarSize
+        }
+    }
+
+    // ---- where the verses come from ----
+
+    /**
+     * Verse Scroll's mode: where its verses come from (see [VerseSource]). The one last chosen is kept
+     * for the next visit — never a search's or a topic's, which lasts until Verse Scroll is next opened
+     * from the Reader.
+     */
+    var source by mutableStateOf(VerseSource.decode(prefs.getString(KEY_SOURCE, null)) ?: VerseSource.Full)
+        private set
+    private var savedSource: VerseSource = source
+
+    /** How many verses Full and Focused deal from, once the pool has loaded (0 until then). */
+    var fullCount by mutableIntStateOf(0)
+        private set
+    var focusedCount by mutableIntStateOf(0)
+        private set
+
+    /** The chosen verses turned out to be none at all (no highlights yet, say). */
+    var sourceEmpty by mutableStateOf(false)
+        private set
+
+    // A book's or chapter's place, or a shuffled list's round; built as the first card is dealt.
+    private var deck: VerseDeck? = null
+    private var endShown = false
+    private var verseCounts: Map<String, List<Int>>? = null
+
+    /** Shows [next]'s verses from the start, unless they're the ones already showing. */
+    fun choose(next: VerseSource) {
+        VerseSource.encode(next)?.let { encoded ->
+            savedSource = next
+            prefs.edit().putString(KEY_SOURCE, encoded).apply()
+        }
+        if (next == source && cards.isNotEmpty() && !sourceEmpty) return
+        source = next
+        reset()
+        generateMore()
+    }
+
+    /** "Scroll these" on a search's results or a topic: those verses, shuffled. */
+    fun showFound(title: String, from: String, refs: List<VerseRef>) = choose(VerseSource.Found(title, from, refs))
+
+    /** Opened from the Reader: back to the chosen mode, if a search's or a topic's verses were showing. */
+    fun useSavedSource() {
+        if (source is VerseSource.Found) choose(savedSource)
+    }
+
+    /** "Start again" at the end of a book or chapter. */
+    fun startAgain() {
+        prefs.edit().remove(KEY_ORDER_SOURCE).remove(KEY_ORDER_VERSE).apply()
+        reset()
+        generateMore()
     }
 
     // ---- the feed ----
@@ -161,7 +219,9 @@ class VerseScrollController(
     /** The screen opened: keep the feed from earlier in this session, unless it was left a while ago. */
     fun onOpen() {
         val stale = leftAtMillis > 0 && System.currentTimeMillis() - leftAtMillis > FRESH_FEED_AFTER_MS
-        if (stale || waitingForBibleText) reset()
+        // A book or chapter keeps its place however long it's been (and resumes there even after the app
+        // was closed, see buildDeck); the others start fresh after a while away.
+        if ((stale && !source.inOrder) || waitingForBibleText || sourceEmpty) reset()
         leftAtMillis = 0
         versesToday = readTodayCount()
         if (cards.size - currentIndex < CARDS_AHEAD) generateMore()
@@ -187,6 +247,9 @@ class VerseScrollController(
         highlightedKeys.clear()
         highlightedThisVisit = 0
         waitingForBibleText = false
+        sourceEmpty = false
+        deck = null
+        endShown = false
     }
 
     /** A card settled on screen. */
@@ -196,6 +259,17 @@ class VerseScrollController(
         if (card is VerseFeedCard && viewedUids.add(card.uid)) {
             versesToday = bumpTodayCount()
             if (viewedUids.size % 10 == 0) saveRecent()
+        }
+        // A book or chapter read in order: where to pick up next time (its own verses, not a Rabbit hole's
+        // links), or, at its end, from the start.
+        if (source.inOrder) {
+            when {
+                card is VerseFeedCard && card.from == null -> prefs.edit()
+                    .putString(KEY_ORDER_SOURCE, VerseSource.encode(source))
+                    .putString(KEY_ORDER_VERSE, "${card.content.ref.chapter}:${card.content.ref.verse}")
+                    .apply()
+                card is EndFeedCard -> prefs.edit().remove(KEY_ORDER_SOURCE).remove(KEY_ORDER_VERSE).apply()
+            }
         }
         if (cards.size - index < CARDS_AHEAD) generateMore()
     }
@@ -234,17 +308,17 @@ class VerseScrollController(
                     LinkedFrom(step.from, labelOf(step.fromRefs), step.nth, step.of)
                 )
             }
-            // Nothing left anywhere on this thread: a fresh one from a Discover verse.
+            // Nothing left anywhere on this thread: a fresh one from the next of the mode's own verses.
             return startNewThread()
         }
-        return discoverCard()
+        return sourceCard()
     }
 
-    private suspend fun discoverCard(newThread: Boolean = false): VerseFeedCard? {
-        val pool = discover ?: return null
+    // The next of the mode's own verses (Discover's, outside a Rabbit hole).
+    private suspend fun sourceCard(newThread: Boolean = false): FeedCard? {
         // A verse that isn't in the database yet (the Bible text still downloading) is skipped.
         repeat(MAX_SKIPS) {
-            val ref = pool.next() ?: return null
+            val ref = nextRef() ?: return endOfSource()
             val content = loadContent(ref, 1) ?: return@repeat
             sinceCheckIn++
             waitingForBibleText = false
@@ -254,8 +328,57 @@ class VerseScrollController(
         return null
     }
 
+    private suspend fun nextRef(): VerseRef? = when (val s = source) {
+        VerseSource.Full -> discover?.next()
+        VerseSource.Focused -> discover?.next(familiarOnly = true)
+        else -> (deck ?: buildDeck(s).also { deck = it }).next()
+    }
+
+    // No more verses: a book or chapter read to its end gets one last card; a mode with no verses at all
+    // says so (or, for a book, waits for the Bible text).
+    private fun endOfSource(): FeedCard? {
+        val current = deck ?: return null
+        if (current.size == 0) {
+            if (source.inOrder) {
+                waitingForBibleText = cards.none { it is VerseFeedCard }
+                deck = null
+            } else {
+                sourceEmpty = true
+            }
+            return null
+        }
+        if (source.inOrder && !endShown) {
+            endShown = true
+            return EndFeedCard(nextUid++, source.label)
+        }
+        return null
+    }
+
+    private suspend fun buildDeck(s: VerseSource): VerseDeck = when (s) {
+        is VerseSource.Book, is VerseSource.Chapter -> {
+            val book = if (s is VerseSource.Book) s.book else (s as VerseSource.Chapter).book
+            val chapters = chaptersOf(book).filter { s !is VerseSource.Chapter || it.first == s.chapter }
+            // Back where it was left, when it's the same book or chapter.
+            val resume = prefs.getString(KEY_ORDER_VERSE, null)
+                ?.takeIf { prefs.getString(KEY_ORDER_SOURCE, null) == VerseSource.encode(s) }
+                ?.split(':')?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }
+            ReadingOrderDeck(book, chapters, resume?.let { it[0] to it[1] })
+        }
+        VerseSource.Highlighted -> ShuffledDeck(repository.allHighlights.first().map { VerseRef(it.book, it.chapter, it.verse) })
+        VerseSource.Studied -> ShuffledDeck(repository.allCompletedVerses.first().map { VerseRef(it.book, it.chapter, it.verse) })
+        is VerseSource.Found -> ShuffledDeck(s.refs)
+        VerseSource.Full, VerseSource.Focused -> ShuffledDeck(emptyList())
+    }
+
+    // Each chapter of [book] with its verse count; empty until the Bible text has been imported.
+    private suspend fun chaptersOf(book: String): List<Pair<Int, Int>> {
+        val counts = verseCounts ?: repository.getChapterVerseCounts().takeIf { it.isNotEmpty() }?.also { verseCounts = it }
+        return counts?.get(book).orEmpty().mapIndexed { i, n -> (i + 1) to n }.filter { it.second > 0 }
+    }
+
     private suspend fun startNewThread(): FeedCard? {
-        val card = discoverCard(newThread = true) ?: return null
+        val next = sourceCard(newThread = true)
+        val card = next as? VerseFeedCard ?: return next
         val index = cards.size
         val started = rabbitHole.start(index, card.content.refs, seenKeys())
         thread = started
@@ -269,6 +392,15 @@ class VerseScrollController(
     private fun truncateAfter(index: Int) {
         while (cards.size > index + 1) cards.removeAt(cards.lastIndex)
         sinceCheckIn = cards.asReversed().takeWhile { it is VerseFeedCard }.size
+        // A book or chapter read in order carries on from the last of its own verses still here, not
+        // after the ones just dropped.
+        (deck as? ReadingOrderDeck)?.let { inOrder ->
+            val last = cards.asReversed().firstNotNullOfOrNull { card ->
+                (card as? VerseFeedCard)?.takeIf { it.from == null }?.content?.ref
+            }
+            inOrder.continueAfter(last?.chapter, last?.verse)
+            endShown = cards.any { it is EndFeedCard }
+        }
     }
 
     // ---- the Rabbit hole ----
@@ -506,6 +638,9 @@ class VerseScrollController(
         private const val KEY_COUNT_DATE = "count_date"
         private const val KEY_COUNT = "count"
         private const val KEY_RECENT = "recent"
+        private const val KEY_SOURCE = "source"
+        private const val KEY_ORDER_SOURCE = "order_source"
+        private const val KEY_ORDER_VERSE = "order_verse"
 
         /** Sunshine, the lightest of the twelve highlight colors. */
         const val DEFAULT_COLOR = "#F1F1B1"

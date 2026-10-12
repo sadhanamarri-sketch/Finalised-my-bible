@@ -670,6 +670,8 @@ internal fun CheckInPage(
     onKeepGoing: () -> Unit,
     rabbitHoleFrom: String? = null,
     rabbitHoleDepth: Int = 0,
+    // The mode the Rabbit hole was left from ("Full", "Romans 8"): the way back to it.
+    backToLabel: String = "Discover",
     onBackToDiscover: () -> Unit = {}
 ) {
     Box(
@@ -716,9 +718,58 @@ internal fun CheckInPage(
                     PillButton("Read ${lastVerse.book} ${lastVerse.chapter}", primary = true, colors = colors, onClick = onRead)
                 }
                 if (rabbitHoleFrom != null) {
-                    PillButton("Back to Discover", primary = false, colors = colors, onClick = onBackToDiscover)
+                    PillButton("Back to $backToLabel", primary = false, colors = colors, onClick = onBackToDiscover)
                 }
                 PillButton(if (rabbitHoleFrom != null) "Keep going" else "Keep scrolling", primary = false, colors = colors, onClick = onKeepGoing)
+            }
+        }
+    }
+}
+
+/**
+ * The end of a book or chapter read in order ("That's the end of Romans 8."): start it again, or pick
+ * other verses. On the plain background, like a check-in.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun EndPage(
+    colors: VsColors,
+    label: String,
+    onStartAgain: () -> Unit,
+    onOtherVerses: () -> Unit
+) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(colors.bg)
+            .padding(cardPadding()),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Eyebrow("The end", colors)
+            Text(
+                text = "That's the end of $label.",
+                color = colors.ink,
+                fontFamily = FrauncesFontFamily,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 31.sp,
+                lineHeight = 1.15.em
+            )
+            Text(
+                text = "Go through it again from the start, or choose other verses to scroll.",
+                color = colors.soft,
+                fontFamily = WorkSansFontFamily,
+                fontSize = 15.5.sp,
+                lineHeight = 1.5.em,
+                modifier = Modifier.widthIn(max = 300.dp)
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.padding(top = 8.dp)
+            ) {
+                PillButton("Start again", primary = true, colors = colors, onClick = onStartAgain)
+                PillButton("Other verses", primary = false, colors = colors, onClick = onOtherVerses)
             }
         }
     }

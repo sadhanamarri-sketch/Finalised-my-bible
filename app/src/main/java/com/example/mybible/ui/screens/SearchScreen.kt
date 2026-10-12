@@ -6,6 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SwipeUp
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Translate
@@ -67,6 +69,7 @@ import com.example.mybible.ui.components.BackTopBar
 import com.example.mybible.ui.components.DsSwitch
 import com.example.mybible.ui.components.NeSectionLabel
 import com.example.mybible.ui.theme.WorkSansFontFamily
+import com.example.mybible.versescroll.VerseRef
 import com.example.mybible.versesByBook
 import com.example.mybible.within
 import kotlinx.coroutines.launch
@@ -378,17 +381,30 @@ private fun SearchPage(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        Text(
-            text = when {
-                isSearching -> " "
-                searchQuery.trim().length < 2 -> " "
-                else -> countLine(outcome)
-            },
-            fontSize = 13.sp,
-            fontFamily = WorkSansFontFamily,
-            letterSpacing = 0.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = when {
+                    isSearching -> " "
+                    searchQuery.trim().length < 2 -> " "
+                    else -> countLine(outcome)
+                },
+                fontSize = 13.sp,
+                fontFamily = WorkSansFontFamily,
+                letterSpacing = 0.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            // The results as a Verse Scroll, one verse at a time, shuffled.
+            if (!isSearching && searchQuery.trim().length >= 2 && outcome.hits.isNotEmpty()) {
+                ScrollTheseButton {
+                    viewModel.scrollVerses(
+                        title = scrollTitle(searchQuery.trim(), outcome),
+                        from = "Search",
+                        refs = outcome.hits.map { VerseRef(it.verse.book, it.verse.chapter, it.verse.number) }
+                    )
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.height(4.dp))
 
@@ -522,6 +538,42 @@ private fun SearchPage(
 
 // Same "book:chapter:verse" as MainViewModel's searchLastTappedKey.
 private fun SearchHit.key() = "${verse.book}:${verse.chapter}:${verse.number}"
+
+// What Verse Scroll's top bar calls a search's verses: the words searched for, or, for a Greek or
+// Hebrew word searched by its number ("Find every verse with this word"), the word: "agápē", not "G26".
+private fun scrollTitle(query: String, outcome: SearchOutcome): String {
+    val word = outcome.originalWords.singleOrNull()?.takeIf { it.number.equals(query, ignoreCase = true) }
+    return "\u201c${word?.transliteration ?: query}\u201d"
+}
+
+/** "Scroll these": a list's verses in Verse Scroll (Search's results, a topic's references). */
+@Composable
+internal fun ScrollTheseButton(onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(50))
+            .clickable(onClick = onClick)
+            .padding(start = 10.dp, end = 12.dp, top = 6.dp, bottom = 6.dp)
+    ) {
+        Icon(
+            Icons.Default.SwipeUp,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(16.dp)
+        )
+        Text(
+            text = "Scroll these",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            fontFamily = WorkSansFontFamily,
+            letterSpacing = 0.sp,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 6.dp)
+        )
+    }
+}
 
 // Shaped like Highlighted Verses' filter sheet: where to look, each choice with how many of the
 // results it has; changes apply as they're tapped, and the button closes the sheet.

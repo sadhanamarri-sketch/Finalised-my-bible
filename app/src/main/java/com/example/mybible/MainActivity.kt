@@ -118,7 +118,8 @@ class MainActivity : ComponentActivity() {
     private fun openFromWidget(tab: NavTab) {
         // Or a note left open over the tabs would cover it.
         viewModel.closePagesOverTabs()
-        viewModel.selectTab(tab)
+        // Verse Scroll in its chosen mode, not a search's verses left from earlier.
+        if (tab == NavTab.VERSE_SCROLL) viewModel.openVerseScroll() else viewModel.selectTab(tab)
         instantNavigationTo = tab
     }
 
@@ -326,6 +327,11 @@ class MainActivity : ComponentActivity() {
                     // button), ending the cross-reference session.
                     NavTab.CROSS_REFERENCES -> {
                         viewModel.closeCrossReferences()
+                        return@BackHandler
+                    }
+                    // Back to whatever opened it: the Reader, or Search's results for "Scroll these".
+                    NavTab.VERSE_SCROLL -> {
+                        viewModel.closeVerseScroll()
                         return@BackHandler
                     }
                     else -> {}

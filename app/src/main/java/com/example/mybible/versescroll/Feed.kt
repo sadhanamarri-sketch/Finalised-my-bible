@@ -50,6 +50,9 @@ data class LinkedFrom(val ref: VerseRef, val label: String, val nth: Int, val of
  */
 data class CheckInFeedCard(override val uid: Long, val threadId: Int? = null, val rootIndex: Int? = null) : FeedCard
 
+/** The end of a book or chapter read in order ([label] says which): start again, or pick other verses. */
+data class EndFeedCard(override val uid: Long, val label: String) : FeedCard
+
 enum class FeedMode { DISCOVER, RABBIT_HOLE }
 
 /** Asks the screen to move to a card (after following a link, or on leaving a Rabbit hole). */
@@ -64,7 +67,7 @@ const val CHECK_IN_EVERY = 20
 /** Verses longer than this get the easier-reading treatment: a soft panel behind them, no moving touches. */
 const val LONG_VERSE_WORDS = 40
 
-/** One of Discover's verses. [familiar] marks the best known, dealt two cards in three. */
+/** One of Discover's verses. [familiar] marks the best known: two cards in three in Full, all of Focused. */
 data class DiscoverEntry(val ref: VerseRef, val weight: Double, val familiar: Boolean = true)
 
 /**
@@ -102,6 +105,10 @@ class DiscoverPool(
 
     val isEmpty: Boolean get() = familiar.isEmpty && others.isEmpty
 
+    /** How many verses: in all (Full), and of the best known alone (Focused). */
+    val size: Int = entries.size
+    val familiarSize: Int = entries.count { it.familiar }
+
     fun restoreRecent(keys: List<String>) {
         recent.clear()
         keys.takeLast(recentLimit).forEach { recent.addLast(it) }
@@ -111,8 +118,10 @@ class DiscoverPool(
 
     fun recentKeys(): List<String> = recent.toList()
 
-    fun next(): VerseRef? {
+    /** The next verse: from either tier, or with [familiarOnly] (Focused) from the best known alone. */
+    fun next(familiarOnly: Boolean = false): VerseRef? {
         val tier = when {
+            familiarOnly && !familiar.isEmpty -> familiar
             others.isEmpty -> familiar
             familiar.isEmpty -> others
             random.nextDouble() < familiarShare -> familiar
