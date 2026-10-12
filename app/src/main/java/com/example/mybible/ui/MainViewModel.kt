@@ -1473,9 +1473,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // kind of scroll jump (the verse that was pinned at the top drifts
     // toward the middle) and compounds on every subsequent toggle, since
     // each one re-anchors off the now-wrong top verse.
-    fun toggleTeluguInline(anchorVerse: Int? = null) {
+    //
+    // With [keepFocus], anchorVerse is instead the verse in focus (one
+    // jumped to, or Blur Mode's centre verse): it lands centred again and
+    // stays the focused verse, its spotlight ([blur]) kept if it still had
+    // one — before, the toggle made the *top* verse the focused one, so the
+    // verse being looked at lost its focus and moved.
+    fun toggleTeluguInline(anchorVerse: Int? = null, keepFocus: Boolean = false, blur: Boolean = false) {
         _showTeluguInline.value = !_showTeluguInline.value
-        if (anchorVerse != null) setJumpTarget(anchorVerse, blur = false, pinToTop = true)
+        if (anchorVerse != null) setJumpTarget(anchorVerse, blur = blur, pinToTop = !keepFocus)
         loadCurrentChapter()
     }
 
@@ -1486,9 +1492,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // new data to re-fetch, just a height change per verse to restore
     // position across (setting focusedVerseNumber still re-triggers
     // ReaderScreen's scroll-restore effect on its own).
-    fun toggleInterlinear(anchorVerse: Int? = null) {
+    fun toggleInterlinear(anchorVerse: Int? = null, keepFocus: Boolean = false, blur: Boolean = false) {
         _showInterlinear.value = !_showInterlinear.value
-        if (anchorVerse != null) setJumpTarget(anchorVerse, blur = false, pinToTop = true)
+        if (anchorVerse != null) setJumpTarget(anchorVerse, blur = blur, pinToTop = !keepFocus)
     }
 
     fun toggleBlurMode() {

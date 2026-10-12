@@ -56,8 +56,16 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
    A feed made only of your highlighted verses, or only your studied ones.
    *To ask:* by colour too (only "Promise")? Newest first, Bible order, or shuffled?
 
-5. **Keep the focused verse when Telugu or Greek is turned on.** "Focused verse ... stay even
-   if Telugu/Greek enabled."
+5. **Done 12 Oct.** **Keep the focused verse when Telugu or Greek is turned on.** "Focused
+   verse ... stay even if Telugu/Greek enabled."
+   *Found:* turning Telugu or Greek/Hebrew on or off re-anchored the Reader on the verse at the
+   top of the screen and made *that* the focused verse — so after jumping to John 3:16, the
+   focus moved to 3:14, the dimming of the other verses went, and 3:16 slid to the bottom of the
+   screen; in Blur Mode the focus jumped from the centre verse to the top one.
+   *Fixed:* the verse in focus (one jumped to, or Blur Mode's centre verse) stays the focused
+   verse, centred, with the others still dimmed, through Telugu and Greek/Hebrew going on and
+   off; with no verse in focus, the verse at the top stays at the top, as before
+   (`ReaderScreen.kt`, `MainViewModel.toggleTeluguInline`/`toggleInterlinear`).
    The verse in focus should stay in focus and on screen when Telugu or Greek/Hebrew is
    switched on.
    *To ask:* what happens now — does the page move away from the verse, does the focus

@@ -500,6 +500,21 @@ fun ReaderScreen(
         }
     }
 
+    // Turning Telugu or Greek/Hebrew on or off changes every verse's height, so the Reader is put back on
+    // one verse: the verse in focus — one jumped to, or Blur Mode's centre verse — stays centred and in
+    // focus (its spotlight too, if it still had one); without one, the verse at the top stays at the top.
+    fun keepPlaceAcrossToggle(toggle: (anchorVerse: Int?, keepFocus: Boolean, blur: Boolean) -> Unit) {
+        val focused = focusedVerseNumber
+            ?: if (isBlurModeEnabled) verses.getOrNull(centerItemIndex - 1)?.number else null
+        if (focused != null) {
+            toggle(focused, true, xrefFocusActive && focused == focusedVerseNumber)
+        } else {
+            // Item 0 in the LazyColumn is the "$currentBook $currentChapter" header (see
+            // itemsIndexed(verses) below), so verse array index = list index - 1.
+            toggle(verses.getOrNull(listState.firstVisibleItemIndex - 1)?.number, false, false)
+        }
+    }
+
     var showReaderMenu by remember { mutableStateOf(false) }
 
     // --- Auto-hide the bottom pill on scroll, matching Capacitor's
@@ -1455,15 +1470,14 @@ fun ReaderScreen(
                     viewModel.openNoteReader(note, originTab = NavTab.READER)
                 },
                 onToggleInterlinear = {
-                    // Anchor on whatever verse is at the top of the
-                    // viewport, same as the pill toggle below — not on
+                    // Anchor on the verse in focus, else the one at the top
+                    // of the viewport, same as the pill toggle below — not on
                     // `verse` itself, which is just whichever verse this
                     // selection toolbar happens to be attached to (often
                     // off-screen or near the bottom, since the toolbar is
                     // bottom-aligned) and would jump the view to it instead
                     // of preserving where the user was reading.
-                    val anchorVerse = verses.getOrNull(listState.firstVisibleItemIndex - 1)?.number
-                    viewModel.toggleInterlinear(anchorVerse)
+                    keepPlaceAcrossToggle { anchor, keepFocus, blur -> viewModel.toggleInterlinear(anchor, keepFocus, blur) }
                 },
                 onDismiss = {
                     viewModel.setSelectedVerse(null)
@@ -1570,13 +1584,9 @@ fun ReaderScreen(
                         active = showTeluguInline,
                         contentDescription = "Telugu inline translation",
                         onClick = {
-                            // Item 0 in the LazyColumn is the "$currentBook
-                            // $currentChapter" header (see itemsIndexed(verses)
-                            // below), so verse array index = list index - 1.
                             // See toggleTeluguInline's doc for why this is
                             // needed at all.
-                            val anchorVerse = verses.getOrNull(listState.firstVisibleItemIndex - 1)?.number
-                            viewModel.toggleTeluguInline(anchorVerse)
+                            keepPlaceAcrossToggle { anchor, keepFocus, blur -> viewModel.toggleTeluguInline(anchor, keepFocus, blur) }
                         },
                         modifier = Modifier.testTag("pill_telugu_toggle"),
                         offsetY = 1.dp
@@ -1595,8 +1605,7 @@ fun ReaderScreen(
                         onClick = {
                             // See toggleTeluguInline's/toggleInterlinear's
                             // doc for why this anchor is needed.
-                            val anchorVerse = verses.getOrNull(listState.firstVisibleItemIndex - 1)?.number
-                            viewModel.toggleInterlinear(anchorVerse)
+                            keepPlaceAcrossToggle { anchor, keepFocus, blur -> viewModel.toggleInterlinear(anchor, keepFocus, blur) }
                         },
                         modifier = Modifier.testTag("pill_greek_toggle"),
                         offsetY = (-1).dp
