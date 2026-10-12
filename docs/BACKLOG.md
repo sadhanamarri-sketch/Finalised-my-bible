@@ -182,3 +182,15 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
    "Faith", scroll through just those verses.
    *To ask:* a button on the results ("Scroll these"), in result order or shuffled? Greek and
    Hebrew word searches too?
+
+## Noted 12 Oct 2026
+
+10. **Bug — going from Verse Scroll to the Reader still isn't smooth.** "The transition from
+    verse scroll to reader is still not smooth." On 7 Oct the switch became a 0.3-second
+    dissolve, the Reader fading in over Verse Scroll (`VERSE_SCROLL_DISSOLVE_MS` in
+    `MainActivity.kt`), and the old chapter's flash was removed; something still looks
+    rough.
+    *To check:* what it looks like — the Reader jumping to the verse after it appears, a
+    blank or paper-coloured flash, a stutter during the fade, or the Return banner popping
+    in late? Every time, or only the first time? Then record the switch frame by frame
+    (as was done for the old-chapter flash) to find the rough frames before changing it.
