@@ -362,13 +362,19 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
 15. **Done 12 Oct.** **Earbuds' gestures for reading aloud.** "Can the scroll verse continue reading
     sync earbuds gestures?"
     *Built:* reading aloud answers a headset's or earbuds' media controls, as a music app does.
-    A tap pauses or plays (this already worked). "Next" (a double tap on most earbuds; a wired
+    A tap pauses or plays. "Next" (a double tap on most earbuds; a wired
     headset's button pressed twice) goes on to the next card in Verse Scroll, with the screen
     moving to it, or the next verse in the Reader. "Previous" (usually a triple tap) starts the
     card or verse again, or, in its first three seconds, goes back to the one before. Continue
     reading carries on from wherever a skip lands; paused, a skip waits there. The notification
     and the lock screen have Previous and Next buttons too, and Stop shows on newer Android's
     lock-screen controls. Which tap does what is set by the earbuds themselves (or their app).
+    **Found 12 Oct, testing the build: no gesture reached the app, not even a tap.** Android hands
+    a headset's buttons to the app whose sound played last, and the reading's sound is the speech
+    engine's — another app's — so they went elsewhere. *Fixed:* while it reads, the app now plays
+    silence in its own name (`Silence.kt`), so the buttons come to it; it stops when paused, and
+    the buttons still come here to play again. It also keeps a Bluetooth headset's sound open
+    between verses, so a verse's first word isn't clipped.
 
 16. **Next, after testing the build from 12 Oct.** **The Reader's own controls for reading aloud.**
     "I will test and then we can bring it to reader as well with addition control and touch and

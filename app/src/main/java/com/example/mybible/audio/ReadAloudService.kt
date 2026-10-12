@@ -50,6 +50,9 @@ class ReadAloudService : Service() {
             .apply { setReferenceCounted(false) }
     }
 
+    // Played while reading so the headset's buttons come to this app (see Silence).
+    private val silence = Silence()
+
     // Paused because another sound took over for a moment (a call, a navigation prompt): plays on after it.
     private var pausedForFocus = false
     private var listeningForNoisy = false
@@ -118,6 +121,7 @@ class ReadAloudService : Service() {
 
     override fun onDestroy() {
         scope.cancel()
+        silence.stop()
         stayAwake(false)
         abandonFocus()
         listenForNoisy(false)
@@ -137,11 +141,14 @@ class ReadAloudService : Service() {
         when (state.status) {
             ReadAloudState.Status.PLAYING -> {
                 requestFocus()
+                silence.play()
                 listenForNoisy(true)
                 stayAwake(true)
                 goForeground(state)
             }
             ReadAloudState.Status.PAUSED -> {
+                // The headset's buttons still come here (this app's sound played last), to play again.
+                silence.stop()
                 listenForNoisy(false)
                 stayAwake(false)
                 if (pausedForFocus) {
@@ -154,6 +161,7 @@ class ReadAloudService : Service() {
                 }
             }
             ReadAloudState.Status.IDLE -> {
+                silence.stop()
                 abandonFocus()
                 listenForNoisy(false)
                 stayAwake(false)
