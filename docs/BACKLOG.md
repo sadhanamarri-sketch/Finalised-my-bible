@@ -117,6 +117,9 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
        for their permission — so this needs BSI's say too, and if asking BSI, their own
        human recording is the better thing to ask for.
    - **Decided 12 Oct — the plan to build:**
+     - *Build in two steps.* First, the phone's own voice for both KJV and Telugu, the same
+       way. Then, once the Bible Brain key arrives (requested 12 Oct), add Bible Brain's
+       narration for KJV, with the phone's voice staying as KJV's fallback.
      - *Telugu:* the phone's own voice (text-to-speech) for the whole Bible — exactly the
        app's BSI text, read a verse at a time with each verse highlighted as it's read,
        offline, free, and no recordings handed out (the phone reads the text, as a screen
