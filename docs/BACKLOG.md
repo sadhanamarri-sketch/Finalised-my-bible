@@ -123,7 +123,10 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
        reader would). The voice and speed are the reader's to pick.
      - *KJV:* Bible Brain's human narration for the whole Bible, with the phone's voice when
        offline or when Bible Brain can't be reached. Needs an API key from Faith Comes By
-       Hearing and `4.dbt.io` allowed in the build environment to test against.
+       Hearing (requested 12 Oct) and `4.dbt.io` allowed in the build environment to test
+       against. The key goes in the environment's settings as `BIBLE_BRAIN_API_KEY` (never
+       in the chat), and for the APK as a GitHub Actions secret of the same name — the
+       repository is public, so the key must never be committed.
      - Not doing: Bible Brain's dramatised Telugu Old Version New Testament (`TCWOVV`), a
        pre-recorded AI voice, or asking BSI for their recording.
      - *Playing (decided 12 Oct):* stops at the end of the chapter. Keeps playing with the
