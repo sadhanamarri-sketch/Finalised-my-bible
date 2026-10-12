@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 /** Which of the Bible's two texts are read aloud: English, Telugu, or each verse in English then Telugu. */
 enum class ReadLanguage(val label: String) {
@@ -92,6 +93,12 @@ interface Speaker {
 
     fun speak(id: String, text: String, telugu: Boolean, rate: Float, voice: String?)
 
+    /** Whether it has a voice for [locale] (Greek, Hebrew): null while its speech engine is starting. */
+    fun hasVoiceFor(locale: Locale): Boolean?
+
+    /** Says [text] in [locale]'s voice: a Greek or Hebrew word, on its page. */
+    fun speakIn(id: String, text: String, locale: Locale, rate: Float)
+
     fun stop()
 
     fun voices(telugu: Boolean): List<VoiceOption>
@@ -167,6 +174,23 @@ class ReadAloud(
 
     /** Whether the phone has a Telugu voice (null: not known yet). */
     fun hasTeluguVoice(): Boolean? = if (teluguFailed) false else speaker.hasTelugu()
+
+    /** Whether the phone has a voice for [locale]: null while its speech engine is starting. */
+    fun hasVoiceFor(locale: Locale): Boolean? = speaker.hasVoiceFor(locale)
+
+    /**
+     * Says a Greek or Hebrew word ([text]) in the phone's voice for [locale], a little slower, pausing
+     * anything being read. False when the phone has no voice for it (null: not known yet, and it's
+     * said if it can be).
+     */
+    fun sayWord(text: String, locale: Locale): Boolean? {
+        val voice = speaker.hasVoiceFor(locale)
+        if (voice == false) return false
+        if (_state.value.status == ReadAloudState.Status.PLAYING) pause()
+        utterances++
+        speaker.speakIn("word-$utterances", text, locale, WORD_RATE)
+        return voice
+    }
 
     /** A few words in the voice and speed chosen, to hear them: only while nothing is being read. */
     fun trySpeaking(text: String, telugu: Boolean) {
@@ -356,5 +380,8 @@ class ReadAloud(
     private companion object {
         // Verses in a row with nothing to read before giving up (a list of verses with no Telugu at all).
         const val MAX_SKIPPED = 50
+
+        // A word said on its own goes a little slower, to be heard clearly.
+        const val WORD_RATE = 0.8f
     }
 }

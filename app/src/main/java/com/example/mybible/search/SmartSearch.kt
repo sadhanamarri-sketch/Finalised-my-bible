@@ -1,5 +1,6 @@
 package com.example.mybible.search
 
+import com.example.mybible.model.OriginalWordCard
 import com.example.mybible.model.SearchHit
 import com.example.mybible.model.SearchOutcome
 import com.example.mybible.model.SearchSource
@@ -34,6 +35,9 @@ class SmartSearch(private val index: BibleIndex, private val lexicon: SearchLexi
 
     /** How a Greek or Hebrew word is used, for its page (see OriginalSearch.study). */
     fun study(strongs: String, verseRef: Int?): WordStudy? = originals.study(strongs, verseRef)
+
+    /** The Greek or Hebrew words a search names, for linking one to a word (see OriginalSearch.wordsNamed). */
+    fun wordsNamed(query: String, hebrew: Boolean): List<OriginalWordCard> = originals.wordsNamed(query, hebrew)
 
     fun search(query: String, caseSensitive: Boolean = false, disabled: Set<String> = emptySet()): SearchOutcome {
         originals.search(query, disabled)?.let { return it }

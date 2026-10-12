@@ -1,6 +1,9 @@
 package com.example.mybible.search
 
+import com.example.mybible.data.byNumber
 import com.example.mybible.model.RelatedKind
+import com.example.mybible.model.WordLink
+import com.example.mybible.model.WordLinkKind
 import com.example.mybible.model.SearchHit
 import com.example.mybible.model.SearchOutcome
 import org.junit.Assert.assertEquals
@@ -149,6 +152,88 @@ class OriginalSearchTest {
         assertEquals(listOf("אָהֵב (ahav)"), preview.otherWords)
         assertEquals("H7225", search.preview("H7225G")!!.query)
         assertNull(search.preview("G99999"))
+    }
+
+    // ---- links of your own between a Greek word and a Hebrew one ----
+
+    // [block] run while [links] (a Greek word's number to a Hebrew one's) are yours.
+    private fun <T> withLinks(vararg links: Pair<String, String>, block: () -> T): T {
+        val byNumber = links.map { (greek, hebrew) -> WordLink(greek, hebrew) }.byNumber()
+        TestBible.lexicon.ownLinks = { byNumber[it].orEmpty() }
+        try {
+            return block()
+        } finally {
+            TestBible.lexicon.ownLinks = { emptyList() }
+        }
+    }
+
+    @Test
+    fun wordsYouLinkAreShownAndFoundWithIt() = withLinks("G0026" to "H7355", "G0025" to "H7355") {
+        // agapē: the Septuagint's ahavah, then racham ("I will love thee", Psalms 18:1), yours.
+        val preview = search.preview("G0026")!!
+        assertEquals(listOf("H0160" to WordLinkKind.SEPTUAGINT, "H7355" to WordLinkKind.YOURS), preview.linked.map { it.number to it.kind })
+        val racham = preview.linked[1]
+        assertEquals(listOf("רָחַם", "racham", "to have compassion"), listOf(racham.word, racham.transliteration, racham.meaning))
+        assertEquals(1, racham.verseCount)
+        assertEquals("H7355", racham.senseKey)
+        // Finding every verse with agapē finds racham's too (ahavah has none here).
+        assertEquals(listOf("רָחַם (racham)"), preview.otherWords)
+        assertEquals(1, preview.otherVerseCount)
+        val agape = search.search("G26")
+        assertEquals(listOf("1 Corinthians 13:4", "1 John 4:8"), agape.exact())
+        assertEquals(listOf("Psalms 18:1"), agape.related())
+        assertEquals("Where the Hebrew has רָחַם (racham), which you linked to ἀγάπη.", agape.relatedNote)
+
+        // With the Septuagint's ahav, each is said.
+        val loved = search.search("G25")
+        assertEquals(listOf("Leviticus 19:18", "Judges 16:15", "Psalms 18:1"), loved.related())
+        assertEquals(
+            "Where the Hebrew has אָהֵב (ahav), which the Septuagint, the Greek Old Testament, translates with ἀγαπάω. " +
+                "And where it has רָחַם (racham), which you linked to it.",
+            loved.relatedNote
+        )
+
+        // And from racham's side, both are linked to it.
+        assertEquals(listOf("G0026", "G0025"), search.preview("H7355")!!.linked.map { it.number })
+        val fromRacham = search.search("H7355")
+        assertEquals(listOf("Psalms 18:1"), fromRacham.exact())
+        assertEquals(listOf("John 3:16", "1 Corinthians 13:4", "1 John 4:8"), fromRacham.related())
+        assertEquals("Where the Greek has ἀγάπη (agapē) or ἀγαπάω (agapaō), which you linked to רָחַם.", fromRacham.relatedNote)
+    }
+
+    @Test
+    fun aLinkTheSeptuagintHasIsntTwice() = withLinks("G0026" to "H0160") {
+        assertEquals(listOf("H0160" to WordLinkKind.SEPTUAGINT), search.preview("G0026")!!.linked.map { it.number to it.kind })
+    }
+
+    @Test
+    fun aLinkedWordsPageOpensOnItsMainSense() = withLinks("G0026" to "H2617") {
+        // Its sense in the most verses, as the lexicon numbers it: chesed's "kindness", not "shame".
+        val chesed = search.preview("G0026")!!.linked.single { it.number == "H2617" }
+        assertEquals("H2617A" to "kindness", chesed.senseKey to chesed.meaning)
+    }
+
+    @Test
+    fun wordsToLinkByAnyNameInTheOtherLanguage() {
+        fun numbers(query: String, hebrew: Boolean = true) = search.wordsNamed(query, hebrew).map { it.number }
+        // chesed by its sound, as people also write it, its letters and its number.
+        assertEquals("H2617", numbers("chesed").first())
+        assertEquals("H2617", numbers("hesed").first())
+        assertEquals("H2617", numbers("חֶסֶד").first())
+        assertEquals(listOf("H2617"), numbers("2617"))
+        assertEquals(listOf("H2617"), numbers("H2617"))
+        // By what it means, or the start of it.
+        assertTrue("H2617" in numbers("kindness"))
+        assertTrue("H2617" in numbers("ches"))
+        assertTrue("H2617" in numbers("kind"))
+        // Greek words for a Hebrew word's page, and only those.
+        assertTrue(numbers("H2617", hebrew = false).isEmpty())
+        assertEquals("G1656", numbers("eleos", hebrew = false).first())
+        assertTrue("G1656" in numbers("mercy", hebrew = false))
+        val love = numbers("love", hebrew = false)
+        assertTrue(love.containsAll(listOf("G25", "G26")))
+        assertTrue(love.all { it.startsWith("G") })
+        assertTrue(numbers(" ").isEmpty())
     }
 
     @Test

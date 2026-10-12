@@ -111,6 +111,25 @@ class TtsSpeaker(context: Context) : Speaker {
         }
     }
 
+    override fun hasVoiceFor(locale: Locale): Boolean? {
+        if (ready != true) {
+            start()
+            return ready
+        }
+        return tts.isLanguageAvailable(locale) >= TextToSpeech.LANG_AVAILABLE
+    }
+
+    override fun speakIn(id: String, text: String, locale: Locale, rate: Float) {
+        whenReady(id) {
+            if (tts.setLanguage(locale) < 0) {
+                listener?.onError(id)
+                return@whenReady
+            }
+            tts.setSpeechRate(rate)
+            if (tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, id) != TextToSpeech.SUCCESS) listener?.onError(id)
+        }
+    }
+
     override fun stop() {
         waiting.clear()
         if (ready == true) engine?.stop()

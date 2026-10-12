@@ -1,5 +1,6 @@
 package com.example.mybible.search
 
+import com.example.mybible.model.LinkedWord
 import com.example.mybible.model.OriginalWordCard
 import com.example.mybible.model.RelatedKind
 import com.example.mybible.model.SearchHit
@@ -7,6 +8,7 @@ import com.example.mybible.model.SearchOutcome
 import com.example.mybible.model.SearchSource
 import com.example.mybible.model.Verse
 import com.example.mybible.model.WordSearchPreview
+import com.example.mybible.model.WordLinkKind
 import com.example.mybible.model.WordStudy
 import com.example.mybible.model.WordUse
 import java.text.Normalizer
@@ -66,18 +68,92 @@ class OriginalSearch(private val index: BibleIndex, private val lexicon: SearchL
         val senses = lexicon.originalsNumbered(number)
         val verses = BitSet(index.size).apply { senses.forEach { or(versesOf(it)) } }
         if (verses.isEmpty) return null
-        val others = lexicon.counterpartsOf(number).map { lexicon.originalsNumbered(it.number) }
-            .filter { it.isNotEmpty() }
-            .map { group -> group to BitSet(index.size).apply { group.forEach { or(versesOf(it)) } } }
-            .filter { !it.second.isEmpty }
-        val otherVerses = BitSet(index.size).apply { others.forEach { or(it.second) } }
+        // The words it's linked to (the Septuagint's, then yours), each with its senses and verses.
+        val linked = lexicon.counterpartsOf(number).mapNotNull { counterpart ->
+            val group = lexicon.originalsNumbered(counterpart.number)
+            if (group.isEmpty()) null else Triple(counterpart, group, BitSet(index.size).apply { group.forEach { or(versesOf(it)) } })
+        }
+        val others = linked.filter { !it.third.isEmpty }
+        val otherVerses = BitSet(index.size).apply { others.forEach { or(it.third) } }
         return WordSearchPreview(
             query = displayNumber(number),
             verseCount = verses.cardinality(),
             otherVerseCount = otherVerses.cardinality(),
             otherTestament = if (number.startsWith("G")) "Old Testament" else "New Testament",
-            otherWords = others.map { (group, _) -> "${group[0].lemma.substringBefore(',')} (${group[0].transliteration.substringBefore(',')})" }
+            otherWords = others.map { (_, group, _) -> "${group[0].lemma.substringBefore(',')} (${group[0].transliteration.substringBefore(',')})" },
+            linked = linked.map { (counterpart, group, groupVerses) ->
+                LinkedWord(
+                    number = counterpart.number,
+                    senseKey = group.maxBy { it.verseCount }.key,
+                    language = group[0].language,
+                    word = group[0].lemma.substringBefore(','),
+                    transliteration = group[0].transliteration.substringBefore(','),
+                    // Its meaning in most of its verses: chesed's "kindness", not "shame".
+                    meaning = group.groupBy { it.gloss.lowercase() }.values.maxBy { g -> g.sumOf { it.verseCount } }[0].gloss,
+                    verseCount = groupVerses.cardinality(),
+                    kind = when (counterpart.kinship) {
+                        Counterpart.Kinship.SEPTUAGINT -> WordLinkKind.SEPTUAGINT
+                        Counterpart.Kinship.ORIGIN -> WordLinkKind.ORIGIN
+                        Counterpart.Kinship.YOURS -> WordLinkKind.YOURS
+                    }
+                )
+            }
         )
+    }
+
+    /**
+     * The Greek words that [query] names, or the Hebrew and Aramaic ones when [hebrew], for linking
+     * one to a word of the other language: by its Strong's number (bare digits are the language's,
+     * 2617 is H2617), its letters, its transliteration, what it means ("kindness"), or the start of
+     * its letters, its transliteration ("ches") or a word of its meaning ("kind"). The likeliest
+     * first, each as a card like Search's.
+     */
+    fun wordsNamed(query: String, hebrew: Boolean): List<OriginalWordCard> {
+        val q = query.trim()
+        if (q.isEmpty()) return emptyList()
+        val letter = if (hebrew) 'H' else 'G'
+        // By number, each word once, in the order found, with the meaning it was found by, if it was.
+        val found = LinkedHashMap<String, String?>()
+        fun add(words: List<OriginalWord>, byMeaning: Boolean = false) {
+            for (word in words) {
+                if (word.number[0] == letter && word.number !in found) found[word.number] = word.gloss.takeIf { byMeaning }
+            }
+        }
+        fun byUse(words: List<OriginalWord>) =
+            words.sortedByDescending { w -> lexicon.originalsNumbered(w.number).sumOf { it.verseCount } }
+        // Each word by its senses that matched, those in the most verses first: chesed's "kindness"
+        // (239 verses) before nasa's (40 of its 600). Each word's most used of them stands for it.
+        fun byMatchedUse(senses: List<OriginalWord>) = senses.groupBy { it.number }.values
+            .sortedByDescending { group -> group.distinctBy { it.key }.sumOf { it.verseCount } }
+            .map { group -> group.maxBy { it.verseCount } }
+
+        // A number names one word, or none in this language.
+        linkNumber.matchEntire(q)?.let { m ->
+            val named = m.groupValues[1].uppercase().ifEmpty { letter.toString() }
+            if (named[0] == letter) add(lexicon.originalsNumbered(named + m.groupValues[2].padStart(4, '0')))
+            return found.keys.map { card(lexicon.originalsNumbered(it), emptyMap(), alternative = false) }
+        }
+        if (hasOriginalLetter(q)) {
+            add(spelled(q))
+            val key = originalKey(q)
+            if (key.length >= 2) add(byUse(lexicon.originalsSpelledFrom(key)))
+        } else {
+            val key = latinKey(q)
+            if (key.length >= 2) add(transliterated(key))
+            val words = wordsOf(q).filter { it !in STOPWORDS }
+            if (words.size == 1) {
+                val meaning = lexicon.originalsMeaning(words[0], index::contains) +
+                    lexicon.meaningsOf(words[0], index::contains).map { it.word }
+                add(byMatchedUse(meaning), byMeaning = true)
+            }
+            if (key.length >= 3) add(byUse(lexicon.originalsTransliteratedFrom(key)))
+            if (q.length >= 3) add(byMatchedUse(lexicon.originalsGlossed(q.lowercase())), byMeaning = true)
+        }
+        return found.entries.take(MAX_LINK_CANDIDATES).map { (number, meaning) ->
+            val card = card(lexicon.originalsNumbered(number), emptyMap(), alternative = false)
+            // Found by one of its meanings: that one first (nasa: "kindness, to lift, bear").
+            if (meaning == null) card else card.copy(meanings = (listOf(meaning) + card.meanings.filterNot { it.equals(meaning, ignoreCase = true) }).take(3))
+        }
     }
 
     /**
@@ -336,25 +412,32 @@ class OriginalSearch(private val index: BibleIndex, private val lexicon: SearchL
 
     // "Where the Hebrew has אַהֲבָה (ahavah), which the Septuagint, the Greek Old Testament,
     // translates with ἀγάπη." / "Where the Greek has ἔλεος (eleos), the Septuagint’s word for חֶסֶד."
+    // Words you linked it to: "… And where it has חֶסֶד (chesed), which you linked to it."
     private fun noteOn(word: OriginalWord, others: List<Other>): String {
-        val names = others.map { "${it.word.lemma.substringBefore(',')} (${it.word.transliteration.substringBefore(',')})" }
-        val listed = if (names.size == 1) names[0] else names.dropLast(1).joinToString(", ") + " or " + names.last()
+        fun listed(of: List<Other>): String {
+            val names = of.map { "${it.word.lemma.substringBefore(',')} (${it.word.transliteration.substringBefore(',')})" }
+            return if (names.size == 1) names[0] else names.dropLast(1).joinToString(", ") + " or " + names.last()
+        }
         val lemma = word.lemma.substringBefore(',')
-        val septuagint = others.all { it.counterpart.kinship == Counterpart.Kinship.SEPTUAGINT }
-        val origin = others.all { it.counterpart.kinship == Counterpart.Kinship.ORIGIN }
-        return if (word.language == "Greek") {
-            "Where the Hebrew has $listed, " + when {
+        val other = if (word.language == "Greek") "Hebrew" else "Greek"
+        val (yours, builtIn) = others.partition { it.counterpart.kinship == Counterpart.Kinship.YOURS }
+        if (builtIn.isEmpty()) return "Where the $other has ${listed(yours)}, which you linked to $lemma."
+        val septuagint = builtIn.all { it.counterpart.kinship == Counterpart.Kinship.SEPTUAGINT }
+        val origin = builtIn.all { it.counterpart.kinship == Counterpart.Kinship.ORIGIN }
+        val note = if (word.language == "Greek") {
+            "Where the Hebrew has ${listed(builtIn)}, " + when {
                 septuagint -> "which the Septuagint, the Greek Old Testament, translates with $lemma."
                 origin -> "the word $lemma comes from."
                 else -> "the Hebrew behind $lemma."
             }
         } else {
-            "Where the Greek has $listed, " + when {
+            "Where the Greek has ${listed(builtIn)}, " + when {
                 septuagint -> "the Septuagint’s word for $lemma."
                 origin -> "which comes from $lemma."
                 else -> "the Greek for $lemma."
             }
         }
+        return if (yours.isEmpty()) note else "$note And where it has ${listed(yours)}, which you linked to it."
     }
 
     private fun versesOf(word: OriginalWord): BitSet {
@@ -441,10 +524,14 @@ class OriginalSearch(private val index: BibleIndex, private val lexicon: SearchL
         const val MAX_STUDY_RENDERINGS = 4
         /** A word page names the books the word is in most, this many. */
         const val MAX_STUDY_BOOKS = 5
+        /** Words offered for linking to one, at most. */
+        const val MAX_LINK_CANDIDATES = 30
 
         private val strongsNumber = Regex("([GgHh])0*(\\d{1,5})([A-Za-z]?)")
         private val strongsTag = Regex("([GH])(\\d{1,5})")
         private val strongsSense = Regex("([GH])(\\d{1,5})([A-Z]?)")
+        // A number to link to: G26, H2617, or just 2617.
+        private val linkNumber = Regex("([GgHh]?)0*(\\d{1,4})[A-Za-z]?")
         private val separators = Regex("[\\s\\u05BE,.;:·]+")
         // ו and, ה the, ב in, כ as, ל to, מ from, ש that.
         private const val HEBREW_PREFIXES = "והבכלמש"

@@ -52,7 +52,9 @@ class Counterpart(val number: String, val kinship: Kinship) {
         /** The Septuagint, the Greek Old Testament, translates the Hebrew with the Greek. */
         SEPTUAGINT,
         /** The Greek word comes from the Hebrew one: amēn, Messias, Dabid. */
-        ORIGIN
+        ORIGIN,
+        /** You linked them (see SearchLexicon.ownLinks). */
+        YOURS
     }
 }
 
@@ -228,10 +230,53 @@ class SearchLexicon private constructor(
     }
 
     /**
-     * The words of the other Testament's language the word numbered [number] is: agapē is ahavah
-     * in the Septuagint; ahavah is agapē and philia; amēn comes from amen.
+     * Your own links between Greek and Hebrew words (see WordLink): for a word's number (G0026),
+     * the numbers of the words of the other language you linked it to (H2617). Read on each search,
+     * so a link made or removed counts at once.
      */
-    fun counterpartsOf(number: String): List<Counterpart> = counterparts[number].orEmpty()
+    @Volatile
+    var ownLinks: (String) -> List<String> = { emptyList() }
+
+    /**
+     * The words of the other Testament's language the word numbered [number] is: agapē is ahavah
+     * in the Septuagint; ahavah is agapē and philia; amēn comes from amen. Then the ones you
+     * linked it to that those don't have.
+     */
+    fun counterpartsOf(number: String): List<Counterpart> {
+        val builtIn = counterparts[number].orEmpty()
+        val own = ownLinks(number).filter { n -> builtIn.none { it.number == n } }.distinct()
+        return if (own.isEmpty()) builtIn else builtIn + own.map { Counterpart(it, Counterpart.Kinship.YOURS) }
+    }
+
+    // Every word by each single word its meaning is, God and the LORD too: for finding a word by
+    // what it means (see OriginalSearch.wordsNamed), not for an English search's verses.
+    private val byAnyHead: Map<String, List<OriginalWord>> by lazy { indexBy { it.heads.toList() } }
+
+    /** The Greek and Hebrew words whose meaning is [word] or a form of it: "kindness" is chesed's. */
+    fun originalsMeaning(word: String, inBible: (String) -> Boolean): List<OriginalWord> =
+        kin(word, inBible).flatMap { byAnyHead[it].orEmpty() }.distinctBy { it.key }
+
+    /** The words whose transliteration (a [latinKey]) starts with [prefix]: "ches" finds chesed. */
+    fun originalsTransliteratedFrom(prefix: String): List<OriginalWord> =
+        byTransliteration.entries.filter { it.key.startsWith(prefix) }.flatMap { it.value }.distinctBy { it.key }
+
+    /** The words spelled with [prefix] (an [originalKey]) to start with: αγαπ finds agapē and agapaō. */
+    fun originalsSpelledFrom(prefix: String): List<OriginalWord> =
+        byLemma.entries.filter { it.key.startsWith(prefix) }.flatMap { it.value }.distinctBy { it.key }
+
+    /**
+     * The words with [text] (lowercase) at the start of a word of their meaning: "kind" finds chesed,
+     * "kindness"; "ches" doesn't find "riches".
+     */
+    fun originalsGlossed(text: String): List<OriginalWord> = originals.filter { word ->
+        val gloss = word.gloss.lowercase()
+        var at = gloss.indexOf(text)
+        while (at >= 0) {
+            if (at == 0 || !gloss[at - 1].isLetter()) return@filter true
+            at = gloss.indexOf(text, at + 1)
+        }
+        false
+    }
 
     // A gloss in today's spelling or words, with the King James one: favor → favour.
     private fun kingJamesWordsOf(heads: Set<String>, inBible: (String) -> Boolean): Set<String> {

@@ -87,8 +87,22 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
    *To ask:* what happens now — does the page move away from the verse, does the focus
    (the other verses dimmed) go away, or both? Hebrew too?
 
-6. **Link Greek and Hebrew words myself.** "Ability to link words by myself (Greek and
+6. **Done 12 Oct.** **Link Greek and Hebrew words myself.** "Ability to link words by myself (Greek and
    Hebrew)."
+   *Built (decided 12 Oct: Greek ↔ Hebrew):* each word page has a card of the other language's
+   words for it — "Hebrew words for it" on a Greek word, "Greek words for it" on a Hebrew one:
+   - the built-in ones, marked "Septuagint" (ahavah for agapē) or by origin (mashiach for
+     Messias), and yours, marked "Your link", with a ✕ that removes it after asking;
+   - "Link a Hebrew word" (or Greek) opens a search: type the word in Hebrew or Greek, how it
+     sounds (chesed, hesed, ches…), its Strong's number (H2617, or just 2617) or what it means
+     (kindness, mercy); the likeliest come first, and one already linked says so. Tap one to link it;
+   - a link shows on both words' pages, and tapping a linked word opens its page over this
+     one, with back coming back here;
+   - "Find every verse with this word" finds your linked words' verses too, each a chip that
+     can be switched off, with a line saying which you linked ("…and where it has חֶסֶד
+     (chesed), which you linked to it");
+   - your links are in the Drive and file backups with notes and highlights; one removed stays
+     removed when an older backup is restored.
    Add your own link between a Greek word and a Hebrew word, alongside the Septuagint links
    already built in, so the word pages and "Find every verse with this word" use it.
    *To ask:* Greek ↔ Hebrew only, or also an English word in a verse ↔ a Greek or Hebrew word?
@@ -218,8 +232,15 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
    [Telugu IRV](https://southasiabibles.com/resource/language/Telugu/Indian-Revised-Version),
    [Telugu dramatised New Testament](https://podbay.fm/p/-telugu-bible-dramatized).
 
-8. **Pronunciation for Greek and Hebrew words.** "Can pronunciation be included for greek and
+8. **Done 12 Oct.** **Pronunciation for Greek and Hebrew words.** "Can pronunciation be included for greek and
    hebrew?"
+   *Built (decided 12 Oct: written and a speaker):* under the transliteration, each word page
+   says how the word sounds, its syllables split and the stressed one in capitals — ἀγάπη
+   "ah-GAH-pay", בְּרֵאשִׁית "beh-reh-SHEET", חֶסֶד "KHEH-sed" — in the pronunciation usually
+   taught for Biblical Greek and Hebrew. Greek's comes from the word's own letters and accent;
+   Hebrew's from STEPBible's syllables and stress. The speaker beside it says the word in the
+   phone's Greek or Hebrew voice (modern pronunciation), pausing anything being read aloud; on
+   a phone without that voice, the page says so, with "Get one" to install it.
    Possible, in two ways:
    - *Written:* a sounds-like guide next to the transliteration the word pages already show
      (from STEPBible). For Hebrew it's ready: Open Scriptures' Strong's data, which the app's

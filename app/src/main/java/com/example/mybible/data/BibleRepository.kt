@@ -393,6 +393,13 @@ class BibleRepository(private val context: Context) {
     private val _savedWordsFlow = MutableStateFlow<List<SavedWordItem>>(loadSavedWordsFromPrefs())
     val allSavedWords: Flow<List<SavedWordItem>> = _savedWordsFlow.asStateFlow()
 
+    // Your links between Greek and Hebrew words (see WordLink), and the same by number for Search,
+    // which reads them on each search (see SearchLexicon.ownLinks).
+    private val _wordLinksFlow = MutableStateFlow<List<WordLink>>(loadWordLinksFromPrefs())
+    val allWordLinks: Flow<List<WordLink>> = _wordLinksFlow.asStateFlow()
+    @Volatile
+    private var wordLinksByNumber: Map<String, List<String>> = _wordLinksFlow.value.byNumber()
+
     // Fixed set of colors now (see model/HighlightColors.kt) — no add/
     // delete/enable-disable — but a label can still be renamed, so this
     // stays a real flow: the base palette with any saved label overrides
@@ -483,6 +490,17 @@ class BibleRepository(private val context: Context) {
     private fun saveSavedWordsToPrefs(list: List<SavedWordItem>) {
         _savedWordsFlow.value = list
         prefs.edit().putString("saved_words_json", json.encodeToString(list)).apply()
+    }
+
+    private fun loadWordLinksFromPrefs(): List<WordLink> {
+        val str = prefs.getString("word_links_json", null) ?: return emptyList()
+        return try { json.decodeFromString(str) } catch (e: Exception) { emptyList() }
+    }
+
+    private fun saveWordLinksToPrefs(list: List<WordLink>) {
+        _wordLinksFlow.value = list
+        wordLinksByNumber = list.byNumber()
+        prefs.edit().putString("word_links_json", json.encodeToString(list)).apply()
     }
 
     // Keyed by colorHex (a color's fixed identity — see model/HighlightColors.kt),
@@ -922,6 +940,22 @@ class BibleRepository(private val context: Context) {
         saveSavedWordsToPrefs(current)
     }
 
+    /** Links the Greek word numbered [greek] (G26, G0026) to the Hebrew one numbered [hebrew]. */
+    suspend fun addWordLink(greek: String, hebrew: String) {
+        val g = linkNumber(greek)?.takeIf { it.startsWith("G") } ?: return
+        val h = linkNumber(hebrew)?.takeIf { it.startsWith("H") } ?: return
+        saveWordLinksToPrefs(_wordLinksFlow.value.withLink(g, h))
+        // Linked again after being removed: a restore or another phone's backup doesn't remove it.
+        clearTombstones(listOf(wordLinkTombstoneKey(g, h)))
+    }
+
+    suspend fun removeWordLink(greek: String, hebrew: String) {
+        val g = linkNumber(greek) ?: return
+        val h = linkNumber(hebrew) ?: return
+        saveWordLinksToPrefs(_wordLinksFlow.value.withoutLink(g, h))
+        recordTombstone(wordLinkTombstoneKey(g, h))
+    }
+
     suspend fun saveNote(
         id: Long,
         title: String,
@@ -1006,6 +1040,7 @@ class BibleRepository(private val context: Context) {
     private class SearchEngine(val verses: SmartSearch, val topics: TopicSearch)
 
     private val searchEngineMutex = Mutex()
+    @Volatile
     private var searchEngineCache: SearchEngine? = null
 
     /** Builds Search's index ahead of the first search: called as Search opens. */
@@ -1021,7 +1056,9 @@ class BibleRepository(private val context: Context) {
         val open = { name: String -> context.assets.open("search/$name") }
         coroutineScope {
             // The word data and the topics are read while Room hands over the verses and they're indexed.
-            val lexicon = async(Dispatchers.Default) { SearchLexicon.load(open) }
+            val lexicon = async(Dispatchers.Default) {
+                SearchLexicon.load(open).apply { ownLinks = { number -> wordLinksByNumber[number].orEmpty() } }
+            }
             val topics = async(Dispatchers.Default) { TopicBook.load(open) }
             val bookIndex = BIBLE_BOOKS.withIndex().associate { (i, book) -> book to i }
             val verses = bibleDao.getAllVerseTexts().mapNotNull { row ->
@@ -1073,6 +1110,15 @@ class BibleRepository(private val context: Context) {
         if (strongs.isNullOrBlank()) return@withContext null
         val ref = verse?.let { v -> BIBLE_BOOKS.indexOf(v.book).takeIf { it >= 0 }?.let { BibleIndex.packRef(it, v.chapter, v.number) } }
         searchEngine()?.verses?.study(strongs, ref)
+    }
+
+    /**
+     * The Greek words, or Hebrew and Aramaic ones when [hebrew], that [query] names, for linking one
+     * to the open word page's word (see OriginalSearch.wordsNamed). Empty until Search's index can
+     * be built.
+     */
+    suspend fun wordsToLink(query: String, hebrew: Boolean): List<OriginalWordCard> = withContext(Dispatchers.Default) {
+        searchEngine()?.verses?.wordsNamed(query, hebrew).orEmpty()
     }
 
     /** A Nave's topic's page, for Search: its headings and verses (see TopicSearch.page). */
@@ -1507,6 +1553,7 @@ class BibleRepository(private val context: Context) {
             highlights = _highlightsFlow.value,
             highlightColorDefs = resolvedHighlightColorDefs(_highlightColorLabelOverridesFlow.value),
             savedWords = _savedWordsFlow.value,
+            wordLinks = _wordLinksFlow.value,
             tombstones = SyncTombstones(_tombstonesFlow.value)
         )
         json.encodeToString(data)
@@ -1522,7 +1569,8 @@ class BibleRepository(private val context: Context) {
         val completedAdded: Int,
         val highlightsAdded: Int,
         val colorsRelabeled: Int,
-        val savedWordsAdded: Int
+        val savedWordsAdded: Int,
+        val wordLinksAdded: Int = 0
     )
 
     /** Restores from a backup produced by [exportBackupJson] (this device,
@@ -1571,6 +1619,8 @@ class BibleRepository(private val context: Context) {
      *    per-item timestamp to compare on a non-tombstoned collision —
      *    unlike the others above, a saved word is never edited in place,
      *    only saved/unsaved, so identity alone is enough.
+     *  - word links: unioned by their two words (see mergeWordLinks); one
+     *    removed since is skipped, unless it was linked again after that.
      */
     suspend fun importFromBackup(jsonText: String): ImportResult = withContext(Dispatchers.IO) {
         val data = json.decodeFromString<BackupData>(jsonText)
@@ -1709,6 +1759,9 @@ class BibleRepository(private val context: Context) {
         }
         saveSavedWordsToPrefs(mergedSavedWords)
 
+        val (mergedWordLinks, wordLinksAdded) = mergeWordLinks(_wordLinksFlow.value, data.wordLinks, tombstones)
+        if (wordLinksAdded > 0) saveWordLinksToPrefs(mergedWordLinks)
+
         ImportResult(
             notesAdded = notesAdded,
             notesUpdated = notesUpdated,
@@ -1716,7 +1769,8 @@ class BibleRepository(private val context: Context) {
             completedAdded = completedAdded,
             highlightsAdded = highlightsAdded,
             colorsRelabeled = colorsRelabeled,
-            savedWordsAdded = savedWordsAdded
+            savedWordsAdded = savedWordsAdded,
+            wordLinksAdded = wordLinksAdded
         )
     }
 

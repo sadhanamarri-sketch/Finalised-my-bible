@@ -301,9 +301,11 @@ private const val KEY_ASKED_NOTIFICATIONS = "asked_notifications"
 private fun speedLabel(speed: Float): String =
     (if (speed % 1f == 0f) speed.toInt().toString() else speed.toString().trimEnd('0')) + "×"
 
-// The phone's speech engine's own page for adding voices (Google's lists its languages), or failing
-// that, the phone's text-to-speech settings.
-private fun openVoiceInstaller(context: Context) {
+/**
+ * The phone's speech engine's own page for adding voices (Google's lists its languages), or failing
+ * that, the phone's text-to-speech settings.
+ */
+fun openVoiceInstaller(context: Context) {
     val tries = listOf(
         Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA),
         Intent("com.android.settings.TTS_SETTINGS")

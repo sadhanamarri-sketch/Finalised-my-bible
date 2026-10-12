@@ -22,6 +22,10 @@ class ReadAloudTest {
         override fun speak(id: String, text: String, telugu: Boolean, rate: Float, voice: String?) {
             said += Said(id, text, telugu, rate, voice)
         }
+        val words = mutableListOf<Pair<String, java.util.Locale>>()
+        var otherVoices: Boolean? = true
+        override fun hasVoiceFor(locale: java.util.Locale) = otherVoices
+        override fun speakIn(id: String, text: String, locale: java.util.Locale, rate: Float) { words += text to locale }
         override fun stop() { stops++ }
         override fun voices(telugu: Boolean) = emptyList<VoiceOption>()
 
@@ -235,6 +239,23 @@ class ReadAloudTest {
         assertEquals(ReadAloudState.Status.IDLE, reader.state.value.status)
         assertEquals(listOf("For God sent not his Son", "He that believeth on him is not condemned"), speaker.said.map { it.text })
         assertEquals(1, loads)
+    }
+
+    @Test
+    fun aGreekOrHebrewWordIsSaidInItsOwnVoicePausingAReading() {
+        val speaker = FakeSpeaker()
+        val reader = reader(speaker)
+        val chapter = Chapter(john3, from = 16)
+        reader.start(chapter)
+        val greek = java.util.Locale("el", "GR")
+        assertEquals(true, reader.sayWord("ἀγάπη", greek))
+        assertEquals(ReadAloudState.Status.PAUSED, reader.state.value.status)
+        assertEquals(1, chapter.paused)
+        assertEquals(listOf("ἀγάπη" to greek), speaker.words)
+        // No Hebrew voice on the phone: nothing said, and the page is told so.
+        speaker.otherVoices = false
+        assertEquals(false, reader.sayWord("חֶסֶד", java.util.Locale("he", "IL")))
+        assertEquals(1, speaker.words.size)
     }
 
     @Test

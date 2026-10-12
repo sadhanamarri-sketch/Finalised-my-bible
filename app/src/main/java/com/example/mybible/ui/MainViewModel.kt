@@ -29,6 +29,7 @@ import com.example.mybible.versescroll.VerseRef
 import com.example.mybible.versescroll.VerseScrollController
 import com.example.mybible.data.resolveBookName
 import com.example.mybible.data.LexiconLookupResult
+import com.example.mybible.data.linkNumber
 import com.example.mybible.model.*
 import com.example.mybible.ui.components.BIBLE_BOOKS
 import com.example.mybible.ui.components.BOOK_CHAPTER_COUNTS
@@ -554,9 +555,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun pauseReading() = readAloud.pause()
 
+    /**
+     * A Greek or Hebrew word's speaker: says [text] in the phone's Greek or Hebrew voice. False when
+     * the phone has no such voice.
+     */
+    fun sayOriginalWord(text: String, greek: Boolean): Boolean? =
+        readAloud.sayWord(text, if (greek) GREEK_VOICE else HEBREW_VOICE)
+
+    /** Whether the phone has a Greek voice, or a Hebrew one: null while its speech engine is starting. */
+    fun hasOriginalWordVoice(greek: Boolean): Boolean? = readAloud.hasVoiceFor(if (greek) GREEK_VOICE else HEBREW_VOICE)
+
     fun resumeReading() = readAloud.resume()
 
     fun stopReading() = readAloud.stop()
+
+    private companion object {
+        val GREEK_VOICE: java.util.Locale = java.util.Locale("el", "GR")
+        val HEBREW_VOICE: java.util.Locale = java.util.Locale("he", "IL")
+    }
 
     override fun onCleared() {
         // Verse Scroll's reading needs its feed, which goes with this; the Reader's chapter can read on.
@@ -1790,6 +1806,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // GreekWordScreen/HebrewWordScreen is ever open at a time.
     private val _lexiconOpenedFromSavedWords = MutableStateFlow(false)
 
+    // Whether the open word page was opened from another's linked words (see openLinkedWord): its
+    // back goes back to that page, which waits below it.
+    private var lexiconOpenedFromWordPage = false
+
     // What the open Greek or Hebrew word page's "Find every verse with this word" will find: its
     // verses, and the other Testament's with the word in its language. Null while it's worked
     // out, or when Search can't find the word.
@@ -1812,8 +1832,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val scrollPosition: Int,
         val baseVerse: Verse?,
         val openedFromSavedWords: Boolean,
-        val searchPreview: WordSearchPreview?,
-        val study: WordStudy?,
+        val openedFromWordPage: Boolean,
+        // Dropped when a link changes, to be worked out again when the page is back (see changeOpenWordLink).
+        var searchPreview: WordSearchPreview?,
+        var study: WordStudy?,
         val returnTab: NavTab?
     ) {
         val tab: NavTab get() = if (greek != null) NavTab.GREEK_WORD else NavTab.HEBREW_WORD
@@ -1831,6 +1853,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             scrollPosition = if (greek != null) _greekWordScrollPosition.value else _hebrewWordScrollPosition.value,
             baseVerse = _lexiconBaseVerse.value,
             openedFromSavedWords = _lexiconOpenedFromSavedWords.value,
+            openedFromWordPage = lexiconOpenedFromWordPage,
             searchPreview = _wordSearchPreview.value,
             study = _wordStudy.value,
             returnTab = _lexiconReturnTab.value
@@ -1866,11 +1889,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         _lexiconBaseVerse.value = page.baseVerse
         _lexiconOpenedFromSavedWords.value = page.openedFromSavedWords
+        lexiconOpenedFromWordPage = page.openedFromWordPage
         _wordSearchPreview.value = page.searchPreview
         _wordStudy.value = page.study
-        // Covered before its search data came in: worked out again.
+        // Covered before its search data came in, or a link changed since: worked out again.
         if (page.searchPreview == null || page.study == null) {
-            loadWordSearchPreview(page.greek?.strongs ?: page.hebrew?.strongs, page.baseVerse)
+            loadWordSearchPreview(page.greek?.strongs ?: page.hebrew?.strongs, page.baseVerse, page.openedFromWordPage)
         }
         return page.tab
     }
@@ -1908,16 +1932,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun loadWordSearchPreview(strongs: String?, verse: Verse?) {
+    private fun loadWordSearchPreview(strongs: String?, verse: Verse?, fromWordPage: Boolean = false) {
         wordSearchPreviewJob?.cancel()
         _wordSearchPreview.value = null
         _wordStudy.value = null
         if (strongs.isNullOrBlank()) return
         wordSearchPreviewJob = viewModelScope.launch {
             _wordSearchPreview.value = repository.wordSearchPreview(strongs)
-            _wordStudy.value = repository.wordStudy(strongs, verse)
+            _wordStudy.value = studyOf(strongs, verse, fromWordPage)
         }
     }
+
+    // A word page's word study. One opened from a linked word wasn't tapped in a verse: the word as a
+    // whole, not the sense its number has (H2617A) or one in the verse its page was opened from.
+    private suspend fun studyOf(strongs: String, verse: Verse?, fromWordPage: Boolean): WordStudy? =
+        if (fromWordPage) repository.wordStudy(linkNumber(strongs) ?: strongs, null) else repository.wordStudy(strongs, verse)
 
     /**
      * The word page's "Find every verse with this word": a new search for the word by its Strong's
@@ -1941,13 +1970,91 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         selectTab(NavTab.SEARCH)
     }
 
+    // ---- Your links between Greek and Hebrew words (see WordLink) ----
+
+    /**
+     * Opens the page of [word], a word linked to the open page's (חֶסֶד on eleos's page), over it:
+     * its back comes back to this page, as it was.
+     */
+    fun openLinkedWord(word: LinkedWord) {
+        val base = _lexiconBaseVerse.value
+        // By its main sense's number, as a word tapped in the Reader is, for its lexicon entry.
+        if (word.number.startsWith("G")) {
+            selectGreekWord(
+                GreekWord(greek = word.word, transliteration = word.transliteration, englishGloss = word.meaning, strongs = word.senseKey),
+                baseVerse = base,
+                openedFromWordPage = true
+            )
+        } else {
+            selectHebrewWord(
+                HebrewWord(hebrew = word.word, transliteration = word.transliteration, englishGloss = word.meaning, strongs = word.senseKey),
+                baseVerse = base,
+                openedFromWordPage = true
+            )
+        }
+    }
+
+    // A word page opened from another's linked words: back is to that page, as it was.
+    private fun backToWordPageBelow(): Boolean {
+        if (!lexiconOpenedFromWordPage) return false
+        val below = wordPagesBelow.lastOrNull() ?: return false
+        lexiconOpenedFromWordPage = false
+        selectGreekWord(null)
+        selectHebrewWord(null)
+        selectTab(below.tab)
+        return true
+    }
+
+    /**
+     * The Greek words, or Hebrew ones when [hebrew], that [query] names (by letters, transliteration,
+     * Strong's number or meaning), for linking one to the open word page's word.
+     */
+    suspend fun wordsToLink(query: String, hebrew: Boolean): List<OriginalWordCard> = repository.wordsToLink(query, hebrew)
+
+    /** Links the open word page's word to the word of the other language numbered [other] (H2617). */
+    fun linkOpenWord(other: String) = changeOpenWordLink(other, link = true)
+
+    /** Removes your link between the open word page's word and the word numbered [other]. */
+    fun unlinkOpenWord(other: String) = changeOpenWordLink(other, link = false)
+
+    private fun changeOpenWordLink(other: String, link: Boolean) {
+        val strongs = _selectedGreekWord.value?.strongs ?: _selectedHebrewWord.value?.strongs ?: return
+        val number = linkNumber(strongs) ?: return
+        val (greek, hebrew) = if (number.startsWith("G")) number to other else other to number
+        viewModelScope.launch {
+            if (link) repository.addWordLink(greek, hebrew) else repository.removeWordLink(greek, hebrew)
+            // The pages under this one show their links and searches again when they're back.
+            wordPagesBelow.forEach { it.searchPreview = null; it.study = null }
+            refreshWordSearchPreview()
+        }
+    }
+
+    // The open word page's links and what its search finds, again, without blanking them meanwhile.
+    private fun refreshWordSearchPreview() {
+        val strongs = _selectedGreekWord.value?.strongs ?: _selectedHebrewWord.value?.strongs ?: return
+        val verse = _lexiconBaseVerse.value
+        val fromWordPage = lexiconOpenedFromWordPage
+        wordSearchPreviewJob?.cancel()
+        wordSearchPreviewJob = viewModelScope.launch {
+            val preview = repository.wordSearchPreview(strongs)
+            val study = studyOf(strongs, verse, fromWordPage)
+            _wordSearchPreview.value = preview
+            _wordStudy.value = study
+        }
+    }
+
     // Opens GreekWordScreen for this word — same "land on a full page,
     // fetch lazily" shape as CrossReferenceScreen/openCrossReferences.
     // Passing null instead clears the selection without switching tabs
     // (used internally by closeGreekWordPage(), and safe to leave as a
     // dedicated no-op path for any future non-navigating "just clear it"
     // caller); baseVerse is only meaningful on that real-selection path.
-    fun selectGreekWord(greekWord: GreekWord?, baseVerse: Verse? = null, openedFromSavedWords: Boolean = false) {
+    fun selectGreekWord(
+        greekWord: GreekWord?,
+        baseVerse: Verse? = null,
+        openedFromSavedWords: Boolean = false,
+        openedFromWordPage: Boolean = false
+    ) {
         // A word tapped on a detour from another word's page: that page waits below this one.
         if (greekWord != null) coverOpenWordPage()
         _selectedGreekWord.value = greekWord
@@ -1957,10 +2064,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (greekWord == null) return
         if (baseVerse != null) _lexiconBaseVerse.value = baseVerse
         _lexiconOpenedFromSavedWords.value = openedFromSavedWords
+        lexiconOpenedFromWordPage = openedFromWordPage
 
         _greekWordScrollPosition.value = 0
         loadGreekLexicon(greekWord)
-        loadWordSearchPreview(greekWord.strongs, baseVerse)
+        loadWordSearchPreview(greekWord.strongs, baseVerse, openedFromWordPage)
         selectTab(NavTab.GREEK_WORD)
     }
 
@@ -1971,6 +2079,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // is hardcoded as the tab underneath since Saved Words is only ever
     // reachable from there today.
     fun closeGreekWordPage() {
+        if (backToWordPageBelow()) return
         selectGreekWord(null)
         if (_lexiconOpenedFromSavedWords.value) {
             _lexiconOpenedFromSavedWords.value = false
@@ -2014,7 +2123,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun selectHebrewWord(hebrewWord: HebrewWord?, baseVerse: Verse? = null, openedFromSavedWords: Boolean = false) {
+    fun selectHebrewWord(
+        hebrewWord: HebrewWord?,
+        baseVerse: Verse? = null,
+        openedFromSavedWords: Boolean = false,
+        openedFromWordPage: Boolean = false
+    ) {
         // See selectGreekWord.
         if (hebrewWord != null) coverOpenWordPage()
         _selectedHebrewWord.value = hebrewWord
@@ -2024,10 +2138,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (hebrewWord == null) return
         if (baseVerse != null) _lexiconBaseVerse.value = baseVerse
         _lexiconOpenedFromSavedWords.value = openedFromSavedWords
+        lexiconOpenedFromWordPage = openedFromWordPage
 
         _hebrewWordScrollPosition.value = 0
         loadHebrewLexicon(hebrewWord)
-        loadWordSearchPreview(hebrewWord.strongs, baseVerse)
+        loadWordSearchPreview(hebrewWord.strongs, baseVerse, openedFromWordPage)
         selectTab(NavTab.HEBREW_WORD)
     }
 
@@ -2057,6 +2172,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // Mirrors closeGreekWordPage's origin-aware branch above.
     fun closeHebrewWordPage() {
+        if (backToWordPageBelow()) return
         selectHebrewWord(null)
         if (_lexiconOpenedFromSavedWords.value) {
             _lexiconOpenedFromSavedWords.value = false
@@ -3212,7 +3328,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _backupStatusMessage.value = "Restored: ${result.notesAdded} new notes, " +
                     "${result.notesUpdated} updated, ${result.highlightsAdded} new highlights, " +
                     "${result.completedAdded} new completed verses, ${result.tagsAdded} new tags, " +
-                    "${result.savedWordsAdded} new saved words, ${result.colorsRelabeled} colors relabeled"
+                    "${result.savedWordsAdded} new saved words, ${result.wordLinksAdded} new word links, " +
+                    "${result.colorsRelabeled} colors relabeled"
             } catch (e: Exception) {
                 _backupStatusMessage.value = "Couldn't read that backup file"
             }
@@ -3301,7 +3418,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         _lastDriveRestoreAt.value = now
                         _backupStatusMessage.value = "Restored from Drive: ${importResult.notesAdded} new notes, " +
                             "${importResult.notesUpdated} updated, ${importResult.highlightsAdded} new highlights, " +
-                            "${importResult.savedWordsAdded} new saved words, ${importResult.colorsRelabeled} colors relabeled"
+                            "${importResult.savedWordsAdded} new saved words, ${importResult.wordLinksAdded} new word links, " +
+                            "${importResult.colorsRelabeled} colors relabeled"
                     } catch (e: Exception) {
                         _backupStatusMessage.value = "Couldn't read the Drive backup"
                     }

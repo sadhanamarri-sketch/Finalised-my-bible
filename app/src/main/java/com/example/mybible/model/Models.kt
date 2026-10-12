@@ -172,7 +172,47 @@ data class WordSearchPreview(
     /** "Old Testament" or "New Testament". */
     val otherTestament: String = "",
     /** The other Testament's words for it: "אַהֲבָה (ahavah)". */
-    val otherWords: List<String> = emptyList()
+    val otherWords: List<String> = emptyList(),
+    /** The words of the other language it's linked to, for its page: the Septuagint's and your own. */
+    val linked: List<LinkedWord> = emptyList()
+)
+
+/** Why two words, one Greek and one Hebrew, are linked. */
+enum class WordLinkKind {
+    /** The Septuagint, the Greek Old Testament, translates the Hebrew with the Greek. */
+    SEPTUAGINT,
+    /** The Greek word comes from the Hebrew one: amēn, Messias. */
+    ORIGIN,
+    /** You linked them (see WordLink). */
+    YOURS
+}
+
+/** A word of the other language a word page's word is linked to: חֶסֶד (chesed) on eleos's page. */
+data class LinkedWord(
+    /** Its Strong's number, without a sense: H2617. */
+    val number: String,
+    /** Its sense in the most verses, as the lexicon and the Reader number it: H2617A, "kindness". */
+    val senseKey: String,
+    /** Greek, Hebrew or Aramaic. */
+    val language: String,
+    val word: String,
+    val transliteration: String,
+    /** What it means most: "kindness". */
+    val meaning: String,
+    val verseCount: Int,
+    val kind: WordLinkKind
+)
+
+/**
+ * A link you made between a Greek word and a Hebrew one, by their Strong's numbers without a sense
+ * (G0026, H2617): shown on both words' pages beside the Septuagint's, and searched with them by
+ * "Find every verse with this word". Part of BackupData.
+ */
+@Serializable
+data class WordLink(
+    val greek: String,
+    val hebrew: String,
+    val createdAt: Long = System.currentTimeMillis()
 )
 
 /**
@@ -402,5 +442,7 @@ data class BackupData(
     // Same "defaults to empty for older backups" reasoning as
     // highlightColorDefs above — added after saved words existed.
     val savedWords: List<SavedWordItem> = emptyList(),
+    // Your links between Greek and Hebrew words; empty in backups from before they existed.
+    val wordLinks: List<WordLink> = emptyList(),
     val tombstones: SyncTombstones = SyncTombstones()
 )
