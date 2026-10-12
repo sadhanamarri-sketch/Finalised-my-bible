@@ -26,8 +26,8 @@ import kotlin.math.roundToInt
  *   the word: "amen" and "abba" are English searches.
  *
  * Finds every verse the word is in, whatever the King James calls it there, marking the English
- * words that usually render it. A word's meanings are chips: aphiēmi's "forgive" can stay on and
- * "permit" go off. Then the other Testament's verses with the same word in its language: for
+ * words that usually render it. A word's meanings are word chips to pick: aphiēmi's "forgive"
+ * without "permit". Then the other Testament's verses with the same word in its language: for
  * agapē, those with ahavah, which the Septuagint translates with agapē.
  */
 class OriginalSearch(private val index: BibleIndex, private val lexicon: SearchLexicon) {

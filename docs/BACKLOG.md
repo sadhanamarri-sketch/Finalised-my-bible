@@ -403,3 +403,19 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     as the sheet closes, however it's closed, so reading aloud doesn't start over at every tap.
     A search with only one such word (a case-sensitive "LORD") or a topic's verses has no chips
     and nothing to pick.
+
+18. **Done 12 Oct.** **Search's chips, open until picked.** "In search results too ... instead of
+    auto selecting the cards automatically... leave them open."
+    *Built:* the chips under the search box are now the same words as Verse Scroll's choice of a
+    search's verses: the word in each form it was found in ("love 281", "loved 89"), the King
+    James wording ("KJV: charity 24") and the Greek and Hebrew words ("Greek agapē 26"), each
+    with how many verses it found, in the place the filter button chose. None is picked at first,
+    which is all of the verses; picking some shows only theirs ("26 of 480 verses"), and Show
+    all, next to that count above the list, picks none again. They used to start all switched on, each to be
+    switched off. A verse said in other words now counts for everything that says it there:
+    1 Corinthians 13:4's "charity" is the King James wording for love and agapē in the Greek, so
+    either chip finds it. Scroll these takes all the verses with the picked words still picked,
+    so Verse Scroll starts with the same verses and its choice of verses can widen them. On a
+    Greek or Hebrew word's page, a meaning ("forgive 38") opens Search with that meaning picked,
+    and the other Testament's word with it, the other meanings there to pick too. A search in
+    Telugu has its words as typed and "Inside longer words".

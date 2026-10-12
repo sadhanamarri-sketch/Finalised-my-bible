@@ -1,5 +1,6 @@
 package com.example.mybible.search
 
+import com.example.mybible.model.MatchedWord
 import com.example.mybible.model.RelatedKind
 import com.example.mybible.model.SearchHit
 import com.example.mybible.model.SearchOutcome
@@ -17,6 +18,7 @@ object TeluguSearch {
 
     /** Id of the "Inside longer words" chip. */
     const val INSIDE = "telugu:inside"
+    private const val INSIDE_LABEL = "Inside longer words"
     /** Words shorter than this (in Unicode characters) are only looked for where a word starts. */
     const val MIN_INSIDE_LENGTH = 4
 
@@ -34,6 +36,9 @@ object TeluguSearch {
     fun search(query: String, verses: List<Verse>, disabled: Set<String> = emptySet()): SearchOutcome {
         val words = wordsOf(query)
         if (words.isEmpty()) return SearchOutcome()
+        // What found each verse, for the word chips: the words as typed, or inside longer ones.
+        val asTyped = listOf(MatchedWord(words.joinToString(" "), MatchedWord.Kind.WORD))
+        val insideLonger = listOf(MatchedWord(INSIDE_LABEL, MatchedWord.Kind.WORD))
         val inRow = ArrayList<SearchHit>()
         val atStart = ArrayList<SearchHit>()
         val inside = ArrayList<SearchHit>()
@@ -42,7 +47,7 @@ object TeluguSearch {
             val tokens = tokensOf(text)
             val starts = words.map { w -> tokens.filter { it.key.startsWith(w) } }
             if (starts.all { it.isNotEmpty() }) {
-                val hit = SearchHit(verse, text, starts.flatten().distinct().sortedBy { it.start }.map { it.start until it.end })
+                val hit = SearchHit(verse, text, starts.flatten().distinct().sortedBy { it.start }.map { it.start until it.end }, matched = asTyped)
                 if (words.size > 1 && hasRun(tokens, words)) inRow += hit else atStart += hit
                 continue
             }
@@ -52,13 +57,13 @@ object TeluguSearch {
             if (words.indices.all { starts[it].isNotEmpty() || within[it].isNotEmpty() }) {
                 val marked = (starts.flatten() + within.flatten()).distinct().sortedBy { it.start }
                 val longer = within.flatten().map { text.substring(it.start, it.end) }.distinct().take(2)
-                inside += SearchHit(verse, text, marked.map { it.start until it.end }, reasons = longer.map { "Inside “$it”" })
+                inside += SearchHit(verse, text, marked.map { it.start until it.end }, reasons = longer.map { "Inside “$it”" }, matched = insideLonger)
             }
         }
         val exact = inRow + atStart
         val sources = if (inside.isEmpty()) emptyList() else {
             val byBook = inside.groupingBy { it.verse.book }.eachCount()
-            listOf(SearchSource(listOf(INSIDE), "Inside longer words", inside.size, INSIDE !in disabled, byBook))
+            listOf(SearchSource(listOf(INSIDE), INSIDE_LABEL, inside.size, INSIDE !in disabled, byBook))
         }
         val hits = if (INSIDE in disabled) exact else exact + inside
         return SearchOutcome(hits = hits, exactCount = exact.size, sources = sources, relatedKind = RelatedKind.INSIDE_LONGER_WORDS)

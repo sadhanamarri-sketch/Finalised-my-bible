@@ -121,12 +121,13 @@ class SmartSearchTest {
         assertEquals(listOf("love" to WORD), love.found("Leviticus 19:18"))
         assertEquals(listOf("loved" to WORD), love.found("John 3:16"))
         assertEquals(listOf("loveth" to WORD, "love" to WORD), love.found("1 John 4:8"))
-        assertEquals(listOf("charity" to WORDING), love.found("1 Corinthians 13:4"))
+        // Everything that says it in other words: the King James wording, and the Greek, agapē.
+        assertEquals(listOf("charity" to WORDING, "Greek agapē" to ORIGINAL), love.found("1 Corinthians 13:4"))
         // Word forms switched off: only the word itself.
         assertEquals(listOf("love" to WORD), search.search("love", disabled = setOf(SmartSearch.FORMS)).found("1 John 4:8"))
 
-        // A King James wording switched off leaves the Greek word.
-        assertEquals(listOf("careful" to WORDING), search.search("worry").found("Philippians 4:6"))
+        // "Careful" there is merimnaō in Greek; without the King James wording, the Greek alone.
+        assertEquals(listOf("careful" to WORDING, "Greek merimnaō" to ORIGINAL), search.search("worry").found("Philippians 4:6"))
         assertEquals(listOf("Greek merimnaō" to ORIGINAL), search.search("worry", disabled = setOf("kjv:careful")).found("Philippians 4:6"))
 
         // More than one word: the words as typed, or the wording for them.

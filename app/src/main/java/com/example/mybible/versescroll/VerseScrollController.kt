@@ -170,9 +170,22 @@ class VerseScrollController(
         generateMore()
     }
 
-    /** "Scroll these" on a search's results or a topic: those verses, shuffled, and what found each (see VerseSource.Found). */
-    fun showFound(title: String, from: String, refs: List<VerseRef>, matched: Map<String, List<MatchedWord>> = emptyMap()) =
-        choose(VerseSource.Found(title, from, refs, matched))
+    /**
+     * "Scroll these" on a search's results or a topic: those verses, shuffled, what found each, and
+     * the words picked to show the verses of (see VerseSource.Found).
+     */
+    fun showFound(
+        title: String,
+        from: String,
+        refs: List<VerseRef>,
+        matched: Map<String, List<MatchedWord>> = emptyMap(),
+        only: Set<MatchedWord> = emptySet()
+    ) {
+        val found = VerseSource.Found(title, from, refs, matched)
+        // Picked words that found none of these, or all of the words: the same as none.
+        val picked = only.filterTo(HashSet()) { word -> found.words.any { it.first == word } }
+        choose(if (picked.size in 1 until found.words.size) found.copy(only = picked) else found)
+    }
 
     /** Opened from the Reader: back to the chosen mode, if a search's or a topic's verses were showing. */
     fun useSavedSource() {

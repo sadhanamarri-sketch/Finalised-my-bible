@@ -1,6 +1,7 @@
 package com.example.mybible.versescroll
 
 import com.example.mybible.model.MatchedWord
+import com.example.mybible.wordsFound
 import kotlin.random.Random
 
 /**
@@ -75,10 +76,7 @@ sealed interface VerseSource {
          * there are two or more.
          */
         val words: List<Pair<MatchedWord, Int>> by lazy {
-            val counts = LinkedHashMap<MatchedWord, Int>()
-            for (ref in refs) matched[ref.key]?.forEach { counts.merge(it, 1, Int::plus) }
-            if (counts.size < 2) emptyList()
-            else counts.toList().sortedWith(compareBy({ it.first.kind.ordinal }, { -it.second }))
+            wordsFound(refs.mapNotNull { matched[it.key] }).takeIf { it.size >= 2 }.orEmpty()
         }
 
         /** What found [ref], when there are words to pick from. */

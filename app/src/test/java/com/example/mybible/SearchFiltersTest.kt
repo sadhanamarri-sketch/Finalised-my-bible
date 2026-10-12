@@ -1,5 +1,6 @@
 package com.example.mybible
 
+import com.example.mybible.model.MatchedWord
 import com.example.mybible.model.SearchHit
 import com.example.mybible.model.SearchOutcome
 import com.example.mybible.model.SearchSource
@@ -46,6 +47,42 @@ class SearchFiltersTest {
         assertEquals(listOf("Psalms 37:1"), ot.refs())
         assertEquals(1, ot.exactCount)
         assertEquals(listOf("KJV: fret" to 1, "Greek merimnaō" to 0), ot.sources.map { it.label to it.count })
+    }
+
+    // "love": found by its forms, the King James wording and the Greek.
+    private val love = MatchedWord("love", MatchedWord.Kind.WORD)
+    private val loveth = MatchedWord("loveth", MatchedWord.Kind.WORD)
+    private val charity = MatchedWord("charity", MatchedWord.Kind.WORDING)
+    private val agape = MatchedWord("Greek agapē", MatchedWord.Kind.ORIGINAL)
+    private val loveOutcome = SearchOutcome(
+        hits = listOf(
+            hit("Leviticus", 19, 18).copy(matched = listOf(love)),
+            hit("1 John", 4, 8).copy(matched = listOf(loveth, love)),
+            hit("Mark", 12, 30).copy(matched = listOf(love)),
+            hit("1 Corinthians", 13, 4).copy(matched = listOf(charity, agape)),
+            hit("1 Peter", 4, 8).copy(matched = listOf(charity))
+        ),
+        exactCount = 3
+    )
+
+    @Test
+    fun theWordsThatFoundTheVerses() {
+        // The word searched for first, then King James wording, then Greek and Hebrew; most verses first.
+        assertEquals(listOf(love to 3, loveth to 1, charity to 2, agape to 1), wordsFound(loveOutcome.hits.map { it.matched }))
+    }
+
+    @Test
+    fun pickedWordsLeaveTheirVerses() {
+        assertSame(loveOutcome, loveOutcome.foundBy(emptySet()))
+        // Any word that found a verse keeps it; those with the words themselves still come first.
+        val picked = loveOutcome.foundBy(setOf(loveth, agape))
+        assertEquals(listOf("1 John 4:8", "1 Corinthians 13:4"), picked.refs())
+        assertEquals(1, picked.exactCount)
+        val other = loveOutcome.foundBy(setOf(charity))
+        assertEquals(listOf("1 Corinthians 13:4", "1 Peter 4:8"), other.refs())
+        assertEquals(0, other.exactCount)
+        // With a place too: the New Testament's of them.
+        assertEquals(listOf("1 John 4:8", "Mark 12:30"), loveOutcome.foundBy(setOf(love)).within(BiblePlace.NewTestament).refs())
     }
 
     @Test

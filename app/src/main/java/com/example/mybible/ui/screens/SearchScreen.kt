@@ -57,11 +57,11 @@ import com.example.mybible.BiblePlace
 import com.example.mybible.FilterSummary
 import com.example.mybible.SheetChip
 import com.example.mybible.label
+import com.example.mybible.model.MatchedWord
 import com.example.mybible.model.OriginalWordCard
 import com.example.mybible.model.RelatedKind
 import com.example.mybible.model.SearchHit
 import com.example.mybible.model.SearchOutcome
-import com.example.mybible.model.SearchSource
 import com.example.mybible.model.TopicCard
 import com.example.mybible.model.ThemeMode
 import com.example.mybible.ui.MainViewModel
@@ -72,6 +72,7 @@ import com.example.mybible.ui.theme.WorkSansFontFamily
 import com.example.mybible.versescroll.VerseRef
 import com.example.mybible.versesByBook
 import com.example.mybible.within
+import com.example.mybible.wordsFound
 import kotlinx.coroutines.launch
 
 @Composable
@@ -107,6 +108,9 @@ private fun SearchPage(
     val lastTappedKey by viewModel.searchLastTappedKey.collectAsState()
     val place by viewModel.searchPlace.collectAsState()
     val outcomeAll by viewModel.searchOutcomeAll.collectAsState()
+    val outcomeInPlace by viewModel.searchOutcomeInPlace.collectAsState()
+    val picked by viewModel.searchPicked.collectAsState()
+    val words = remember(outcomeInPlace, picked) { wordChips(outcomeInPlace, picked) }
     val readerBook by viewModel.currentBook.collectAsState()
     var showFilterSheet by remember { mutableStateOf(false) }
 
@@ -382,27 +386,50 @@ private fun SearchPage(
         Spacer(modifier = Modifier.height(8.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = when {
-                    isSearching -> " "
-                    searchQuery.trim().length < 2 -> " "
-                    else -> countLine(outcome)
-                },
-                fontSize = 13.sp,
-                fontFamily = WorkSansFontFamily,
-                letterSpacing = 0.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f)
-            )
-            // The results as a Verse Scroll, one verse at a time, shuffled.
+            val narrowed = picked.isNotEmpty() && !isSearching && searchQuery.trim().length >= 2
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                Text(
+                    text = when {
+                        isSearching -> " "
+                        searchQuery.trim().length < 2 -> " "
+                        narrowed -> "${outcome.hits.size} of " + if (outcomeInPlace.hits.size == 1) "1 verse" else "${outcomeInPlace.hits.size} verses"
+                        else -> countLine(outcome)
+                    },
+                    fontSize = 13.sp,
+                    fontFamily = WorkSansFontFamily,
+                    letterSpacing = 0.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                // With word chips picked: all of the verses again. Up here, it's there whichever
+                // chips the row has in view.
+                if (narrowed) {
+                    Text(
+                        text = "Show all",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = WorkSansFontFamily,
+                        letterSpacing = 0.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .padding(start = 6.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable(onClick = viewModel::clearSearchWords)
+                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                    )
+                }
+            }
+            // The results as a Verse Scroll, one verse at a time, shuffled: all of them, with the
+            // words picked still picked there.
             if (!isSearching && searchQuery.trim().length >= 2 && outcome.hits.isNotEmpty()) {
                 ScrollTheseButton {
-                    val refs = outcome.hits.map { VerseRef(it.verse.book, it.verse.chapter, it.verse.number) }
+                    val hits = outcomeInPlace.hits
+                    val refs = hits.map { VerseRef(it.verse.book, it.verse.chapter, it.verse.number) }
                     viewModel.scrollVerses(
                         title = scrollTitle(searchQuery.trim(), outcome),
                         from = "Search",
                         refs = refs,
-                        matched = refs.zip(outcome.hits) { ref, hit -> ref.key to hit.matched }.toMap()
+                        matched = refs.zip(hits) { ref, hit -> ref.key to hit.matched }.toMap(),
+                        only = picked
                     )
                 }
             }
@@ -455,10 +482,9 @@ private fun SearchPage(
                         TopicCards(outcome.topics, onOpen = { viewModel.openTopic(it.topicId, it.section) })
                     }
                 }
-                // Shown even when nothing is left on: it's how to turn things back on.
-                if (outcome.sources.isNotEmpty()) {
-                    item(key = "sources") {
-                        SourceChips(outcome.sources, themeMode, onToggle = { viewModel.toggleSearchSource(it) })
+                if (words.isNotEmpty()) {
+                    item(key = "found-by") {
+                        WordChips(words, picked, themeMode, onPick = viewModel::toggleSearchWord)
                     }
                 }
                 outcome.suggestion?.let { suggestion ->
@@ -471,7 +497,6 @@ private fun SearchPage(
                         Text(
                             text = when {
                                 outcomeAll.hits.isNotEmpty() -> "None in ${place.label(readerBook, 0)}"
-                                outcome.sources.any { !it.enabled } -> "Nothing left with these switched off"
                                 else -> "No matching verses found"
                             },
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -716,18 +741,33 @@ private fun countLine(outcome: SearchOutcome): String {
     }
 }
 
-// What else the search matched besides the words as typed — their other forms, King James
-// wording, Greek and Hebrew words — each switched off and on with a tap.
+// The chips to pick from: what found the verses in the filter's place, with how many. One picked
+// stays, at 0, when none of its verses are there, so it can be unpicked. None when there'd be one.
+private fun wordChips(inPlace: SearchOutcome, picked: Set<MatchedWord>): List<Pair<MatchedWord, Int>> {
+    val found = wordsFound(inPlace.hits.map { it.matched })
+    val chips = found + picked.filter { word -> found.none { it.first == word } }.map { it to 0 }
+    return if (chips.size < 2 && picked.isEmpty()) emptyList() else chips
+}
+
+// What found the verses — the word in each of its forms, King James wording, Greek and Hebrew
+// words — none picked at first, which is all of them. Picking some shows only theirs (Show all, by
+// the count above, all of them again). As in Verse Scroll's choice of verses.
 @Composable
-private fun SourceChips(sources: List<SearchSource>, themeMode: ThemeMode, onToggle: (List<String>) -> Unit) {
+private fun WordChips(
+    words: List<Pair<MatchedWord, Int>>,
+    picked: Set<MatchedWord>,
+    themeMode: ThemeMode,
+    onPick: (MatchedWord) -> Unit
+) {
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(sources, key = { it.ids.joinToString(",") }) { source ->
+        items(words, key = { (word, _) -> "${word.kind}:${word.label}" }) { (word, count) ->
             SheetChip(
-                text = source.label,
-                selected = source.enabled,
+                // Not a form of the word itself: "KJV: charity".
+                text = if (word.kind == MatchedWord.Kind.WORDING) "KJV: ${word.label}" else word.label,
+                selected = word in picked,
                 themeMode = themeMode,
-                count = source.count,
-                onClick = { onToggle(source.ids) }
+                count = count,
+                onClick = { onPick(word) }
             )
         }
     }

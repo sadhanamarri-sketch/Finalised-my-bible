@@ -21,7 +21,8 @@ import java.util.BitSet
  *
  * A verse needs every other word of the query, through its forms or one of those. Verses with
  * the words themselves come first, then those that say it in other words, each with why it
- * matched. Every addition is a [SearchSource] the Search page can switch off ([disabled] ids).
+ * matched, and what found it ([SearchHit.matched]: the word chips the Search page picks from).
+ * Every addition is a [SearchSource], which [disabled] ids leave out.
  *
  * A search typed in Greek or Hebrew, by Strong's number, or for a transliteration the King
  * James text doesn't have (agape) goes to [OriginalSearch] instead.
@@ -64,24 +65,30 @@ class SmartSearch(private val index: BibleIndex, private val lexicon: SearchLexi
         val ranking = Ranking(terms, formsOn, disabled)
         val exactHits = ArrayList<Ranked>()
         val relatedHits = ArrayList<Ranked>()
+        // For each verse in other words, everything that says it there (charity and agapē both).
+        val sayIt = HashMap<Int, List<Source>>()
         candidates.forEachSetBit { id ->
             val missing = required.filter { !exactOf(it).get(id) }
-            val reasons = missing.map { t -> t.sources.filter { it.id !in disabled && it.verses.get(id) }.minBy { it.rank } }
-            val ranked = ranking.rank(id, reasons)
-            if (missing.isEmpty()) exactHits += ranked else relatedHits += ranked
+            val here = missing.map { t -> t.sources.filter { it.id !in disabled && it.verses.get(id) } }
+            val ranked = ranking.rank(id, here.map { found -> found.minBy { it.rank } })
+            if (missing.isEmpty()) exactHits += ranked else {
+                relatedHits += ranked
+                sayIt[id] = here.flatten().sortedBy { it.rank }
+            }
         }
         exactHits.sortWith(byPlace)
         relatedHits.sortWith(byPlace)
 
         val highlighter = Highlighter(terms, ::exactOf, caseSensitive, formsOn, ranking.slots)
-        // What found each verse, for Verse Scroll: what says it in other words, or for one word,
-        // the forms of it the verse has (love, loveth); for more, the words as typed.
+        // What found each verse, for the word chips on Search and Verse Scroll: everything that says
+        // it in other words, or for one word, the forms of it the verse has (love, loveth); for
+        // more, the words as typed.
         val one = required.singleOrNull()?.takeIf { it.words.size == 1 && !caseSensitive }?.words?.get(0)
         val oneForms = one?.let { if (formsOn) lexicon.formsOf(it) else setOf(it) }
         val typedWords = letters.findAll(query).joinToString(" ") { it.value }
         val asTyped = listOf(MatchedWord(if (caseSensitive) typedWords else typedWords.lowercase(), MatchedWord.Kind.WORD))
         fun matched(ranked: Ranked): List<MatchedWord> = when {
-            ranked.reasons.isNotEmpty() -> ranked.reasons.map { it.matched }.distinct()
+            ranked.id in sayIt -> sayIt.getValue(ranked.id).map { it.matched }.distinct()
             oneForms == null -> asTyped
             else -> ranked.words.mapNotNullTo(LinkedHashSet()) { it.word.takeIf(oneForms::contains) }
                 .map { MatchedWord(it, MatchedWord.Kind.WORD) }.ifEmpty { asTyped }

@@ -1,13 +1,14 @@
 package com.example.mybible
 
+import com.example.mybible.model.MatchedWord
+import com.example.mybible.model.SearchHit
 import com.example.mybible.model.SearchOutcome
 import com.example.mybible.ui.components.BIBLE_BOOKS
 
 /**
- * A search's results in one part of the Bible: its verses there, and its chips counting what they
- * bring there (a chip bringing nothing there is left out, unless it's switched off: that's how to
- * switch it back on). Its topics and Greek and Hebrew words stay: they're about the words searched
- * for, not where they are.
+ * A search's results in one part of the Bible: its verses there, and its sources counting what they
+ * bring there (one bringing nothing there is left out, unless it's left out of the search). Its
+ * topics and Greek and Hebrew words stay: they're about the words searched for, not where they are.
  */
 fun SearchOutcome.within(place: BiblePlace, currentBook: String = "", currentChapter: Int = 0): SearchOutcome {
     if (place == BiblePlace.WholeBible) return this
@@ -23,3 +24,23 @@ fun SearchOutcome.within(place: BiblePlace, currentBook: String = "", currentCha
 /** The books a search found verses in, in Bible order, with how many each: the filter's book list. */
 fun SearchOutcome.versesByBook(): List<Pair<String, Int>> =
     hits.groupingBy { it.verse.book }.eachCount().toList().sortedBy { BIBLE_BOOKS.indexOf(it.first) }
+
+/**
+ * The words that found a search's verses (each verse's [SearchHit.matched]), each with how many
+ * verses: the word searched for (its forms or meanings), then King James wording, then Greek and
+ * Hebrew, the most verses first. The word chips on Search and in Verse Scroll.
+ */
+fun wordsFound(matched: Iterable<List<MatchedWord>>): List<Pair<MatchedWord, Int>> {
+    val counts = LinkedHashMap<MatchedWord, Int>()
+    for (words in matched) words.forEach { counts.merge(it, 1, Int::plus) }
+    return counts.toList().sortedWith(compareBy({ it.first.kind.ordinal }, { -it.second }))
+}
+
+/** A search's results that one of [words] found, those with the words themselves first; none picked: all of them. */
+fun SearchOutcome.foundBy(words: Set<MatchedWord>): SearchOutcome {
+    if (words.isEmpty()) return this
+    fun picked(hit: SearchHit) = hit.matched.any { it in words }
+    val exact = hits.take(exactCount).filter(::picked)
+    val related = hits.drop(exactCount).filter(::picked)
+    return copy(hits = exact + related, exactCount = exact.size)
+}

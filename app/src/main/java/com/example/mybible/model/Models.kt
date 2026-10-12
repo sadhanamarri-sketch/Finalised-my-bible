@@ -129,9 +129,10 @@ data class MatchedWord(val label: String, val kind: Kind) {
 }
 
 /**
- * Something a search also matched besides the words as typed, shown as a chip that switches it
- * off and on: the words' other forms, a King James wording, or a Greek or Hebrew word (several
- * small ones share a chip, hence [ids]).
+ * Something a search also matched besides the words as typed, with the verses it adds: the words'
+ * other forms, a King James wording, or a Greek or Hebrew word (several small ones share one,
+ * hence [ids]). A search can leave it out by its [ids], as a Greek or Hebrew word's page does to
+ * find one meaning's verses; Search itself narrows its results with [SearchHit.matched] instead.
  */
 data class SearchSource(
     val ids: List<String>,
@@ -256,7 +257,7 @@ data class WordStudy(
 
 /**
  * A line of a [WordStudy]: a meaning, a King James word or a book, with how many (verses, or a %).
- * For a meaning, [offChips] are the search's chips to switch off for its verses alone.
+ * For a meaning, [offChips] are the search's sources (see SearchSource) to leave out for its verses alone.
  */
 data class WordUse(val label: String, val count: Int, val offChips: Set<String> = emptySet())
 

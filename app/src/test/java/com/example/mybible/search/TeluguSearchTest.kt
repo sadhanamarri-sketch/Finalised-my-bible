@@ -1,5 +1,6 @@
 package com.example.mybible.search
 
+import com.example.mybible.model.MatchedWord
 import com.example.mybible.model.RelatedKind
 import com.example.mybible.model.SearchHit
 import com.example.mybible.model.SearchOutcome
@@ -54,6 +55,9 @@ class TeluguSearchTest {
         assertEquals(listOf("Inside “క్రీస్తుయేసును”"), jesus.hit("Acts 3:20").reasons)
         assertEquals(listOf("క్రీస్తుయేసును"), jesus.hit("Acts 3:20").marked())
         assertEquals("Inside longer words" to 1, jesus.sources.single().let { it.label to it.count })
+        // The word chips: the word as typed, and inside longer ones.
+        assertEquals(listOf(MatchedWord("యేసు", MatchedWord.Kind.WORD)), jesus.hit("Matthew 1:1").matched)
+        assertEquals(listOf(MatchedWord("Inside longer words", MatchedWord.Kind.WORD)), jesus.hit("Acts 3:20").matched)
 
         // Switched off, they're gone, and the chip says what it would bring back.
         val off = search("యేసు", disabled = setOf(TeluguSearch.INSIDE))

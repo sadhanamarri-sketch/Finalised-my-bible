@@ -33,6 +33,7 @@ import com.example.mybible.data.linkNumber
 import com.example.mybible.model.*
 import com.example.mybible.ui.components.BIBLE_BOOKS
 import com.example.mybible.ui.components.BOOK_CHAPTER_COUNTS
+import com.example.mybible.foundBy
 import com.example.mybible.within
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import kotlinx.coroutines.Dispatchers
@@ -618,12 +619,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * "Scroll these" on Search's results or a Nave's topic: Verse Scroll through just those verses,
      * shuffled. [title] names them ("“love”", "Faith"); [from] says where they came from; [matched],
-     * for a search's, what found each verse (by VerseRef.key), to show on its card and filter by.
+     * for a search's, what found each verse (by VerseRef.key), to show on its card and filter by,
+     * and [only] the words picked on Search, still picked there.
      */
-    fun scrollVerses(title: String, from: String, refs: List<VerseRef>, matched: Map<String, List<MatchedWord>> = emptyMap()) {
+    fun scrollVerses(
+        title: String,
+        from: String,
+        refs: List<VerseRef>,
+        matched: Map<String, List<MatchedWord>> = emptyMap(),
+        only: Set<MatchedWord> = emptySet()
+    ) {
         if (refs.isEmpty()) return
         verseScrollOrigin = NavTab.SEARCH
-        verseScroll.showFound(title, from, refs, matched)
+        verseScroll.showFound(title, from, refs, matched, only)
         selectTab(NavTab.VERSE_SCROLL)
     }
 
@@ -982,12 +990,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
     // The current search's result: the verses found (those with the words themselves first, then
-    // the ones saying it in other words), the chips for what else it matched, and a spelling to
-    // try when nothing was found. See BibleRepository.searchBible.
+    // the ones saying it in other words), what found each, and a spelling to try when nothing was
+    // found. See BibleRepository.searchBible.
     private val _searchOutcome = MutableStateFlow(SearchOutcome())
-
-    /** The search's results over the whole Bible: what the filter's choices count. */
-    val searchOutcomeAll: StateFlow<SearchOutcome> = _searchOutcome.asStateFlow()
 
     // Where Search's results are narrowed to with its filter button: the whole Bible, a testament
     // or a book. Kept from one search to the next until the search session ends.
@@ -998,8 +1003,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _searchPlace.value = place
     }
 
-    /** The results shown: those in the filter's place (see SearchFilters). */
-    val searchOutcome: StateFlow<SearchOutcome> = combine(_searchOutcome, _searchPlace) { outcome, place -> outcome.within(place) }
+    // The word chips picked under the search box ("loveth", "KJV: charity", "Greek agapē"): only
+    // the verses they found. None at first, which is all of them; a new search starts with none.
+    private val _searchPicked = MutableStateFlow<Set<MatchedWord>>(emptySet())
+    val searchPicked: StateFlow<Set<MatchedWord>> = _searchPicked.asStateFlow()
+
+    fun toggleSearchWord(word: MatchedWord) {
+        val picked = _searchPicked.value
+        _searchPicked.value = if (word in picked) picked - word else picked + word
+    }
+
+    fun clearSearchWords() {
+        _searchPicked.value = emptySet()
+    }
+
+    /** The search's results over the whole Bible, with the words picked: what the filter's choices count. */
+    val searchOutcomeAll: StateFlow<SearchOutcome> = combine(_searchOutcome, _searchPicked) { outcome, picked -> outcome.foundBy(picked) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SearchOutcome())
+
+    /** The results in the filter's place, whatever found them: what the word chips count, and Scroll these takes. */
+    val searchOutcomeInPlace: StateFlow<SearchOutcome> = combine(_searchOutcome, _searchPlace) { outcome, place -> outcome.within(place) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SearchOutcome())
+
+    /** The results shown: those in the filter's place that the words picked found (see SearchFilters). */
+    val searchOutcome: StateFlow<SearchOutcome> = combine(searchOutcomeInPlace, _searchPicked) { outcome, picked -> outcome.foundBy(picked) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, SearchOutcome())
 
     private val _isSearching = MutableStateFlow(false)
@@ -1007,10 +1034,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _searchCaseSensitive = MutableStateFlow(false)
     val searchCaseSensitive: StateFlow<Boolean> = _searchCaseSensitive.asStateFlow()
-
-    // Ids of the chips switched off: word forms, a King James wording, a Greek or Hebrew word
-    // (see SearchSource). Per search — a new query starts with everything on.
-    private val _searchDisabledSources = MutableStateFlow<Set<String>>(emptySet())
 
     // The Greek or Hebrew word page this search session started from ("Find every verse with
     // this word"), which Search's back returns to instead of the Reader.
@@ -1960,8 +1983,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * The word page's "Find every verse with this word": a new search for the word by its Strong's
      * number, in both Testaments, whose back arrow returns to the page. From the page's word
-     * study, the search is narrowed to one book ([place]), or to one meaning with the chips of
-     * the others ([offChips]) switched off.
+     * study, the search is narrowed to one book ([place]), or to one meaning: its word chips
+     * picked, those of the others ([offChips], see WordUse) left to pick too.
      */
     fun findEveryVerseWithWord(query: String, place: BiblePlace = BiblePlace.WholeBible, offChips: Set<String> = emptySet()) {
         val wordPage = _activeTab.value.takeIf { it == NavTab.GREEK_WORD || it == NavTab.HEBREW_WORD } ?: return
@@ -1969,13 +1992,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _searchReturnAvailable.value = false
         endSearchSession()
         _searchPlace.value = place
-        _searchDisabledSources.value = offChips
         _searchFromWordPage.value = wordPage
         _searchQuery.value = query
         addToSearchHistory(query)
         // Results to read, not a keyboard.
         _suppressNextSearchAutofocus.value = true
-        searchJob = viewModelScope.launch { performSearch(query) }
+        searchJob = viewModelScope.launch {
+            if (offChips.isNotEmpty()) {
+                _isSearching.value = true
+                // What the meaning's verses were found by, without the others: the words to pick.
+                val meaning = repository.searchBible(query, disabledSources = offChips)
+                _searchPicked.value = meaning.hits.flatMapTo(HashSet()) { it.matched }
+            }
+            performSearch(query)
+        }
         selectTab(NavTab.SEARCH)
     }
 
@@ -2975,15 +3005,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun onSearchQueryChanged(query: String) {
         // The field reports moving the cursor too, with the same text: nothing to search again,
-        // and the chips switched off stay off.
+        // and the words picked stay picked.
         if (query == _searchQuery.value) return
         _searchQuery.value = query
-        _searchDisabledSources.value = emptySet()
+        _searchPicked.value = emptySet()
         runSearch()
     }
 
     fun setSearchCaseSensitive(enabled: Boolean) {
         _searchCaseSensitive.value = enabled
+        // Its words found by other things (as typed, not "loveth"): none picked.
+        _searchPicked.value = emptySet()
         runSearch()
     }
 
@@ -2991,18 +3023,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // than on the first search.
     fun prepareSearch() {
         viewModelScope.launch { repository.prepareSearch() }
-    }
-
-    // A chip under the search box: switches what it matched off, or back on. A chip standing for
-    // several Greek and Hebrew words shows as on only while all of them are, so a tap on it turns
-    // them all back on when any is off.
-    fun toggleSearchSource(ids: List<String>) {
-        val disabled = _searchDisabledSources.value
-        _searchDisabledSources.value = if (ids.any { it in disabled }) disabled - ids.toSet() else disabled + ids
-        searchJob?.cancel()
-        val query = _searchQuery.value
-        // No spinner: the list changes in place, under the chip just tapped.
-        searchJob = viewModelScope.launch { performSearch(query, showProgress = false) }
     }
 
     fun openTopic(topicId: Int, section: Int? = null) {
@@ -3047,13 +3067,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (stack.isNotEmpty()) _topicStack.value = stack.dropLast(1) + change(stack.last())
     }
 
-    private suspend fun performSearch(query: String, showProgress: Boolean = true) {
-        if (showProgress) _isSearching.value = true
-        _searchOutcome.value = repository.searchBible(
-            query,
-            caseSensitive = _searchCaseSensitive.value,
-            disabledSources = _searchDisabledSources.value
-        )
+    private suspend fun performSearch(query: String) {
+        _isSearching.value = true
+        _searchOutcome.value = repository.searchBible(query, caseSensitive = _searchCaseSensitive.value)
         _isSearching.value = false
     }
 
@@ -3110,7 +3126,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         searchJob?.cancel()
         _searchQuery.value = ""
         _searchOutcome.value = SearchOutcome()
-        _searchDisabledSources.value = emptySet()
+        _searchPicked.value = emptySet()
         _isSearching.value = false
     }
 
@@ -3126,7 +3142,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         searchJob?.cancel()
         _searchQuery.value = ""
         _searchOutcome.value = SearchOutcome()
-        _searchDisabledSources.value = emptySet()
+        _searchPicked.value = emptySet()
         _searchPlace.value = BiblePlace.WholeBible
         _searchFromWordPage.value = null
         _topicStack.value = emptyList()
@@ -3141,7 +3157,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun searchFromHistory(query: String) {
         searchJob?.cancel()
         _searchQuery.value = query
-        _searchDisabledSources.value = emptySet()
+        _searchPicked.value = emptySet()
         addToSearchHistory(query)
         viewModelScope.launch { performSearch(query) }
     }
