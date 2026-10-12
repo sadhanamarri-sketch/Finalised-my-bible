@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -83,6 +84,12 @@ import com.example.mybible.ui.theme.WorkSansFontFamily
 import com.example.mybible.ui.components.BIBLE_BOOKS
 import com.example.mybible.ui.components.BookListStep
 import com.example.mybible.ui.components.ChapterGridStep
+import com.example.mybible.ui.components.DsNote
+import com.example.mybible.ui.components.DsOutlineAccentButton
+import com.example.mybible.ui.components.DsSectionDivider
+import com.example.mybible.ui.components.DsSectionLabel
+import com.example.mybible.ui.components.DsSizeAdjustRow
+import com.example.mybible.ui.components.DsToggleRow
 import com.example.mybible.ui.components.PickerDarkGold
 import com.example.mybible.ui.components.PickerPaperGold
 import com.example.mybible.versescroll.VerseRef
@@ -610,7 +617,10 @@ internal fun BoxScope.FirstTimeHint(colors: VsColors, reduceMotion: Boolean, onD
     }
 }
 
-/** Verse Scroll's own settings: backgrounds, motion, the double-tap color, and the Telugu line. */
+/**
+ * Verse Scroll's own settings, laid out like the app's Settings: the background and its motion, the
+ * double-tap color, the Telugu under each verse and its size, and reading aloud.
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun VerseScrollSettingsSheet(
@@ -621,12 +631,14 @@ internal fun VerseScrollSettingsSheet(
     reduceMotion: Boolean,
     doubleTapColor: String,
     showTelugu: Boolean,
+    teluguSize: Int,
     sceneCount: Int,
     continueReading: Boolean,
     onPhotos: (Boolean) -> Unit,
     onMotion: (Boolean) -> Unit,
     onDoubleTapColor: (String) -> Unit,
     onShowTelugu: (Boolean) -> Unit,
+    onTeluguSize: (Int) -> Unit,
     onContinueReading: (Boolean) -> Unit,
     onReadAloudSettings: () -> Unit,
     onDismiss: () -> Unit
@@ -634,82 +646,94 @@ internal fun VerseScrollSettingsSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = colors.surface
+        // The page's own color, as the app's Settings: its size row and dividers show against it.
+        containerColor = MaterialTheme.colorScheme.background
     ) {
         Column(
-            verticalArrangement = Arrangement.spacedBy(18.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 // Taller than some screens.
                 .verticalScroll(rememberScrollState())
                 .navigationBarsPadding()
-                .padding(start = 20.dp, end = 20.dp, bottom = 16.dp)
+                .padding(start = 20.dp, end = 20.dp, bottom = 20.dp)
         ) {
             Text(
                 text = "Verse Scroll",
-                color = colors.ink,
-                fontFamily = WorkSansFontFamily,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 18.sp
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(bottom = 18.dp)
             )
-            SettingGroup("Backgrounds", colors) {
-                OptionPill("Nature photos", photos, colors) { onPhotos(true) }
-                OptionPill("Plain", !photos, colors) { onPhotos(false) }
-            }
-            SettingNote(
-                (if (sceneCount > 0) "$sceneCount nature photos" else "Nature photos") +
-                    " from Unsplash, each dimmed as much as it needs for the verse to stay easy to read. A verse " +
-                    "about the sea, the night, snow, harvest, peace, a shepherd or mountains gets a matching photo. " +
-                    "Check-ins stay plain, as a pause.",
-                colors
+
+            DsSectionLabel("Background", isFirst = true)
+            DsToggleRow(
+                label = "Nature photos",
+                subLabel = (if (sceneCount > 0) "$sceneCount photos" else "Photos") + " from Unsplash, matched to the verse " +
+                    "(the sea, the night, snow, harvest, mountains) and dimmed so it stays easy to read. Off: the plain page.",
+                checked = photos,
+                onCheckedChange = onPhotos
             )
-            SettingGroup("Motion", colors) {
-                OptionPill("Gentle", motion, colors) { onMotion(true) }
-                OptionPill("Off", !motion, colors) { onMotion(false) }
-            }
-            SettingNote(
-                if (reduceMotion) "Your phone is set to reduce motion, so photos stay still."
-                else "Photos drift and zoom very slowly. Only the one on screen moves.",
-                colors
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                SettingLabel("Double-tap color", colors)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    defs.forEach { def ->
-                        val selected = def.colorHex.equals(doubleTapColor, ignoreCase = true)
-                        Box(
-                            Modifier
-                                .clip(CircleShape)
-                                .clickable(role = Role.RadioButton) { onDoubleTapColor(def.colorHex) }
-                                .semantics {
-                                    contentDescription = def.label
-                                    this.selected = selected
-                                }
-                        ) { Swatch(hexToColor(def.colorHex), selected, colors) }
-                    }
-                }
-                SettingNote(
-                    "Double-tap highlights in ${defs.find { it.colorHex.equals(doubleTapColor, ignoreCase = true) }?.label ?: "this color"}.",
-                    colors
+            if (photos) {
+                Spacer(Modifier.height(8.dp))
+                DsToggleRow(
+                    label = "Gentle motion",
+                    subLabel = if (reduceMotion) "Your phone is set to reduce motion, so photos stay still."
+                    else "Photos drift and zoom very slowly. Only the one on screen moves.",
+                    checked = motion && !reduceMotion,
+                    onCheckedChange = onMotion,
+                    enabled = !reduceMotion
                 )
             }
-            SettingGroup("Telugu under each verse", colors) {
-                OptionPill("Off", !showTelugu, colors) { onShowTelugu(false) }
-                OptionPill("On", showTelugu, colors) { onShowTelugu(true) }
+            DsSectionDivider()
+
+            DsSectionLabel("Double-tap color")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                defs.forEach { def ->
+                    val selected = def.colorHex.equals(doubleTapColor, ignoreCase = true)
+                    Box(
+                        Modifier
+                            .clip(CircleShape)
+                            .clickable(role = Role.RadioButton) { onDoubleTapColor(def.colorHex) }
+                            .semantics {
+                                contentDescription = def.label
+                                this.selected = selected
+                            }
+                    ) { Swatch(hexToColor(def.colorHex), selected, colors) }
+                }
             }
-            SettingGroup("Reading aloud: continue reading", colors) {
-                OptionPill("Off", !continueReading, colors) { onContinueReading(false) }
-                OptionPill("On", continueReading, colors) { onContinueReading(true) }
-            }
-            SettingNote(
-                "With the speaker at the top on, each card is read aloud as it comes up" +
-                    if (continueReading) ", then Verse Scroll moves on to the next by itself, hands-free, even with the screen off."
-                    else "; swipe on for the next. Continue reading moves on by itself, hands-free.",
-                colors
+            DsNote(
+                "Double-tapping a verse highlights it in " +
+                    (defs.find { it.colorHex.equals(doubleTapColor, ignoreCase = true) }?.label ?: "this color") + ".",
+                modifier = Modifier.padding(top = 10.dp)
             )
-            SettingGroup("Language, voice and speed", colors) {
-                OptionPill("Reading aloud settings", false, colors, onReadAloudSettings)
-            }
+            DsSectionDivider()
+
+            DsSectionLabel("Telugu")
+            DsToggleRow(
+                label = "Telugu under each verse",
+                subLabel = "The Telugu Bible's verse, under the King James text.",
+                checked = showTelugu,
+                onCheckedChange = onShowTelugu
+            )
+            Spacer(Modifier.height(10.dp))
+            DsSizeAdjustRow(
+                valueLabel = "${teluguSize}px",
+                onDecrease = { onTeluguSize(-1) },
+                onIncrease = { onTeluguSize(1) }
+            )
+            DsSectionDivider()
+
+            DsSectionLabel("Reading aloud")
+            DsToggleRow(
+                label = "Continue reading",
+                subLabel = "With the speaker at the top on, each card is read aloud as it comes up" +
+                    if (continueReading) ", then Verse Scroll moves on to the next by itself, hands-free, even with the screen off."
+                    else ". On: Verse Scroll moves on to the next by itself, hands-free.",
+                checked = continueReading,
+                onCheckedChange = onContinueReading
+            )
+            Spacer(Modifier.height(14.dp))
+            DsOutlineAccentButton(text = "Language, voice and speed", onClick = onReadAloudSettings)
         }
     }
 }
@@ -887,52 +911,6 @@ private fun SourceRow(
             more -> Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = colors.soft, modifier = Modifier.padding(start = 12.dp).size(20.dp))
         }
     }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun SettingGroup(label: String, colors: VsColors, options: @Composable () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SettingLabel(label, colors)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            options()
-        }
-    }
-}
-
-@Composable
-private fun SettingLabel(label: String, colors: VsColors) {
-    Text(label, color = colors.ink, fontFamily = WorkSansFontFamily, fontWeight = FontWeight.Medium, fontSize = 13.5.sp)
-}
-
-@Composable
-private fun SettingNote(text: String, colors: VsColors) {
-    Text(
-        text = text,
-        color = colors.soft,
-        fontFamily = WorkSansFontFamily,
-        fontSize = 12.5.sp,
-        lineHeight = 1.45.em,
-        modifier = Modifier.padding(top = 0.dp)
-    )
-}
-
-@Composable
-private fun OptionPill(label: String, selected: Boolean, colors: VsColors, onClick: () -> Unit) {
-    Text(
-        text = label,
-        color = if (selected) colors.bg else colors.ink,
-        fontFamily = WorkSansFontFamily,
-        fontWeight = FontWeight.Medium,
-        fontSize = 13.sp,
-        modifier = Modifier
-            .clip(CircleShape)
-            .background(if (selected) colors.ink else Color.Transparent)
-            .border(1.dp, if (selected) colors.ink else colors.line, CircleShape)
-            .clickable(role = Role.RadioButton, onClick = onClick)
-            .semantics { this.selected = selected }
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-    )
 }
 
 /**

@@ -63,6 +63,10 @@ class VerseScrollController(
     var showTelugu by mutableStateOf(prefs.getBoolean(KEY_TELUGU, false))
         private set
 
+    /** How big that Telugu is, in sp. */
+    var teluguSize by mutableIntStateOf(prefs.getInt(KEY_TELUGU_SIZE, DEFAULT_TELUGU_SIZE).coerceIn(MIN_TELUGU_SIZE, MAX_TELUGU_SIZE))
+        private set
+
     /** Whether the first-time "double-tap a verse" hint has been dismissed. */
     var hintSeen by mutableStateOf(prefs.getBoolean(KEY_HINT_SEEN, false))
         private set
@@ -85,6 +89,11 @@ class VerseScrollController(
     fun updateShowTelugu(on: Boolean) {
         showTelugu = on
         prefs.edit().putBoolean(KEY_TELUGU, on).apply()
+    }
+
+    fun adjustTeluguSize(by: Int) {
+        teluguSize = (teluguSize + by).coerceIn(MIN_TELUGU_SIZE, MAX_TELUGU_SIZE)
+        prefs.edit().putInt(KEY_TELUGU_SIZE, teluguSize).apply()
     }
 
     fun dismissHint() {
@@ -774,6 +783,7 @@ class VerseScrollController(
         private const val KEY_MOTION = "motion"
         private const val KEY_COLOR = "double_tap_color"
         private const val KEY_TELUGU = "show_telugu"
+        private const val KEY_TELUGU_SIZE = "telugu_size"
         private const val KEY_HINT_SEEN = "hint_seen"
         private const val KEY_COUNT_DATE = "count_date"
         private const val KEY_COUNT = "count"
@@ -784,6 +794,11 @@ class VerseScrollController(
 
         /** Sunshine, the lightest of the twelve highlight colors. */
         const val DEFAULT_COLOR = "#F1F1B1"
+
+        // The Telugu under a verse: the Reader's own size to start with, against the verse's 26.
+        const val DEFAULT_TELUGU_SIZE = 18
+        const val MIN_TELUGU_SIZE = 14
+        const val MAX_TELUGU_SIZE = 24
 
         // A link naming a few verses is shown as that passage when it's this short; otherwise its first verse.
         private const val MAX_PASSAGE = 3

@@ -5,11 +5,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -48,7 +51,7 @@ fun DsSectionLabel(text: String, isFirst: Boolean = false, modifier: Modifier = 
 /**
  * A label + optional description on the left, a pill switch on the right —
  * Capacitor's ".ds-toggle-row" (label: Georgia/serif 17px; sub: sans-serif
- * 13.5px, ink-soft).
+ * 13.5px, ink-soft). Not [enabled]: the label dimmed and the switch fixed.
  */
 @Composable
 fun DsToggleRow(
@@ -56,7 +59,8 @@ fun DsToggleRow(
     subLabel: String? = null,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
     Row(
         modifier = modifier
@@ -70,7 +74,7 @@ fun DsToggleRow(
                 text = label,
                 fontSize = 17.sp,
                 fontFamily = FontFamily.Serif,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.5f)
             )
             if (subLabel != null) {
                 Text(
@@ -82,7 +86,7 @@ fun DsToggleRow(
                 )
             }
         }
-        DsSwitch(checked = checked, onCheckedChange = onCheckedChange)
+        DsSwitch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
     }
 }
 
@@ -189,6 +193,68 @@ private fun DsSizeBtn(
             color = MaterialTheme.colorScheme.onSurface
         )
     }
+}
+
+/**
+ * One of a few choices side by side in a dim bar, the chosen one filled in the accent color — the
+ * reminder frequency's look.
+ */
+@Composable
+fun <T> DsSegmentedRow(
+    options: List<T>,
+    selected: T,
+    label: (T) -> String,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        options.forEach { option ->
+            val isSelected = option == selected
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                    .selectable(selected = isSelected, role = Role.RadioButton) { onSelect(option) }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = label(option),
+                    fontSize = 13.5.sp,
+                    fontFamily = FontFamily.SansSerif,
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+/** A line about a setting, in the toggle rows' description style. */
+@Composable
+fun DsNote(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        fontSize = 13.5.sp,
+        fontFamily = FontFamily.SansSerif,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier
+    )
+}
+
+/** The rule between two sections of settings. */
+@Composable
+fun DsSectionDivider(modifier: Modifier = Modifier) {
+    HorizontalDivider(modifier = modifier.padding(top = 18.dp), color = MaterialTheme.colorScheme.surfaceVariant)
 }
 
 /**

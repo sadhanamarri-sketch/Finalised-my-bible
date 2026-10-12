@@ -339,3 +339,22 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     ("SUNSHINE · 4"), so a verse highlighted in the Reader still shows when it comes up in
     a passage; tags that don't fit go on to a second line. A double-tap still pops the ring
     under your finger and opens the colour box.
+
+13. **Done 12 Oct.** **Verse Scroll's settings, like the rest of the app's.** "Can we revamp the
+    settings of verse scroll in sync with rest of the app?"
+    *Built:* Verse Scroll's settings are laid out like the app's Settings page, from the same
+    parts: gold section headings (Background, Double-tap color, Telugu, Reading aloud), a
+    switch for each on/off setting with a line about it, dividers between sections, the
+    same text-size row, and an outline button on to reading aloud's settings. "Gentle
+    motion" shows only with nature photos on, and can't be turned on when the phone is set
+    to reduce motion. Reading aloud's settings, which open from there and from the Reader,
+    match too: "Read in" is a segmented choice like Settings' reminder frequency, each
+    language a section, and "Get more voices", "Speech settings" and "Get a Telugu voice"
+    outline buttons. Both sheets use the page's own colour, so their controls show in the
+    dark themes as they do on the Settings page.
+
+14. **Done 12 Oct.** **Verse Scroll: bigger Telugu.** "Increase the font of telugu in verse
+    scroll a bit because it's too small to read."
+    *Built:* the Telugu under each verse is 18 (it was 15), the Reader's own Telugu size, and
+    can be set from 14 to 24 in Verse Scroll's settings, under the Telugu switch. It runs to
+    six lines before "…" (it was four), so most verses show it whole.

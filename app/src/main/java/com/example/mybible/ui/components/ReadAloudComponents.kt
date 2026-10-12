@@ -24,13 +24,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.mybible.audio.VoiceDepths
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -62,15 +58,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.example.mybible.audio.ReadAloud
@@ -153,11 +147,11 @@ fun ReadAloudBar(
 }
 
 /**
- * Reading aloud's settings: the language, then for each language read its own speed, pitch and voice
- * (each tried as it's changed), and, from Verse Scroll ([inVerseScroll]), whether to go on to the next
- * card by itself.
+ * Reading aloud's settings, laid out like the app's Settings: the language, then for each language read its
+ * own speed, pitch and voice (each tried as it's changed), more voices, and, from Verse Scroll
+ * ([inVerseScroll]), whether to go on to the next card by itself.
  */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReadAloudSheet(
     readAloud: ReadAloud,
@@ -207,38 +201,44 @@ fun ReadAloudSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MaterialTheme.colorScheme.surface
+        // The page's own color, as the app's Settings: its controls and dividers show against it.
+        containerColor = MaterialTheme.colorScheme.background
     ) {
         Column(
-            verticalArrangement = Arrangement.spacedBy(18.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
                 .navigationBarsPadding()
-                .padding(start = 20.dp, end = 20.dp, bottom = 16.dp)
+                .padding(start = 20.dp, end = 20.dp, bottom = 20.dp)
         ) {
             Text(
                 text = "Reading aloud",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
-                fontFamily = WorkSansFontFamily,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 18.sp
+                modifier = Modifier.padding(bottom = 18.dp)
             )
             if (state.noVoice) {
-                Note("This phone has no voice to read with. Google's Speech Services, from the Play Store, adds one.")
+                DsNote(
+                    "This phone has no voice to read with. Google's Speech Services, from the Play Store, adds one.",
+                    modifier = Modifier.padding(bottom = 18.dp)
+                )
             }
 
-            Group("Read in") {
-                ReadLanguage.entries.forEach { language ->
-                    Choice(language.label, settings.language == language) { settings.updateLanguage(language) }
-                }
-            }
-            Note(
+            DsSectionLabel("Read in", isFirst = true)
+            DsSegmentedRow(
+                options = ReadLanguage.entries,
+                selected = settings.language,
+                label = { it.label },
+                onSelect = settings::updateLanguage
+            )
+            DsNote(
                 when (settings.language) {
                     ReadLanguage.ENGLISH -> "The King James text, verse by verse."
                     ReadLanguage.TELUGU -> "The Telugu Bible's text, verse by verse."
                     ReadLanguage.BOTH -> "Each verse in English, then in Telugu."
-                }
+                },
+                modifier = Modifier.padding(top = 10.dp)
             )
             // Each language read, with its own speed, pitch and voice.
             val read = when (settings.language) {
@@ -248,6 +248,7 @@ fun ReadAloudSheet(
             }
             for (telugu in read) {
                 key(telugu) {
+                    DsSectionDivider()
                     LanguageSettings(
                         language = if (telugu) "Telugu" else "English",
                         settings = settings,
@@ -263,29 +264,40 @@ fun ReadAloudSheet(
                 }
             }
             when {
-                measuring -> Note("Listening to each voice to sort them from the deepest…")
+                measuring -> DsNote("Listening to each voice to sort them from the deepest…", modifier = Modifier.padding(top = 12.dp))
                 state.status == ReadAloudState.Status.PLAYING && readAloud.voicesUnmeasured(englishVoices + teluguVoices) ->
-                    Note("Pause the reading to sort the voices from the deepest.")
+                    DsNote("Pause the reading to sort the voices from the deepest.", modifier = Modifier.padding(top = 12.dp))
             }
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Group("More voices") {
-                    Choice("Get more voices", selected = false) { openVoiceInstaller(context) }
-                    Choice("Phone speech settings", selected = false) { openSpeechSettings(context) }
-                }
-                Note("Google's speech engine has more voices to download, some of them men's. The phone's speech settings choose its speech engine.")
+
+            DsSectionDivider()
+            DsSectionLabel("More voices")
+            DsNote("Google's speech engine has more voices to download, some of them men's. The phone's speech settings choose its speech engine.")
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 14.dp)
+            ) {
+                DsOutlineAccentButton(text = "Get more voices", onClick = { openVoiceInstaller(context) }, modifier = Modifier.weight(1f))
+                DsOutlineAccentButton(text = "Speech settings", onClick = { openSpeechSettings(context) }, modifier = Modifier.weight(1f))
             }
 
             if (inVerseScroll) {
-                Group("Continue reading") {
-                    Choice("Off", !settings.continueReading) { settings.updateContinueReading(false) }
-                    Choice("On", settings.continueReading) { settings.updateContinueReading(true) }
-                }
-                Note(
-                    if (settings.continueReading) "Once a verse has been read, Verse Scroll moves on to the next card and reads it, hands-free, until you pause."
-                    else "Each card is read as it comes up; swipe on for the next."
+                DsSectionDivider()
+                DsSectionLabel("Verse Scroll")
+                DsToggleRow(
+                    label = "Continue reading",
+                    subLabel = if (settings.continueReading) "Once a verse has been read, Verse Scroll moves on to the next card and reads it, hands-free, until you pause."
+                    else "Each card is read as it comes up; swipe on for the next.",
+                    checked = settings.continueReading,
+                    onCheckedChange = settings::updateContinueReading
                 )
             }
-            Note("Read in your phone's own voice, offline. It keeps reading with the screen off; pause or stop it from the notification.")
+            DsSectionDivider()
+            DsNote(
+                "Read in your phone's own voice, offline. It keeps reading with the screen off; pause or stop it from the notification.",
+                modifier = Modifier.padding(top = 14.dp)
+            )
         }
     }
 }
@@ -359,7 +371,7 @@ fun openSpeechSettings(context: Context) {
     }
 }
 
-// One language's own settings, in a panel of their own: its speed, its pitch and its voice. Without a
+// One language's own settings, a section of their own: its speed, its pitch and its voice. Without a
 // voice for it on the phone ([noVoice]), a way to get one instead.
 @Composable
 private fun LanguageSettings(
@@ -374,37 +386,28 @@ private fun LanguageSettings(
     onPlay: (VoiceOption) -> Unit,
     onGetVoice: () -> Unit
 ) {
-    Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.background) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 10.dp)
-        ) {
-            Text(language, color = MaterialTheme.colorScheme.onSurface, fontFamily = WorkSansFontFamily, fontWeight = FontWeight.SemiBold, fontSize = 15.5.sp)
-            if (noVoice) {
-                Note(
-                    if (settings.language == ReadLanguage.BOTH) "This phone has no Telugu voice yet, so only the English is read."
-                    else "This phone has no Telugu voice yet, so nothing can be read in Telugu."
+    DsSectionLabel(language)
+    if (noVoice) {
+        DsNote(
+            if (settings.language == ReadLanguage.BOTH) "This phone has no Telugu voice yet, so only the English is read."
+            else "This phone has no Telugu voice yet, so nothing can be read in Telugu."
+        )
+        DsOutlineAccentButton(text = "Get a Telugu voice", onClick = onGetVoice, modifier = Modifier.padding(top = 14.dp))
+    } else {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            SpeedAndPitch(language, settings, telugu, onChanged)
+            if (voices.isNotEmpty()) {
+                VoiceList(
+                    title = "Voice",
+                    voices = voices,
+                    selected = selected,
+                    measuring = measuring,
+                    onPick = { voice ->
+                        settings.updateVoice(telugu, name = voice.name)
+                        onChanged()
+                    },
+                    onPlay = onPlay
                 )
-                Row(modifier = Modifier.padding(bottom = 4.dp)) {
-                    Choice("Get a Telugu voice", selected = false, onClick = onGetVoice)
-                }
-            } else {
-                SpeedAndPitch(language, settings, telugu, onChanged)
-                if (voices.isNotEmpty()) {
-                    VoiceList(
-                        title = "Voice",
-                        voices = voices,
-                        selected = selected,
-                        measuring = measuring,
-                        onPick = { voice ->
-                            settings.updateVoice(telugu, name = voice.name)
-                            onChanged()
-                        },
-                        onPlay = onPlay
-                    )
-                }
             }
         }
     }
@@ -455,7 +458,7 @@ private fun VoiceList(
         voices.filterIndexed { i, voice -> i < SHOWN_VOICES || voice.name == selected }
     }
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(title, color = MaterialTheme.colorScheme.onSurface, fontFamily = WorkSansFontFamily, fontWeight = FontWeight.Medium, fontSize = 13.5.sp)
+        SettingName(title)
         for (voice in shown) {
             VoiceRow(voice, selected = voice.name == selected, measuring = measuring, onPick = { onPick(voice) }, onPlay = { onPlay(voice) })
         }
@@ -463,16 +466,16 @@ private fun VoiceList(
             Text(
                 text = "All ${voices.size} voices",
                 color = MaterialTheme.colorScheme.primary,
-                fontFamily = WorkSansFontFamily,
-                fontWeight = FontWeight.Medium,
-                fontSize = 13.sp,
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.5.sp,
                 modifier = Modifier
                     .clip(CircleShape)
                     .clickable { all = true }
                     .padding(horizontal = 10.dp, vertical = 8.dp)
             )
         }
-        if (selected == null || voices.none { it.name == selected }) Note("Read in the phone's usual voice until the voices are measured.")
+        if (selected == null || voices.none { it.name == selected }) DsNote("Read in the phone's usual voice until the voices are measured.")
     }
 }
 
@@ -496,9 +499,9 @@ private fun VoiceRow(voice: VoiceOption, selected: Boolean, measuring: Boolean, 
                 .weight(1f)
                 .padding(start = 6.dp, top = 6.dp, bottom = 6.dp)
         ) {
-            Text(voice.label, color = MaterialTheme.colorScheme.onSurface, fontFamily = WorkSansFontFamily, fontSize = 14.sp)
+            Text(voice.label, color = MaterialTheme.colorScheme.onSurface, fontFamily = FontFamily.SansSerif, fontSize = 15.sp)
             if (about.isNotEmpty()) {
-                Text(about, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = WorkSansFontFamily, fontSize = 12.sp)
+                Text(about, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = FontFamily.SansSerif, fontSize = 13.sp)
             }
         }
         IconButton(onClick = onPlay) {
@@ -527,23 +530,22 @@ private fun SliderSetting(
     val shown = dragged ?: value
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(label, color = MaterialTheme.colorScheme.onSurface, fontFamily = WorkSansFontFamily, fontWeight = FontWeight.Medium, fontSize = 13.5.sp)
+            SettingName(label)
             Text(
                 text = timesLabel(shown),
-                color = MaterialTheme.colorScheme.onSurface,
-                fontFamily = WorkSansFontFamily,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 13.5.sp,
-                modifier = Modifier.padding(start = 8.dp)
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontFamily = FontFamily.SansSerif,
+                fontSize = 14.5.sp,
+                modifier = Modifier.padding(start = 10.dp)
             )
             Spacer(modifier = Modifier.weight(1f))
             if (kotlin.math.abs(shown - usual) > 0.001f) {
                 Text(
                     text = "Reset",
                     color = MaterialTheme.colorScheme.primary,
-                    fontFamily = WorkSansFontFamily,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 13.sp,
+                    fontFamily = FontFamily.SansSerif,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.5.sp,
                     modifier = Modifier
                         .clip(CircleShape)
                         .clickable {
@@ -565,9 +567,9 @@ private fun SliderSetting(
             modifier = Modifier.semantics { contentDescription = description }
         )
         Row {
-            Text(ends.first, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = WorkSansFontFamily, fontSize = 12.sp)
+            Text(ends.first, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = FontFamily.SansSerif, fontSize = 12.5.sp)
             Spacer(modifier = Modifier.weight(1f))
-            Text(ends.second, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = WorkSansFontFamily, fontSize = 12.sp)
+            Text(ends.second, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = FontFamily.SansSerif, fontSize = 12.5.sp)
         }
     }
 }
@@ -577,46 +579,10 @@ private const val SLIDER_STEP = 0.05f
 // "1×", "1.25×", "0.85×".
 private fun timesLabel(value: Float): String = String.format(java.util.Locale.US, "%.2f", value).trimEnd('0').trimEnd('.') + "×"
 
-@OptIn(ExperimentalLayoutApi::class)
+// A setting's name, as the app's Settings names its switches.
 @Composable
-private fun Group(label: String, options: @Composable () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(label, color = MaterialTheme.colorScheme.onSurface, fontFamily = WorkSansFontFamily, fontWeight = FontWeight.Medium, fontSize = 13.5.sp)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            options()
-        }
-    }
-}
-
-@Composable
-private fun Note(text: String) {
-    Text(
-        text = text,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        fontFamily = WorkSansFontFamily,
-        fontSize = 12.5.sp,
-        lineHeight = 1.45.em
-    )
-}
-
-// A pill to pick, like Verse Scroll's settings.
-@Composable
-private fun Choice(label: String, selected: Boolean, onClick: () -> Unit) {
-    val ink = MaterialTheme.colorScheme.onBackground
-    Text(
-        text = label,
-        color = if (selected) MaterialTheme.colorScheme.background else ink,
-        fontFamily = WorkSansFontFamily,
-        fontWeight = FontWeight.Medium,
-        fontSize = 13.sp,
-        modifier = Modifier
-            .clip(CircleShape)
-            .background(if (selected) ink else Color.Transparent)
-            .border(1.dp, if (selected) ink else MaterialTheme.colorScheme.outlineVariant, CircleShape)
-            .clickable(role = Role.RadioButton, onClick = onClick)
-            .semantics { this.selected = selected }
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-    )
+private fun SettingName(text: String) {
+    Text(text, fontSize = 17.sp, fontFamily = FontFamily.Serif, color = MaterialTheme.colorScheme.onSurface)
 }
 
 private const val ENGLISH_SAMPLE = "For God so loved the world."

@@ -35,6 +35,7 @@ import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.components.BackTopBar
 import com.example.mybible.ui.components.DsOutlineAccentButton
 import com.example.mybible.ui.components.DsSectionLabel
+import com.example.mybible.ui.components.DsSegmentedRow
 import com.example.mybible.ui.components.DsSizeAdjustRow
 import com.example.mybible.ui.components.DsSwitch
 import com.example.mybible.ui.components.DsToggleRow
@@ -398,36 +399,12 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 6.dp)
             )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                ReminderFrequency.entries.forEach { freq ->
-                    val selected = freq == reminderFrequency
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
-                            .clickable { viewModel.setReminderFrequency(freq) }
-                            .padding(vertical = 10.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = freq.label,
-                            fontSize = 13.5.sp,
-                            fontFamily = FontFamily.SansSerif,
-                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                            color = if (selected) MaterialTheme.colorScheme.onPrimary
-                                else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
+            DsSegmentedRow(
+                options = ReminderFrequency.entries,
+                selected = reminderFrequency,
+                label = { it.label },
+                onSelect = { viewModel.setReminderFrequency(it) }
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 

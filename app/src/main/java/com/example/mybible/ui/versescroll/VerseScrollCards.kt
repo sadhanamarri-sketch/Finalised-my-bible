@@ -95,6 +95,9 @@ private val CardBottomPadding = 122.dp
 private const val VERSE_SIZE = 26f
 private const val VERSE_LINE_HEIGHT = 1.4f
 
+// The Telugu under a verse stops after this many lines, with "…".
+private const val TELUGU_LINES = 6
+
 // The space between the parts of the card (eyebrow, verse, reference, note), and between a passage's verses.
 private val STACK_GAP = 14.dp
 private val VERSE_GAP = (VERSE_SIZE * 0.35f).dp
@@ -145,6 +148,7 @@ private data class Burst(val id: Long, val at: Offset, val color: Color)
  * as every other (cut short with "…" if it runs out of room). Double-tap highlights, long-press opens
  * the full verse sheet.
  *
+ * @param teluguSize the Telugu under the verse's size, in sp (when [showTelugu]).
  * @param highlightHexes a verse's highlight colors (up to three), in the order they were put on.
  * @param onDoubleTap highlights the card; returns the color for the burst under the finger.
  */
@@ -158,6 +162,7 @@ internal fun VerseCardPage(
     reduceMotion: Boolean,
     isCurrent: Boolean,
     showTelugu: Boolean,
+    teluguSize: Int,
     highlightHexes: (VerseRef) -> List<String>,
     colorLabel: (String) -> String,
     notePreview: String?,
@@ -225,6 +230,7 @@ internal fun VerseCardPage(
                 colors = c,
                 onScene = onScene,
                 showTelugu = showTelugu,
+                teluguSize = teluguSize,
                 highlightHexes = highlightHexes,
                 colorLabel = colorLabel,
                 notePreview = notePreview
@@ -254,6 +260,7 @@ private fun VerseStack(
     colors: VsColors,
     onScene: Boolean,
     showTelugu: Boolean,
+    teluguSize: Int,
     highlightHexes: (VerseRef) -> List<String>,
     colorLabel: (String) -> String,
     notePreview: String?
@@ -284,9 +291,9 @@ private fun VerseStack(
                             Text(
                                 text = telugu,
                                 color = colors.soft,
-                                fontSize = 15.sp,
+                                fontSize = teluguSize.sp,
                                 lineHeight = 1.65.em,
-                                maxLines = 4,
+                                maxLines = TELUGU_LINES,
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
