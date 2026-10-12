@@ -190,7 +190,16 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     dissolve, the Reader fading in over Verse Scroll (`VERSE_SCROLL_DISSOLVE_MS` in
     `MainActivity.kt`), and the old chapter's flash was removed; something still looks
     rough.
-    *To check:* what it looks like — the Reader jumping to the verse after it appears, a
-    blank or paper-coloured flash, a stutter during the fade, or the Return banner popping
-    in late? Every time, or only the first time? Then record the switch frame by frame
-    (as was done for the old-chapter flash) to find the rough frames before changing it.
+    **Found 12 Oct, from your screen recording (Hosea 6:11, dark theme, 74 frames):**
+    the Reader's words, banner, "Mark Hosea 6 studied" and bar fade in *on top of* the
+    Verse Scroll card for 0.3 seconds — two sets of words and two bars over the wheat photo
+    (1.80–2.07 s) — and then, in a single frame (2.10 s), the photo is swapped for the
+    Reader's dark page: a hard cut, the screen's brightness dropping from 60 to 34 at once.
+    *Why:* the Reader paints no background of its own (its root `Box` in `ReaderScreen.kt`
+    leaves that to the app's background behind every page). In the dissolve the Reader
+    fades in over Verse Scroll, which stays fully drawn underneath until the end — so only
+    the Reader's words fade in, and its page colour only appears when Verse Scroll is
+    removed.
+    *Fix:* give the page fading in its own background, so the dark (or paper) page itself
+    fades in over the photo and the words with it — a true dissolve, nothing doubled and no
+    cut at the end. A small change; check it frame by frame afterwards.
