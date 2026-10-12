@@ -397,10 +397,12 @@ private fun SearchPage(
             // The results as a Verse Scroll, one verse at a time, shuffled.
             if (!isSearching && searchQuery.trim().length >= 2 && outcome.hits.isNotEmpty()) {
                 ScrollTheseButton {
+                    val refs = outcome.hits.map { VerseRef(it.verse.book, it.verse.chapter, it.verse.number) }
                     viewModel.scrollVerses(
                         title = scrollTitle(searchQuery.trim(), outcome),
                         from = "Search",
-                        refs = outcome.hits.map { VerseRef(it.verse.book, it.verse.chapter, it.verse.number) }
+                        refs = refs,
+                        matched = refs.zip(outcome.hits) { ref, hit -> ref.key to hit.matched }.toMap()
                     )
                 }
             }

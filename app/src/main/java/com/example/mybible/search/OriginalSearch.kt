@@ -1,6 +1,7 @@
 package com.example.mybible.search
 
 import com.example.mybible.model.LinkedWord
+import com.example.mybible.model.MatchedWord
 import com.example.mybible.model.OriginalWordCard
 import com.example.mybible.model.RelatedKind
 import com.example.mybible.model.SearchHit
@@ -341,6 +342,13 @@ class OriginalSearch(private val index: BibleIndex, private val lexicon: SearchL
             }
         }
 
+        // What found each verse, for Verse Scroll: the word's meaning there, when it has several
+        // ("forgive", "permit"), else the word ("Greek agapē").
+        val chips = chosen.toHashSet()
+        val matchedOf = all.associateWith { m ->
+            MatchedWord(if (m in chips) m.label else "${m.word.language} ${m.word.transliteration.substringBefore(',')}", MatchedWord.Kind.WORD)
+        }
+
         val spellings = HashMap<String, HashMap<String, Int>>()
         val hits = ArrayList<SearchHit>(found.cardinality())
         var id = found.nextSetBit(0)
@@ -348,7 +356,8 @@ class OriginalSearch(private val index: BibleIndex, private val lexicon: SearchL
             val here = all.filter { on(it) && it.verses.get(id) }
             val reasons = chosen.filter { it in here }
                 .map { "${it.word.transliteration.substringBefore(',')}, meaning “${it.word.gloss}”" }.distinct()
-            hits += hit(id, here.flatMapTo(HashSet()) { m -> m.senses.flatMap(lexicon::markedFormsOf) }, reasons, spellings)
+            val marked = here.flatMapTo(HashSet()) { m -> m.senses.flatMap(lexicon::markedFormsOf) }
+            hits += hit(id, marked, reasons, spellings, here.map(matchedOf::getValue).distinct())
             id = found.nextSetBit(id + 1)
         }
         // Each word of the query: the likelier word it can be, then the others.
@@ -397,7 +406,7 @@ class OriginalSearch(private val index: BibleIndex, private val lexicon: SearchL
                 "${other.word.language} ${sense.transliteration.substringBefore(',')}, meaning “${sense.gloss}”"
             }
             val marked = here.flatMapTo(HashSet()) { other -> other.senses.flatMap { lexicon.markedFormsOf(it.first) } }
-            related += hit(id, marked, reasons, spellings)
+            related += hit(id, marked, reasons, spellings, here.map { MatchedWord(it.label, MatchedWord.Kind.ORIGINAL) }.distinct())
             id = shown.nextSetBit(id + 1)
         }
         val chips = others.map { SearchSource(listOf(it.id), it.label, it.verses.cardinality(), it.id !in disabled, index.countByBook(it.verses)) }
@@ -463,7 +472,13 @@ class OriginalSearch(private val index: BibleIndex, private val lexicon: SearchL
         }
     }
 
-    private fun hit(id: Int, marked: Set<String>, reasons: List<String>, spellings: HashMap<String, HashMap<String, Int>>): SearchHit {
+    private fun hit(
+        id: Int,
+        marked: Set<String>,
+        reasons: List<String>,
+        spellings: HashMap<String, HashMap<String, Int>>,
+        matched: List<MatchedWord>
+    ): SearchHit {
         val verse = index[id]
         val text = verse.text
         val highlights = ArrayList<IntRange>()
@@ -473,7 +488,7 @@ class OriginalSearch(private val index: BibleIndex, private val lexicon: SearchL
                 spellings.getOrPut(word) { HashMap() }.merge(text.substring(start, end), 1, Int::plus)
             }
         }
-        return SearchHit(Verse(verse.book, verse.chapter, verse.number, text), text, highlights, reasons = reasons)
+        return SearchHit(Verse(verse.book, verse.chapter, verse.number, text), text, highlights, reasons = reasons, matched = matched)
     }
 
     private fun card(senses: List<OriginalWord>, spellings: Map<String, Map<String, Int>>, alternative: Boolean): OriginalWordCard {

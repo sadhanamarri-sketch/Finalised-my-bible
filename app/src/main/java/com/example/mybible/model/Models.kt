@@ -106,8 +106,27 @@ data class SearchHit(
      * ("careful" for worry), or the same Greek or Hebrew word. [reasons] say which.
      */
     val related: Boolean = false,
-    val reasons: List<String> = emptyList()
+    val reasons: List<String> = emptyList(),
+    /** What found it, for Verse Scroll's chips and its filter when the results are scrolled through. */
+    val matched: List<MatchedWord> = emptyList()
 )
+
+/**
+ * What found a search's verse: the word searched for, in the form the verse has it ("loveth");
+ * the King James wording for it ("charity"); or a Greek or Hebrew word with its meaning ("Greek
+ * agapaō"). For a word searched in Greek or Hebrew: its meaning in the verse ("forgive") when it
+ * has several, or the word ("Greek agapē"), and the other Testament's word ("Hebrew ahavah").
+ */
+data class MatchedWord(val label: String, val kind: Kind) {
+    enum class Kind {
+        /** The word searched for: one of its forms, or of its meanings. */
+        WORD,
+        /** The King James wording for a word of today. */
+        WORDING,
+        /** A Greek or Hebrew word with the same meaning. */
+        ORIGINAL
+    }
+}
 
 /**
  * Something a search also matched besides the words as typed, shown as a chip that switches it

@@ -1,5 +1,6 @@
 package com.example.mybible.versescroll
 
+import com.example.mybible.model.MatchedWord
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
@@ -32,6 +33,46 @@ class VerseSourceTest {
         assertEquals("3 verses from Search, shuffled", VerseSource.Found("“love”", "Search", List(3) { VerseRef("John", 3, it + 1) }).blurb)
         assertTrue(VerseSource.Book("Ruth").inOrder)
         assertTrue(!VerseSource.Highlighted.inOrder)
+    }
+
+    @Test
+    fun aSearchsVersesByTheWordsThatFoundThem() {
+        val love = MatchedWord("love", MatchedWord.Kind.WORD)
+        val loveth = MatchedWord("loveth", MatchedWord.Kind.WORD)
+        val charity = MatchedWord("charity", MatchedWord.Kind.WORDING)
+        val agapao = MatchedWord("Greek agapaō", MatchedWord.Kind.ORIGINAL)
+        val lev = VerseRef("Leviticus", 19, 18)
+        val john = VerseRef("1 John", 4, 8)
+        val cor = VerseRef("1 Corinthians", 13, 4)
+        val ps = VerseRef("Psalms", 18, 1)
+        val mk = VerseRef("Mark", 12, 30)
+        val matched = mapOf(
+            lev.key to listOf(love), john.key to listOf(loveth, love), cor.key to listOf(charity),
+            ps.key to listOf(agapao), mk.key to listOf(love)
+        )
+        val found = VerseSource.Found("“love”", "Search", listOf(lev, john, cor, ps, mk), matched)
+
+        // The word searched for first, then the King James wording, then Greek and Hebrew; most verses first.
+        assertEquals(listOf(love to 3, loveth to 1, charity to 1, agapao to 1), found.words)
+        assertEquals(listOf(loveth, love), found.wordsOf(john))
+        // Nothing picked: all of them.
+        assertEquals(found.refs, found.shown)
+        assertEquals("5 verses from Search, shuffled", found.blurb)
+
+        // A verse is shown when any word that found it is picked.
+        val picked = found.copy(only = setOf(loveth, charity))
+        assertEquals(listOf(john, cor), picked.shown)
+        assertEquals("2 of 5 verses from Search, shuffled", picked.blurb)
+        // The chips stay, with their counts over all of the verses.
+        assertEquals(found.words, picked.words)
+
+        // One word for every verse, or none (a topic's): nothing to pick, and no chips on the cards.
+        val one = VerseSource.Found("“LORD”", "Search", listOf(lev, mk), mapOf(lev.key to listOf(love), mk.key to listOf(love)))
+        assertTrue(one.words.isEmpty())
+        assertTrue(one.wordsOf(lev).isEmpty())
+        val topic = VerseSource.Found("Faith", "Nave’s topic", listOf(lev, mk))
+        assertTrue(topic.words.isEmpty())
+        assertEquals(topic.refs, topic.shown)
     }
 
     @Test

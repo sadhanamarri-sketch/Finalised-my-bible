@@ -617,12 +617,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * "Scroll these" on Search's results or a Nave's topic: Verse Scroll through just those verses,
-     * shuffled. [title] names them ("“love”", "Faith"); [from] says where they came from.
+     * shuffled. [title] names them ("“love”", "Faith"); [from] says where they came from; [matched],
+     * for a search's, what found each verse (by VerseRef.key), to show on its card and filter by.
      */
-    fun scrollVerses(title: String, from: String, refs: List<VerseRef>) {
+    fun scrollVerses(title: String, from: String, refs: List<VerseRef>, matched: Map<String, List<MatchedWord>> = emptyMap()) {
         if (refs.isEmpty()) return
         verseScrollOrigin = NavTab.SEARCH
-        verseScroll.showFound(title, from, refs)
+        verseScroll.showFound(title, from, refs, matched)
         selectTab(NavTab.VERSE_SCROLL)
     }
 

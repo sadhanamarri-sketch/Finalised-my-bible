@@ -1,5 +1,8 @@
 package com.example.mybible.search
 
+import com.example.mybible.model.MatchedWord.Kind.ORIGINAL
+import com.example.mybible.model.MatchedWord.Kind.WORD
+import com.example.mybible.model.MatchedWord.Kind.WORDING
 import com.example.mybible.model.SearchHit
 import com.example.mybible.model.SearchOutcome
 import org.junit.Assert.assertEquals
@@ -108,6 +111,32 @@ class SmartSearchTest {
 
         assertTrue(search.search("xyzzy plugh").hits.isEmpty())
         assertTrue(search.search("a").hits.isEmpty())
+    }
+
+    @Test
+    fun whatFoundEachVerse() {
+        // For Verse Scroll's chips and filter: the form of the word a verse has, or what else found it.
+        fun SearchOutcome.found(ref: String) = hit(ref).matched.map { it.label to it.kind }
+        val love = search.search("love")
+        assertEquals(listOf("love" to WORD), love.found("Leviticus 19:18"))
+        assertEquals(listOf("loved" to WORD), love.found("John 3:16"))
+        assertEquals(listOf("loveth" to WORD, "love" to WORD), love.found("1 John 4:8"))
+        assertEquals(listOf("charity" to WORDING), love.found("1 Corinthians 13:4"))
+        // Word forms switched off: only the word itself.
+        assertEquals(listOf("love" to WORD), search.search("love", disabled = setOf(SmartSearch.FORMS)).found("1 John 4:8"))
+
+        // A King James wording switched off leaves the Greek word.
+        assertEquals(listOf("careful" to WORDING), search.search("worry").found("Philippians 4:6"))
+        assertEquals(listOf("Greek merimnaō" to ORIGINAL), search.search("worry", disabled = setOf("kjv:careful")).found("Philippians 4:6"))
+
+        // More than one word: the words as typed, or the wording for them.
+        val spirit = search.search("Holy Spirit")
+        assertEquals(listOf("holy spirit" to WORD), spirit.found("Luke 11:13"))
+        assertEquals(listOf("holy ghost" to WORDING), spirit.found("Matthew 1:18"))
+        // Case-sensitive: as typed, capitals and all.
+        assertEquals(listOf("LORD" to WORD), search.search("LORD", caseSensitive = true).found("Psalms 23:1"))
+        // Verses with all but one of the words say nothing.
+        assertTrue(search.search("the truth will set you free").hits.all { it.matched.isEmpty() })
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.example.mybible.search
 
+import com.example.mybible.model.MatchedWord
 import com.example.mybible.model.OriginalWordCard
 import com.example.mybible.model.SearchHit
 import com.example.mybible.model.SearchOutcome
@@ -73,7 +74,20 @@ class SmartSearch(private val index: BibleIndex, private val lexicon: SearchLexi
         relatedHits.sortWith(byPlace)
 
         val highlighter = Highlighter(terms, ::exactOf, caseSensitive, formsOn, ranking.slots)
-        val hits = exactHits.map { highlighter.hit(it, related = false) } + relatedHits.map { highlighter.hit(it, related = true) }
+        // What found each verse, for Verse Scroll: what says it in other words, or for one word,
+        // the forms of it the verse has (love, loveth); for more, the words as typed.
+        val one = required.singleOrNull()?.takeIf { it.words.size == 1 && !caseSensitive }?.words?.get(0)
+        val oneForms = one?.let { if (formsOn) lexicon.formsOf(it) else setOf(it) }
+        val typedWords = letters.findAll(query).joinToString(" ") { it.value }
+        val asTyped = listOf(MatchedWord(if (caseSensitive) typedWords else typedWords.lowercase(), MatchedWord.Kind.WORD))
+        fun matched(ranked: Ranked): List<MatchedWord> = when {
+            ranked.reasons.isNotEmpty() -> ranked.reasons.map { it.matched }.distinct()
+            oneForms == null -> asTyped
+            else -> ranked.words.mapNotNullTo(LinkedHashSet()) { it.word.takeIf(oneForms::contains) }
+                .map { MatchedWord(it, MatchedWord.Kind.WORD) }.ifEmpty { asTyped }
+        }
+        val hits = exactHits.map { highlighter.hit(it, related = false, matched = matched(it)) } +
+            relatedHits.map { highlighter.hit(it, related = true, matched = matched(it)) }
         val sources = if (caseSensitive) emptyList() else chips(required, matching, ::exactOf, disabled)
 
         if (hits.isNotEmpty()) return SearchOutcome(hits, exactHits.size, sources)
@@ -162,6 +176,11 @@ class SmartSearch(private val index: BibleIndex, private val lexicon: SearchLexi
         val words: List<String> = emptyList()
     ) {
         var rank = 0
+
+        /** What it tells Verse Scroll found a verse: "charity", "Greek agapē". */
+        val matched: MatchedWord
+            get() = if (kind == Kind.WORDING) MatchedWord(words.joinToString(" "), MatchedWord.Kind.WORDING)
+            else MatchedWord(chip, MatchedWord.Kind.ORIGINAL)
     }
 
     private fun addSources(required: List<Term>) {
@@ -293,7 +312,7 @@ class SmartSearch(private val index: BibleIndex, private val lexicon: SearchLexi
     ) {
         private val allFunctionWords = terms.all { t -> t.words.all { it in STOPWORDS } }
 
-        fun hit(ranked: Ranked, related: Boolean, reasons: List<String>? = null): SearchHit {
+        fun hit(ranked: Ranked, related: Boolean, reasons: List<String>? = null, matched: List<MatchedWord> = emptyList()): SearchHit {
             val verse = index[ranked.id]
             val text = verse.text
             val words = ranked.words
@@ -313,7 +332,8 @@ class SmartSearch(private val index: BibleIndex, private val lexicon: SearchLexi
                 text = text,
                 highlights = merged(marks),
                 related = related,
-                reasons = reasons ?: ranked.reasons.map { it.reason }.distinct()
+                reasons = reasons ?: ranked.reasons.map { it.reason }.distinct(),
+                matched = matched
             )
         }
     }
@@ -523,6 +543,8 @@ class SmartSearch(private val index: BibleIndex, private val lexicon: SearchLexi
     }
 
     companion object {
+        private val letters = Regex("[A-Za-z]+")
+
         /** Id of the "Word forms" chip. */
         const val FORMS = "forms"
         /** A word already in this many verses gets no Greek and Hebrew: come, say, lord. */

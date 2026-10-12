@@ -1,6 +1,7 @@
 package com.example.mybible.search
 
 import com.example.mybible.data.byNumber
+import com.example.mybible.model.MatchedWord
 import com.example.mybible.model.RelatedKind
 import com.example.mybible.model.WordLink
 import com.example.mybible.model.WordLinkKind
@@ -90,6 +91,18 @@ class OriginalSearchTest {
         // Its chip stays, off, saying what it would bring back.
         assertFalse(off.sources.first { it.label == "forgive" }.enabled)
         assertEquals(2, off.sources.first { it.label == "forgive" }.count)
+    }
+
+    @Test
+    fun whatFoundEachVerse() {
+        // For Verse Scroll's chips and filter: a word's meaning in a verse, when it has several.
+        val aphiemi = search.search("ἀφίημι")
+        assertEquals(listOf(MatchedWord("to release", MatchedWord.Kind.WORD)), aphiemi.hit("Matthew 4:20").matched)
+        assertEquals(listOf(MatchedWord("forgive", MatchedWord.Kind.WORD)), aphiemi.hit("John 20:23").matched)
+        // One meaning: the word itself; then the other Testament's word.
+        val loved = search.search("ἠγάπησεν")
+        assertEquals(listOf(MatchedWord("Greek agapaō", MatchedWord.Kind.WORD)), loved.hit("John 3:16").matched)
+        assertEquals(listOf(MatchedWord("Hebrew ahav", MatchedWord.Kind.ORIGINAL)), loved.hit("Leviticus 19:18").matched)
     }
 
     @Test

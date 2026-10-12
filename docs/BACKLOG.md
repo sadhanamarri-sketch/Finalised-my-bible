@@ -386,3 +386,20 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     touch-and-hold is noise cancellation, set in their app, and never reaches other apps, so the
     hold is on the screen's button; their tap, double tap and triple tap are play and pause, next
     and previous, which the Reader and Verse Scroll answer.
+
+17. **Done 12 Oct.** **Verse Scroll from a search: what found each verse, and a filter by it.** "I
+    should be able to filter to choose which category in scroll verse and it should also display
+    the category just it does for highlighted verses." (The category: the word that matched.)
+    *Built:* each card from a search's Scroll these says what found its verse, in outlined gold
+    chips by the reference, beside its highlight colours: the form of the word it has ("LOVE",
+    "LOVETH"), the King James wording for it ("CHARITY"), or a Greek or Hebrew word with its
+    meaning ("GREEK AGAPAŌ", "HEBREW AHAV"). A search typed in Greek or Hebrew says the word's
+    meaning there when it has several ("FORGIVE", "PERMIT"), or the word itself, and the other
+    Testament's word ("HEBREW AHAVAH"). A search of several words says the words as typed, or the
+    wording for them ("HOLY GHOST"). Tapping the search's name at the top lists those words under
+    "Searched for", "King James wording" and "Greek & Hebrew", each with how many verses it found
+    ("love 281", "charity 24"). Pick any of them to scroll only their verses; the button says how
+    many ("Show 31 verses") and Clear picks none, which is all of them. The choice is put to use
+    as the sheet closes, however it's closed, so reading aloud doesn't start over at every tap.
+    A search with only one such word (a case-sensitive "LORD") or a topic's verses has no chips
+    and nothing to pick.

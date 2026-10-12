@@ -1,5 +1,6 @@
 package com.example.mybible.versescroll
 
+import com.example.mybible.model.MatchedWord
 import kotlin.random.Random
 
 /**
@@ -52,10 +53,43 @@ sealed interface VerseSource {
     /**
      * A search's results or a topic's verses ("Scroll these"): [title] names it ("“love”", "Faith"),
      * [from] where it came from ("Search", "Nave’s topic"). Never kept for the next visit.
+     *
+     * A search's say what found each verse ([matched], by [VerseRef.key]: "loveth", "charity", "Greek
+     * agapē"), for its cards' chips; [only] are the words picked to show the verses of (none: all).
      */
-    data class Found(val title: String, val from: String, val refs: List<VerseRef>) : VerseSource {
+    data class Found(
+        val title: String,
+        val from: String,
+        val refs: List<VerseRef>,
+        val matched: Map<String, List<MatchedWord>> = emptyMap(),
+        val only: Set<MatchedWord> = emptySet()
+    ) : VerseSource {
+        /** The verses it shows: those a picked word found, or all of them. */
+        val shown: List<VerseRef> by lazy {
+            if (only.isEmpty()) refs else refs.filter { ref -> matched[ref.key].orEmpty().any { it in only } }
+        }
+
+        /**
+         * The words to pick from, with how many verses each found: the word searched for (its forms or
+         * meanings), then King James wording, then Greek and Hebrew, the most verses first. None unless
+         * there are two or more.
+         */
+        val words: List<Pair<MatchedWord, Int>> by lazy {
+            val counts = LinkedHashMap<MatchedWord, Int>()
+            for (ref in refs) matched[ref.key]?.forEach { counts.merge(it, 1, Int::plus) }
+            if (counts.size < 2) emptyList()
+            else counts.toList().sortedWith(compareBy({ it.first.kind.ordinal }, { -it.second }))
+        }
+
+        /** What found [ref], when there are words to pick from. */
+        fun wordsOf(ref: VerseRef): List<MatchedWord> = if (words.isEmpty()) emptyList() else matched[ref.key].orEmpty()
+
         override val label get() = title
-        override val blurb get() = (if (refs.size == 1) "1 verse" else "${refs.size} verses") + " from $from, shuffled"
+        override val blurb get() = when {
+            shown.size < refs.size -> "${shown.size} of ${refs.size} verses"
+            refs.size == 1 -> "1 verse"
+            else -> "${refs.size} verses"
+        } + " from $from, shuffled"
     }
 
     companion object {

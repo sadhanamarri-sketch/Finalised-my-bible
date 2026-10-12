@@ -149,6 +149,7 @@ private data class Burst(val id: Long, val at: Offset, val color: Color)
  * the full verse sheet.
  *
  * @param teluguSize the Telugu under the verse's size, in sp (when [showTelugu]).
+ * @param words for a search's verses, what found this one ("loveth", "charity", "Greek agapē").
  * @param highlightHexes a verse's highlight colors (up to three), in the order they were put on.
  * @param onDoubleTap highlights the card; returns the color for the burst under the finger.
  */
@@ -163,6 +164,7 @@ internal fun VerseCardPage(
     isCurrent: Boolean,
     showTelugu: Boolean,
     teluguSize: Int,
+    words: List<String>,
     highlightHexes: (VerseRef) -> List<String>,
     colorLabel: (String) -> String,
     notePreview: String?,
@@ -231,6 +233,7 @@ internal fun VerseCardPage(
                 onScene = onScene,
                 showTelugu = showTelugu,
                 teluguSize = teluguSize,
+                words = words,
                 highlightHexes = highlightHexes,
                 colorLabel = colorLabel,
                 notePreview = notePreview
@@ -261,14 +264,15 @@ private fun VerseStack(
     onScene: Boolean,
     showTelugu: Boolean,
     teluguSize: Int,
+    words: List<String>,
     highlightHexes: (VerseRef) -> List<String>,
     colorLabel: (String) -> String,
     notePreview: String?
 ) {
     val telugu = if (showTelugu) lines.mapNotNull { it.telugu }.joinToString(" ") else ""
     val style = verseStyle(colors, onScene)
-    // The chips next to the reference say how the card's verses are highlighted: the verse's text
-    // itself is left plain.
+    // The chips next to the reference say what found the verse, for a search's, outlined, and how the
+    // card's verses are highlighted, in their colors: the verse's text itself is left plain.
     val chips = cardColors(refs.map { it.verse }, refs.map(highlightHexes))
 
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
@@ -309,6 +313,21 @@ private fun VerseStack(
                                     .align(Alignment.CenterVertically)
                                     .padding(end = 5.dp)
                             )
+                            for (word in words) {
+                                Text(
+                                    text = word.uppercase(),
+                                    color = colors.gold,
+                                    fontFamily = WorkSansFontFamily,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 10.sp,
+                                    letterSpacing = 0.1.em,
+                                    maxLines = 1,
+                                    modifier = Modifier
+                                        .align(Alignment.CenterVertically)
+                                        .border(1.dp, colors.gold.copy(alpha = 0.7f), CircleShape)
+                                        .padding(start = 9.dp, end = 9.dp, top = 4.dp, bottom = 3.dp)
+                                )
+                            }
                             for (chip in chips) {
                                 Text(
                                     text = colorLabel(chip.hex).uppercase() + chip.verses?.joinToString(", ", prefix = " \u00b7 ").orEmpty(),

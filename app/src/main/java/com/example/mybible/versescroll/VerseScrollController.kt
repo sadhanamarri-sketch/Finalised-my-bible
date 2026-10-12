@@ -18,6 +18,7 @@ import com.example.mybible.audio.ReadingPlace
 import com.example.mybible.audio.ReadingSession
 import com.example.mybible.audio.VerseToRead
 import com.example.mybible.data.BibleRepository
+import com.example.mybible.model.MatchedWord
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -169,8 +170,9 @@ class VerseScrollController(
         generateMore()
     }
 
-    /** "Scroll these" on a search's results or a topic: those verses, shuffled. */
-    fun showFound(title: String, from: String, refs: List<VerseRef>) = choose(VerseSource.Found(title, from, refs))
+    /** "Scroll these" on a search's results or a topic: those verses, shuffled, and what found each (see VerseSource.Found). */
+    fun showFound(title: String, from: String, refs: List<VerseRef>, matched: Map<String, List<MatchedWord>> = emptyMap()) =
+        choose(VerseSource.Found(title, from, refs, matched))
 
     /** Opened from the Reader: back to the chosen mode, if a search's or a topic's verses were showing. */
     fun useSavedSource() {
@@ -389,7 +391,7 @@ class VerseScrollController(
         }
         VerseSource.Highlighted -> ShuffledDeck(repository.allHighlights.first().map { VerseRef(it.book, it.chapter, it.verse) })
         VerseSource.Studied -> ShuffledDeck(repository.allCompletedVerses.first().map { VerseRef(it.book, it.chapter, it.verse) })
-        is VerseSource.Found -> ShuffledDeck(s.refs)
+        is VerseSource.Found -> ShuffledDeck(s.shown)
         VerseSource.Full, VerseSource.Focused -> ShuffledDeck(emptyList())
     }
 

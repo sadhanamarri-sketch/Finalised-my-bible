@@ -349,6 +349,10 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                             isCurrent = pagerState.settledPage == page,
                             showTelugu = controller.showTelugu,
                             teluguSize = controller.teluguSize,
+                            // A search's verses (not a Rabbit hole's links): what found each.
+                            words = (controller.source as? VerseSource.Found)?.takeIf { card.from == null }
+                                ?.let { found -> card.content.refs.flatMap(found::wordsOf).distinct().map { it.label } }
+                                .orEmpty(),
                             highlightHexes = ::hexesOf,
                             colorLabel = ::labelOf,
                             notePreview = firstNote?.let(::notePreview),

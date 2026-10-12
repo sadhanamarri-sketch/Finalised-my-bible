@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -79,6 +80,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.example.mybible.model.HighlightColorDef
+import com.example.mybible.model.MatchedWord
 import com.example.mybible.ui.theme.GelasioFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
 import com.example.mybible.ui.components.BIBLE_BOOKS
@@ -745,7 +747,8 @@ internal fun VerseScrollSettingsSheet(
 /**
  * Which verses Verse Scroll shows: Full, Focused, your highlighted or studied verses, the Reader's
  * chapter, or any book or chapter, read in order (picked from the books, then the chapters). A
- * search's or topic's verses show at the top while they're on.
+ * search's or topic's verses show at the top while they're on; a search's, with the words that found
+ * them to pick from, put to use as the sheet closes.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -765,8 +768,19 @@ internal fun VerseScrollSourceSheet(
     var picking by remember { mutableStateOf<String?>(null) }
     // "1 verse", "2,000 verses"; [kind] goes before it: "5 highlighted verses".
     fun verses(n: Int, kind: String = "") = if (n == 1) "1 ${kind}verse" else String.format(Locale.US, "%,d ${kind}verses", n)
+    // A search's verses: the words picked so far (every one of them is the same as none), and the
+    // verses they'd show.
+    val found = current as? VerseSource.Found
+    var picked by remember(found) { mutableStateOf(found?.only.orEmpty()) }
+    val pending = remember(found, picked) {
+        found?.copy(only = picked.takeIf { it.size < found.words.size }.orEmpty())
+    }
+    // However the sheet closes: the words picked, when they've changed.
+    val close = {
+        if (pending != null && pending != found) onChoose(pending) else onDismiss()
+    }
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = close,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = colors.surface
     ) {
@@ -775,6 +789,7 @@ internal fun VerseScrollSourceSheet(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .navigationBarsPadding()
                     .padding(bottom = 12.dp)
             ) {
@@ -786,8 +801,42 @@ internal fun VerseScrollSourceSheet(
                     fontSize = 18.sp,
                     modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 8.dp)
                 )
-                if (current is VerseSource.Found) {
-                    SourceRow(current.label, current.blurb.replaceFirstChar { it.uppercase() } + ".", true, true, colors) { onDismiss() }
+                if (found != null && pending != null) {
+                    val pick = if (found.words.isNotEmpty() && picked.isEmpty()) " Pick words to see only the verses they found." else ""
+                    SourceRow(found.label, pending.blurb.replaceFirstChar { it.uppercase() } + "." + pick, true, true, colors) { close() }
+                    if (found.words.isNotEmpty()) {
+                        WordFilter(
+                            words = found.words,
+                            picked = picked,
+                            colors = colors,
+                            onPick = { word -> picked = if (word in picked) picked - word else picked + word }
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier
+                                .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 10.dp)
+                                .fillMaxWidth()
+                        ) {
+                            if (picked.isNotEmpty()) {
+                                PillButton("Clear", primary = false, colors = colors, onClick = { picked = emptySet() })
+                            }
+                            val n = pending.shown.size
+                            PillButton(
+                                if (pending.only.isEmpty()) "Show all ${verses(n)}" else "Show ${verses(n)}",
+                                primary = true,
+                                colors = colors,
+                                onClick = close,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        Box(
+                            Modifier
+                                .padding(horizontal = 20.dp, vertical = 6.dp)
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(colors.line)
+                        )
+                    }
                 }
                 SourceRow(
                     "Full",
@@ -869,6 +918,76 @@ internal fun VerseScrollSourceSheet(
                 }
             }
         }
+    }
+}
+
+/**
+ * What found a search's verses ("loveth", "charity", "Greek agapē"), each with how many: the word
+ * searched for, King James wording, Greek and Hebrew. Picked words show only the verses they found.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun WordFilter(
+    words: List<Pair<MatchedWord, Int>>,
+    picked: Set<MatchedWord>,
+    colors: VsColors,
+    onPick: (MatchedWord) -> Unit
+) {
+    Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 2.dp, bottom = 10.dp)) {
+        words.groupBy { it.first.kind }.entries.forEachIndexed { i, (kind, group) ->
+            Text(
+                text = when (kind) {
+                    MatchedWord.Kind.WORD -> "Searched for"
+                    MatchedWord.Kind.WORDING -> "King James wording"
+                    MatchedWord.Kind.ORIGINAL -> "Greek & Hebrew"
+                }.uppercase(),
+                color = colors.gold,
+                fontFamily = WorkSansFontFamily,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 11.5.sp,
+                letterSpacing = 0.12.em,
+                modifier = Modifier.padding(top = if (i == 0) 4.dp else 14.dp, bottom = 8.dp)
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                group.forEach { (word, count) ->
+                    WordChip(word.label, count, word in picked, colors) { onPick(word) }
+                }
+            }
+        }
+    }
+}
+
+// A word to pick, with how many verses it found; a check, filled, when picked.
+@Composable
+private fun WordChip(label: String, count: Int, picked: Boolean, colors: VsColors, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(if (picked) colors.primary else Color.Transparent)
+            .border(1.dp, if (picked) colors.primary else colors.line, CircleShape)
+            .toggleable(value = picked, role = Role.Checkbox, onValueChange = { onClick() })
+            .padding(start = if (picked) 10.dp else 13.dp, end = 13.dp, top = 7.dp, bottom = 7.dp)
+    ) {
+        if (picked) {
+            Icon(Icons.Default.Check, contentDescription = null, tint = colors.onPrimary, modifier = Modifier.padding(end = 5.dp).size(16.dp))
+        }
+        Text(
+            text = label,
+            color = if (picked) colors.onPrimary else colors.ink,
+            fontFamily = WorkSansFontFamily,
+            fontWeight = FontWeight.Medium,
+            fontSize = 13.5.sp
+        )
+        Text(
+            text = "  $count",
+            color = if (picked) colors.onPrimary.copy(alpha = 0.75f) else colors.soft,
+            fontFamily = WorkSansFontFamily,
+            fontSize = 13.sp
+        )
     }
 }
 
