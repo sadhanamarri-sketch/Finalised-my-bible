@@ -116,15 +116,18 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
        handing out recordings of BSI's text is an audio edition, which BSI's terms keep
        for their permission — so this needs BSI's say too, and if asking BSI, their own
        human recording is the better thing to ask for.
-   - *Suggested plan (to confirm):* the phone's own voice for Telugu — whole Bible, exactly
-     the app's text, a verse at a time with each verse highlighted as it's read, offline,
-     free, and nothing handed out (the phone reads the text, as a screen reader would).
-     Bible Brain's human narration for KJV, with the phone's voice as the offline fallback.
-     Optionally, Bible Brain's dramatised Old Version for the Telugu New Testament as a
-     second choice there.
-   *To ask:* is the phone's voice good enough to start with, or only real narration? For
-   Telugu, the phone's voice reading the BSI text, or a recording of a different
-   translation? Play a chapter, or continue through the book?
+   - **Decided 12 Oct — the plan to build:**
+     - *Telugu:* the phone's own voice (text-to-speech) for the whole Bible — exactly the
+       app's BSI text, read a verse at a time with each verse highlighted as it's read,
+       offline, free, and no recordings handed out (the phone reads the text, as a screen
+       reader would). The voice and speed are the reader's to pick.
+     - *KJV:* Bible Brain's human narration for the whole Bible, with the phone's voice when
+       offline or when Bible Brain can't be reached. Needs an API key from Faith Comes By
+       Hearing and `4.dbt.io` allowed in the build environment to test against.
+     - Not doing: Bible Brain's dramatised Telugu Old Version New Testament (`TCWOVV`), a
+       pre-recorded AI voice, or asking BSI for their recording.
+   *Still to ask:* play one chapter, or carry on through the book? Keep playing with the
+   screen off (needs a notification with play and pause)?
    Sources: [LibriVox KJV group](https://librivox.org/group/360),
    [Telugu IRV audio on Bible.com](https://my.bible.com/audio-bible/1895/JHN.3.IRVTEL),
    [Bible Society of India](https://www.bsind.org/category/uncategorized/page/32/),
