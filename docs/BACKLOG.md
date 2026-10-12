@@ -143,6 +143,16 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
        licence or verse timings on offer, so Bible Brain stays the choice.
      - *KJV style (decided 12 Oct):* the reader's choice — a setting with Narrated and
        Dramatised, starting on Narrated, the closer of the two to reading along.
+     - *Added 12 Oct — Verse Scroll reads aloud too:* the verse on the card is read out, in
+       the same voice and settings as the Reader.
+     - *Added 12 Oct — a language setting:* read in English, Telugu, or both.
+     - *Added 12 Oct — a "Continue reading" setting (automatic skip):* in Verse Scroll, once
+       a card's verse has been read, move on to the next card by itself and read that,
+       hands-free, until paused.
+   *To ask (added 12 Oct):* with both languages, English then Telugu for each verse (the
+   order the Reader shows them), or Telugu first? In the Reader, verse by verse in both, or
+   the chapter in one language and then the other? Should "Continue reading" also carry the
+   Reader on into the next chapter, instead of stopping at the chapter's end?
    Sources: [LibriVox KJV group](https://librivox.org/group/360),
    [Telugu IRV audio on Bible.com](https://my.bible.com/audio-bible/1895/JHN.3.IRVTEL),
    [Bible Society of India](https://www.bsind.org/category/uncategorized/page/32/),
