@@ -132,6 +132,22 @@ class VoiceDepthsTest {
     }
 
     @Test
+    fun theDeepestFollowsTheVoicesOfTheEngineReadWith() {
+        val recorder = Recorder()
+        val depths = depths()
+        depths.measure(recorder, english, telugu, unconfined) { true }
+        assertEquals("en-in-x-end-local", depths.deepest(telugu = false))
+        // English read by an AI voice app now: its voices aren't measured, and none of these is read in.
+        depths.measure(recorder, emptyList(), telugu, unconfined) { true }
+        assertNull(depths.deepest(telugu = false))
+        assertEquals("te-in-x-tem-local", depths.deepest(telugu = true))
+        // Back to the phone's usual engine: its voices, measured before, aren't said again.
+        depths.measure(recorder, english, telugu, unconfined) { true }
+        assertEquals("en-in-x-end-local", depths.deepest(telugu = false))
+        assertEquals(4, recorder.recorded.size)
+    }
+
+    @Test
     fun howDeepAVoiceSounds() {
         assertEquals("Deep", VoiceDepths.describe(112f))
         assertEquals("Medium", VoiceDepths.describe(170f))

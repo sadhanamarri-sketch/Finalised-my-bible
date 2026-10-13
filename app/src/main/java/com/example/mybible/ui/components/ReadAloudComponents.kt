@@ -74,6 +74,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.example.mybible.audio.EngineOption
 import com.example.mybible.audio.ReadAloud
 import com.example.mybible.audio.ReadAloudSettings
 import com.example.mybible.audio.ReadAloudState
@@ -183,8 +184,8 @@ fun ReadAloudBar(
 
 /**
  * Reading aloud's settings, laid out like the app's Settings: the language, then for each language read its
- * own speed, pitch and voice (each tried as it's changed), more voices, and, from Verse Scroll
- * ([inVerseScroll]), whether to go on to the next card by itself.
+ * own speech engine, speed, pitch and voice (each tried as it's changed), the phone's speech settings,
+ * and, from Verse Scroll ([inVerseScroll]), whether to go on to the next card by itself.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -206,23 +207,36 @@ fun ReadAloudSheet(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
-    // The phone's voices, once its speech engine has started (on first use, so it can take a moment),
-    // the deepest first as they're measured.
-    val voices by produceState(PhoneVoices.of(readAloud), depthChanges, resumed) {
+    // The phone's speech engines (an AI voice app like VoxSherpa, installed since, too).
+    val engines by produceState(readAloud.engines(), resumed) { value = readAloud.engines() }
+    // An engine chosen for a language and since uninstalled: the phone's usual one again.
+    LaunchedEffect(engines) {
+        if (engines.isEmpty()) return@LaunchedEffect
+        for (telugu in listOf(false, true)) {
+            val chosen = settings.engine(telugu)
+            if (chosen != null && engines.none { it.name == chosen }) settings.updateEngine(telugu, null)
+        }
+    }
+    // Each language's engine's voices, once it has started (on first use, so it can take a moment; an
+    // AI voice app, longer), the deepest of the usual engine's first as they're measured.
+    val voices by produceState(PhoneVoices.of(readAloud), depthChanges, resumed, settings.englishEngine, settings.teluguEngine) {
         value = PhoneVoices.of(readAloud)
-        repeat(40) {
+        repeat(80) {
             if (value.known) return@produceState
             delay(250)
             value = PhoneVoices.of(readAloud)
         }
     }
-    // Each voice measured once, while nothing is being said.
-    LaunchedEffect(voices.known, state.status, resumed) {
+    // Each of the usual engine's voices measured once, while nothing is being said.
+    LaunchedEffect(voices.known, state.status, resumed, settings.englishEngine, settings.teluguEngine) {
         if (voices.known && state.status != ReadAloudState.Status.PLAYING) readAloud.measureVoices()
     }
     val englishVoices = voices.english
     val teluguVoices = voices.telugu
     val noTeluguVoice = voices.hasTelugu == false || state.noTeluguVoice
+    // The voices measured: the usual engine's.
+    val measured = (if (settings.englishEngine == null) englishVoices else emptyList()) +
+        (if (settings.teluguEngine == null) teluguVoices else emptyList())
 
     // A language's voice, speed or pitch changed while it's being read applies at once (the other's as
     // it comes up); with nothing being read, a few words let you hear it.
@@ -288,34 +302,31 @@ fun ReadAloudSheet(
                         language = if (telugu) "Telugu" else "English",
                         settings = settings,
                         telugu = telugu,
+                        engines = engines,
                         voices = if (telugu) teluguVoices else englishVoices,
                         selected = readAloud.voiceFor(telugu),
                         measuring = measuring,
                         noVoice = telugu && noTeluguVoice,
                         onChanged = { changed(telugu) },
                         onPlay = { voice -> readAloud.previewVoice(if (telugu) TELUGU_SAMPLE else ENGLISH_SAMPLE, telugu, voice = voice.name) },
-                        onGetVoice = { openVoiceInstaller(context) }
+                        onGetVoices = { openVoiceInstaller(context, engine = settings.engine(telugu)) }
                     )
                 }
             }
             when {
                 measuring -> DsNote("Listening to each voice to sort them from the deepest…", modifier = Modifier.padding(top = 12.dp))
-                state.status == ReadAloudState.Status.PLAYING && readAloud.voicesUnmeasured(englishVoices + teluguVoices) ->
+                state.status == ReadAloudState.Status.PLAYING && readAloud.voicesUnmeasured(measured) ->
                     DsNote("Pause the reading to sort the voices from the deepest.", modifier = Modifier.padding(top = 12.dp))
             }
 
             DsSectionDivider()
             DsSectionLabel("More voices")
-            DsNote("Google's speech engine has more voices to download, some of them men's. The phone's speech settings choose its speech engine.")
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 14.dp)
-            ) {
-                DsOutlineAccentButton(text = "Get more voices", onClick = { openVoiceInstaller(context) }, modifier = Modifier.weight(1f))
-                DsOutlineAccentButton(text = "Speech settings", onClick = { openSpeechSettings(context) }, modifier = Modifier.weight(1f))
-            }
+            DsNote(
+                "Google's speech engine has more voices to download, some of them men's. An AI voice app, like " +
+                    "VoxSherpa TTS with its Piper voices, installs as another speech engine to choose for a language. " +
+                    "Get more voices, under a language, opens its engine's own voices."
+            )
+            DsOutlineAccentButton(text = "Phone speech settings", onClick = { openSpeechSettings(context) }, modifier = Modifier.padding(top = 14.dp))
 
             if (inVerseScroll) {
                 DsSectionDivider()
@@ -330,20 +341,29 @@ fun ReadAloudSheet(
             }
             DsSectionDivider()
             DsNote(
-                "Read in your phone's own voice, offline. It keeps reading with the screen off; pause, skip or stop it from the notification or your earbuds (next and previous go a verse on or back, in Verse Scroll a card). In the Reader, hold the previous button to go back to the chapter's first verse.",
+                "Read by your phone's speech engines, offline. It keeps reading with the screen off; pause, skip or stop it from the notification or your earbuds (next and previous go a verse on or back, in Verse Scroll a card). In the Reader, hold the previous button to go back to the chapter's first verse.",
                 modifier = Modifier.padding(top = 14.dp)
             )
         }
     }
 }
 
-// The phone's voices for each language, and whether it has a Telugu one: null until its speech engine
-// has started.
-private class PhoneVoices(val english: List<VoiceOption>, val telugu: List<VoiceOption>, val hasTelugu: Boolean?) {
-    val known: Boolean get() = hasTelugu != null
+// Each language's engine's voices, and whether there's a Telugu one: null until the engines have started.
+private class PhoneVoices(
+    val english: List<VoiceOption>,
+    val telugu: List<VoiceOption>,
+    val hasTelugu: Boolean?,
+    private val englishReady: Boolean?
+) {
+    val known: Boolean get() = hasTelugu != null && englishReady != null
 
     companion object {
-        fun of(readAloud: ReadAloud) = PhoneVoices(readAloud.voices(telugu = false), readAloud.voices(telugu = true), readAloud.hasTeluguVoice())
+        fun of(readAloud: ReadAloud) = PhoneVoices(
+            readAloud.voices(telugu = false),
+            readAloud.voices(telugu = true),
+            readAloud.hasTeluguVoice(),
+            readAloud.englishReady()
+        )
     }
 }
 
@@ -371,11 +391,20 @@ private const val KEY_ASKED_NOTIFICATIONS = "asked_notifications"
 
 
 /**
- * The phone's speech engine's own page for adding voices (Google's lists its languages), or failing
- * that, the phone's text-to-speech settings.
+ * Where a speech engine's voices are added ([engine] its package; null, the phone's usual one): an AI
+ * voice app's own app, where its voices are downloaded and chosen, or an engine's page for voices
+ * (Google's lists its languages); failing those, the phone's text-to-speech settings. Never left to
+ * Android to choose an engine, which may pick one whose page has nothing to choose.
  */
-fun openVoiceInstaller(context: Context) {
-    val tries = listOf(
+fun openVoiceInstaller(context: Context, engine: String? = null) {
+    val named = engine ?: try {
+        Settings.Secure.getString(context.contentResolver, Settings.Secure.TTS_DEFAULT_SYNTH)
+    } catch (e: Exception) {
+        null
+    }
+    val tries = listOfNotNull(
+        named?.let { context.packageManager.getLaunchIntentForPackage(it) },
+        named?.let { Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA).setPackage(it) },
         Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA),
         Intent("com.android.settings.TTS_SETTINGS")
     )
@@ -406,45 +435,103 @@ fun openSpeechSettings(context: Context) {
     }
 }
 
-// One language's own settings, a section of their own: its speed, its pitch and its voice. Without a
-// voice for it on the phone ([noVoice]), a way to get one instead.
+// One language's own settings, a section of their own: the speech engine it's read with (when the
+// phone has more than one), its speed, its pitch and its voice. Without a voice for it ([noVoice]), a
+// way to get one instead.
 @Composable
 private fun LanguageSettings(
     language: String,
     settings: ReadAloudSettings,
     telugu: Boolean,
+    engines: List<EngineOption>,
     voices: List<VoiceOption>,
     selected: String?,
     measuring: Boolean,
     noVoice: Boolean,
     onChanged: () -> Unit,
     onPlay: (VoiceOption) -> Unit,
-    onGetVoice: () -> Unit
+    onGetVoices: () -> Unit
 ) {
+    // The engine chosen, while it's still on the phone; else the usual one (null).
+    val chosen = settings.engine(telugu)?.takeIf { name -> engines.isEmpty() || engines.any { it.name == name } }
+    val engineName = engines.firstOrNull { it.name == chosen }?.label
     DsSectionLabel(language)
-    if (noVoice) {
-        DsNote(
-            if (settings.language == ReadLanguage.BOTH) "This phone has no Telugu voice yet, so only the English is read."
-            else "This phone has no Telugu voice yet, so nothing can be read in Telugu."
-        )
-        DsOutlineAccentButton(text = "Get a Telugu voice", onClick = onGetVoice, modifier = Modifier.padding(top = 14.dp))
-    } else {
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            SpeedAndPitch(language, settings, telugu, onChanged)
-            if (voices.isNotEmpty()) {
-                VoiceList(
-                    title = "Voice",
-                    voices = voices,
-                    selected = selected,
-                    measuring = measuring,
-                    onPick = { voice ->
-                        settings.updateVoice(telugu, name = voice.name)
-                        onChanged()
-                    },
-                    onPlay = onPlay
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        if (engines.size > 1 || chosen != null) {
+            EngineChoice(
+                engines = engines,
+                chosen = chosen,
+                onPick = { engine ->
+                    settings.updateEngine(telugu, if (engine.usual) null else engine.name)
+                    onChanged()
+                }
+            )
+        }
+        if (noVoice) {
+            Column {
+                DsNote(
+                    when {
+                        chosen != null -> "${engineName ?: "This speech engine"} has no Telugu voice: choose another speech engine above."
+                        settings.language == ReadLanguage.BOTH -> "This phone has no Telugu voice yet, so only the English is read."
+                        else -> "This phone has no Telugu voice yet, so nothing can be read in Telugu."
+                    }
                 )
+                DsOutlineAccentButton(text = "Get a Telugu voice", onClick = onGetVoices, modifier = Modifier.padding(top = 14.dp))
+            }
+        } else {
+            SpeedAndPitch(language, settings, telugu, onChanged)
+            Column {
+                if (voices.isNotEmpty()) {
+                    VoiceList(
+                        title = "Voice",
+                        voices = voices,
+                        selected = selected,
+                        measuring = measuring && chosen == null,
+                        nothingChosen = if (chosen == null) "Read in the phone's usual voice until the voices are measured."
+                        else "Read in ${engineName ?: "the app"}'s own voice unless you pick one.",
+                        onPick = { voice ->
+                            settings.updateVoice(telugu, name = voice.name)
+                            onChanged()
+                        },
+                        onPlay = onPlay
+                    )
+                }
+                DsOutlineAccentButton(text = "Get more voices", onClick = onGetVoices, modifier = Modifier.padding(top = 12.dp))
             }
         }
+    }
+}
+
+// The phone's speech engines to read a language with, its usual one marked so. An AI voice app's
+// voices sound more natural, but it can take a moment to start.
+@Composable
+private fun EngineChoice(engines: List<EngineOption>, chosen: String?, onPick: (EngineOption) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        SettingName("Speech engine")
+        for (engine in engines) {
+            val picked = if (chosen == null) engine.usual else engine.name == chosen
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .selectable(selected = picked, role = Role.RadioButton, onClick = { onPick(engine) })
+                    .padding(start = 2.dp)
+            ) {
+                RadioButton(selected = picked, onClick = null)
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 6.dp, top = 6.dp, bottom = 6.dp)
+                ) {
+                    Text(engine.label, color = MaterialTheme.colorScheme.onSurface, fontFamily = FontFamily.SansSerif, fontSize = 15.sp)
+                    if (engine.usual) {
+                        Text("The phone's usual one", color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = FontFamily.SansSerif, fontSize = 13.sp)
+                    }
+                }
+            }
+        }
+        if (chosen != null) DsNote("An AI voice app can take a moment to start, and may not change the pitch.")
     }
 }
 
@@ -485,6 +572,7 @@ private fun VoiceList(
     voices: List<VoiceOption>,
     selected: String?,
     measuring: Boolean,
+    nothingChosen: String,
     onPick: (VoiceOption) -> Unit,
     onPlay: (VoiceOption) -> Unit
 ) {
@@ -510,7 +598,7 @@ private fun VoiceList(
                     .padding(horizontal = 10.dp, vertical = 8.dp)
             )
         }
-        if (selected == null || voices.none { it.name == selected }) DsNote("Read in the phone's usual voice until the voices are measured.")
+        if (selected == null || voices.none { it.name == selected }) DsNote(nothingChosen)
     }
 }
 

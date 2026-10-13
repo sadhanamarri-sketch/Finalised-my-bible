@@ -27,7 +27,11 @@ class ReadAloudTest {
         override fun hasVoiceFor(locale: java.util.Locale) = otherVoices
         override fun speakIn(id: String, text: String, locale: java.util.Locale, rate: Float, pitch: Float) { words += text to locale }
         override fun stop() { stops++ }
-        override fun voices(telugu: Boolean) = emptyList<VoiceOption>()
+        var voices = mapOf(
+            false to listOf(VoiceOption("en-in-x-end-local", "India 1", online = false)),
+            true to listOf(VoiceOption("te-in-x-tem-local", "India 1", online = false))
+        )
+        override fun voices(telugu: Boolean) = voices.getValue(telugu)
 
         fun finish() = listener!!.onDone(said.last().id)
         fun fail() = listener!!.onError(said.last().id)
@@ -42,11 +46,14 @@ class ReadAloudTest {
         override var continueReading: Boolean = false,
         var pitch: Float = 1f,
         var teluguSpeed: Float? = null,
-        var teluguPitch: Float? = null
+        var teluguPitch: Float? = null,
+        var englishEngine: String? = null,
+        var englishVoice: String? = null
     ) : ReadAloudPrefs {
         override fun speed(telugu: Boolean) = (if (telugu) teluguSpeed else null) ?: speed
         override fun pitch(telugu: Boolean) = (if (telugu) teluguPitch else null) ?: pitch
-        override fun voice(telugu: Boolean) = if (telugu) teluguVoice else null
+        override fun voice(telugu: Boolean) = if (telugu) teluguVoice else englishVoice
+        override fun engine(telugu: Boolean) = if (telugu) null else englishEngine
     }
 
     private class Chapter(val verses: List<VerseToRead>, val from: Int = 1) : ReadingSession {
@@ -93,6 +100,26 @@ class ReadAloudTest {
         assertEquals(true to "te-in-x-tef-local", speaker.said.last().let { it.telugu to it.voice })
         // Nothing measured, nothing chosen: the phone's usual voice.
         assertNull(reader(FakeSpeaker()).voiceFor(telugu = false))
+    }
+
+    @Test
+    fun anAiVoiceAppReadsInItsOwnVoiceUnlessOneIsChosen() {
+        val depths = VoiceDepths(mapOf("deepest:en" to "en-in-x-end-local", "deepest:te" to "te-in-x-tem-local"))
+        val prefs = FakePrefs(ReadLanguage.BOTH, englishEngine = "com.k2fsa.sherpa.onnx.tts.engine")
+        val speaker = FakeSpeaker()
+        val reader = reader(speaker, prefs, depths)
+        // English by the app, in its own voice; Telugu still by the phone's usual engine, in its deepest.
+        assertNull(reader.voiceFor(telugu = false))
+        assertEquals("te-in-x-tem-local", reader.voiceFor(telugu = true))
+        reader.start(Chapter(john3, from = 16))
+        speaker.finish()
+        assertEquals(listOf(false to null, true to "te-in-x-tem-local"), speaker.said.map { it.telugu to it.voice })
+        // One of the app's voices, chosen: read in it.
+        prefs.englishVoice = "en_US-lessac-medium"
+        assertEquals("en_US-lessac-medium", reader.voiceFor(telugu = false))
+        // Only the usual engine's voices are measured: Telugu's here.
+        assertTrue(reader.usualVoices(telugu = false).isEmpty())
+        assertEquals(listOf("te-in-x-tem-local"), reader.usualVoices(telugu = true).map { it.name })
     }
 
     @Test

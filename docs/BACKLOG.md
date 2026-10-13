@@ -419,3 +419,23 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     Greek or Hebrew word's page, a meaning ("forgive 38") opens Search with that meaning picked,
     and the other Testament's word with it, the other meanings there to pick too. A search in
     Telugu has its words as typed and "Inside longer words".
+
+19. **Done 13 Oct.** **Each language's speech engine, back.** "When I press get more voices, it
+    takes to voxsherpa tts and I can't select anything... can we provision that I can pick from
+    there another tts other than default one? last time i tried kokoro which is slow... now i
+    want to try piper." — "yeah bring back per language engine choice."
+    *Why "Get more voices" went to VoxSherpa:* the button asked Android for "a speech engine's
+    page for voices" without naming one, and Android handed it to VoxSherpa, whose page for that
+    has nothing to choose. Its voices are chosen in the VoxSherpa app itself.
+    *Built:* in the read-aloud settings, English and Telugu each have a "Speech engine" choice
+    when the phone has more than one: the phone's usual one (Google's) or an AI voice app such as
+    VoxSherpa TTS, whose Piper voices are lighter and quicker than Kokoro's. The voice list is
+    then that engine's, and a voice picked before (the other engine's) goes. With an AI voice app
+    and no voice picked, it reads in the app's own voice; only the usual engine's voices are
+    measured for depth. An AI voice app can take a moment to start and may not change the pitch;
+    the settings say so. "Get more voices", now under each language, opens that language's
+    engine itself: the VoxSherpa app, or Google's page for voices, never left for Android to
+    pick. An engine that has no Telugu voice says so under Telugu. An engine chosen and since
+    uninstalled goes back to the phone's usual one. Greek and Hebrew words are always said by the
+    phone's usual engine. An engine no longer chosen for either language is let go, so an AI
+    voice app's model doesn't stay in memory.

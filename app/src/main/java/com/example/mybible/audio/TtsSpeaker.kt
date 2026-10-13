@@ -12,28 +12,32 @@ import java.io.File
 import java.util.Locale
 
 /**
- * The phone's own speech engine (Google's, on most phones), started the first time it's needed rather
- * than with the app. Speaking waits for it to start; everything it reports comes back on the main
- * thread. English is read in the phone's own kind of English when it has one (an Indian English voice
- * on a phone set to English (India)), otherwise in American English.
+ * The phone's speech engines: its usual one (Google's, on most phones), and any other installed — an
+ * AI voice app like VoxSherpa — that [engineFor] chooses for a language (the engine's package; null
+ * for the usual one). Each is started the first time it's needed rather than with the app; speaking
+ * waits for it to start, and everything it reports comes back on the main thread. English is read in
+ * the phone's own kind of English when the engine has it (an Indian English voice on a phone set to
+ * English (India)), otherwise in American English.
  */
-class TtsSpeaker(context: Context) : Speaker {
+class TtsSpeaker(context: Context, private val engineFor: (telugu: Boolean) -> String? = { null }) : Speaker {
     private val appContext = context.applicationContext
 
     override var listener: Speaker.Listener? = null
 
     private val main = Handler(Looper.getMainLooper())
 
-    // A connection to the speech engine, started as it's made. The one that records samples into files
-    // (see VoiceDepths) is a second, with its own voice, settings and queue, so it never cuts into reading.
-    private inner class Connection(val recording: Boolean) {
+    // A connection to a speech engine ([engine] its package, null the usual one), started as it's made.
+    // The one that records samples into files (see VoiceDepths) is another, with its own voice, settings
+    // and queue, so it never cuts into reading.
+    private inner class Connection(engine: String?, val recording: Boolean) {
         var ready: Boolean? = null
             private set
 
         // What was asked of it before it had started: done once it has, or, if it can't, failed.
         private val waiting = ArrayDeque<Pair<() -> Unit, () -> Unit>>()
 
-        val tts: TextToSpeech = TextToSpeech(appContext) { status -> main.post { started(status) } }
+        // An engine no longer installed: Android uses the usual one instead.
+        val tts: TextToSpeech = TextToSpeech(appContext, { status -> main.post { started(status) } }, engine)
 
         private fun started(status: Int) {
             ready = status == TextToSpeech.SUCCESS
@@ -103,23 +107,36 @@ class TtsSpeaker(context: Context) : Speaker {
         }
     }
 
-    // The connection read with, and the one recording samples while the voices are measured.
-    private var reading: Connection? = null
+    // The engines read with, by package (null: the phone's usual one), each started when it's first
+    // needed; and the one recording samples while the usual engine's voices are measured.
+    private val speaking = HashMap<String?, Connection>()
     private var recorder: Connection? = null
     private val recordings = HashMap<String, (Boolean) -> Unit>()
     private var recordingCount = 0
 
-    // The engine, starting it if it hasn't been yet.
-    private fun engine(): Connection = reading ?: Connection(recording = false).also { reading = it }
+    private fun usual(): Connection = speaking.getOrPut(null) { Connection(null, recording = false) }
 
-    /** Whether the phone can speak at all: null while its speech engine is starting. */
+    // The engine a language is read with. One chosen for neither language any more is let go: an AI
+    // voice app keeps its voice's model in memory while it's connected.
+    private fun forLanguage(telugu: Boolean): Connection {
+        val chosen = setOf(engineFor(false), engineFor(true))
+        speaking.keys.filter { it != null && it !in chosen }.forEach { speaking.remove(it)?.shutdown() }
+        val engine = engineFor(telugu)
+        return speaking.getOrPut(engine) { Connection(engine, recording = false) }
+    }
+
+    /** Whether English can be read at all: null while its engine is starting. */
     override val ready: Boolean?
-        get() = engine().ready
+        get() = forLanguage(telugu = false).ready
 
-    override fun hasTelugu(): Boolean? = hasVoiceFor(TELUGU)
+    override fun hasTelugu(): Boolean? {
+        val c = forLanguage(telugu = true)
+        if (c.ready != true) return c.ready
+        return c.tts.isLanguageAvailable(TELUGU) >= TextToSpeech.LANG_AVAILABLE
+    }
 
     override fun speak(id: String, text: String, telugu: Boolean, rate: Float, voice: String?, pitch: Float) {
-        val c = engine()
+        val c = forLanguage(telugu)
         c.whenReady(say = {
             // The voice chosen for the language, else the language's usual voice.
             val chosen = voice?.let { name -> c.voices().firstOrNull { it.name == name } }
@@ -136,14 +153,15 @@ class TtsSpeaker(context: Context) : Speaker {
         }, fail = { listener?.onError(id) })
     }
 
+    // Greek and Hebrew words are said by the phone's usual engine: AI voice apps rarely have them.
     override fun hasVoiceFor(locale: Locale): Boolean? {
-        val c = engine()
+        val c = usual()
         if (c.ready != true) return c.ready
         return c.tts.isLanguageAvailable(locale) >= TextToSpeech.LANG_AVAILABLE
     }
 
     override fun speakIn(id: String, text: String, locale: Locale, rate: Float, pitch: Float) {
-        val c = engine()
+        val c = usual()
         c.whenReady(say = {
             if (c.tts.setLanguage(locale) < 0) {
                 listener?.onError(id)
@@ -156,11 +174,12 @@ class TtsSpeaker(context: Context) : Speaker {
     }
 
     override fun stop() {
-        reading?.stop()
+        speaking.values.forEach { it.stop() }
     }
 
+    // Only the usual engine's voices are measured (see ReadAloud.measureVoices).
     override fun record(text: String, voice: String, file: File, onSaid: (Boolean) -> Unit) {
-        val c = recorder ?: Connection(recording = true).also { recorder = it }
+        val c = recorder ?: Connection(null, recording = true).also { recorder = it }
         c.whenReady(say = {
             val chosen = c.voices().firstOrNull { it.name == voice }
             if (chosen == null || c.tts.setVoice(chosen) != TextToSpeech.SUCCESS) {
@@ -183,8 +202,22 @@ class TtsSpeaker(context: Context) : Speaker {
         unanswered.forEach { it(false) }
     }
 
+    override fun engines(): List<EngineOption> {
+        val tts = usual().tts
+        val usualEngine = try {
+            tts.defaultEngine
+        } catch (e: Exception) {
+            null
+        }
+        return try {
+            tts.engines.map { EngineOption(it.name, it.label, usual = it.name == usualEngine) }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
     override fun voices(telugu: Boolean): List<VoiceOption> {
-        val c = engine()
+        val c = forLanguage(telugu)
         if (c.ready != true) return emptyList()
         val language = if (telugu) TELUGU.language else "en"
         val installed = c.voices()
@@ -196,7 +229,7 @@ class TtsSpeaker(context: Context) : Speaker {
             .filterNot { it.isNetworkConnectionRequired && it.name.replace("-network", "-local") in offline }
             .sortedWith(compareBy<Voice>({ it.locale.country != english().country }, { it.locale.displayCountry }, { it.isNetworkConnectionRequired }, { it.name }))
         // Google's own names mean little (en-us-x-sfg-local): "United States 1", "India 2". Another
-        // phone's engine's are usually names to go by.
+        // engine's are usually names to go by: "Amy", "en US lessac medium".
         val counts = HashMap<String, Int>()
         return found.map { v ->
             val label = if (googleName.matches(v.name)) {

@@ -8,17 +8,10 @@ import androidx.compose.runtime.setValue
 
 /**
  * Reading aloud's settings, kept between visits: the language, and for English and for Telugu each its
- * own speed, pitch and voice.
+ * own speech engine, speed, pitch and voice.
  */
 class ReadAloudSettings(context: Context) : ReadAloudPrefs {
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-
-    init {
-        // A voice picked from an AI voice app, when a language could be read by one: gone with it.
-        for ((engine, voice) in listOf(KEY_ENGLISH_ENGINE to KEY_ENGLISH_VOICE, KEY_TELUGU_ENGINE to KEY_TELUGU_VOICE)) {
-            if (prefs.getString(engine, null) != null) prefs.edit().remove(engine).remove(voice).apply()
-        }
-    }
 
     override var language by mutableStateOf(ReadLanguage.from(prefs.getString(KEY_LANGUAGE, null)))
         private set
@@ -34,6 +27,13 @@ class ReadAloudSettings(context: Context) : ReadAloudPrefs {
         private set
 
     var teluguPitch by mutableFloatStateOf(kept(KEY_TELUGU_PITCH, KEY_PITCH, DEFAULT_PITCH).coerceIn(MIN_PITCH, MAX_PITCH))
+        private set
+
+    // The speech engine for each language (its package): null, the phone's usual one.
+    var englishEngine by mutableStateOf(prefs.getString(KEY_ENGLISH_ENGINE, null))
+        private set
+
+    var teluguEngine by mutableStateOf(prefs.getString(KEY_TELUGU_ENGINE, null))
         private set
 
     var englishVoice by mutableStateOf(prefs.getString(KEY_ENGLISH_VOICE, null))
@@ -53,6 +53,8 @@ class ReadAloudSettings(context: Context) : ReadAloudPrefs {
 
     override fun voice(telugu: Boolean): String? = if (telugu) teluguVoice else englishVoice
 
+    override fun engine(telugu: Boolean): String? = if (telugu) teluguEngine else englishEngine
+
     fun updateLanguage(value: ReadLanguage) {
         language = value
         prefs.edit().putString(KEY_LANGUAGE, value.name).apply()
@@ -68,6 +70,17 @@ class ReadAloudSettings(context: Context) : ReadAloudPrefs {
         val pitch = value.coerceIn(MIN_PITCH, MAX_PITCH)
         if (telugu) teluguPitch = pitch else englishPitch = pitch
         prefs.edit().putFloat(if (telugu) KEY_TELUGU_PITCH else KEY_ENGLISH_PITCH, pitch).apply()
+    }
+
+    /**
+     * The speech engine a language is read with ([engine] its package, null the phone's usual one). A
+     * voice chosen before was the other engine's, so it goes.
+     */
+    fun updateEngine(telugu: Boolean, engine: String?) {
+        if (engine == engine(telugu)) return
+        if (telugu) teluguEngine = engine else englishEngine = engine
+        prefs.edit().putString(if (telugu) KEY_TELUGU_ENGINE else KEY_ENGLISH_ENGINE, engine).apply()
+        updateVoice(telugu, null)
     }
 
     /** [name] null: the deepest of the phone's voices for the language (see VoiceDepths), or its usual one. */
@@ -104,7 +117,6 @@ class ReadAloudSettings(context: Context) : ReadAloudPrefs {
         private const val KEY_ENGLISH_VOICE = "english_voice"
         private const val KEY_TELUGU_VOICE = "telugu_voice"
         private const val KEY_CONTINUE = "continue_reading"
-        // Each language's speech engine, when it could be an AI voice app's.
         private const val KEY_ENGLISH_ENGINE = "english_engine"
         private const val KEY_TELUGU_ENGINE = "telugu_engine"
     }
