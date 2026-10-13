@@ -21,8 +21,6 @@ class VoiceDepthsTest {
 
         override fun hasTelugu() = true
         override fun speak(id: String, text: String, telugu: Boolean, rate: Float, voice: String?, pitch: Float) = Unit
-        override fun hasVoiceFor(locale: java.util.Locale) = true
-        override fun speakIn(id: String, text: String, locale: java.util.Locale, rate: Float, pitch: Float) = Unit
         override fun stop() = Unit
         override fun voices(telugu: Boolean) = emptyList<VoiceOption>()
 

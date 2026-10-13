@@ -436,6 +436,27 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     the settings say so. "Get more voices", now under each language, opens that language's
     engine itself: the VoxSherpa app, or Google's page for voices, never left for Android to
     pick. An engine that has no Telugu voice says so under Telugu. An engine chosen and since
-    uninstalled goes back to the phone's usual one. Greek and Hebrew words are always said by the
-    phone's usual engine. An engine no longer chosen for either language is let go, so an AI
-    voice app's model doesn't stay in memory.
+    uninstalled goes back to the phone's usual one. Greek and Hebrew words were still said by the
+    phone's usual engine (until 20). An engine no longer chosen for either language is let go, so
+    an AI voice app's model doesn't stay in memory.
+
+20. **Done 13 Oct.** **A Greek or Hebrew word said as its "Sounds like" shows.** "hebrew and greek
+    pronunciation doesn't match with the word"
+    *Why:* the speaker on a word's page used the phone's Greek or Hebrew voice, which says a word
+    as Greek and Hebrew are spoken today (ἀγάπη as "a-YA-pee"), while "Sounds like" spells it as
+    Biblical Greek and Hebrew are usually taught ("ah-GAH-pay"). And a phone whose usual speech
+    engine is an AI voice app could say it in an English voice reading Greek letters.
+    *Built:* the speaker says what "Sounds like" shows, in the English reading voice and pitch, a
+    little slower. No Greek or Hebrew voice is needed, and any English engine will do, an AI voice
+    app's too. An English voice reads the spelling as English, so it's given the same sounds
+    spelled as English spells them: lowercase (capitals get read as letters), "eigh" for a lone ay
+    (else it's "eye"), "eye" for a lone ai (else it's "A I"), "gh" before e as in "get", an eh
+    closed by the sound after it ("tet-tah": English has no eh ending a syllable, and reads one as
+    "ay"), "ss" for a final s, and a cluster English can't begin a word with said with the
+    syllable before (ek-seh), or, beginning the word, without its first sound, as English says
+    pneumonia. The stressed syllable starts a part of its own, where an English voice puts the
+    stress: ah-GAH-pay is said "ah gah-pay", beh-reh-SHEET "bare-resh sheet". Checked on every
+    word of the Greek New Testament and the Hebrew Old Testament against the pronouncing rules
+    Piper's voices use: all but 0.2% of the syllables come out as spelled, and those few nearly
+    ("heh" with its h breathed). "No voice on this phone to say it with yet" shows only when there's
+    no English voice at all. A Hebrew word ending in oy now shows it as oy (goy, not gohy).

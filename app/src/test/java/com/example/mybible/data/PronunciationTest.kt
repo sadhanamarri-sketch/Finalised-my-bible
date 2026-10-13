@@ -65,5 +65,41 @@ class PronunciationTest {
         assertEquals("BAH-yeet", Pronunciation.hebrewDictionaryForm("ba.yit", "בַּ֫יִת"))
         assertEquals("dah-VAHR", Pronunciation.hebrewDictionaryForm("da.var", "דָּבָר"))
         assertEquals("bet", Pronunciation.hebrewDictionaryForm("bet", "בֵּית"))
+        // oy closing a syllable is one sound, as oi is.
+        assertEquals("goy", Pronunciation.hebrew("goy"))
+    }
+
+    @Test
+    fun whatAnEnglishVoiceIsGivenToSayIt() {
+        // Lowercase (capitals can be read out as letters), the stressed syllable starting a part of its own.
+        assertEquals("ah gah-pay", Pronunciation.spoken("ah-GAH-pay"))
+        assertEquals("gahr", Pronunciation.spoken("gahr"))
+        // A lone ay or ai spelled so it isn't read "eye" or as letters.
+        assertEquals("eigh gah-pay-sen", Pronunciation.spoken("ay-GAH-pay-sen"))
+        assertEquals("ee-eigh sooss", Pronunciation.spoken("ee-ay-SOOS"))
+        assertEquals("eye tay-soh-men", Pronunciation.spoken("ai-TAY-soh-men"))
+        assertEquals("rohm fai-ah", Pronunciation.spoken("rom-FAI-ah"))
+        // o as in "go" (not "to"), and a final s said s (lohss, not lohz).
+        assertEquals("loh-gohss", Pronunciation.spoken("LO-gos"))
+        assertEquals("theh ohss", Pronunciation.spoken("theh-OS"))
+        // Clusters English can't begin a word with: closing the syllable before, or not said starting it.
+        assertEquals("kree stohss", Pronunciation.spoken("khree-STOS"))
+        assertEquals("nyew-mah", Pronunciation.spoken("PNYOO-mah"))
+        assertEquals("ek sep-nyew-sen", Pronunciation.spoken("eh-KSEH-pnyoo-sen"))
+        assertEquals("soo kay", Pronunciation.spoken("psoo-KHAY"))
+        assertEquals("whee ohss", Pronunciation.spoken("hwee-OS"))
+        // An eh before a consonant closed by it; g before e as in "get".
+        assertEquals("ahn-ghel-lohss", Pronunciation.spoken("AHN-geh-los"))
+        assertEquals("ghee noh-sket-teh", Pronunciation.spoken("gee-NOH-skeh-teh"))
+        assertEquals("bare-resh sheet", Pronunciation.spoken("beh-reh-SHEET"))
+        assertEquals("kess-sed", Pronunciation.spoken("KHEH-sed"))
+        assertEquals("el-loh heem", Pronunciation.spoken("eh-loh-HEEM"))
+        assertEquals("air ray-moh", Pronunciation.spoken("eh-RAY-moh"))
+        assertEquals("hah yezh", Pronunciation.spoken("hah-YESH"))
+        assertEquals("ah-hah vah", Pronunciation.spoken("ah-hah-VAH"))
+        assertEquals("vai-yek-kez zahk", Pronunciation.spoken("vai-yeh-kheh-ZAHK"))
+        // Two words, and nothing to say.
+        assertEquals("hoh kree stohss", Pronunciation.spoken("ho khree-STOS"))
+        assertEquals("", Pronunciation.spoken(""))
     }
 }

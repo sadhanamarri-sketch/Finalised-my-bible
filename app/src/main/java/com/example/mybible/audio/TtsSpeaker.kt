@@ -153,26 +153,6 @@ class TtsSpeaker(context: Context, private val engineFor: (telugu: Boolean) -> S
         }, fail = { listener?.onError(id) })
     }
 
-    // Greek and Hebrew words are said by the phone's usual engine: AI voice apps rarely have them.
-    override fun hasVoiceFor(locale: Locale): Boolean? {
-        val c = usual()
-        if (c.ready != true) return c.ready
-        return c.tts.isLanguageAvailable(locale) >= TextToSpeech.LANG_AVAILABLE
-    }
-
-    override fun speakIn(id: String, text: String, locale: Locale, rate: Float, pitch: Float) {
-        val c = usual()
-        c.whenReady(say = {
-            if (c.tts.setLanguage(locale) < 0) {
-                listener?.onError(id)
-            } else {
-                c.tts.setSpeechRate(rate)
-                c.tts.setPitch(pitch)
-                if (c.tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, id) != TextToSpeech.SUCCESS) listener?.onError(id)
-            }
-        }, fail = { listener?.onError(id) })
-    }
-
     override fun stop() {
         speaking.values.forEach { it.stop() }
     }

@@ -225,6 +225,8 @@ object Pronunciation {
                 // ay closing a syllable (vay·na·SHEK) is the same sound.
                 two == "ay" && (i + 2 == s.length || s[i + 2] !in vowels) -> { sb.append("ai"); i += 2 }
                 two == "oi" -> { sb.append("oy"); i += 2 }
+                // So is oy closing one (גּוֹי, goy).
+                two == "oy" && (i + 2 == s.length || s[i + 2] !in vowels) -> { sb.append("oy"); i += 2 }
                 s[i] in vowels -> {
                     // Closed by a consonant after it (not a silent final h): sed, shekh.
                     val rest = s.substring(i + 1)
@@ -246,5 +248,189 @@ object Pronunciation {
             }
         }
         return sb.toString()
+    }
+
+    // ---- Saying it: the sounds-like spelling, for an English voice ----
+
+    /**
+     * A sounds-like spelling ([greek]'s or [hebrew]'s) as text an English voice says as it reads: the
+     * same sounds spelled as English spells them, so the voice doesn't guess — lowercase (capitals can
+     * be read out as letters), "eye" for a lone ai and "eigh" for a lone ay, "gh" before e, an eh closed
+     * by the sound after it (tet-tah: English has no eh ending a syllable), "ss" for a final s, and the
+     * first sound of a cluster English can't begin a word with said with the syllable before it, or
+     * left out starting the word, as English does (pneuma). The stressed syllable starts a part of its
+     * own, where an English voice puts the stress: ah-GAH-pay is "ah gah-pay", PNYOO-mah "nyew-mah".
+     */
+    fun spoken(soundsLike: String): String =
+        soundsLike.split(' ').filter { it.isNotBlank() }.joinToString(" ") { spokenWord(it) }.trim()
+
+    // A syllable to be said: the consonants before its vowel sound, the vowel sound, those after.
+    private class Said(val onset: MutableList<String>, val vowel: String, val coda: MutableList<String>, val stressed: Boolean)
+
+    private fun spokenWord(word: String): String {
+        val raw = word.split('-').filter { it.isNotEmpty() }
+        val stress = raw.indexOfFirst { s -> s.any(Char::isUpperCase) }.takeIf { raw.size > 1 && it >= 0 }
+        val said = ArrayList<Said>()
+        val pending = ArrayList<String>()
+        for ((n, syllable) in raw.withIndex()) {
+            val units = soundUnits(syllable.lowercase().filter { it in 'a'..'z' })
+            val vowels = units.indices.filter { units[it] in SAID_VOWELS }
+            // A consonant on its own (a stray one in a transliteration) goes with the syllable before.
+            if (vowels.isEmpty()) {
+                if (said.isNotEmpty()) said.last().coda += units else pending += units
+                continue
+            }
+            // Two vowel sounds run together (ro'eh, roheh) are two syllables to say.
+            var start = 0
+            for ((v, at) in vowels.withIndex()) {
+                val onset = (pending + units.subList(start, at)).toMutableList()
+                pending.clear()
+                val coda = if (v == vowels.lastIndex) units.subList(at + 1, units.size).toMutableList() else ArrayList()
+                said += Said(onset, units[at], coda, n == stress && v == 0)
+                start = at + 1
+            }
+        }
+        if (said.isEmpty()) return ""
+        said.last().coda += pending
+        for ((i, s) in said.withIndex()) {
+            // A cluster English can't begin a word with: its first sound closes the syllable before
+            // (ek-seh), or, beginning the word, isn't said (nyew-mah).
+            while (!speakableOnset(s.onset)) {
+                val first = s.onset.removeAt(0)
+                if (i > 0) said[i - 1].coda += first
+            }
+        }
+        for (i in 0 until said.lastIndex) {
+            // An eh ending a syllable before a consonant is said closed by it: ghel-lohss.
+            val next = said[i + 1].onset.firstOrNull()
+            val open = said[i].vowel == "eh" || said[i].vowel == "e"
+            if (open && said[i].coda.isEmpty() && next != null && next !in listOf("h", "y", "w")) said[i].coda += next
+        }
+        val parts = ArrayList<MutableList<String>>()
+        for (s in said) {
+            if (s.stressed || parts.isEmpty()) parts += ArrayList<String>()
+            parts.last() += spokenSyllable(s)
+        }
+        return parts.joinToString(" ") { it.joinToString("-") }
+    }
+
+    // A syllable's letters as its sounds: vowel sounds (ah, oo...) and consonants (sh, k...).
+    private fun soundUnits(s: String): List<String> {
+        val out = ArrayList<String>()
+        var i = 0
+        while (i < s.length) {
+            val unit = SAID_VOWELS.firstOrNull { s.startsWith(it, i) } ?: SAID_CONSONANTS.firstOrNull { s.startsWith(it, i) }
+            if (unit == null) {
+                i++
+                continue
+            }
+            when (unit) {
+                "a" -> out += "ah"
+                "u" -> out += "oo"
+                "kh", "c", "q" -> out += "k"
+                "x" -> out += listOf("k", "s")
+                else -> out += unit
+            }
+            i += unit.length
+        }
+        return out
+    }
+
+    private fun speakableOnset(onset: List<String>): Boolean = when {
+        onset.size <= 1 -> true
+        // A consonant and a y, said as one (nyew); or a cluster and a y (skew).
+        onset.last() == "y" -> onset.size == 2 || onset.dropLast(1) in SAID_ONSETS
+        else -> onset in SAID_ONSETS
+    }
+
+    private fun spokenSyllable(s: Said): String {
+        val onset = s.onset
+        val coda = s.coda.toMutableList()
+        var vowel = s.vowel
+        when {
+            vowel == "o" -> vowel = "oh"
+            vowel == "eh" && coda.isNotEmpty() -> vowel = "e"
+            vowel == "e" && coda.isEmpty() -> vowel = "eh"
+            vowel == "i" && coda.isEmpty() -> vowel = "ee"
+        }
+        if (vowel == "oh" && coda.firstOrNull() == "y") {
+            vowel = "oy"
+            coda.removeAt(0)
+        }
+        // A y gliding into oo (PNYOO, nyew) is spelled with it.
+        val glide = vowel == "oo" && onset.size > 1 && onset.last() == "y"
+        var start = spelledOnset(if (glide) onset.dropLast(1) else onset)
+        val rest = coda.drop(1).joinToString("")
+        var end = coda.joinToString("")
+        val sound = when (vowel) {
+            "e" -> when {
+                // Before an r, as in "bare": ber would be said bur.
+                coda[0] == "r" -> {
+                    end = rest
+                    if (onset.isEmpty() || onset.last() == "z") "air" else "are"
+                }
+                coda == listOf("s") -> {
+                    end = ""
+                    if (start == "y") "es" else "ess"
+                }
+                coda[0] == "g" -> { end = "gg$rest"; "e" }
+                coda[0] == "sh" && (start == "y" || start == "d") -> { end = "zh$rest"; "e" }
+                coda == listOf("d") && start == "y" -> { end = "dd"; "e" }
+                else -> "e"
+            }.also { if (start == "b" && coda[0] in listOf("sh", "f", "b")) start = "bh" }
+            "eh" -> "eh"
+            "ah" -> "ah"
+            "ay" -> if (onset.isEmpty()) "eigh" else "ay"
+            "ai" -> when {
+                onset.isEmpty() -> "eye"
+                coda.isEmpty() -> if (start == "th") "igh" else "ai"
+                // Closed, as in "kyne": kain would be said like Cain.
+                else -> {
+                    end = rest
+                    "y" + if (coda[0] == "s") "ce" else coda[0] + "e"
+                }
+            }
+            "ee" -> "ee".also { if (start == "r" && coda.isNotEmpty()) start = "rh" }
+            "oo" -> when {
+                glide -> when {
+                    onset[onset.size - 2] == "b" -> "ue"
+                    onset[onset.size - 2] == "d" -> "yue"
+                    onset.size > 2 && onset[0] == "s" -> "ew"
+                    else -> "yew"
+                }
+                coda.firstOrNull() == "k" -> { end = "c$rest"; "oo" }
+                coda == listOf("d") || coda.firstOrNull() == "r" -> "ooe"
+                else -> "oo"
+            }
+            "ow" -> "ao"
+            else -> vowel
+        }
+        // A g before e, i or y is said as in "get", not "gem".
+        if (start.endsWith("g") && sound.first() in "eiy") start += "h"
+        // A final s is said s, not z.
+        if (coda == listOf("s") && end == "s") end = "ss"
+        return start + sound + end
+    }
+
+    private fun spelledOnset(onset: List<String>): String = when {
+        onset.take(2) == listOf("h", "w") -> "wh" + onset.drop(2).joinToString("")
+        onset.take(2) == listOf("s", "f") -> "sph" + onset.drop(2).joinToString("")
+        else -> onset.joinToString("")
+    }
+
+    private val SAID_VOWELS = listOf("ah", "eh", "ay", "ai", "ee", "oh", "oo", "oy", "ow", "e", "i", "o", "a", "u")
+    private val SAID_CONSONANTS = listOf(
+        "sh", "th", "kh", "ts", "b", "c", "d", "f", "g", "h", "j", "k", "l", "m", "n", "p", "q", "r", "s", "t", "v", "w", "x", "y", "z"
+    )
+
+    // Consonants an English word can begin with together.
+    private val SAID_ONSETS: Set<List<String>> = buildSet {
+        listOf("k", "t", "p", "m", "n", "l", "w").forEach { add(listOf("s", it)) }
+        addAll(listOf(listOf("s", "k", "r"), listOf("s", "t", "r"), listOf("s", "p", "r"), listOf("s", "p", "l"), listOf("s", "k", "l")))
+        listOf("b", "d", "f", "g", "k", "p", "t", "th", "sh").forEach { add(listOf(it, "r")) }
+        listOf("b", "f", "g", "k", "p", "s").forEach { add(listOf(it, "l")) }
+        listOf("d", "t", "k", "g", "s", "th").forEach { add(listOf(it, "w")) }
+        add(listOf("h", "w"))
+        add(listOf("s", "f"))
     }
 }

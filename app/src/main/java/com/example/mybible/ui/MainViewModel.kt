@@ -15,6 +15,7 @@ import com.example.mybible.data.BibleDataImportWorker
 import com.example.mybible.data.BibleRepository
 import com.example.mybible.data.DriveBackupManager
 import com.example.mybible.data.DriveSyncWorker
+import com.example.mybible.data.Pronunciation
 import com.example.mybible.reminders.ReminderFrequency
 import com.example.mybible.reminders.ReminderScheduler
 import com.example.mybible.reminders.ReminderTheme
@@ -557,14 +558,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun pauseReading() = readAloud.pause()
 
     /**
-     * A Greek or Hebrew word's speaker: says [text] in the phone's Greek or Hebrew voice. False when
-     * the phone has no such voice.
+     * A Greek or Hebrew word's speaker: says what its sounds-like spelling [soundsLike] shows
+     * (ah-GAH-pay), in the English voice. False when there's no English voice.
      */
-    fun sayOriginalWord(text: String, greek: Boolean): Boolean? =
-        readAloud.sayWord(text, if (greek) GREEK_VOICE else HEBREW_VOICE)
+    fun sayPronunciation(soundsLike: String): Boolean? = readAloud.sayWord(Pronunciation.spoken(soundsLike))
 
-    /** Whether the phone has a Greek voice, or a Hebrew one: null while its speech engine is starting. */
-    fun hasOriginalWordVoice(greek: Boolean): Boolean? = readAloud.hasVoiceFor(if (greek) GREEK_VOICE else HEBREW_VOICE)
+    /** Whether there's an English voice to say a word with: null while its speech engine is starting. */
+    fun hasPronunciationVoice(): Boolean? = readAloud.englishReady()
 
     fun resumeReading() = readAloud.resume()
 
@@ -577,11 +577,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** The reading bar's previous, held: the chapter from its first verse. */
     fun readFromChapterStart() = readAloud.skipToStart()
-
-    private companion object {
-        val GREEK_VOICE: java.util.Locale = java.util.Locale("el", "GR")
-        val HEBREW_VOICE: java.util.Locale = java.util.Locale("he", "IL")
-    }
 
     override fun onCleared() {
         // Verse Scroll's reading needs its feed, which goes with this; the Reader's chapter can read on.

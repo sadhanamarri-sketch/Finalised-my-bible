@@ -22,10 +22,6 @@ class ReadAloudTest {
         override fun speak(id: String, text: String, telugu: Boolean, rate: Float, voice: String?, pitch: Float) {
             said += Said(id, text, telugu, rate, voice, pitch)
         }
-        val words = mutableListOf<Pair<String, java.util.Locale>>()
-        var otherVoices: Boolean? = true
-        override fun hasVoiceFor(locale: java.util.Locale) = otherVoices
-        override fun speakIn(id: String, text: String, locale: java.util.Locale, rate: Float, pitch: Float) { words += text to locale }
         override fun stop() { stops++ }
         var voices = mapOf(
             false to listOf(VoiceOption("en-in-x-end-local", "India 1", online = false)),
@@ -417,20 +413,28 @@ class ReadAloudTest {
     }
 
     @Test
-    fun aGreekOrHebrewWordIsSaidInItsOwnVoicePausingAReading() {
+    fun aGreekOrHebrewWordIsSaidInTheEnglishVoicePausingAReading() {
         val speaker = FakeSpeaker()
-        val reader = reader(speaker)
+        val reader = reader(speaker, FakePrefs(pitch = 0.85f, speed = 1.4f, englishVoice = "en-us-x-iol-local"))
         val chapter = Chapter(john3, from = 16)
         reader.start(chapter)
-        val greek = java.util.Locale("el", "GR")
-        assertEquals(true, reader.sayWord("ἀγάπη", greek))
+        assertEquals(true, reader.sayWord("ah gah-pay"))
         assertEquals(ReadAloudState.Status.PAUSED, reader.state.value.status)
         assertEquals(1, chapter.paused)
-        assertEquals(listOf("ἀγάπη" to greek), speaker.words)
-        // No Hebrew voice on the phone: nothing said, and the page is told so.
-        speaker.otherVoices = false
-        assertEquals(false, reader.sayWord("חֶסֶד", java.util.Locale("he", "IL")))
-        assertEquals(1, speaker.words.size)
+        // What its sounds-like spelling shows, in the English voice and pitch, a little slower than usual.
+        val word = speaker.said.last()
+        assertEquals("ah gah-pay", word.text)
+        assertFalse(word.telugu)
+        assertEquals("en-us-x-iol-local", word.voice)
+        assertEquals(0.85f, word.pitch)
+        assertEquals(0.8f, word.rate)
+        // Its end isn't the verse's: the reading stays paused.
+        speaker.finish()
+        assertEquals(ReadAloudState.Status.PAUSED, reader.state.value.status)
+        // No English voice on the phone: nothing said, and the page is told so.
+        val silent = FakeSpeaker(ready = false)
+        assertEquals(false, reader(silent).sayWord("KHEH-sed"))
+        assertTrue(silent.said.isEmpty())
     }
 
     @Test

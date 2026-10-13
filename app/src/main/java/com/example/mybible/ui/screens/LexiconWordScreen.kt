@@ -118,15 +118,15 @@ fun GreekWordScreen(
         // gloss when the tapped word didn't already carry one of its own.
         val displayedGloss = word.englishGloss.ifBlank { foundEntry?.gloss.orEmpty() }
         val grammar = remember(word.morphology) { MorphologyParser.terms(word.morphology) }
+        val soundsLike = remember(word.greek) { Pronunciation.greek(word.greek) }
 
         LexiconWordPageContent(
             headerLabel = if (word.strongs.isNullOrBlank()) "GREEK WORD" else "STRONG'S ${word.strongs.uppercase()}",
             script = word.greek,
             transliteration = word.transliteration,
-            soundsLike = remember(word.greek) { Pronunciation.greek(word.greek) },
-            language = "Greek",
-            onSay = { viewModel.sayOriginalWord(word.greek, greek = true) },
-            hasVoice = { viewModel.hasOriginalWordVoice(greek = true) },
+            soundsLike = soundsLike,
+            onSay = { viewModel.sayPronunciation(soundsLike) },
+            hasVoice = viewModel::hasPronunciationVoice,
             gloss = displayedGloss,
             grammar = { if (grammar.isNotEmpty()) GrammarTermsRow(grammar) },
             lexicalTransliteration = foundEntry?.transliteration.orEmpty(),
@@ -208,25 +208,25 @@ fun HebrewWordScreen(
         val foundEntry = (lexiconResult as? LexiconLookupResult.Found)?.entry
         val displayedGloss = word.englishGloss.ifBlank { foundEntry?.gloss.orEmpty() }
         val parts = remember(word) { HebrewMorphology.parts(word) }
+        val soundsLike = remember(word.transliteration, foundEntry) {
+            val syllables = HebrewMorphology.cleanTransliteration(word.transliteration)
+            when {
+                // As the verse has it: be·re·SHIT.
+                '·' in syllables || syllables.any(Char::isUpperCase) -> Pronunciation.hebrew(syllables)
+                // A word opened from a link has only "chesed": the lexicon's che.sed, then.
+                !foundEntry?.transliteration.isNullOrBlank() ->
+                    Pronunciation.hebrewDictionaryForm(foundEntry!!.transliteration, foundEntry.lemma.ifBlank { word.hebrew })
+                else -> Pronunciation.hebrew(syllables)
+            }
+        }
 
         LexiconWordPageContent(
             headerLabel = if (word.strongs.isNullOrBlank()) "HEBREW WORD" else "STRONG'S ${word.strongs.uppercase()}",
             script = HebrewMorphology.cleanWord(word.hebrew),
             transliteration = HebrewMorphology.cleanTransliteration(word.transliteration),
-            soundsLike = remember(word.transliteration, foundEntry) {
-                val syllables = HebrewMorphology.cleanTransliteration(word.transliteration)
-                when {
-                    // As the verse has it: be·re·SHIT.
-                    '·' in syllables || syllables.any(Char::isUpperCase) -> Pronunciation.hebrew(syllables)
-                    // A word opened from a link has only "chesed": the lexicon's che.sed, then.
-                    !foundEntry?.transliteration.isNullOrBlank() ->
-                        Pronunciation.hebrewDictionaryForm(foundEntry!!.transliteration, foundEntry.lemma.ifBlank { word.hebrew })
-                    else -> Pronunciation.hebrew(syllables)
-                }
-            },
-            language = "Hebrew",
-            onSay = { viewModel.sayOriginalWord(HebrewMorphology.cleanWord(word.hebrew), greek = false) },
-            hasVoice = { viewModel.hasOriginalWordVoice(greek = false) },
+            soundsLike = soundsLike,
+            onSay = { viewModel.sayPronunciation(soundsLike) },
+            hasVoice = viewModel::hasPronunciationVoice,
             gloss = HebrewMorphology.cleanGloss(displayedGloss),
             grammar = {
                 when {
@@ -277,10 +277,8 @@ private fun LexiconWordPageContent(
     headerLabel: String,
     script: String,
     transliteration: String,
-    // How it sounds, spelled for an English reader (ah-GAH-pay), and its speaker; [language] names the
-    // voice it needs: "Greek", "Hebrew".
+    // How it sounds, spelled for an English reader (ah-GAH-pay), and its speaker.
     soundsLike: String,
-    language: String,
     onSay: () -> Boolean?,
     hasVoice: () -> Boolean?,
     gloss: String,
@@ -334,7 +332,7 @@ private fun LexiconWordPageContent(
                 modifier = Modifier.padding(top = 2.dp)
             )
         }
-        if (soundsLike.isNotBlank()) SoundsLike(soundsLike, language, onSay, hasVoice)
+        if (soundsLike.isNotBlank()) SoundsLike(soundsLike, onSay, hasVoice)
         if (gloss.isNotBlank()) {
             Text(
                 text = gloss,
@@ -429,10 +427,10 @@ private fun LexiconWordPageContent(
     }
 }
 
-// How the word sounds, spelled for an English reader (ah-GAH-pay), and a speaker that says it in the
-// phone's Greek or Hebrew voice — or says there isn't one, with a way to get it.
+// How the word sounds, spelled for an English reader (ah-GAH-pay), and a speaker that says just that, in
+// the English reading voice — or says there's no voice, with a way to get one.
 @Composable
-private fun SoundsLike(soundsLike: String, language: String, onSay: () -> Boolean?, hasVoice: () -> Boolean?) {
+private fun SoundsLike(soundsLike: String, onSay: () -> Boolean?, hasVoice: () -> Boolean?) {
     val context = LocalContext.current
     var noVoice by remember(soundsLike) { mutableStateOf(false) }
     // Tapped while the phone's speech engine was starting: whether it has the voice, once it knows.
@@ -480,7 +478,7 @@ private fun SoundsLike(soundsLike: String, language: String, onSay: () -> Boolea
     if (noVoice) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "No $language voice on this phone yet.",
+                text = "No voice on this phone to say it with yet.",
                 fontSize = 13.sp,
                 fontFamily = WorkSansFontFamily,
                 color = MaterialTheme.colorScheme.onSurfaceVariant

@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.util.Locale
 
 /** Which of the Bible's two texts are read aloud: English, Telugu, or each verse in English then Telugu. */
 enum class ReadLanguage(val label: String) {
@@ -121,12 +120,6 @@ interface Speaker {
 
     /** Says [text] in [voice] (null: the language's usual one), at [rate] and [pitch] (1: the voice's own). */
     fun speak(id: String, text: String, telugu: Boolean, rate: Float, voice: String?, pitch: Float)
-
-    /** Whether it has a voice for [locale] (Greek, Hebrew): null while its speech engine is starting. */
-    fun hasVoiceFor(locale: Locale): Boolean?
-
-    /** Says [text] in [locale]'s voice: a Greek or Hebrew word, on its page. */
-    fun speakIn(id: String, text: String, locale: Locale, rate: Float, pitch: Float)
 
     fun stop()
 
@@ -267,21 +260,19 @@ class ReadAloud(
     /** Whether English's speech engine has started (null: not yet; false: it couldn't). */
     fun englishReady(): Boolean? = speaker.ready
 
-    /** Whether the phone has a voice for [locale]: null while its speech engine is starting. */
-    fun hasVoiceFor(locale: Locale): Boolean? = speaker.hasVoiceFor(locale)
-
     /**
-     * Says a Greek or Hebrew word ([text]) in the phone's voice for [locale], a little slower and at
-     * English's pitch, pausing anything being read. False when the phone has no voice for it (null: not
-     * known yet, and it's said if it can be).
+     * Says how a Greek or Hebrew word sounds — [spoken], its sounds-like spelling as an English voice
+     * should be given it (see Pronunciation.spoken) — in the English voice, a little slower, pausing
+     * anything being read. False when there's no English voice (null: not known yet, and it's said if
+     * it can be).
      */
-    fun sayWord(text: String, locale: Locale): Boolean? {
-        val voice = speaker.hasVoiceFor(locale)
-        if (voice == false) return false
+    fun sayWord(spoken: String): Boolean? {
+        val ready = speaker.ready
+        if (ready == false) return false
         if (_state.value.status == ReadAloudState.Status.PLAYING) pause()
         utterances++
-        speaker.speakIn("word-$utterances", text, locale, WORD_RATE, prefs.pitch(telugu = false))
-        return voice
+        speaker.speak("word-$utterances", spoken, telugu = false, rate = WORD_RATE, voice = voiceFor(telugu = false), pitch = prefs.pitch(telugu = false))
+        return ready
     }
 
     /** A few words in the language's voice, speed and pitch, to hear them: only while nothing is being read. */
