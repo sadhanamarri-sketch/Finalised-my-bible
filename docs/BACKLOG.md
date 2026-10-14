@@ -460,3 +460,46 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     Piper's voices use: all but 0.2% of the syllables come out as spelled, and those few nearly
     ("heh" with its h breathed). "No voice on this phone to say it with yet" shows only when there's
     no English voice at all. A Hebrew word ending in oy now shows it as oy (goy, not gohy).
+
+## Noted 14 Oct 2026
+
+21. **Your own recordings, timed once and played verse by verse.** "If I have bible audio of
+    telugu and kjv without timed.. can we generate timed? and the audio stays in the files
+    storage and we just play like a music player with timed file." — "timing is just one time
+    thing for each chapter right? ... a separate app can do it and we store the json in the
+    app" — "is it possible to include the speed as well? will it work with verse scroll?" —
+    "let's not implement everything right away... keep it in the list."
+    *The plan:* the recordings stay in the phone's storage, and the app is pointed at the KJV
+    folder and the Telugu folder once. Each recording is timed once, off the phone: espeak
+    reads each verse of the app's text, that is matched to the narration by its sound, each
+    verse's start is moved onto the narrator's pause, and three runs at different speeds vote.
+    Only the timing file goes in the app: every verse's start and end, about 0.6 MB a language
+    for the whole Bible. The app checks each file's length against the one timed, so a
+    different recording is never followed wrongly. Then it plays like a music player — screen
+    off, lock screen, earbuds — with each verse lit up as it's read and a tap on a verse going
+    there. The English and Telugu speeds apply, the narrator's pitch kept. Verse Scroll plays
+    each card's own verse, from its start to its end; English then Telugu plays each verse from
+    both recordings; a verse with no recording is read by the phone's voice. The recordings
+    never go in the repository, which is public.
+    *Tried 14 Oct on Ruth* (Telugu, "Telugu Audio Bible YGFM", 18 minutes, the whole book in
+    one file): four chapters joined end to end, each opening with about 3 s of a spoken
+    heading, a low sound (music or hiss) under the narration throughout, and the narrator
+    pausing as much inside verses as between them, so pauses alone couldn't place the verses.
+    All 85 verse starts came out on a pause: 79 the same at all three speeds, and 5 settled by
+    the vote (2:7, 4:5, 4:15, 4:16, 4:18). Each verse's length followed its text's (0.98).
+    Checked by ear on a private page, at 0.75× to 2× and a verse at a time: "this is
+    excellent." Ruth's timing file is 1.6 KB, about a minute's work a book.
+    *Needs:* the rest of the books from the same source, and a KJV recording, as links that
+    can be downloaded here or as uploads. Long chapters (Psalm 119) need the matching done in
+    a narrower band to fit in memory.
+
+22. **The Gospels as films, verse by verse.** "Is it possible to stream videos in the same
+    way... i found new videos of gospel verse wise no deviation."
+    *Possible the same way:* a film's sound is timed like a recording, and the film plays
+    above the verses, each lit up as it's said. Where the films are decides how: files that
+    can be downloaded work like the recordings (a few GB a Gospel); YouTube's play only in
+    YouTube's own player inside the app, which can't keep playing with the screen off, and
+    can't be downloaded to be timed; Faith Comes By Hearing's Gospel films (on Bible.is) could
+    be streamed through Bible Brain once its key arrives. A film in another translation lines
+    up verse by verse, but its words won't be the app's.
+    *Needs:* a link to the films.
