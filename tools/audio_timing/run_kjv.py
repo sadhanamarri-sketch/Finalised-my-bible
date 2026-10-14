@@ -45,6 +45,7 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     jobs = []
     damaged = []
+    taken = set()   # where two zips hold the same chapter, the first one given is used
     for zpath in ZIPS:
         with zipfile.ZipFile(zpath) as z, open(zpath, 'rb') as raw:
             for info in z.infolist():
@@ -59,6 +60,9 @@ def main():
                 index = num - 1 if testament == 'A' else 38 + num
                 book = BOOKS[index]
                 out = os.path.join(OUT, f'{index + 1:02d}_{ch:03d}.json')
+                if out in taken:
+                    continue
+                taken.add(out)
                 jobs.append((zpath, info.filename, book, ch, out))
     jobs.sort(key=lambda j: j[4])
     print(f'{len(jobs)} chapters; {len(damaged)} damaged in the zip, skipped: {damaged}', flush=True)

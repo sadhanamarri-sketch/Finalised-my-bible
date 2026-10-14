@@ -19,8 +19,11 @@ For each chapter (`timing.py`):
 
 Then `refine.py` chooses each start among the pauses near it. It weighs what the matching found
 (held tightly where its three readings agreed), how long each pause is (a verse usually follows a
-longer one) and whether each verse then takes about as long as its text. On 150 KJV chapters, it put
-back 96% of known-good starts that had been knocked 1.5–4 s off.
+longer one) and whether each verse then takes about as long as its text. Verse 1 is kept after the
+chapter's spoken heading, about as long after it as that narrator's headings usually take: the
+matching sometimes put verse 1 on a pause inside the heading, and the pause before a heading is
+long. On 150 KJV chapters, the refinement put back 96% of known-good starts that had been knocked
+1.5–4 s off.
 
 A recording with one file per book (the Telugu one) is split first (`run_telugu.py`). Its chapters
 were joined with a moment of digital silence, but not always, and some joins are in the middle of a
@@ -36,9 +39,10 @@ Needs Python 3 with NumPy, ffmpeg, espeak-ng (with its Telugu voice for Telugu) 
 ```sh
 gcc -O3 -shared -fPIC -o libdtw2.so dtw2.c -lm
 
-# KJV, Faith Comes By Hearing's narrated recording (ENGKJVO1DA, ENGKJVN1DA): one file per chapter
-python3 run_kjv.py kjv.tsv results/kjv 4 ENGKJVN1DA.zip ENGKJVO1DA.zip
-python3 apply_refine_kjv.py results/kjv kjv.tsv 4 ENGKJVN1DA.zip ENGKJVO1DA.zip
+# KJV, Faith Comes By Hearing's narrated recording (ENGKJVO1DA, ENGKJVN1DA): one file per chapter.
+# Where two zips hold the same file, the first one given is used, so replacement files go first.
+python3 run_kjv.py kjv.tsv results/kjv 4 ENGKJVN1DA.zip replacements.zip ENGKJVO1DA.zip
+python3 apply_refine_kjv.py results/kjv kjv.tsv 4 ENGKJVN1DA.zip replacements.zip ENGKJVO1DA.zip
 python3 export.py kjv results/kjv kjv.tsv ../../data/audio_timing/kjv.json
 
 # Telugu, one file per book (Psalms in two)

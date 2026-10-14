@@ -38,6 +38,15 @@ else:
             entry = {'file': r['file'], 'start': ch['start'], 'end': ch['end'], 'verses': tidy(ch['verses'])}
             if ch['metrics']['unsure']: entry['unsure'] = ch['metrics']['unsure']
             chapters[(r['book'], int(c))] = entry
+    # a chapter ends by the time the next one in its file starts
+    by_file = {}
+    for e in chapters.values(): by_file.setdefault(e['file'], []).append(e)
+    for es in by_file.values():
+        es.sort(key=lambda e: e['start'])
+        for e, nxt in zip(es, es[1:]):
+            if e['end'] > nxt['start']:
+                e['end'] = nxt['start']
+                e['verses'][-1][1] = min(e['verses'][-1][1], e['end'])
     recording = ('Telugu Audio Bible, YGFM (Apostle Ratnaker), reading the Telugu Old Version: one file per '
                  'book (Psalms in two), chapters read one after another.')
 

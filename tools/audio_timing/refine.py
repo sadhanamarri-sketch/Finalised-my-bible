@@ -5,12 +5,14 @@ import re
 import numpy as np
 
 
-def refine(starts, unsure, lengths, quiet, end, sure_sd=0.35, unsure_sd=4.0, reach=8.0, pause_weight=2.0):
+def refine(starts, unsure, lengths, quiet, end, sure_sd=0.35, unsure_sd=4.0, reach=8.0, pause_weight=2.0, head=None):
     """[starts]: each verse's start (s) from the matching; [unsure]: indexes whose runs disagreed;
     [lengths]: each verse's letters; [quiet]: (start, end) quiet stretches in the same seconds;
-    [end]: where the last verse ends. Returns the chosen starts."""
+    [end]: where the last verse ends; [head]: (where the chapter's spoken heading starts, how long
+    headings usually run before verse 1), which keeps verse 1 after the heading. Returns the chosen
+    starts."""
     n = len(starts)
-    if n < 3:
+    if n < 3 and head is None:
         return list(starts)
     starts = np.asarray(starts, float)
     L = np.asarray(lengths, float)
@@ -24,6 +26,10 @@ def refine(starts, unsure, lengths, quiet, end, sure_sd=0.35, unsure_sd=4.0, rea
     for k in range(n):
         if durs[k] < 0.35 * mu[k] or durs[k] > 2.8 * mu[k] + 2:
             doubt.update({k, k + 1})
+    if head is not None:
+        h, gap = head
+        if not 0.5 * gap <= starts[0] - h <= 2.5 * gap + 2:
+            doubt.add(0)
     onsets = np.array([b - 0.08 for a, b in quiet], float)
     plen = np.array([b - a for a, b in quiet], float)
     cands, scores = [], []
@@ -33,9 +39,17 @@ def refine(starts, unsure, lengths, quiet, end, sure_sd=0.35, unsure_sd=4.0, rea
         pick = np.where(np.abs(onsets - starts[k]) <= w)[0]
         c = [starts[k]] + [onsets[i] for i in pick]
         p = [0.0] + [plen[i] for i in pick]
+        if k == 0 and head is not None:
+            c.append(h + gap); p.append(0.0)
         c = np.array(c); p = np.array(p)
         cands.append(c)
-        scores.append(-(c - starts[k]) ** 2 / (2 * sd ** 2) + pause_weight * np.log1p(p))
+        score = -(c - starts[k]) ** 2 / (2 * sd ** 2) + pause_weight * np.log1p(p)
+        if k == 0 and head is not None:
+            # verse 1 comes about as long after the heading's start as headings usually take
+            d = c - h
+            score = score - (d - gap) ** 2 / (2 * (0.2 * gap + 0.6) ** 2)
+            score[d < min(1.0, 0.4 * gap)] = -1e9
+        scores.append(score)
     # Best path: each start after the one before, verses as long as their text.
     best = [scores[0]]
     back = []
