@@ -8,9 +8,9 @@ import numpy as np
 def refine(starts, unsure, lengths, quiet, end, sure_sd=0.35, unsure_sd=4.0, reach=8.0, pause_weight=2.0, head=None):
     """[starts]: each verse's start (s) from the matching; [unsure]: indexes whose runs disagreed;
     [lengths]: each verse's letters; [quiet]: (start, end) quiet stretches in the same seconds;
-    [end]: where the last verse ends; [head]: (where the chapter's spoken heading starts, how long
-    headings usually run before verse 1), which keeps verse 1 after the heading. Returns the chosen
-    starts."""
+    [end]: where the last verse ends; [head]: (where the chapter's spoken heading starts, how long it
+    takes: heading_factor times its length as espeak says it), which keeps verse 1 from starting
+    inside the heading. Returns the chosen starts."""
     n = len(starts)
     if n < 3 and head is None:
         return list(starts)
@@ -28,7 +28,7 @@ def refine(starts, unsure, lengths, quiet, end, sure_sd=0.35, unsure_sd=4.0, rea
             doubt.update({k, k + 1})
     if head is not None:
         h, gap = head
-        if not 0.5 * gap <= starts[0] - h <= 2.5 * gap + 2:
+        if starts[0] - h < 0.75 * gap:
             doubt.add(0)
     onsets = np.array([b - 0.08 for a, b in quiet], float)
     plen = np.array([b - a for a, b in quiet], float)
@@ -45,9 +45,10 @@ def refine(starts, unsure, lengths, quiet, end, sure_sd=0.35, unsure_sd=4.0, rea
         cands.append(c)
         score = -(c - starts[k]) ** 2 / (2 * sd ** 2) + pause_weight * np.log1p(p)
         if k == 0 and head is not None:
-            # verse 1 comes about as long after the heading's start as headings usually take
+            # verse 1 comes no sooner after the heading's start than the heading takes (it can come
+            # later: a psalm's title is read after its heading)
             d = c - h
-            score = score - (d - gap) ** 2 / (2 * (0.2 * gap + 0.6) ** 2)
+            score = score - np.where(d < gap, (d - gap) ** 2 / (2 * (0.2 * gap + 0.6) ** 2), 0.0)
             score[d < min(1.0, 0.4 * gap)] = -1e9
         scores.append(score)
     # Best path: each start after the one before, verses as long as their text.
@@ -69,6 +70,15 @@ def refine(starts, unsure, lengths, quiet, end, sure_sd=0.35, unsure_sd=4.0, rea
         if k > 0:
             i = int(back[k - 1][i])
     return out
+
+
+def heading_factor(gaps, lengths, fallback=None):
+    """How much longer than espeak a narrator takes over a book's chapter headings, with the pause
+    after them: the median, over its chapters, of the matching's [gaps] (heading to verse 1) against
+    the headings' [lengths] as espeak says them, so the few where the matching put verse 1 on a pause
+    inside the heading don't count. With fewer than three chapters to go by, [fallback]."""
+    ratios = [g / n for g, n in zip(gaps, lengths) if g >= 1.0 and n > 0]
+    return float(np.median(ratios)) if len(ratios) >= 3 or fallback is None else fallback
 
 
 def letters(text):

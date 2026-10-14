@@ -10,35 +10,13 @@ from multiprocessing import Pool
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import numpy as np
 from timing import decode, envelope, quiet_stretches, digital_silences, time_group, synth, SR
+from books import telugu_file, telugu_heading
 
 TE_DIR, KJV_TSV, OUT, WORKERS, ZIPS = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4]), sys.argv[5:]
 BOOKS = []
 for line in open(KJV_TSV, encoding='utf-8'):
     b = line.split('\t', 1)[0]
     if b not in BOOKS: BOOKS.append(b)
-ALIASES = {'Michah': 'Micah', 'Zecharia': 'Zechariah'}
-ORDINALS = ['మొదటి', 'రెండవ', 'మూడవ', 'నాలుగవ', 'అయిదవ', 'ఆరవ', 'ఏడవ', 'ఎనిమిదవ', 'తొమ్మిదవ', 'పదియవ']
-
-
-def parse(member):
-    """(book, first chapter, last chapter or None, the book's Telugu name) from a file's name, like
-    "Book of Genesis  - ఆదికాండము  Telugu Audio Bible   YGFM - Apostle Ratnaker.mp3" or
-    "Psalms Part 2 - కీర్తనలు 73 - 150 అధ్యాయములు.mp3"."""
-    base = os.path.basename(member)[:-4]
-    english, _, rest = base.partition(' - ')
-    english = ' '.join(english.replace('Book of', '').split())
-    first, last = 1, None
-    part = re.match(r'Psalms Part (\d)', english)
-    if part:
-        english = 'Psalms'
-        nums = [int(n) for n in re.findall(r'\d+', rest)]
-        first, last = nums[0], nums[1]
-    english = ALIASES.get(english, english)
-    if english not in BOOKS:
-        raise ValueError(f'no book for {base!r}')
-    telugu = rest.split('Telugu')[0]
-    telugu = re.split(r'\s\d', ' ' + telugu.strip())[0].strip() if part else telugu.strip()
-    return english, first, last, ' '.join(telugu.split())
 
 
 def merge_joins(joins, within=3.0):
@@ -96,7 +74,7 @@ def plan(durations, expected):
 def job(args):
     zpath, member = args
     try:
-        book, first, last, telugu = parse(member)
+        book, first, last, telugu = telugu_file(member, BOOKS)
         index = BOOKS.index(book)
         out = os.path.join(OUT, f'{index + 1:02d}_{first:03d}.json')
         if os.path.exists(out):
@@ -113,8 +91,7 @@ def job(args):
         texts = []
         for ch in chapters:
             c = int(ch['chapter'])
-            heading = f'{telugu} {ORDINALS[c - 1] if c <= len(ORDINALS) else str(c) + " వ"} అధ్యాయము'
-            texts.append([heading] + [' '.join(v['text'].split()) for v in ch['verses']])
+            texts.append([telugu_heading(telugu, c)] + [' '.join(v['text'].split()) for v in ch['verses']])
         raw = [len(synth(t, 'te', 160)[0]) / 22050 for t in texts]
         pace = total / sum(raw)
         groups = plan([b - a for a, b in stretches], [pace * r for r in raw])

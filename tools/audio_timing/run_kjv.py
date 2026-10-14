@@ -8,6 +8,7 @@ from multiprocessing import Pool
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from timing import decode, envelope, quiet_stretches, time_chapter
+from books import kjv_heading
 
 KJV_TSV, OUT, WORKERS, ZIPS = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4:]
 BOOKS, TEXT = [], {}
@@ -29,8 +30,7 @@ def job(args):
             data = z.read(member)
         x = decode(data)
         quiet = quiet_stretches(envelope(x))
-        heading = f'Psalm {ch}.' if book == 'Psalms' else f'{book} chapter {ch}.'
-        verses, m = time_chapter(x, [heading] + TEXT[(book, ch)], 'en-us', quiet)
+        verses, m = time_chapter(x, [kjv_heading(book, ch)] + TEXT[(book, ch)], 'en-us', quiet)
         result = {'book': book, 'chapter': ch, 'file': os.path.basename(member), 'duration': round(len(x) / 16000, 2),
                   'verses': verses, 'metrics': m}
         with open(out + '.tmp', 'w', encoding='utf-8') as f:
