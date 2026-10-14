@@ -50,6 +50,18 @@ def merge_joins(joins, within=3.0):
     return out
 
 
+def drop_gated(joins, near=20.0, run=3):
+    """Joins that come in a quick run, [run] or more each within [near] s of the last, are pauses
+    silenced in editing (a noise gate), not joins between chapters: they're dropped."""
+    out, i = [], 0
+    while i < len(joins):
+        j = i
+        while j + 1 < len(joins) and joins[j + 1][0] - joins[j][1] < near: j += 1
+        if j - i + 1 < run: out += joins[i:j + 1]
+        i = j + 1
+    return out
+
+
 def plan(durations, expected):
     """Which chapters each stretch between joins holds, fitted by length: consecutive chapters, so a
     stretch may hold several (read on with no join between them), none (a short interlude), or a
@@ -95,7 +107,7 @@ def job(args):
         with zipfile.ZipFile(zpath) as z:
             x = decode(z.read(member))
         total = len(x) / SR
-        joins = merge_joins([(a, b) for a, b in digital_silences(x) if a > 1.0 and b < total - 1.0])
+        joins = drop_gated(merge_joins([(a, b) for a, b in digital_silences(x) if a > 1.0 and b < total - 1.0]))
         bounds = [0.0] + [round((a + b) / 2, 3) for a, b in joins] + [round(total, 3)]
         stretches = list(zip(bounds[:-1], bounds[1:]))
         texts = []

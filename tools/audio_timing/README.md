@@ -24,9 +24,10 @@ back 96% of known-good starts that had been knocked 1.5–4 s off.
 
 A recording with one file per book (the Telugu one) is split first (`run_telugu.py`). Its chapters
 were joined with a moment of digital silence, but not always, and some joins are in the middle of a
-chapter. So the chapters are fitted to the stretches between joins by their expected length. A stretch
-can hold several chapters, which are then timed together and split at their spoken headings, or none
-(an interlude).
+chapter. In places every pause was silenced in editing (a noise gate), so a quick run of silences,
+three or more each within 20 s of the last, isn't taken for joins. The chapters are then fitted to the
+stretches between joins by their expected length. A stretch can hold several chapters, which are
+timed together and split at their spoken headings, or none (an interlude).
 
 ## Running it
 

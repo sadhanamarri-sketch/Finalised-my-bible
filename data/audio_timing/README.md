@@ -10,6 +10,7 @@ Each file is JSON:
 {
   "recording": "which recording, and how its files are laid out",
   "how": "how the timings were made",
+  "files": {"A01___01_Genesis_____ENGKJVO1DA.mp3": 293.02, ...},
   "chapters": {
     "Genesis 1": {
       "file": "A01___01_Genesis_____ENGKJVO1DA.mp3",
@@ -25,11 +26,12 @@ Each file is JSON:
 - `file` is the recording's file name. `start` and `end` are the chapter's place in that file, in
   seconds. A chapter's span includes its spoken heading, which comes before verse 1.
 - `verses` holds each verse's `[start, end]` in seconds from the start of the file, in verse order:
-  the first is verse 1. A verse ends where the pause before the next one begins.
+  the first is verse 1. A verse ends where the pause before the next one begins, never after the
+  next one starts.
 - `unsure` lists the verses whose three matching runs disagreed by more than 0.3 s. Their starts were
   then chosen by the refinement step, but they're the likeliest to be off.
-- A file's length can be checked against the recording on the phone, so a different recording is
-  never followed with these timings.
+- `files` gives each recording file's length in seconds, to check against the file on the phone, so
+  a different recording is never followed with these timings.
 
 ## kjv.json
 

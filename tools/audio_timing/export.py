@@ -1,6 +1,6 @@
-"""Writes the timings for the app: one file per recording, every chapter's file, where the chapter
-starts and ends in it, and each verse's [start, end] in seconds; verses where the matching's runs
-disagreed are listed as unsure.
+"""Writes the timings for the app, one file per recording: each recording file's length, and for every
+chapter its file, where the chapter starts and ends in it, and each verse's [start, end] in seconds;
+verses where the matching's runs disagreed are listed as unsure.
 
 usage: export.py kjv <results dir> <kjv.tsv> <out.json>
        export.py te <results dir> <kjv.tsv> <out.json>
@@ -13,24 +13,33 @@ for line in open(kjv, encoding='utf-8'):
     b = line.split('\t', 1)[0]
     if b not in order: order.append(b)
 
-chapters = {}
+def tidy(verses):
+    """A verse ends by the time the next one starts (they can overlap by a frame or two)."""
+    out = [[s, min(e, verses[k + 1][0]) if k + 1 < len(verses) else e] for k, (s, e) in enumerate(verses)]
+    if any(e <= s for s, e in out): raise ValueError(f'a verse ends before it starts: {out}')
+    return out
+
+
+chapters, files = {}, {}
 if kind == 'kjv':
     for p in glob.glob(os.path.join(res, '*.json')):
         r = json.load(open(p, encoding='utf-8'))
-        entry = {'file': r['file'], 'start': 0.0, 'end': r['duration'], 'verses': r['verses']}
+        entry = {'file': r['file'], 'start': 0.0, 'end': r['duration'], 'verses': tidy(r['verses'])}
         if r['metrics']['unsure']: entry['unsure'] = r['metrics']['unsure']
         chapters[(r['book'], r['chapter'])] = entry
+        files[r['file']] = r['duration']
     recording = ("Faith Comes By Hearing's King James Version, narrated (ENGKJVO1DA, ENGKJVN1DA): "
                  "one file per chapter.")
 else:
     for p in glob.glob(os.path.join(res, '*.json')):
         r = json.load(open(p, encoding='utf-8'))
+        files[r['file']] = r['duration']
         for c, ch in r['chapters'].items():
-            entry = {'file': r['file'], 'start': ch['start'], 'end': ch['end'], 'verses': ch['verses']}
+            entry = {'file': r['file'], 'start': ch['start'], 'end': ch['end'], 'verses': tidy(ch['verses'])}
             if ch['metrics']['unsure']: entry['unsure'] = ch['metrics']['unsure']
             chapters[(r['book'], int(c))] = entry
-    recording = ('Telugu Audio Bible, YGFM (Apostle Ratnaker), Bible Society of India Old Version: one file '
-                 'per book (Psalms in two), chapters read one after another.')
+    recording = ('Telugu Audio Bible, YGFM (Apostle Ratnaker), reading the Telugu Old Version: one file per '
+                 'book (Psalms in two), chapters read one after another.')
 
 data = {
     'recording': recording,
@@ -38,6 +47,7 @@ data = {
             "time warping) at the narrator's pace and a little slower and faster; each verse's start "
             "moved onto the narrator's pause, the three voting, then chosen among nearby pauses by verse "
             "length. Seconds from the start of the file."),
+    'files': dict(sorted(files.items())),
     'chapters': {f'{b} {c}': chapters[(b, c)] for b, c in sorted(chapters, key=lambda k: (order.index(k[0]), k[1]))},
 }
 with open(out, 'w', encoding='utf-8') as f:
