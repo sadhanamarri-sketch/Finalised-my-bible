@@ -1,0 +1,38 @@
+# Verse timings
+
+Where each verse starts and ends in two recordings of the Bible, for playing them in the app and
+following along verse by verse (backlog item 21). The recordings stay on the phone, never here. Made
+with `tools/audio_timing`.
+
+Each file is JSON:
+
+```json
+{
+  "recording": "which recording, and how its files are laid out",
+  "how": "how the timings were made",
+  "chapters": {
+    "Genesis 1": {
+      "file": "A01___01_Genesis_____ENGKJVO1DA.mp3",
+      "start": 0.0, "end": 293.02,
+      "verses": [[6.55, 9.58], [10.43, 19.53], ...],
+      "unsure": [6, 9, 29]
+    }
+  }
+}
+```
+
+- Chapters are keyed by the app's book names and chapter numbers ("Psalms 23", "Song of Solomon 2").
+- `file` is the recording's file name. `start` and `end` are the chapter's place in that file, in
+  seconds. A chapter's span includes its spoken heading, which comes before verse 1.
+- `verses` holds each verse's `[start, end]` in seconds from the start of the file, in verse order:
+  the first is verse 1. A verse ends where the pause before the next one begins.
+- `unsure` lists the verses whose three matching runs disagreed by more than 0.3 s. Their starts were
+  then chosen by the refinement step, but they're the likeliest to be off.
+- A file's length can be checked against the recording on the phone, so a different recording is
+  never followed with these timings.
+
+## kjv.json
+
+Faith Comes By Hearing's King James Version, narrated by one reader (ENGKJVO1DA, ENGKJVN1DA). One
+file per chapter: 1,189 chapters, 31,102 verses, 79.9 hours. The three runs agreed on 96.2% of verse
+starts, and the refinement moved 2.1%.
