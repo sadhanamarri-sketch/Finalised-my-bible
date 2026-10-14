@@ -19,11 +19,18 @@ For each chapter (`timing.py`):
 
 Then `refine.py` chooses each start among the pauses near it. It weighs what the matching found
 (held tightly where its three readings agreed), how long each pause is (a verse usually follows a
-longer one) and whether each verse then takes about as long as its text. Verse 1 is kept after the
-chapter's spoken heading, about as long after it as that narrator's headings usually take: the
-matching sometimes put verse 1 on a pause inside the heading, and the pause before a heading is
-long. On 150 KJV chapters, the refinement put back 96% of known-good starts that had been knocked
-1.5–4 s off.
+longer one) and whether each verse then takes about as long as its text. It also keeps verse 1 from
+starting inside the chapter's spoken heading, where the matching had put it in 211 Telugu chapters
+and 67 KJV ones, mostly on the pause between the book's name and the chapter's number (afterwards 1
+and 17, most of those psalms with no title, straight after a short heading). How long each heading
+takes is espeak's length for it, times how much longer the narrator takes over that book's headings
+(`books.py` has what each narrator says). Verse 1 can still come later than that: a psalm's title is
+read after its heading.
+
+Tested on starts all three readings agreed on: knocked 1.5–4 s off, it put back 96% of them (150 KJV
+chapters); moved 0.4–2.5 s onto the nearest other pause, as the matching goes wrong, it put back
+90–94% of them in four Telugu books, where about 20% would be right if left alone. It moved 6 of the
+4,277 other starts there.
 
 A recording with one file per book (the Telugu one) is split first (`run_telugu.py`). Its chapters
 were joined with a moment of digital silence, but not always, and some joins are in the middle of a
@@ -57,7 +64,11 @@ chapter by chapter (book by book for Telugu), so a run that stops can be started
 ## What came out (14 Oct 2026)
 
 - KJV: all 1,189 chapters and 31,102 verses (79.9 hours). The three readings agreed on 96.2% of
-  verse starts, and the refinement moved 2.1%. 300 chapters had been lost from the first download
+  verse starts, and the refinement moved 2.2%. 300 chapters had been lost from the first download
   of `ENGKJVO1DA.zip` (long runs of zeros in the file), and 4 more were cut off. They were timed from
   replacement files, each identical to the original by size and checksum.
-- Telugu: see `data/audio_timing/README.md`.
+- Telugu: all 1,189 chapters and 31,101 verses (96.7 hours, 67 files). The three readings agreed on
+  93.3% of verse starts, and the refinement moved 3.5%. Each verse's length follows its text's
+  (median correlation 0.98 a chapter). 56 chapters were read on from the one before with no join,
+  and were split at their spoken headings. In Deuteronomy 23 every pause had been silenced in
+  editing, which at first was taken for joins and put chapters 23 to 28 out of place.

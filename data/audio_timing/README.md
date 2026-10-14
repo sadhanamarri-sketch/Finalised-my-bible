@@ -37,4 +37,13 @@ Each file is JSON:
 
 Faith Comes By Hearing's King James Version, narrated by one reader (ENGKJVO1DA, ENGKJVN1DA). One
 file per chapter: 1,189 chapters, 31,102 verses, 79.9 hours. The three runs agreed on 96.2% of verse
-starts, and the refinement moved 2.1%.
+starts, and the refinement moved 2.2%. A psalm's title ("A Psalm of David") is read after its
+heading and isn't in the app's text, so verse 1 starts after it.
+
+## telugu.json
+
+The Telugu Audio Bible from YGFM (Apostle Ratnaker), which follows the app's Telugu text verse for
+verse. One file per book (Psalms in two), its chapters read one after another: 1,189 chapters, 31,101
+verses (the app's Telugu Exodus 7 has 24), 96.7 hours, 67 files. A chapter's `start` and `end` are
+its place in its book's file. The three runs agreed on 93.3% of verse starts, and the refinement
+moved 3.5%.

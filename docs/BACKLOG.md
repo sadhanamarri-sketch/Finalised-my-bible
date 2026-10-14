@@ -489,9 +489,20 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     the vote (2:7, 4:5, 4:15, 4:16, 4:18). Each verse's length followed its text's (0.98).
     Checked by ear on a private page, at 0.75× to 2× and a verse at a time: "this is
     excellent." Ruth's timing file is 1.6 KB, about a minute's work a book.
-    *Needs:* the rest of the books from the same source, and a KJV recording, as links that
-    can be downloaded here or as uploads. Long chapters (Psalm 119) need the matching done in
-    a narrower band to fit in memory.
+    *Timed 14 Oct, the whole Bible in both* (`data/audio_timing/`, made with
+    `tools/audio_timing/`): the KJV from Faith Comes By Hearing (one reader, one file per
+    chapter, 79.9 hours) and the whole Telugu recording (YGFM, one file per book, 96.7 hours),
+    both downloaded from Google Drive. Every chapter of both: 31,102 and 31,101 verses, in
+    timing files of 0.64 MB and 0.76 MB. The three runs agreed on 96.2% (KJV) and 93.3%
+    (Telugu) of verse starts. A last step chooses each start among the nearby pauses by how
+    long each verse should take, and keeps verse 1 out of the chapter's spoken heading. Tested
+    on good starts knocked onto a wrong pause, it put back 90–96% of them. 300 KJV chapters had
+    been lost in the first download (runs of zeros) and 4 cut off. They were timed from
+    replacements, checked against the originals by size and checksum. In the Telugu, 56
+    chapters ran on from the one before with no break in the file and were found by their
+    spoken headings. In Deuteronomy 23 every pause had been silenced in editing, which at first
+    was taken for breaks between chapters. Six chapters of each are on a private page to check
+    by ear. *Still to do:* the player itself, in the app.
 
 22. **The Gospels as films, verse by verse.** "Is it possible to stream videos in the same
     way... i found new videos of gospel verse wise no deviation."
