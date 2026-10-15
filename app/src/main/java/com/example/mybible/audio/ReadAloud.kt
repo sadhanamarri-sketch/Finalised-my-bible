@@ -62,6 +62,13 @@ interface ReadingSession {
     /** Where touching and holding "previous" goes: the reading's first verse (the Reader's, its chapter's first). None by default. */
     suspend fun first(): VerseToRead? = null
 
+    /**
+     * The verses [next] would give one after another from [verse], as far as that's known without moving
+     * anything on (the Reader's, the rest of its chapter; a Verse Scroll card's, the rest of its verses):
+     * a recording plays on into them without a break. None by default.
+     */
+    suspend fun following(verse: VerseToRead): List<VerseToRead> = emptyList()
+
     /** It ended: [finished] when it came to its end, otherwise stopped (a tap, another reading starting). */
     fun onStopped(finished: Boolean) {}
 
@@ -85,6 +92,9 @@ interface ReadAloudPrefs {
 
     /** The speech engine a language is read with (its package), or null for the phone's usual one. */
     fun engine(telugu: Boolean): String? = null
+
+    /** Whether a language is played from its recording on the phone, where there's one, rather than read by the phone's voice. */
+    fun recording(telugu: Boolean): Boolean = false
 
     /** Verse Scroll: once a card has been read, move on to the next and read that. */
     val continueReading: Boolean
@@ -147,6 +157,8 @@ data class ReadAloudState(
     val verse: VerseToRead? = null,
     /** Whether it's the verse's Telugu being read, rather than its English. */
     val telugu: Boolean = false,
+    /** Whether it's played from a recording, rather than read by the phone's voice. */
+    val recording: Boolean = false,
     /** The phone has no Telugu voice, so Telugu was left out — or, with Telugu alone, nothing could be read. */
     val noTeluguVoice: Boolean = false,
     /** The phone has no voice at all (no speech engine). */
@@ -158,10 +170,15 @@ data class ReadAloudState(
 }
 
 /**
- * Reads verses aloud in the phone's own voice, one at a time: each in English, in Telugu, or in English
- * and then Telugu, as the settings say. One reading at a time — starting another stops the first. A
- * pause stops the voice mid-verse and picks up again at the word it got to. Everything runs on the main
- * thread ([scope]'s).
+ * Reads verses aloud, one at a time: each in English, in Telugu, or in English and then Telugu, as the
+ * settings say, in the phone's own voice or played from a narrated recording on the phone. One reading
+ * at a time — starting another stops the first. A pause stops the voice mid-verse and picks up again at
+ * the word it got to (a recording, where it was). Everything runs on the main thread ([scope]'s).
+ *
+ * A recording plays each verse from its own stretch of its file, and nothing after it. Read in one
+ * language, the verses after it that the reading goes on to (the rest of the Reader's chapter) play on
+ * from the same file without a break, its pauses and any music under it as recorded; the verse being
+ * read moves on as each one begins.
  */
 class ReadAloud(
     private val speaker: Speaker,
@@ -172,8 +189,12 @@ class ReadAloud(
     /** How deep each of the phone's voices is, to read in the deepest unless one was chosen. */
     private val depths: VoiceDepths = VoiceDepths(),
     /** The time in milliseconds, to tell a headset's "previous" early in a verse from later on. */
-    private val clock: () -> Long = { System.nanoTime() / 1_000_000 }
-) : Speaker.Listener {
+    private val clock: () -> Long = { System.nanoTime() / 1_000_000 },
+    /** The narrated recordings on the phone, played instead of the phone's voice where the settings say. */
+    val recordings: RecordedVerses = RecordedVerses.None,
+    /** Plays them. */
+    private val recorder: Recorder = Recorder.None
+) : Speaker.Listener, Recorder.Listener {
 
     private val _state = MutableStateFlow(ReadAloudState())
     val state: StateFlow<ReadAloudState> = _state.asStateFlow()
@@ -204,10 +225,49 @@ class ReadAloud(
     // The Telugu voice failed during this reading (say, an online voice with no connection).
     private var teluguFailed = false
 
-    private data class Part(val telugu: Boolean, val text: String)
+    // Each stretch of a recording played (or a recording stopped) gets a new id; anything the player
+    // reports about an older one is ignored.
+    private var plays = 0L
+
+    // Where in its file a recording was paused, to play on from there should the player have let it go.
+    private var recordedResume: Double? = null
+
+    // How far the recording playing has got (the last of its marks reached, or past its end), and the
+    // verse moving on with it.
+    private var reached = 0.0
+    private var crossing: Job? = null
+
+    /** A verse's text in a language, to be read by the phone's voice or played from a recording. */
+    private sealed interface Part {
+        val telugu: Boolean
+        val text: String
+    }
+
+    private data class Spoken(override val telugu: Boolean, override val text: String) : Part
+
+    // A verse in a recording, and the verses after it to play on into from the same file ([ahead]).
+    private data class Recorded(
+        override val telugu: Boolean,
+        override val text: String,
+        val at: RecordedVerse,
+        val ahead: List<Ahead> = emptyList()
+    ) : Part
+
+    private data class Ahead(val verse: VerseToRead, val text: String, val at: RecordedVerse)
 
     init {
         speaker.listener = this
+        recorder.listener = this
+    }
+
+    // Whether a language is played from its recording (chosen, and there to play).
+    private fun reads(telugu: Boolean): Boolean = prefs.recording(telugu) && recordings.ready(telugu)
+
+    // Whether everything the language setting reads is played from recordings: no voice needed.
+    private fun recordingsOnly(): Boolean = when (prefs.language) {
+        ReadLanguage.ENGLISH -> reads(telugu = false)
+        ReadLanguage.TELUGU -> reads(telugu = true)
+        ReadLanguage.BOTH -> reads(telugu = false) && reads(telugu = true)
     }
 
     /** The phone's voices for a language, for the settings: the deepest first, once they're measured. */
@@ -250,6 +310,7 @@ class ReadAloud(
     /** A few words in [voice], at the language's speed and pitch, to hear it: pausing a reading that's playing. */
     fun previewVoice(text: String, telugu: Boolean, voice: String) {
         if (_state.value.status == ReadAloudState.Status.PLAYING) pause()
+        stopSample()
         utterances++
         speaker.speak("try-$utterances", text, telugu, prefs.speed(telugu), voice, prefs.pitch(telugu))
     }
@@ -270,16 +331,43 @@ class ReadAloud(
         val ready = speaker.ready
         if (ready == false) return false
         if (_state.value.status == ReadAloudState.Status.PLAYING) pause()
+        stopSample()
         utterances++
         speaker.speak("word-$utterances", spoken, telugu = false, rate = WORD_RATE, voice = voiceFor(telugu = false), pitch = prefs.pitch(telugu = false))
         return ready
     }
 
-    /** A few words in the language's voice, speed and pitch, to hear them: only while nothing is being read. */
+    /**
+     * A few words in the language's voice, speed and pitch, to hear them: only while nothing is being read.
+     * Played from its recording, a verse of that (John 3:16) at the language's speed instead.
+     */
     fun trySpeaking(text: String, telugu: Boolean) {
         if (_state.value.active) return
+        stopSample()
         utterances++
-        speaker.speak("try-$utterances", text, telugu, prefs.speed(telugu), voiceFor(telugu), prefs.pitch(telugu))
+        if (!reads(telugu)) {
+            speaker.speak("try-$utterances", text, telugu, prefs.speed(telugu), voiceFor(telugu), prefs.pitch(telugu))
+            return
+        }
+        speaker.stop()
+        val said = utterances
+        val id = plays
+        scope.launch {
+            val sample = recordings.verse(SAMPLE_VERSE, telugu, heading = false)
+            if (id != plays || said != utterances || _state.value.active) return@launch
+            if (sample != null) {
+                recorder.play(id, sample.file, sample.from, sample.end, prefs.speed(telugu))
+            } else {
+                speaker.speak("try-$utterances", text, telugu, prefs.speed(telugu), voiceFor(telugu), prefs.pitch(telugu))
+            }
+        }
+    }
+
+    // A recording heard on its own (trySpeaking's), stopped for something else.
+    private fun stopSample() {
+        if (_state.value.active) return
+        plays++
+        recorder.stop()
     }
 
     /** Starts reading [next] from its first verse, stopping whatever was being read. */
@@ -288,12 +376,12 @@ class ReadAloud(
         halt()
         session = null
         if (previous != null && previous !== next) previous.onStopped(finished = false)
-        if (speaker.ready == false) {
+        if (speaker.ready == false && !recordingsOnly()) {
             _state.value = ReadAloudState(noVoice = true)
             next.onStopped(finished = false)
             return
         }
-        if (prefs.language == ReadLanguage.TELUGU && speaker.hasTelugu() == false) {
+        if (prefs.language == ReadLanguage.TELUGU && speaker.hasTelugu() == false && !reads(telugu = true)) {
             _state.value = ReadAloudState(noTeluguVoice = true)
             next.onStopped(finished = false)
             return
@@ -310,6 +398,10 @@ class ReadAloud(
         if (_state.value.status != ReadAloudState.Status.PLAYING) return
         utterances++
         speaker.stop()
+        if (parts.getOrNull(partIndex) is Recorded) {
+            recordedResume = recorder.position
+            recorder.pause()
+        }
         _state.update { it.copy(status = ReadAloudState.Status.PAUSED) }
         current.onPaused()
     }
@@ -320,10 +412,16 @@ class ReadAloud(
         _state.update { it.copy(status = ReadAloudState.Status.PLAYING) }
         onPlaying()
         current.onResumed()
+        val part = parts.getOrNull(partIndex)
         when {
             // Still finding the next verse: it's read as soon as it's found.
             advancing?.isActive == true -> Unit
-            parts.isNotEmpty() -> speakPart()
+            // A recording paused: on from where it was, at the speed now set.
+            part is Recorded -> {
+                recorder.speed(prefs.speed(part.telugu))
+                if (recorder.resume()) recordedResume = null else speakPart()
+            }
+            part != null -> speakPart()
             else -> advance(after = _state.value.verse)
         }
     }
@@ -331,10 +429,20 @@ class ReadAloud(
     fun stop() {
         val current = session
         halt()
+        recorder.release()
         session = null
         _state.value = ReadAloudState()
         current?.onStopped(finished = false)
         measureSoon()
+    }
+
+    /**
+     * The language, or whether a language is played from its recording, changed: the verse being read
+     * starts again as now set (a recording otherwise plays on in the old way to the chapter's end).
+     */
+    fun restartVerse() {
+        val verse = skippableVerse() ?: return
+        readFrom(verse)
     }
 
     /**
@@ -356,6 +464,7 @@ class ReadAloud(
         if (clock() - verseStartedAt > BACK_WITHIN_MS) {
             partIndex = 0
             resumeAt = 0
+            recordedResume = null
             if (_state.value.status == ReadAloudState.Status.PLAYING) speakPart()
             return
         }
@@ -388,12 +497,21 @@ class ReadAloud(
         val verse = _state.value.verse ?: return null
         utterances++
         speaker.stop()
+        stopRecording()
         return verse
     }
 
-    /** A setting changed (the speed, a voice): what's being said starts again, from the word it got to. */
+    /**
+     * A setting changed (the speed, a voice): what's being said starts again, from the word it got to. A
+     * recording just plays on at the new speed.
+     */
     fun refresh() {
         if (_state.value.status != ReadAloudState.Status.PLAYING || parts.isEmpty() || advancing?.isActive == true) return
+        val part = parts.getOrNull(partIndex)
+        if (part is Recorded) {
+            recorder.speed(prefs.speed(part.telugu))
+            return
+        }
         utterances++
         speaker.stop()
         speakPart()
@@ -404,9 +522,33 @@ class ReadAloud(
         advancing = null
         utterances++
         speaker.stop()
+        stopRecording()
         parts = emptyList()
         partIndex = 0
         resumeAt = 0
+    }
+
+    // Whatever recording is playing stops, and anything it reports from now on is ignored.
+    private fun stopRecording() {
+        crossing?.cancel()
+        crossing = null
+        plays++
+        recorder.stop()
+        recordedResume = null
+        reached = 0.0
+    }
+
+    // Reads [verse] (just come to in the reading), then on from it as usual.
+    private fun readFrom(verse: VerseToRead) {
+        var given = false
+        advance(after = null) { reading, from ->
+            if (given) {
+                reading.next(from)
+            } else {
+                given = true
+                verse
+            }
+        }
     }
 
     // Reads the verse after [after] in the reading (its first, without one), or ends the reading. [step]
@@ -419,6 +561,7 @@ class ReadAloud(
         parts = emptyList()
         partIndex = 0
         resumeAt = 0
+        recordedResume = null
         advancing = scope.launch {
             var previous = after
             var skipped = 0
@@ -429,7 +572,8 @@ class ReadAloud(
                     end(current, finished = true)
                     return@launch
                 }
-                val read = partsOf(verse)
+                val read = partsOf(verse, current)
+                if (session !== current) return@launch
                 if (read == null) {
                     // Telugu alone, and no Telugu voice: nothing can be read.
                     end(current, finished = false, noTeluguVoice = true)
@@ -444,9 +588,13 @@ class ReadAloud(
                     end(current, finished = false)
                     return@launch
                 }
-                parts = read
+                // A recording read in one language plays on into the verses after it. (In both, each verse
+                // is its English and then its Telugu, though some have no Telugu.)
+                val alone = read.singleOrNull().takeIf { prefs.language != ReadLanguage.BOTH }
+                parts = if (alone is Recorded) listOf(alone.copy(ahead = aheadOf(current, verse, alone))) else read
+                if (session !== current) return@launch
                 verseStartedAt = clock()
-                _state.update { it.copy(verse = verse, telugu = read[0].telugu) }
+                _state.update { it.copy(verse = verse, telugu = read[0].telugu, recording = read[0] is Recorded) }
                 break
             }
             if (_state.value.status == ReadAloudState.Status.PLAYING) speakPart()
@@ -455,6 +603,7 @@ class ReadAloud(
 
     private fun end(current: ReadingSession, finished: Boolean, noTeluguVoice: Boolean = false) {
         halt()
+        recorder.release()
         session = null
         _state.value = ReadAloudState(noTeluguVoice = noTeluguVoice || _state.value.noTeluguVoice)
         current.onStopped(finished)
@@ -470,29 +619,145 @@ class ReadAloud(
         }
     }
 
-    // The verse's text in each language it's read in, in order; null when it's Telugu alone and there's no
-    // Telugu voice.
-    private fun partsOf(verse: VerseToRead): List<Part>? {
+    // The verse's text in each language it's read in, in order, each played from its recording where it's
+    // there to play, else read by the phone's voice; null when it's Telugu alone and there's neither a
+    // Telugu recording nor a Telugu voice. A chapter's first verse, in the Reader, from its spoken heading.
+    private suspend fun partsOf(verse: VerseToRead, current: ReadingSession): List<Part>? {
         val language = prefs.language
-        val english = SpeechText.english(verse.english).takeIf { it.isNotEmpty() }?.let { Part(false, it) }
+        val heading = current.place == ReadingPlace.READER
+        val english = if (language == ReadLanguage.TELUGU) null else SpeechText.english(verse.english).takeIf { it.isNotEmpty() }?.let { text ->
+            recorded(verse, telugu = false, text, heading) ?: Spoken(false, text)
+        }
+        val teluguRecording = reads(telugu = true)
         val teluguVoice = !teluguFailed && speaker.hasTelugu() != false
-        if (language != ReadLanguage.ENGLISH && !teluguVoice) _state.update { it.copy(noTeluguVoice = true) }
-        val telugu = verse.telugu?.let(SpeechText::telugu)?.takeIf { it.isNotEmpty() && teluguVoice }?.let { Part(true, it) }
+        if (language != ReadLanguage.ENGLISH && !teluguVoice && !teluguRecording) _state.update { it.copy(noTeluguVoice = true) }
+        val telugu = if (language == ReadLanguage.ENGLISH) null else verse.telugu?.let(SpeechText::telugu)?.takeIf { it.isNotEmpty() }?.let { text ->
+            recorded(verse, telugu = true, text, heading) ?: Spoken(true, text).takeIf { teluguVoice }
+        }
         return when (language) {
             ReadLanguage.ENGLISH -> listOfNotNull(english)
-            ReadLanguage.TELUGU -> if (teluguVoice) listOfNotNull(telugu) else null
+            ReadLanguage.TELUGU -> if (teluguVoice || teluguRecording) listOfNotNull(telugu) else null
             ReadLanguage.BOTH -> listOfNotNull(english, telugu)
         }
     }
 
+    // [verse] in a language's recording, when it's played from that and the verse is there to play.
+    private suspend fun recorded(verse: VerseToRead, telugu: Boolean, text: String, heading: Boolean): Recorded? {
+        if (!reads(telugu)) return null
+        val at = recordings.verse(verse, telugu, heading) ?: return null
+        return Recorded(telugu, text, at)
+    }
+
+    // The verses the reading goes on to after [verse], each the next in its chapter, that its recording
+    // [part] can play on into: in the same file, each read in the same way.
+    private suspend fun aheadOf(current: ReadingSession, verse: VerseToRead, part: Recorded): List<Ahead> {
+        val ahead = mutableListOf<Ahead>()
+        var last = verse
+        var lastAt = part.at
+        for (next in current.following(verse)) {
+            if (next.book != last.book || next.chapter != last.chapter || next.verse != last.verse + 1) break
+            val text = (if (part.telugu) next.telugu?.let(SpeechText::telugu) else SpeechText.english(next.english))
+                ?.takeIf { it.isNotEmpty() } ?: break
+            val at = recordings.verse(next, part.telugu, heading = false) ?: break
+            if (at.file != lastAt.file || at.start < lastAt.start) break
+            ahead += Ahead(next, text, at)
+            last = next
+            lastAt = at
+        }
+        return ahead
+    }
+
     private fun speakPart() {
-        val part = parts.getOrNull(partIndex) ?: return
-        val from = resumeAt.coerceIn(0, part.text.length)
-        if (partIndex == 0 && from == 0) verseStartedAt = clock()
-        spokenFrom = from
-        utterances++
-        _state.update { it.copy(telugu = part.telugu) }
-        speaker.speak(currentId, part.text.substring(from), part.telugu, prefs.speed(part.telugu), voiceFor(part.telugu), prefs.pitch(part.telugu))
+        when (val part = parts.getOrNull(partIndex) ?: return) {
+            is Spoken -> {
+                val from = resumeAt.coerceIn(0, part.text.length)
+                if (partIndex == 0 && from == 0) verseStartedAt = clock()
+                spokenFrom = from
+                utterances++
+                _state.update { it.copy(telugu = part.telugu, recording = false) }
+                speaker.speak(currentId, part.text.substring(from), part.telugu, prefs.speed(part.telugu), voiceFor(part.telugu), prefs.pitch(part.telugu))
+            }
+            is Recorded -> {
+                // From where it was paused, should the player have let it go; else from the verse's start.
+                val from = recordedResume ?: part.at.from
+                if (partIndex == 0 && recordedResume == null) verseStartedAt = clock()
+                recordedResume = null
+                crossing?.cancel()
+                plays++
+                reached = from
+                _state.update { it.copy(telugu = part.telugu, recording = true) }
+                val to = (part.ahead.lastOrNull()?.at ?: part.at).end
+                recorder.play(plays, part.at.file, from, to, prefs.speed(part.telugu), part.ahead.map { it.at.start })
+            }
+        }
+    }
+
+    // ---- what the recording's player reports ----
+
+    override fun onReached(id: Long, seconds: Double) {
+        if (id != plays || session == null) return
+        reached = maxOf(reached, seconds)
+        if (crossing?.isActive != true) crossing = scope.launch { moveOn(id) }
+    }
+
+    override fun onEnded(id: Long) {
+        if (id != plays) return
+        // A recording heard in the settings, over: the player's let go.
+        if (session == null) {
+            recorder.release()
+            return
+        }
+        reached = Double.POSITIVE_INFINITY
+        val before = crossing
+        crossing = scope.launch {
+            before?.join()
+            if (!moveOn(id)) return@launch
+            // Played to its end: the verse's next part (its Telugu, after its English), or the next verse.
+            recordedResume = null
+            if (partIndex + 1 < parts.size) {
+                partIndex++
+                if (_state.value.status == ReadAloudState.Status.PLAYING) speakPart()
+            } else {
+                advance(after = _state.value.verse)
+            }
+        }
+    }
+
+    override fun onFailed(id: Long) {
+        if (id != plays || session == null) return
+        val part = parts.getOrNull(partIndex) as? Recorded ?: return
+        // Its file wouldn't play (moved or deleted since it was found): the verse is read by the phone's
+        // voice instead, and the verses after it find the file left out.
+        recordings.failed(part.at.file)
+        parts = parts.toMutableList().also { it[partIndex] = Spoken(part.telugu, part.text) }
+        recordedResume = null
+        resumeAt = 0
+        if (_state.value.status == ReadAloudState.Status.PLAYING) speakPart()
+    }
+
+    // The verse moves on through those the recording has played into so far, the reading kept in step
+    // (its next verse each time). False when the reading went elsewhere, or stopped, on the way.
+    private suspend fun moveOn(id: Long): Boolean {
+        while (true) {
+            if (id != plays) return false
+            val current = session ?: return false
+            val part = parts.getOrNull(partIndex) as? Recorded ?: return true
+            val next = part.ahead.firstOrNull() ?: return true
+            if (next.at.start > reached + MARK_SLACK) return true
+            val verse = _state.value.verse ?: return false
+            val found = current.next(verse)
+            if (id != plays || session !== current) return false
+            if (found == null || found.book != next.verse.book || found.chapter != next.verse.chapter || found.verse != next.verse.verse) {
+                // Somewhere else after all: what's playing stops, and that's read instead.
+                stopRecording()
+                if (found == null) end(current, finished = true) else readFrom(found)
+                return false
+            }
+            parts = listOf(Recorded(part.telugu, next.text, next.at, part.ahead.drop(1)))
+            partIndex = 0
+            verseStartedAt = clock()
+            _state.update { it.copy(verse = found) }
+        }
     }
 
     override fun onRange(id: String, start: Int) {
@@ -514,10 +779,11 @@ class ReadAloud(
         if (id != currentId) return
         val part = parts.getOrNull(partIndex) ?: return
         if (part.telugu) {
-            // No Telugu voice after all: Telugu is left out from here on (and with Telugu alone, it stops).
+            // No Telugu voice after all: Telugu is left out from here on (and with Telugu alone, it stops,
+            // unless it's played from its recording, this verse just missing from it).
             teluguFailed = true
             _state.update { it.copy(noTeluguVoice = true) }
-            if (prefs.language == ReadLanguage.TELUGU) {
+            if (prefs.language == ReadLanguage.TELUGU && !reads(telugu = true)) {
                 session?.let { end(it, finished = false, noTeluguVoice = true) }
             } else {
                 onDone(id)
@@ -543,5 +809,11 @@ class ReadAloud(
 
         // A word said on its own goes a little slower, to be heard clearly.
         const val WORD_RATE = 0.8f
+
+        // A mark reached counts for a verse starting this close after it (seconds), however it's rounded.
+        const val MARK_SLACK = 0.01
+
+        // The verse a recording is heard by in the settings.
+        val SAMPLE_VERSE = VerseToRead("John", 3, 16, "", null)
     }
 }

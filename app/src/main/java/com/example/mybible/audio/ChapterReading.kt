@@ -3,7 +3,8 @@ package com.example.mybible.audio
 /**
  * The Reader's chapter, read aloud from verse [from] to the chapter's end — where it stops (it doesn't
  * go on to the next chapter); next and previous go a verse on or back, and holding previous, back to
- * the chapter's first verse. Its verses are loaded as it starts, by [load].
+ * the chapter's first verse. Its verses are loaded as it starts, by [load]. Played from a recording,
+ * the chapter plays on from one verse to the next without a break.
  */
 class ChapterReading(
     val book: String,
@@ -32,4 +33,11 @@ class ChapterReading(
 
     // Holding "previous": the chapter's first verse, wherever the reading started.
     override suspend fun first(): VerseToRead? = (verses ?: load().also { verses = it }).firstOrNull()
+
+    // The rest of the chapter, which a recording plays on through.
+    override suspend fun following(verse: VerseToRead): List<VerseToRead> {
+        val all = verses ?: load().also { verses = it }
+        val i = all.indexOfFirst { it.verse == verse.verse }
+        return if (i < 0) emptyList() else all.drop(i + 1)
+    }
 }

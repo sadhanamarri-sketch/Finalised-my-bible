@@ -463,10 +463,10 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
 
 ## Noted 14 Oct 2026
 
-21. **Your own recordings, timed once and played verse by verse.** "If I have bible audio of
-    telugu and kjv without timed.. can we generate timed? and the audio stays in the files
-    storage and we just play like a music player with timed file." — "timing is just one time
-    thing for each chapter right? ... a separate app can do it and we store the json in the
+21. **Done 15 Oct.** **Your own recordings, timed once and played verse by verse.** "If I have
+    bible audio of telugu and kjv without timed.. can we generate timed? and the audio stays in the
+    files storage and we just play like a music player with timed file." — "timing is just one
+    time thing for each chapter right? ... a separate app can do it and we store the json in the
     app" — "is it possible to include the speed as well? will it work with verse scroll?" —
     "let's not implement everything right away... keep it in the list."
     *The plan:* the recordings stay in the phone's storage, and the app is pointed at the KJV
@@ -520,7 +520,29 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     be heard.
     *For the player:* a verse played on its own (Verse Scroll's cards) must play just that
     stretch of the file (Media3's clipping), never play on and stop at its end time.
-    *Still to do:* the player itself, in the app.
+    *Built 15 Oct:* "Can we implement just the timed recordings now leave rest of backlog alone
+    which can be implemented later." In the reading-aloud settings (the reading bar's, Verse
+    Scroll's, or Settings › Reading aloud), English and Telugu each choose Recording or Phone's
+    voice. Recording asks once for the folder its files are in (one folder can hold both); they
+    stay there just as they came, read through Android's folder access, never copied. Each file the
+    timings name is found by its name (a lost double space or another Unicode form aside) and
+    looked over: MP3 or M4A (32 of the Telugu books are M4As named .mp3), whole (a stretch of zeros
+    or a file cut short isn't), and the length that was timed, to within a second. The settings say
+    how many chapters are ready and name the rest ("Not in the folder, so read by the phone's
+    voice: 1 Samuel 16–31, ..."). Media3's player plays each verse from 0.04 s before it starts to
+    its end and no further. In one language the Reader's chapter plays on through its verses as one
+    stretch of the file, its pauses and any music as recorded, the verse marked moving on as each
+    begins; read from verse 1, it starts with the chapter's spoken heading. Both: each verse from
+    the KJV recording, then the Telugu. Verse Scroll: each card's own verses. A pause picks up
+    where it was; next, previous, the earbuds, the notification and the lock screen work as for the
+    phone's voice; each language's speed applies, the narrator's pitch kept. A verse the recording
+    hasn't (its file missing, damaged or moved) is read by the phone's voice.
+    *Checked on the recordings themselves:* every file of both looked over as on a phone, all as
+    timed (to 0.03 s); the 304 damaged in the first KJV Old Testament zip are its replacements'
+    (`missed_chapters.zip`, `four.zip`) to put in the folder. Media3 seeking to every verse start in
+    ten files (KJV and Telugu; MP3, M4A and Ruth's MP3 whose bitrate varies) lands on the same
+    frame, at the same time, as reading the file from its start, as the timings were made.
+    *Not built:* a tap on a verse going there (with the rest of the Reader's reading aloud, 23).
 
 22. **The Gospels as films, verse by verse.** "Is it possible to stream videos in the same
     way... i found new videos of gospel verse wise no deviation."
@@ -595,4 +617,4 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     *To build it:* the read-aloud engine needs a "move to this verse" that keeps the reading
     going (today it can only start a new one). The taps, Blur Mode's focus, where a reading starts
     and the bar's states all build on that.
-    *Open:* whether the app should remember అ between launches (today it starts off every time).
+    అ itself isn't remembered: it starts off at every launch, as now (decided 15 Oct).

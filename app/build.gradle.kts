@@ -121,6 +121,14 @@ android {
     buildFeatures {
         compose = true
     }
+
+    // The narrated recordings' verse timings (data/audio_timing, made by tools/audio_timing) go in as
+    // assets: audio_timing/kjv.json and audio_timing/telugu.json. Everything under data/ ships in the app.
+    sourceSets {
+        getByName("main") {
+            assets.srcDir(rootProject.file("data"))
+        }
+    }
 }
 
 dependencies {
@@ -165,6 +173,10 @@ dependencies {
     // directly over HttpURLConnection, which is all three endpoints
     // (list/create/update against the appDataFolder) actually need.
     implementation("com.google.android.gms:play-services-auth:21.2.0")
+
+    // Plays the narrated recordings kept on the phone (audio/RecordingPlayer): a verse's stretch of a
+    // file and no more, from MP3s and M4As alike.
+    implementation("androidx.media3:media3-exoplayer:1.5.1")
 
     testImplementation("junit:junit:4.13.2")
 }

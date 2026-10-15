@@ -79,9 +79,11 @@ import com.example.mybible.audio.ReadAloud
 import com.example.mybible.audio.ReadAloudSettings
 import com.example.mybible.audio.ReadAloudState
 import com.example.mybible.audio.ReadLanguage
+import com.example.mybible.audio.Recordings
 import com.example.mybible.audio.VoiceOption
 import com.example.mybible.ui.theme.WorkSansFontFamily
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
  * The Reader's reading-aloud bar, over its bottom pill while a chapter is read aloud: previous (held, back
@@ -161,6 +163,7 @@ fun ReadAloudBar(
                 Text(
                     text = when {
                         !playing -> "Paused"
+                        state.recording -> if (state.telugu) "Telugu recording" else "English recording"
                         state.telugu -> "Reading in Telugu"
                         // Both languages, but no Telugu voice on the phone.
                         state.noTeluguVoice -> "English only: no Telugu voice"
@@ -183,9 +186,11 @@ fun ReadAloudBar(
 }
 
 /**
- * Reading aloud's settings, laid out like the app's Settings: the language, then for each language read its
- * own speech engine, speed, pitch and voice (each tried as it's changed), the phone's speech settings,
- * and, from Verse Scroll ([inVerseScroll]), whether to go on to the next card by itself.
+ * Reading aloud's settings, laid out like the app's Settings: the language, then for each language read
+ * whether it's played from its recording on the phone (the folder it's in, and what was found there) or
+ * read by the phone's voice, with its own speech engine, speed, pitch and voice (each tried as it's
+ * changed), the phone's speech settings, and, from Verse Scroll ([inVerseScroll]), whether to go on to
+ * the next card by itself.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -197,6 +202,19 @@ fun ReadAloudSheet(
 ) {
     val context = LocalContext.current
     val state by readAloud.state.collectAsState()
+    // The recordings on the phone (none in tests), what's been found of each, and the folder picker.
+    val recordings = readAloud.recordings as? Recordings
+    val noRecordings = remember { MutableStateFlow(emptyMap<Boolean, Recordings.Status>()) }
+    val recordingStatus by (recordings?.status ?: noRecordings).collectAsState()
+    var pickingFor by remember { mutableStateOf<Boolean?>(null) }
+    val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { folder ->
+        val telugu = pickingFor
+        pickingFor = null
+        if (folder != null && telugu != null && recordings != null) {
+            recordings.choose(telugu, folder)
+            settings.updateRecording(telugu, true)
+        }
+    }
     val depthChanges by readAloud.voiceDepthChanges.collectAsState()
     val measuring by readAloud.measuringVoices.collectAsState()
     // Back from the phone's settings (voices added there, say): its voices again.
@@ -279,7 +297,11 @@ fun ReadAloudSheet(
                 options = ReadLanguage.entries,
                 selected = settings.language,
                 label = { it.label },
-                onSelect = settings::updateLanguage
+                onSelect = { language ->
+                    settings.updateLanguage(language)
+                    // A recording would play on in the language it started in to the chapter's end.
+                    if (state.recording) readAloud.restartVerse()
+                }
             )
             DsNote(
                 when (settings.language) {
@@ -302,6 +324,17 @@ fun ReadAloudSheet(
                         language = if (telugu) "Telugu" else "English",
                         settings = settings,
                         telugu = telugu,
+                        recording = recordingStatus[telugu],
+                        onReadWith = { fromRecording ->
+                            settings.updateRecording(telugu, fromRecording)
+                            // Being read, the verse starts again the new way.
+                            if (state.active) readAloud.restartVerse()
+                        },
+                        onChooseFolder = {
+                            pickingFor = telugu
+                            pickFolder.launch(null)
+                        },
+                        onLookAgain = { recordings?.checkAgain(telugu) },
                         engines = engines,
                         voices = if (telugu) teluguVoices else englishVoices,
                         selected = readAloud.voiceFor(telugu),
@@ -341,7 +374,7 @@ fun ReadAloudSheet(
             }
             DsSectionDivider()
             DsNote(
-                "Read by your phone's speech engines, offline. It keeps reading with the screen off; pause, skip or stop it from the notification or your earbuds (next and previous go a verse on or back, in Verse Scroll a card). In the Reader, hold the previous button to go back to the chapter's first verse.",
+                "Read by your phone's speech engines, or played from recordings kept on your phone; offline either way. It keeps reading with the screen off; pause, skip or stop it from the notification or your earbuds (next and previous go a verse on or back, in Verse Scroll a card). In the Reader, hold the previous button to go back to the chapter's first verse.",
                 modifier = Modifier.padding(top = 14.dp)
             )
         }
@@ -435,14 +468,20 @@ fun openSpeechSettings(context: Context) {
     }
 }
 
-// One language's own settings, a section of their own: the speech engine it's read with (when the
-// phone has more than one), its speed, its pitch and its voice. Without a voice for it ([noVoice]), a
-// way to get one instead.
+// One language's own settings, a section of their own: whether it's played from its recording on the
+// phone ([recording], what's known of that; null: recordings aren't to be had) or read by the phone's
+// voice; then the recording's folder and speed, or the speech engine it's read with (when the phone has
+// more than one), its speed, its pitch and its voice. Without a voice for it ([noVoice]), a way to get
+// one instead.
 @Composable
 private fun LanguageSettings(
     language: String,
     settings: ReadAloudSettings,
     telugu: Boolean,
+    recording: Recordings.Status?,
+    onReadWith: (Boolean) -> Unit,
+    onChooseFolder: () -> Unit,
+    onLookAgain: () -> Unit,
     engines: List<EngineOption>,
     voices: List<VoiceOption>,
     selected: String?,
@@ -456,6 +495,19 @@ private fun LanguageSettings(
     val chosen = settings.engine(telugu)?.takeIf { name -> engines.isEmpty() || engines.any { it.name == name } }
     val engineName = engines.firstOrNull { it.name == chosen }?.label
     DsSectionLabel(language)
+    if (recording != null) {
+        DsSegmentedRow(
+            options = listOf(true, false),
+            selected = settings.recording(telugu),
+            label = { if (it) "Recording" else "Phone's voice" },
+            onSelect = onReadWith,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+        if (settings.recording(telugu)) {
+            RecordingSettings(language, settings, telugu, recording, onChooseFolder, onLookAgain, onChanged)
+            return
+        }
+    }
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         if (engines.size > 1 || chosen != null) {
             EngineChoice(
@@ -501,6 +553,83 @@ private fun LanguageSettings(
         }
     }
 }
+
+// A language's recording on the phone: which one it is, the folder it's in and what was found there,
+// and its speed (the narrator's own voice and pitch, whatever the speed).
+@Composable
+private fun RecordingSettings(
+    language: String,
+    settings: ReadAloudSettings,
+    telugu: Boolean,
+    status: Recordings.Status,
+    onChooseFolder: () -> Unit,
+    onLookAgain: () -> Unit,
+    onChanged: () -> Unit
+) {
+    val checking = status.checking
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            DsNote(if (telugu) TELUGU_RECORDING else ENGLISH_RECORDING)
+            when {
+                status.folder == null -> DsNote("Choose the folder they're in on your phone. They're played from there, never copied.")
+                checking != null -> DsNote("Looking over the files in ${status.folder}: ${checking.first} of ${checking.second}\u2026")
+                status.lost -> DsNote("${status.folder} can't be opened any more. Choose it again.")
+                else -> {
+                    Text(
+                        text = "${status.folder}: ${count(status.chapters)} of ${count(status.chaptersInAll)} chapters ready",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontFamily = FontFamily.SansSerif,
+                        fontSize = 15.sp
+                    )
+                    if (status.chapters == 0) DsNote("None of the recording's files are in this folder. Choose the one they're in.")
+                    if (status.missing.isNotEmpty() && status.chapters > 0) {
+                        DsNote("Not in the folder, so read by the phone's voice: ${briefly(status.missing)}.")
+                    }
+                    if (status.unlike.isNotEmpty()) {
+                        DsNote("Damaged, or not this recording (another length), so read by the phone's voice: ${briefly(status.unlike)}.")
+                    }
+                    if (status.failed.isNotEmpty()) {
+                        DsNote("Couldn't be opened just now: ${briefly(status.failed)}. Moved? Look over the folder again.")
+                    }
+                }
+            }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            DsOutlineAccentButton(
+                text = if (status.folder == null || status.lost) "Choose folder" else "Choose another folder",
+                onClick = onChooseFolder,
+                enabled = checking == null
+            )
+            if (status.folder != null && !status.lost && checking == null) {
+                DsOutlineAccentButton(text = "Look over the folder again", onClick = onLookAgain)
+            }
+        }
+        SliderSetting(
+            label = "Speed",
+            description = "$language recording speed",
+            value = settings.speed(telugu),
+            range = ReadAloudSettings.MIN_SPEED..ReadAloudSettings.MAX_SPEED,
+            usual = ReadAloudSettings.DEFAULT_SPEED,
+            ends = "Slower" to "Faster",
+            onChange = { speed ->
+                settings.updateSpeed(telugu, speed)
+                onChanged()
+            }
+        )
+    }
+}
+
+// "1,189".
+private fun count(n: Int): String = String.format(java.util.Locale.US, "%,d", n)
+
+// The first few of a list of chapters, and how many more.
+private fun briefly(chapters: List<String>): String =
+    if (chapters.size <= BRIEF) chapters.joinToString(", ") else chapters.take(BRIEF).joinToString(", ") + " and ${chapters.size - BRIEF} more"
+
+private const val BRIEF = 8
+
+private const val ENGLISH_RECORDING = "The King James Version from Faith Comes By Hearing: one MP3 a chapter (ENGKJVO1DA and ENGKJVN1DA), kept just as they came."
+private const val TELUGU_RECORDING = "The Telugu Audio Bible from YGFM: one file a book (Psalms in two), kept just as they came."
 
 // The phone's speech engines to read a language with, its usual one marked so. An AI voice app's
 // voices sound more natural, but it can take a moment to start.

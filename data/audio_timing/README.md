@@ -4,6 +4,11 @@ Where each verse starts and ends in two recordings of the Bible, for playing the
 following along verse by verse (backlog item 21). The recordings stay on the phone, never here. Made
 with `tools/audio_timing`.
 
+The app carries both files as assets (`app/build.gradle.kts` adds this folder's parent, so they're
+`audio_timing/kjv.json` and `audio_timing/telugu.json` there), read by `audio/RecordingTimings.kt`.
+`audio/Recordings.kt` matches the files in the folder chosen on the phone to `files` by name, and
+takes a file only when its length is the one given there.
+
 Each file is JSON:
 
 ```json

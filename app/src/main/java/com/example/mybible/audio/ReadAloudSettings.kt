@@ -8,7 +8,7 @@ import androidx.compose.runtime.setValue
 
 /**
  * Reading aloud's settings, kept between visits: the language, and for English and for Telugu each its
- * own speech engine, speed, pitch and voice.
+ * own speech engine, speed, pitch and voice, and whether it's played from its recording on the phone.
  */
 class ReadAloudSettings(context: Context) : ReadAloudPrefs {
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -45,6 +45,13 @@ class ReadAloudSettings(context: Context) : ReadAloudPrefs {
     override var continueReading by mutableStateOf(prefs.getBoolean(KEY_CONTINUE, false))
         private set
 
+    // Each language played from its recording on the phone (once there's one), rather than read by the phone's voice.
+    var englishRecording by mutableStateOf(prefs.getBoolean(KEY_ENGLISH_RECORDING, false))
+        private set
+
+    var teluguRecording by mutableStateOf(prefs.getBoolean(KEY_TELUGU_RECORDING, false))
+        private set
+
     private fun kept(key: String, before: String, default: Float): Float = prefs.getFloat(key, prefs.getFloat(before, default))
 
     override fun speed(telugu: Boolean): Float = if (telugu) teluguSpeed else englishSpeed
@@ -54,6 +61,8 @@ class ReadAloudSettings(context: Context) : ReadAloudPrefs {
     override fun voice(telugu: Boolean): String? = if (telugu) teluguVoice else englishVoice
 
     override fun engine(telugu: Boolean): String? = if (telugu) teluguEngine else englishEngine
+
+    override fun recording(telugu: Boolean): Boolean = if (telugu) teluguRecording else englishRecording
 
     fun updateLanguage(value: ReadLanguage) {
         language = value
@@ -89,6 +98,11 @@ class ReadAloudSettings(context: Context) : ReadAloudPrefs {
         prefs.edit().putString(if (telugu) KEY_TELUGU_VOICE else KEY_ENGLISH_VOICE, name).apply()
     }
 
+    fun updateRecording(telugu: Boolean, on: Boolean) {
+        if (telugu) teluguRecording = on else englishRecording = on
+        prefs.edit().putBoolean(if (telugu) KEY_TELUGU_RECORDING else KEY_ENGLISH_RECORDING, on).apply()
+    }
+
     fun updateContinueReading(on: Boolean) {
         continueReading = on
         prefs.edit().putBoolean(KEY_CONTINUE, on).apply()
@@ -119,5 +133,7 @@ class ReadAloudSettings(context: Context) : ReadAloudPrefs {
         private const val KEY_CONTINUE = "continue_reading"
         private const val KEY_ENGLISH_ENGINE = "english_engine"
         private const val KEY_TELUGU_ENGINE = "telugu_engine"
+        private const val KEY_ENGLISH_RECORDING = "english_recording"
+        private const val KEY_TELUGU_RECORDING = "telugu_recording"
     }
 }

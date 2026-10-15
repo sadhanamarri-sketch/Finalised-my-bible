@@ -272,6 +272,7 @@ class ReadAloudService : Service() {
             .setContentText(
                 when {
                     !playing -> "Paused"
+                    state.recording -> if (state.telugu) "Playing the Telugu recording" else "Playing the English recording"
                     state.telugu -> "Reading aloud in Telugu"
                     else -> "Reading aloud in English"
                 }

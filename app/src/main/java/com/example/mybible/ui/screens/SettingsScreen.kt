@@ -41,6 +41,7 @@ import com.example.mybible.ui.components.DsSwitch
 import com.example.mybible.ui.components.DsToggleRow
 import com.example.mybible.ui.components.ReminderTimePickerDialog
 import com.example.mybible.ui.components.formatMinutesLabel
+import com.example.mybible.ui.components.ReadAloudSheet
 import com.example.mybible.ui.theme.EbGaramondFontFamily
 import com.example.mybible.ui.theme.GelasioFontFamily
 import com.example.mybible.ui.theme.LoraFontFamily
@@ -112,6 +113,7 @@ fun SettingsScreen(
     val reminderEnabledThemes by viewModel.reminderEnabledThemes.collectAsState()
     var showStartTimePicker by remember { mutableStateOf(false) }
     var showEndTimePicker by remember { mutableStateOf(false) }
+    var readAloudOpen by remember { mutableStateOf(false) }
 
     val driveAccount by viewModel.driveAccount.collectAsState()
     val isDriveSyncing by viewModel.isDriveSyncing.collectAsState()
@@ -370,6 +372,23 @@ fun SettingsScreen(
         )
 
         HorizontalDivider(modifier = Modifier.padding(top = 18.dp), color = MaterialTheme.colorScheme.surfaceVariant)
+
+        // ---- Reading aloud ----
+        DsSectionLabel("Reading aloud")
+        Text(
+            text = "In the phone's voice, or played from recordings of the King James Version and the Telugu Bible kept on your phone.",
+            fontSize = 15.5.sp,
+            fontFamily = FontFamily.SansSerif,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 14.dp)
+        )
+        DsOutlineAccentButton(
+            text = "Reading aloud settings",
+            onClick = { readAloudOpen = true },
+            modifier = Modifier.testTag("settings_read_aloud_button")
+        )
+
+        HorizontalDivider(modifier = Modifier.padding(top = 22.dp), color = MaterialTheme.colorScheme.surfaceVariant)
 
         // ---- Reminders ----
         DsSectionLabel("Reminders")
@@ -651,5 +670,14 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(40.dp))
     }
+    }
+
+    if (readAloudOpen) {
+        ReadAloudSheet(
+            readAloud = viewModel.readAloud,
+            settings = viewModel.readAloudSettings,
+            inVerseScroll = false,
+            onDismiss = { readAloudOpen = false }
+        )
     }
 }

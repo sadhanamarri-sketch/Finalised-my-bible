@@ -520,6 +520,13 @@ class VerseScrollController(
             return moveTo(before)
         }
 
+        // The rest of the card's verses (a passage's), which a recording plays on through.
+        override suspend fun following(verse: VerseToRead): List<VerseToRead> {
+            val card = cards.getOrNull(index) as? VerseFeedCard ?: return emptyList()
+            if (card.uid != uid) return emptyList()
+            return (line + 1 until card.content.lines.size).map { toRead(card, it) }
+        }
+
         // On to the verse card at [to], from its first verse, the screen going with it.
         private suspend fun moveTo(to: Int): VerseToRead {
             val card = cards[to] as VerseFeedCard
