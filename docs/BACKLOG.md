@@ -502,7 +502,21 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     chapters ran on from the one before with no break in the file and were found by their
     spoken headings. In Deuteronomy 23 every pause had been silenced in editing, which at first
     was taken for breaks between chapters. Six chapters of each are on a private page to check
-    by ear. *Still to do:* the player itself, in the app.
+    by ear.
+    *Checked by ear 15 Oct* (a verse at a time, Bluetooth earbuds, in the Claude app): the
+    English was fine. In the Telugu "almost all of them include first or two words of next
+    verse.. and some verses where timing is marked with ≈ first word of that particular verse
+    misses." Two causes. The Telugu narrator leaves less than half a second between verses
+    (0.45 s at the median, the English 0.75 s, 0.93 s in the samples), and Bluetooth earbuds
+    play a moment behind, so a verse stopped on time still runs on into the next one's first
+    word; the page now has a Bluetooth delay that stops a single verse that much early. And about
+    one start in twenty had landed on a pause after the verse's first word; checked against the
+    narrator's own voice (verses that begin with the same word should sound alike just after
+    their starts), 362 Telugu starts were moved back to their first word.
+    *For the player:* a verse played on its own (Verse Scroll's cards) must stop early by the
+    output's delay, which Bluetooth makes larger, or fade out, or the next Telugu verse's first
+    word is heard.
+    *Still to do:* the player itself, in the app.
 
 22. **The Gospels as films, verse by verse.** "Is it possible to stream videos in the same
     way... i found new videos of gospel verse wise no deviation."

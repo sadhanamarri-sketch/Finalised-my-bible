@@ -46,4 +46,7 @@ The Telugu Audio Bible from YGFM (Apostle Ratnaker), which follows the app's Tel
 verse. One file per book (Psalms in two), its chapters read one after another: 1,189 chapters, 31,101
 verses (the app's Telugu Exodus 7 has 24), 96.7 hours, 67 files. A chapter's `start` and `end` are
 its place in its book's file. The three runs agreed on 93.3% of verse starts, and the refinement
-moved 3.5%.
+moved 3.5%. Then 362 starts that had landed a word late, on a pause after the verse's first word,
+were moved back by the narrator's own voice. This narrator leaves less than half a second between
+verses (0.45 s at the median, the KJV's 0.75 s), so a verse played on its own must stop a moment
+early on Bluetooth earbuds, which play a little behind, or the next verse's first word is heard.

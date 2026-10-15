@@ -58,3 +58,31 @@ int dtw_path(const float *a, int n, const float *b, int m, int d, const int *lo,
     *edge = e;
     return len;
 }
+
+// The cost of matching two short stretches of features end to end (a: n x d, b: m x d), the same
+// steps and weights as above, divided by n + m: how alike two people's (or one narrator's) readings
+// of the same word are.
+double dtw_cost(const float *a, int n, const float *b, int m, int d) {
+    double *prev = malloc(sizeof(double) * (size_t)m), *cur = malloc(sizeof(double) * (size_t)m);
+    if (!prev || !cur) { free(prev); free(cur); return -1; }
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < m; j++) {
+            double c = 0;
+            for (int k = 0; k < d; k++) { double t = a[(size_t)i * d + k] - b[(size_t)j * d + k]; c += t * t; }
+            c = sqrt(c);
+            double best;
+            if (i == 0 && j == 0) best = 0;
+            else {
+                best = 1e300;
+                if (i > 0 && j > 0 && prev[j - 1] + c < best) best = prev[j - 1] + c;   /* (1,1): 2c in all */
+                if (i > 0 && prev[j] < best) best = prev[j];
+                if (j > 0 && cur[j - 1] < best) best = cur[j - 1];
+            }
+            cur[j] = best + c;
+        }
+        double *t = prev; prev = cur; cur = t;
+    }
+    double r = prev[m - 1] / (n + m);
+    free(prev); free(cur);
+    return r;
+}

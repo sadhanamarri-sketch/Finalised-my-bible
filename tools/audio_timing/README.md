@@ -32,6 +32,12 @@ chapters); moved 0.4–2.5 s onto the nearest other pause, as the matching goes 
 90–94% of them in four Telugu books, where about 20% would be right if left alone. It moved 6 of the
 4,277 other starts there.
 
+Last, `voice_check.py` checks the starts with the narrator's own voice: verses that begin with the
+same word (దేవుడు, మరియు) should sound alike just after their starts. Where a verse's first half
+second matches that word, at the other verses' starts, clearly better more than 0.3 s earlier, its
+start had landed on a pause after the first word, and it's moved back to where the word begins. It
+can check the verses whose first word begins at least 8 in the same file: about half of them.
+
 A recording with one file per book (the Telugu one) is split first (`run_telugu.py`). Its chapters
 were joined with a moment of digital silence, but not always, and some joins are in the middle of a
 chapter. In places every pause was silenced in editing (a noise gate), so a quick run of silences,
@@ -55,6 +61,7 @@ python3 export.py kjv results/kjv kjv.tsv ../../data/audio_timing/kjv.json
 # Telugu, one file per book (Psalms in two)
 python3 run_telugu.py ../../app/src/main/assets/telugu kjv.tsv results/te 4 telugu_*.zip
 python3 apply_refine_te.py results/te ../../app/src/main/assets/telugu 4 telugu_*.zip
+python3 voice_check.py results/te ../../app/src/main/assets/telugu 4 telugu_*.zip
 python3 export.py te results/te kjv.tsv ../../data/audio_timing/telugu.json
 ```
 
@@ -68,7 +75,9 @@ chapter by chapter (book by book for Telugu), so a run that stops can be started
   of `ENGKJVO1DA.zip` (long runs of zeros in the file), and 4 more were cut off. They were timed from
   replacement files, each identical to the original by size and checksum.
 - Telugu: all 1,189 chapters and 31,101 verses (96.7 hours, 67 files). The three readings agreed on
-  93.3% of verse starts, and the refinement moved 3.5%. Each verse's length follows its text's
+  93.3% of verse starts, and the refinement moved 3.5%. Checked by ear, some verses started a word
+  late; the voice check moved 362 starts back (1.2%). In Genesis, of the starts it can check, 7.5%
+  were a word late after the matching, 6.3% after the refinement and 1.5% after the voice check. Each verse's length follows its text's
   (median correlation 0.98 a chapter). 56 chapters were read on from the one before with no join,
   and were split at their spoken headings. In Deuteronomy 23 every pause had been silenced in
   editing, which at first was taken for joins and put chapters 23 to 28 out of place.
