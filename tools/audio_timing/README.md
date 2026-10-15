@@ -38,6 +38,16 @@ second matches that word, at the other verses' starts, clearly better more than 
 start had landed on a pause after the first word, and it's moved back to where the word begins. It
 can check the verses whose first word begins at least 8 in the same file: about half of them.
 
+For the Telugu, that gets most verses right, but not all to the word: espeak's Telugu voice is
+far from this narrator's, and he pauses inside verses as much as between them. So every word is then
+placed by a forced aligner trained on the narrator himself (`telugu_words/`, the Montreal Forced
+Aligner, which uses Kaldi). Its training material is 7,000 verses (21 hours) whose boundaries came
+out solid above; each word's sounds come from its letters (`telugu_g2p.py`: Telugu spelling is
+nearly phonetic). It then aligns each chapter's whole text, heading first, and each verse starts
+where its first word does (`words_to_verses.py`). Checked by the narrator's own voice as below, on
+Genesis: within 0.15 s of where the verses' first words begin, 76% of starts after the matching, 82%
+after the voice check, 89% by the words.
+
 A recording with one file per book (the Telugu one) is split first (`run_telugu.py`). Its chapters
 were joined with a moment of digital silence, but not always, and some joins are in the middle of a
 chapter. In places every pause was silenced in editing (a noise gate), so a quick run of silences,
@@ -62,7 +72,20 @@ python3 export.py kjv results/kjv kjv.tsv ../../data/audio_timing/kjv.json
 python3 run_telugu.py ../../app/src/main/assets/telugu kjv.tsv results/te 4 telugu_*.zip
 python3 apply_refine_te.py results/te ../../app/src/main/assets/telugu 4 telugu_*.zip
 python3 voice_check.py results/te ../../app/src/main/assets/telugu 4 telugu_*.zip
-python3 export.py te results/te kjv.tsv ../../data/audio_timing/telugu.json
+
+# ...then word by word, with the Montreal Forced Aligner 3 (conda-forge), about 2 hours in all
+conda create -p ./mfa -c conda-forge montreal-forced-aligner && export PATH=$PWD/mfa/bin:$PATH
+mfa configure --disable_use_postgres -j 4
+python3 telugu_words/to_flac.py results/te audio telugu_*.zip
+python3 telugu_words/build_corpus.py results/te ../../app/src/main/assets/telugu corpus 7000
+mfa train corpus/train corpus/dict.txt te_model.zip --audio_directory audio --single_speaker -j 4 \
+    --config_path telugu_words/train.yaml
+mfa align corpus/align corpus/dict.txt te_model.zip aligned --audio_directory audio --single_speaker \
+    -j 4 --output_format json --beam 20 --retry_beam 100
+# (15 chapters were given up on at that beam: aligned again alone with --beam 400 --retry_beam 2000,
+# their words added to aligned/)
+python3 telugu_words/words_to_verses.py aligned results/te ../../app/src/main/assets/telugu results/te_words
+python3 export.py te results/te_words kjv.tsv ../../data/audio_timing/telugu.json
 ```
 
 `kjv.tsv` is the app's KJV text, one verse per line: book, chapter, verse, text. Results are kept
@@ -76,8 +99,10 @@ chapter by chapter (book by book for Telugu), so a run that stops can be started
   replacement files, each identical to the original by size and checksum.
 - Telugu: all 1,189 chapters and 31,101 verses (96.7 hours, 67 files). The three readings agreed on
   93.3% of verse starts, and the refinement moved 3.5%. Checked by ear, some verses started a word
-  late; the voice check moved 362 starts back (1.2%). In Genesis, of the starts it can check, 7.5%
-  were a word late after the matching, 6.3% after the refinement and 1.5% after the voice check. Each verse's length follows its text's
+  late; the voice check moved 362 starts back (1.2%). Played a verse at a time, they still ran into
+  the next verse or were cut short here and there, so every word was then placed by the forced
+  aligner: all 1,189 chapters. Its starts agree with the earlier ones to within 0.15 s for 96% of
+  verses and differ by more than 0.3 s for 2.9%. Each verse's length follows its text's
   (median correlation 0.98 a chapter). 56 chapters were read on from the one before with no join,
   and were split at their spoken headings. In Deuteronomy 23 every pause had been silenced in
   editing, which at first was taken for joins and put chapters 23 to 28 out of place.

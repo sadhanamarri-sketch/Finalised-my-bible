@@ -506,16 +506,20 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     *Checked by ear 15 Oct* (a verse at a time, Bluetooth earbuds, in the Claude app): the
     English was fine. In the Telugu "almost all of them include first or two words of next
     verse.. and some verses where timing is marked with ≈ first word of that particular verse
-    misses." Two causes. The Telugu narrator leaves less than half a second between verses
-    (0.45 s at the median, the English 0.75 s, 0.93 s in the samples), and Bluetooth earbuds
-    play a moment behind, so a verse stopped on time still runs on into the next one's first
-    word; the page now has a Bluetooth delay that stops a single verse that much early. And about
-    one start in twenty had landed on a pause after the verse's first word; checked against the
-    narrator's own voice (verses that begin with the same word should sound alike just after
-    their starts), 362 Telugu starts were moved back to their first word.
-    *For the player:* a verse played on its own (Verse Scroll's cards) must stop early by the
-    output's delay, which Bluetooth makes larger, or fade out, or the next Telugu verse's first
-    word is heard.
+    misses." A Bluetooth delay (stopping a verse early) made it "not consistent": "same verses
+    cut off early and some overflow to first word of next and some are fine... if bluetooth
+    earbuds is an issue why english works perfectly?"
+    *What it was, and what was done:* about one Telugu verse in thirty was a word off, early or
+    late: espeak's Telugu voice is far from this narrator's, and he pauses inside verses as much
+    as between them. Every Telugu word is now placed by a forced aligner trained on the
+    narrator's own voice, which put those right. And the Telugu narrator leaves only 0.37 s
+    between one verse's last word and the next one's first (the English about 0.9 s), so a verse
+    stopped by a clock ran on into the next one: on a phone the sound runs a moment past the
+    stop, by more or less each time. In English that moment falls in silence. The check page now
+    plays a verse on its own as just its own stretch of the recording, so nothing after it can
+    be heard.
+    *For the player:* a verse played on its own (Verse Scroll's cards) must play just that
+    stretch of the file (Media3's clipping), never play on and stop at its end time.
     *Still to do:* the player itself, in the app.
 
 22. **The Gospels as films, verse by verse.** "Is it possible to stream videos in the same

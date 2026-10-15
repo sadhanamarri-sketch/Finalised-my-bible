@@ -45,8 +45,13 @@ heading and isn't in the app's text, so verse 1 starts after it.
 The Telugu Audio Bible from YGFM (Apostle Ratnaker), which follows the app's Telugu text verse for
 verse. One file per book (Psalms in two), its chapters read one after another: 1,189 chapters, 31,101
 verses (the app's Telugu Exodus 7 has 24), 96.7 hours, 67 files. A chapter's `start` and `end` are
-its place in its book's file. The three runs agreed on 93.3% of verse starts, and the refinement
-moved 3.5%. Then 362 starts that had landed a word late, on a pause after the verse's first word,
-were moved back by the narrator's own voice. This narrator leaves less than half a second between
-verses (0.45 s at the median, the KJV's 0.75 s), so a verse played on its own must stop a moment
-early on Bluetooth earbuds, which play a little behind, or the next verse's first word is heard.
+its place in its book's file.
+
+Every word is placed: a forced aligner (the Montreal Forced Aligner) trained on 21 hours of this
+narrator's own verses learnt his voice, then lined up each chapter's whole text with the recording.
+A verse starts 0.05 s before its first word and ends 0.1 s after its last. These starts agree with
+the earlier timing (by pauses) to within 0.15 s for 96% of verses; `unsure` lists the 911 (2.9%)
+where they differ by more than 0.3 s. This narrator leaves only 0.37 s between one verse's last word
+and the next one's first (at the median; the KJV's narrator about 0.9 s), so a verse played on its
+own must play just its own stretch of the file: one stopped by a clock runs on into the next verse's
+first word on a phone, Bluetooth earbuds especially.

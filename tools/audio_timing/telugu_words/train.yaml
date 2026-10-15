@@ -1,0 +1,11 @@
+training:
+  - monophone:
+      num_iterations: 40
+  - triphone:
+      num_iterations: 35
+  - lda:
+      num_iterations: 35
+  - sat:
+      num_iterations: 35
+  - sat:
+      num_iterations: 35

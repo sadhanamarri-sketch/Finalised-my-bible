@@ -55,7 +55,10 @@ data = {
     'how': ("espeak's reading of the app's text matched to the narration by its sound (MFCC, dynamic "
             "time warping) at the narrator's pace and a little slower and faster; each verse's start "
             "moved onto the narrator's pause, the three voting, then chosen among nearby pauses by verse "
-            "length. Seconds from the start of the file."),
+            "length. Seconds from the start of the file.") if kind == 'kjv' else
+           ("Every word of the app's text placed in the recording by a forced aligner (the Montreal "
+            "Forced Aligner) trained on this narrator's own voice; a verse starts just before its first "
+            "word and ends just after its last. Seconds from the start of the file."),
     'files': dict(sorted(files.items())),
     'chapters': {f'{b} {c}': chapters[(b, c)] for b, c in sorted(chapters, key=lambda k: (order.index(k[0]), k[1]))},
 }
