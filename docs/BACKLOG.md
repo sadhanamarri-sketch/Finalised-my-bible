@@ -532,3 +532,67 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     be streamed through Bible Brain once its key arrives. A film in another translation lines
     up verse by verse, but its words won't be the app's.
     *Needs:* a link to the films.
+
+## Noted 15 Oct 2026
+
+23. **Reading aloud in the Reader: any verse, any time.** "right now I dont have the provision to
+    go back to verse I wanted (meaning if it's reading from verse 1 and it's on verse 14 and I
+    want to hear verse 4 now), that doesn't work. And also assess how jump to verse and clicking
+    read aloud. And in blur mode. Let's access every possibility and resolve it in reader tab for
+    read aloud." — "disable highlighted verse pop up while reading and enable only when paused.
+    Reasoning is we may not concentrate/listen/miss the current recording anyway if it's playing
+    and we are trying to highlight something." — "can telugu and english selection be in sync
+    with pill buttons current selection? Like If I select both for read aloud and అ is not
+    selected in pill, it will be automatically select. Like wise if only telugu is selected."
+    *Today:* a reading is one chapter, from the verse it starts at to the chapter's end, and
+    nothing else on screen moves it. Going back to verse 4 means its sheet's "Read aloud from
+    here", which starts a new reading, or Previous, a verse at a time. A tap on a verse opens its
+    sheet (highlights, notes), and the reading bar goes while it's open. The menu's Read aloud
+    starts from a verse half hidden at the top of the screen (after a jump, a few verses above the
+    one jumped to), and while it reads, it starts again from there. A jump or a swipe to another
+    chapter leaves it reading the old one. In Blur Mode the centre verse and the one being read
+    are both sharp, and a tap on a blurred verse turns Blur Mode off. The reading bar hides with
+    the pill as the page scrolls.
+    *Agreed 15 Oct* (not built yet):
+    - *Playing, the page is for listening:* a tap anywhere on a verse (its words, its Telugu, its
+      Greek or Hebrew words, its cross-reference mark) reads from that verse at once, in the same
+      language and speed. Nothing else opens: no sheet, dictionary, word page or cross
+      references, and a long press (marking studied) does nothing. A tap on the verse being read
+      starts it again. After a tap moves the reading, the bar offers Undo (back to the verse it
+      was on) for a few seconds, for a stray tap or for hearing one verse again. With the pill
+      hidden, a tap still reads the verse. Picking verses (for a note, or marking studied) still
+      picks.
+    - *Paused, everything works as now:* a tap opens the verse's sheet, and the reading bar stays
+      on screen with it. The sheet's Read aloud from here (the headphones) plays from that verse,
+      as does Play and then a tap. Play on the bar, or the earbuds, goes on where it stopped and
+      closes the sheet. With the pill hidden, the first tap brings it back, as now.
+    - *Read aloud in the menu:* after a jump (a search, a cross reference, highlights, the verse
+      picker), from the verse jumped to; otherwise from the first verse wholly on screen; in Blur
+      Mode, from the sharp one. While it reads, the menu says Stop reading aloud instead.
+    - *Another chapter while it reads:* it keeps reading where it was, so a cross reference is a
+      quick look. The bar says what it's reading ("Reading John 3:16"), with Back (go there) and
+      Read here (this chapter, from the verse at the top). A tap on a verse there reads from it.
+    - *Scrolled away from the verse being read:* a Follow button on the bar brings it back and
+      keeps it in view.
+    - *Blur Mode:* while it reads, only the verse being read is sharp, kept at the centre as the
+      reading moves on, and a tap on any verse reads it. Paused or not reading, a tap brings a
+      blurred verse into focus and a second opens its sheet. Blur Mode turns off only from its
+      own button.
+    - *The reading bar* stays on screen while it reads, no longer hiding with the pill.
+    - *The chapter's end:* it stops, as now, and the bar offers Next chapter for a few seconds.
+    - *The notification* opens the Reader at the verse being read. The earbuds' Next and Previous
+      stay as they are.
+    - *Telling people:* the first reading after this shows one line above the bar, once: "Tap a
+      verse to hear it · Pause for highlights and notes".
+    - *The pill's అ follows the reading's language:* a reading started in Telugu or Both, or
+      switched to either while it reads, turns అ on if it's off. That happens at every start, as
+      the app starts with అ off each time while the reading's language is remembered. English
+      leaves అ alone. Turned off by hand during a reading, it stays off until the next reading is
+      started (a tap that moves the reading isn't one), and it stays on when the reading stops.
+      The pill never changes what's read. Turning Telugu on keeps the verse being read where it
+      is on screen. Verse Scroll's own Telugu switch does the same. The line being said is lit:
+      with Both, the English and then the Telugu; with Telugu alone, the Telugu.
+    *To build it:* the read-aloud engine needs a "move to this verse" that keeps the reading
+    going (today it can only start a new one). The taps, Blur Mode's focus, where a reading starts
+    and the bar's states all build on that.
+    *Open:* whether the app should remember అ between launches (today it starts off every time).
