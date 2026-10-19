@@ -569,9 +569,11 @@ private fun RecordingSettings(
     val checking = status.checking
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            DsNote(if (telugu) TELUGU_RECORDING else ENGLISH_RECORDING)
+            DsNote(recordingNote(telugu, status))
             when {
                 status.folder == null -> DsNote("Choose the folder they're in on your phone. They're played from there, never copied.")
+                // Before it's known which recording's files to look over, how many isn't.
+                checking != null && checking.second == 0 -> DsNote("Looking over the files in ${status.folder}\u2026")
                 checking != null -> DsNote("Looking over the files in ${status.folder}: ${checking.first} of ${checking.second}\u2026")
                 status.lost -> DsNote("${status.folder} can't be opened any more. Choose it again.")
                 else -> {
@@ -581,7 +583,9 @@ private fun RecordingSettings(
                         fontFamily = FontFamily.SansSerif,
                         fontSize = 15.sp
                     )
-                    if (status.chapters == 0) DsNote("None of the recording's files are in this folder. Choose the one they're in.")
+                    if (status.chapters == 0) {
+                        DsNote("None of ${if (telugu) "the recording's" else "either recording's"} files are in this folder. Choose the one they're in.")
+                    }
                     if (status.missing.isNotEmpty() && status.chapters > 0) {
                         DsNote("Not in the folder, so read by the phone's voice: ${briefly(status.missing)}.")
                     }
@@ -628,7 +632,18 @@ private fun briefly(chapters: List<String>): String =
 
 private const val BRIEF = 8
 
-private const val ENGLISH_RECORDING = "The King James Version from Faith Comes By Hearing: one MP3 a chapter (ENGKJVO1DA and ENGKJVN1DA), kept just as they came."
+// Which recording a language's is: the one found in its folder, else the ones it can be.
+private fun recordingNote(telugu: Boolean, status: Recordings.Status): String =
+    when (status.recording.takeIf { status.checking == null && status.chapters > 0 }) {
+        Recordings.Recording.KJV_DRAMATIZED -> KJV_DRAMATIZED
+        Recordings.Recording.KJV_NARRATED -> KJV_NARRATED
+        else -> if (telugu) TELUGU_RECORDING else ENGLISH_RECORDINGS
+    }
+
+private const val ENGLISH_RECORDINGS = "The King James Version, either of two recordings, its files kept just as they came: the KJV " +
+    "Dramatized Audio from the Internet Archive (one MP4 a book), or Faith Comes By Hearing's (one MP3 a chapter: ENGKJVO1DA and ENGKJVN1DA)."
+private const val KJV_DRAMATIZED = "The KJV Dramatized Audio from the Internet Archive: one MP4 a book, kept just as they came."
+private const val KJV_NARRATED = "The King James Version from Faith Comes By Hearing: one MP3 a chapter (ENGKJVO1DA and ENGKJVN1DA), kept just as they came."
 private const val TELUGU_RECORDING = "The Telugu Audio Bible from YGFM: one file a book (Psalms in two), kept just as they came."
 
 // The phone's speech engines to read a language with, its usual one marked so. An AI voice app's

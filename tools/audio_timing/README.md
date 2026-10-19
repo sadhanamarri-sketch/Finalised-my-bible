@@ -4,6 +4,9 @@ Makes the files in `data/audio_timing/`: for a recording of the Bible, where eac
 ends in its audio file, so the app can play the recording and follow along verse by verse (backlog
 item 21). The recordings themselves never go in this repository; only the timings do.
 
+Three recordings are timed: Faith Comes By Hearing's narrated KJV and YGFM's Telugu Audio Bible as
+below, and the KJV Dramatized Audio by its words alone (see the end of "How it works").
+
 ## How it works
 
 For each chapter (`timing.py`):
@@ -55,6 +58,22 @@ three or more each within 20 s of the last, isn't taken for joins. The chapters 
 stretches between joins by their expected length. A stretch can hold several chapters, which are
 timed together and split at their spoken headings, or none (an interlude).
 
+The KJV Dramatized Audio (the Internet Archive: one MP4 per book, 76 hours) is timed by its words
+alone (`english_words/`): every word placed by the Montreal Forced Aligner's pretrained English model
+(`english_mfa`, with its US English dictionary; the 4,537 of the KJV's words that dictionary hasn't
+are spelled out by its pretrained G2P model). Each book opens with its title as the KJV prints it
+(`kjv_text.py`), then "Chapter one", and each chapter after with its number ("Psalm two" and its
+title in Psalms). A book is far too long to align in one piece, so `chain_align.py` takes it about
+ten minutes at a time, every book's next stretch in one run of the aligner, round after round. A
+stretch holds whole chapters, each led by an unknown word to take its spoken heading, and ends with
+another to take whatever of the next chapter it reaches into. The aligner takes unknown speech after
+a stretch's words, however long, but not before them: it fits the words in from the stretch's very
+first moment. So each stretch starts exactly where the last one's words ended, and a book's first
+starts with its title in words (else its first verse's words can be fitted to the title's: "Paul" in
+"The Epistle of Paul to Titus"). A stretch whose last words were squeezed in (too little of the
+recording for them) is tried again, longer. Then each verse starts 0.05 s before its first word and
+ends 0.1 s after its last, and each chapter starts where its heading does (`words_to_verses.py`).
+
 ## Running it
 
 Needs Python 3 with NumPy, ffmpeg, espeak-ng (with its Telugu voice for Telugu) and a C compiler.
@@ -86,6 +105,20 @@ mfa align corpus/align corpus/dict.txt te_model.zip aligned --audio_directory au
 # their words added to aligned/)
 python3 telugu_words/words_to_verses.py aligned results/te ../../app/src/main/assets/telugu results/te_words
 python3 export.py te results/te_words kjv.tsv ../../data/audio_timing/telugu.json
+
+# The KJV Dramatized Audio (Kjv1-10.zip, kjv11-20.zip, kjv21-40.zip, kjv41-66.zip in zips/), about
+# 2 hours, with the aligner above and its English models
+mfa model download acoustic english_mfa && mfa model download dictionary english_us_mfa
+mfa model download g2p english_us_mfa
+python3 english_words/prepare.py books zips drama
+python3 english_words/prepare.py words kjv.tsv ~/Documents/MFA/pretrained_models/dictionary/english_us_mfa.dict drama/oov.txt
+mfa g2p drama/oov.txt english_us_mfa drama/oov.dict
+python3 english_words/prepare.py dictionary ~/Documents/MFA/pretrained_models/dictionary/english_us_mfa.dict \
+    drama/oov.dict drama/english_kjv.dict
+python3 english_words/chain_align.py kjv.tsv drama/flac drama/english_kjv.dict english_mfa drama/chain 4
+python3 english_words/words_to_verses.py drama/chain/state.json kjv.tsv drama/members.json drama/mp4_lengths.json \
+    results/drama
+python3 export.py drama results/drama kjv.tsv ../../data/audio_timing/kjv_dramatized.json
 ```
 
 `kjv.tsv` is the app's KJV text, one verse per line: book, chapter, verse, text. Results are kept

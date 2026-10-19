@@ -27,20 +27,35 @@ import java.nio.channels.FileChannel
 import kotlin.math.abs
 
 /**
- * The narrated recordings on the phone, one a language: the King James Version from Faith Comes By
- * Hearing, and YGFM's Telugu Audio Bible. A folder is chosen for each once (both can be one folder,
- * holding the two); its files stay where they are, read through Android's folder access, never copied.
- * Each of the files the recording's timings name is found there by its name, looked over (whole, and
- * the length that was timed: anything else isn't this recording) and remembered, so reading aloud can
- * play any verse from its own stretch of its file (see [verse]).
+ * The recordings on the phone, one a language: the King James Version (the KJV Dramatized Audio, or
+ * Faith Comes By Hearing's narrated one), and YGFM's Telugu Audio Bible. A folder is chosen for each once
+ * (both can be one folder, holding the two); its files stay where they are, read through Android's
+ * folder access, never copied. Which recording the folder holds is told by its files' names. Each of the
+ * files that recording's timings name is found there by its name, looked over (whole, and the length
+ * that was timed: anything else isn't this recording) and remembered, so reading aloud can play any
+ * verse from its own stretch of its file (see [verse]).
  */
 class Recordings(context: Context, private val scope: CoroutineScope) : RecordedVerses {
     private val app = context.applicationContext
+
+    /** A recording there are timings for, made by tools/audio_timing and bundled ([asset]). */
+    enum class Recording(val telugu: Boolean, val asset: String) {
+        /** The KJV Dramatized Audio, from the Internet Archive: one MP4 a book. */
+        KJV_DRAMATIZED(false, "audio_timing/kjv_dramatized.json"),
+
+        /** Faith Comes By Hearing's King James Version, narrated: one MP3 a chapter. */
+        KJV_NARRATED(false, "audio_timing/kjv.json"),
+
+        /** YGFM's Telugu Audio Bible: one file a book (Psalms in two). */
+        TELUGU(true, "audio_timing/telugu.json")
+    }
 
     /** What's known of a language's recording, for the settings. */
     data class Status(
         /** The folder chosen, by its name; null before one is. */
         val folder: String? = null,
+        /** Which of the language's recordings the folder holds, once it's been looked over. */
+        val recording: Recording? = null,
         /** Being looked over: how many of its files so far, of how many. */
         val checking: Pair<Int, Int>? = null,
         /** Chapters there to play, of the recording's. */
@@ -59,21 +74,17 @@ class Recordings(context: Context, private val scope: CoroutineScope) : Recorded
     private val _status = MutableStateFlow(mapOf(false to Status(), true to Status()))
     val status: StateFlow<Map<Boolean, Status>> = _status.asStateFlow()
 
-    // A language's recording: its timings (bundled), the folder chosen and the files found in it.
+    // A language's recording: the folder chosen, the recording it holds and the files found in it.
     private inner class Edition(val telugu: Boolean) {
-        val asset = if (telugu) "audio_timing/telugu.json" else "audio_timing/kjv.json"
+        // The recordings its folder can hold: of two it holds as much of, the first.
+        val recordings = Recording.entries.filter { it.telugu == telugu }
         val saved = File(app.filesDir, if (telugu) "recordings/telugu.json" else "recordings/kjv.json")
-        val loading = Mutex()
-
-        @Volatile
-        var timings: RecordingTimings? = null
 
         @Volatile
         var folder: Uri? = null
 
-        // The timings' file names, each with the file found for it.
         @Volatile
-        var files: Map<String, RecordingFile> = emptyMap()
+        var found: Found? = null
 
         // Files that wouldn't play (their uris), left out until looked over again.
         val failed: MutableSet<String> = java.util.Collections.synchronizedSet(mutableSetOf())
@@ -81,7 +92,15 @@ class Recordings(context: Context, private val scope: CoroutineScope) : Recorded
         var checking: Job? = null
     }
 
+    // The recording a folder holds, its timings, and its files there: the timings' file names, each
+    // with the file found for it.
+    private class Found(val recording: Recording, val timings: RecordingTimings, val files: Map<String, RecordingFile>)
+
     private val editions = mapOf(false to Edition(false), true to Edition(true))
+
+    // Each recording's timings, once read.
+    private val loaded = java.util.concurrent.ConcurrentHashMap<Recording, RecordingTimings>()
+    private val loading = Mutex()
 
     private fun edition(telugu: Boolean) = editions.getValue(telugu)
 
@@ -111,24 +130,21 @@ class Recordings(context: Context, private val scope: CoroutineScope) : Recorded
         edition.folder?.let { check(edition, it) }
     }
 
-    override fun ready(telugu: Boolean): Boolean = edition(telugu).files.isNotEmpty()
+    override fun ready(telugu: Boolean): Boolean = edition(telugu).found?.files?.isNotEmpty() == true
 
     override suspend fun verse(verse: VerseToRead, telugu: Boolean, heading: Boolean): RecordedVerse? {
         val edition = edition(telugu)
-        val files = edition.files
-        if (files.isEmpty()) return null
-        val timings = timings(edition) ?: return null
-        val span = timings.verse(verse.book, verse.chapter, verse.verse, heading) ?: return null
-        val file = files[span.file]?.takeIf { it.uri !in edition.failed } ?: return null
+        val found = edition.found ?: return null
+        val span = found.timings.verse(verse.book, verse.chapter, verse.verse, heading) ?: return null
+        val file = found.files[span.file]?.takeIf { it.uri !in edition.failed } ?: return null
         return RecordedVerse(file, span.from, span.start, span.end)
     }
 
     override fun failed(file: RecordingFile) {
         for (edition in editions.values) {
-            if (edition.files.values.none { it.uri == file.uri }) continue
+            if (edition.found?.files?.values.orEmpty().none { it.uri == file.uri }) continue
             edition.failed += file.uri
-            val timings = edition.timings ?: continue
-            publish(edition, statusOf(edition, timings))
+            publish(edition, statusOf(edition))
         }
     }
 
@@ -138,10 +154,8 @@ class Recordings(context: Context, private val scope: CoroutineScope) : Recorded
         edition.checking?.cancel()
         edition.folder = folder
         edition.checking = scope.launch(Dispatchers.IO) {
-            val timings = timings(edition) ?: return@launch
             val name = nameOf(folder)
-            val total = timings.files.size
-            publish(edition, Status(folder = name, checking = 0 to total))
+            publish(edition, Status(folder = name, checking = 0 to 0))
             val listed = try {
                 list(folder)
             } catch (e: Exception) {
@@ -149,6 +163,12 @@ class Recordings(context: Context, private val scope: CoroutineScope) : Recorded
                 return@launch
             }
             val byKey = listed.groupBy { RecordingIndex.key(it.name) }
+            // The recording whose files these are: the one with most of its chapters here.
+            val (recording, timings) = edition.recordings.mapNotNull { recording -> timings(recording)?.let { recording to it } }
+                .maxByOrNull { (_, timings) -> RecordingIndex.chaptersHeld(timings, byKey.keys) }
+                ?: return@launch publish(edition, Status(folder = name))
+            val total = timings.files.size
+            publish(edition, Status(folder = name, checking = 0 to total))
             val found = LinkedHashMap<String, SavedFile>()
             val missing = mutableListOf<String>()
             val unlike = mutableListOf<String>()
@@ -165,12 +185,12 @@ class Recordings(context: Context, private val scope: CoroutineScope) : Recorded
                 }
                 if (++done % PROGRESS_EVERY == 0) publish(edition, Status(folder = name, checking = done to total))
             }
-            val result = Saved(folder.toString(), name, found, missing, unlike)
+            val result = Saved(folder.toString(), name, recording.name, found, missing, unlike)
             save(edition, result)
             edition.result = result
             edition.failed.clear()
-            edition.files = found.mapValues { RecordingFile(it.value.uri, kindOf(it.value.kind)) }
-            publish(edition, statusOf(edition, timings))
+            edition.found = Found(recording, timings, found.mapValues { RecordingFile(it.value.uri, kindOf(it.value.kind)) })
+            publish(edition, statusOf(edition))
         }
     }
 
@@ -275,6 +295,8 @@ class Recordings(context: Context, private val scope: CoroutineScope) : Recorded
     private data class Saved(
         val folder: String,
         val name: String,
+        // The recording found there (saved before there were two English ones: Faith Comes By Hearing's).
+        val recording: String = Recording.KJV_NARRATED.name,
         val found: Map<String, SavedFile> = emptyMap(),
         val missing: List<String> = emptyList(),
         val unlike: List<String> = emptyList()
@@ -305,37 +327,40 @@ class Recordings(context: Context, private val scope: CoroutineScope) : Recorded
         edition.result = result
         // The app's access to the folder, still there?
         val kept = app.contentResolver.persistedUriPermissions.any { it.uri == folder && it.isReadPermission }
-        val timings = timings(edition) ?: return
+        val recording = edition.recordings.firstOrNull { it.name == result.recording } ?: edition.recordings.first()
+        val timings = timings(recording) ?: return
         if (!kept) {
             publish(edition, Status(folder = result.name, lost = true))
             return
         }
-        edition.files = result.found.mapValues { RecordingFile(it.value.uri, kindOf(it.value.kind)) }
-        publish(edition, statusOf(edition, timings))
+        edition.found = Found(recording, timings, result.found.mapValues { RecordingFile(it.value.uri, kindOf(it.value.kind)) })
+        publish(edition, statusOf(edition))
     }
 
-    private suspend fun timings(edition: Edition): RecordingTimings? {
-        edition.timings?.let { return it }
-        return edition.loading.withLock {
-            edition.timings ?: withContext(Dispatchers.IO) {
+    private suspend fun timings(recording: Recording): RecordingTimings? {
+        loaded[recording]?.let { return it }
+        return loading.withLock {
+            loaded[recording] ?: withContext(Dispatchers.IO) {
                 try {
-                    RecordingTimings.parse(app.assets.open(edition.asset).bufferedReader().use { it.readText() })
+                    RecordingTimings.parse(app.assets.open(recording.asset).bufferedReader().use { it.readText() })
                 } catch (e: Exception) {
                     null
                 }
-            }?.also { edition.timings = it }
+            }?.also { loaded[recording] = it }
         }
     }
 
-    private fun statusOf(edition: Edition, timings: RecordingTimings): Status {
+    private fun statusOf(edition: Edition): Status {
         val result = edition.result ?: return Status()
-        val byFile = timings.chaptersByFile
-        val all = timings.chapterNames
+        val found = edition.found ?: return Status()
+        val byFile = found.timings.chaptersByFile
+        val all = found.timings.chapterNames
         fun chaptersOf(files: Collection<String>) = files.flatMap { byFile[it].orEmpty() }
-        val failed = edition.files.filterValues { it.uri in edition.failed }.keys
-        val playable = edition.files.keys - failed
+        val failed = found.files.filterValues { it.uri in edition.failed }.keys
+        val playable = found.files.keys - failed
         return Status(
             folder = result.name,
+            recording = found.recording,
             chapters = chaptersOf(playable).size,
             chaptersInAll = all.size,
             missing = RecordingIndex.summarize(chaptersOf(result.missing), all),

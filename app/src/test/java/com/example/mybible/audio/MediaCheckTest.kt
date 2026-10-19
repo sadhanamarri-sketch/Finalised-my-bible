@@ -135,6 +135,9 @@ class MediaCheckTest {
         val facts = examine(file)
         assertEquals(MediaKind.MP4, facts.kind)
         assertEquals(754.5, facts.seconds!!, 1e-9)
+        assertTrue(facts.whole)
+        // Cut short: its sound runs on past the file's end.
+        assertFalse(examine(file.copyOf(file.size - 100)).whole)
     }
 
     @Test

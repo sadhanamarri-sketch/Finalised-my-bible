@@ -17,6 +17,13 @@ object RecordingIndex {
     }
 
     /**
+     * How many of a recording's chapters ([timings]) have their files in a folder, the folder's files
+     * given by [keys] (their names as [key] makes them).
+     */
+    fun chaptersHeld(timings: RecordingTimings, keys: Set<String>): Int =
+        timings.chaptersByFile.entries.sumOf { (file, chapters) -> if (key(file) in keys) chapters.size else 0 }
+
+    /**
      * [chapters] said briefly, a book at a time in the order of [all] (every chapter of the recording,
      * "Genesis 1" to "Revelation 22"): a whole book by its name ("2 Samuel"), else its chapters, runs of
      * them joined ("1 Kings 1–8, 21–22").

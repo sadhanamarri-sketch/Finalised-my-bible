@@ -72,6 +72,8 @@ class RecordingPlayer(private val context: Context) : Recorder {
         .setWakeMode(C.WAKE_MODE_LOCAL)
         .build()
         .also {
+            // A video's sound only (the dramatized KJV's files are videos): its pictures aren't decoded.
+            it.trackSelectionParameters = it.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, true).build()
             it.addListener(events)
             player = it
         }

@@ -3,7 +3,8 @@ package com.example.mybible.audio
 /**
  * What kind of sound file one of a recording's files is, so it's opened the right way: an MP3 at one
  * bitrate throughout (a place in it is found by arithmetic, exactly), an MP3 whose bitrate varies (found
- * by reading through it), an MP4 (M4A) with its index of where each few seconds are, or something else.
+ * by reading through it), an MP4 with its index of where things are (an M4A, or a video played for its
+ * sound), or something else.
  */
 enum class MediaKind(val mime: String?) {
     MP3("audio/mpeg"),
@@ -150,6 +151,8 @@ object MediaCheck {
             if (size == 1L && header.size >= 16) size = int64(header, 8)
             if (size == 0L) size = bytes.size - at
             if (size < 8) return MediaFacts(MediaKind.MP4, null, whole = false)
+            // A box that runs on past the file's end: it's been cut short.
+            if (at + size > bytes.size) return MediaFacts(MediaKind.MP4, null, whole = false)
             when (type) {
                 "moov" -> {
                     moovAt = at

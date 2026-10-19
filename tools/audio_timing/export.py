@@ -4,6 +4,7 @@ verses where the matching's runs disagreed are listed as unsure.
 
 usage: export.py kjv <results dir> <kjv.tsv> <out.json>
        export.py te <results dir> <kjv.tsv> <out.json>
+       export.py drama <results dir> <kjv.tsv> <out.json>     (the dramatized KJV, english_words/)
 """
 import sys, os, json, glob
 
@@ -48,7 +49,9 @@ else:
                 e['end'] = nxt['start']
                 e['verses'][-1][1] = min(e['verses'][-1][1], e['end'])
     recording = ('Telugu Audio Bible, YGFM (Apostle Ratnaker), reading the Telugu Old Version: one file per '
-                 'book (Psalms in two), chapters read one after another.')
+                 'book (Psalms in two), chapters read one after another.') if kind == 'te' else \
+                ('KJV Dramatized Audio (the Internet Archive): one MP4 per book, its chapters read one after '
+                 "another, the book's title first and each chapter's number (\"Chapter two\", \"Psalm two\").")
 
 data = {
     'recording': recording,
@@ -58,7 +61,10 @@ data = {
             "length. Seconds from the start of the file.") if kind == 'kjv' else
            ("Every word of the app's text placed in the recording by a forced aligner (the Montreal "
             "Forced Aligner) trained on this narrator's own voice; a verse starts just before its first "
-            "word and ends just after its last. Seconds from the start of the file."),
+            "word and ends just after its last. Seconds from the start of the file.") if kind == 'te' else
+           ("Every word of the app's text placed in the recording by a forced aligner (the Montreal "
+            "Forced Aligner, its pretrained English model); a verse starts just before its first word and "
+            "ends just after its last. Seconds from the start of the file."),
     'files': dict(sorted(files.items())),
     'chapters': {f'{b} {c}': chapters[(b, c)] for b, c in sorted(chapters, key=lambda k: (order.index(k[0]), k[1]))},
 }
