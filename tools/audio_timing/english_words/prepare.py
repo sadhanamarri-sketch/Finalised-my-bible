@@ -5,14 +5,15 @@ named "The Holy Bible - Book 01 - Genesis - KJV Dramatized Audio.mp4"):
       <work>/members.json: each book's number, zip, file and name; <work>/mp4_lengths.json: each file's
       length from its movie header, as the app reads it; <work>/flac/NN.flac: its sound, 16 kHz mono.
   prepare.py words <kjv.tsv> <dictionary> <out oov.txt>
-      the text's words the aligner's dictionary hasn't, for its G2P model to spell out.
+      the words said (the text's, the books' titles, the psalms' titles) that the aligner's dictionary
+      hasn't, for its G2P model to spell out.
   prepare.py dictionary <dictionary> <oov.dict from G2P> <out dictionary>
-      the two in one, in the aligner's dictionary's form.
+      the two in one, in the aligner's dictionary's form, and "hundredand" (kjv_text.number).
 """
 import sys, os, re, json, struct, zipfile, subprocess, tempfile
 from multiprocessing import Pool
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from kjv_text import words
+from kjv_text import words, load, said
 
 BOOK = re.compile(r'Book (\d+) - (.+?) - KJV')
 
@@ -65,26 +66,37 @@ def books(zips, work):
 
 
 def missing_words(kjv_tsv, dictionary, out):
-    known = set(line.split('\t', 1)[0] for line in open(dictionary, encoding='utf-8'))
+    known = set(line.split('\t', 1)[0] for line in open(dictionary, encoding='utf-8')) | {'hundredand'}
     oov = set()
-    for line in open(kjv_tsv, encoding='utf-8'):
-        for w in words(line.rstrip('\n').split('\t')[3]):
-            if w in known: continue
-            # A possessive whose word is known is said as that word and 's.
-            base = w[:-2] if w.endswith("'s") else w.rstrip("'")
-            if base != w and base in known: continue
-            oov.add(base or w)
+    bible = load(kjv_tsv)
+    every = [w for book, chapters in bible.items() for w in said(book, chapters)]
+    every += [w for chapters in bible.values() for verses in chapters.values() for v in verses for w in words(v)]
+    for w in every:
+        if w in known: continue
+        # A possessive whose word is known is said as that word and 's.
+        base = w[:-2] if w.endswith("'s") else w.rstrip("'")
+        if base != w and base in known: continue
+        oov.add(base or w)
     open(out, 'w', encoding='utf-8').write('\n'.join(sorted(oov)) + '\n')
     print(f'{len(oov)} words to spell out')
 
 
 def merge(dictionary, oov_dict, out):
+    base = open(dictionary, encoding='utf-8').read().rstrip('\n') + '\n'
+    sounds = {}
+    for line in base.splitlines():
+        w, _, rest = line.partition('\t')
+        if w in ('hundred', 'and'): sounds.setdefault(w, []).append(rest.rsplit('\t', 1)[-1])
     with open(out, 'w', encoding='utf-8') as f:
-        f.write(open(dictionary, encoding='utf-8').read())
+        f.write(base)
+        # The dictionary's form: the word, its odds (plain ones here), then its sounds.
         for line in open(oov_dict, encoding='utf-8'):
             w, _, phones = line.rstrip('\n').partition('\t')
-            # The dictionary's form: the word, its odds (plain ones here), then its sounds.
             if w and phones: f.write(f'{w}\t1.0\t0.15\t1.0\t1.0\t{phones}\n')
+        # "One hundred and nineteen", or "one hundred nineteen".
+        for h in sounds['hundred']:
+            for a in [''] + sounds['and']:
+                f.write(f'hundredand\t1.0\t0.15\t1.0\t1.0\t{h} {a}'.rstrip() + '\n')
 
 
 if __name__ == '__main__':

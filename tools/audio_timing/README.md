@@ -58,21 +58,31 @@ three or more each within 20 s of the last, isn't taken for joins. The chapters 
 stretches between joins by their expected length. A stretch can hold several chapters, which are
 timed together and split at their spoken headings, or none (an interlude).
 
-The KJV Dramatized Audio (the Internet Archive: one MP4 per book, 76 hours) is timed by its words
-alone (`english_words/`): every word placed by the Montreal Forced Aligner's pretrained English model
-(`english_mfa`, with its US English dictionary; the 4,537 of the KJV's words that dictionary hasn't
-are spelled out by its pretrained G2P model). Each book opens with its title as the KJV prints it
-(`kjv_text.py`), then "Chapter one", and each chapter after with its number ("Psalm two" and its
-title in Psalms). A book is far too long to align in one piece, so `chain_align.py` takes it about
-ten minutes at a time, every book's next stretch in one run of the aligner, round after round. A
-stretch holds whole chapters, each led by an unknown word to take its spoken heading, and ends with
-another to take whatever of the next chapter it reaches into. The aligner takes unknown speech after
-a stretch's words, however long, but not before them: it fits the words in from the stretch's very
-first moment. So each stretch starts exactly where the last one's words ended, and a book's first
-starts with its title in words (else its first verse's words can be fitted to the title's: "Paul" in
-"The Epistle of Paul to Titus"). A stretch whose last words were squeezed in (too little of the
-recording for them) is tried again, longer. Then each verse starts 0.05 s before its first word and
-ends 0.1 s after its last, and each chapter starts where its heading does (`words_to_verses.py`).
+The KJV Dramatized Audio (the Internet Archive: one MP4 per book, 76 hours, read by a cast) is timed
+by its words alone (`english_words/`): every word placed by the Montreal Forced Aligner's pretrained
+English model (`english_mfa`, with its US English dictionary; the 4,570 words said that the dictionary
+hasn't are spelled out by its pretrained G2P model). Besides the verses, the recording says each book's
+title (mostly as the KJV prints it; Genesis just "Genesis"), each chapter's number ("Chapter two"), in
+Psalms "Psalm two" and the psalm's title, which the app's text hasn't (`psalm_titles.json`, from a
+public KJV), and Psalm 119's Hebrew letters; the aligner is given all of it (`kjv_text.py`).
+
+A book is far too long to align in one piece, so `chain_align.py` takes it about ten minutes at a
+time, every book's next stretch in one run of the aligner, round after round. A stretch holds whole
+chapters and ends with an unknown word to take whatever of the next chapter it reaches into. The
+aligner fits a stretch's words in from its very first moment, so each stretch starts just after the
+last word the one before placed (at most a second after: the aligner can call speech that follows
+silence, once a minute and a half of it). A stretch whose last words were squeezed in (too little of
+the recording for them) is tried again, longer.
+
+The aligner goes wrong where the cast's voices are far from what it was trained on (a crowd crying "hide
+us" in Revelation 6, the serpent in Genesis 3): it stretches a word over seconds of speech not its own,
+and carries on placing the words after it late. So a chapter with a word placed as longer than 2.5 s
+isn't taken, nor anything after it in its stretch; it's tried again on its own from the end of the one
+before, and taken as it comes then, its verses marked unsure. As its end isn't to be trusted, the next
+chapter starts from its heading as pocketsphinx's keyword spotting hears it ("chapter seven",
+`find_heading.py`). Verses the aligner put past that are spread over what's left of the chapter by
+their text's length, unsure too. Then each verse starts 0.05 s before its first word and ends 0.1 s
+after its last, and each chapter starts with its heading (`words_to_verses.py`).
 
 ## Running it
 
@@ -106,8 +116,8 @@ mfa align corpus/align corpus/dict.txt te_model.zip aligned --audio_directory au
 python3 telugu_words/words_to_verses.py aligned results/te ../../app/src/main/assets/telugu results/te_words
 python3 export.py te results/te_words kjv.tsv ../../data/audio_timing/telugu.json
 
-# The KJV Dramatized Audio (Kjv1-10.zip, kjv11-20.zip, kjv21-40.zip, kjv41-66.zip in zips/), about
-# 2 hours, with the aligner above and its English models
+# The KJV Dramatized Audio (Kjv1-10.zip, kjv11-20.zip, kjv21-40.zip, kjv41-66.zip in zips/), with the
+# aligner above and its English models, and pocketsphinx (pip) in the Python $KWS_PYTHON names
 mfa model download acoustic english_mfa && mfa model download dictionary english_us_mfa
 mfa model download g2p english_us_mfa
 python3 english_words/prepare.py books zips drama

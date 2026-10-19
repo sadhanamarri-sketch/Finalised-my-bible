@@ -1,7 +1,9 @@
 """The app's King James text as the aligner is given it (lowercase words, apostrophes kept), and what the
-dramatized KJV's narrator says before the text: each book's title as the King James Version prints it,
-then "Chapter one" (or "Psalm one") before a book's first chapter when it has more than one."""
-import re
+dramatized KJV's narrator says besides: each book's title (mostly as the King James Version prints it),
+then each chapter's number ("Chapter two", none in a book of one chapter), in Psalms "Psalm two" and the
+psalm's title (`psalm_titles.json`, from the KJV: the app's text hasn't them), and Psalm 119's Hebrew
+letters."""
+import re, os, json
 
 TITLES = {
     'Genesis': 'The First Book of Moses called Genesis', 'Exodus': 'The Second Book of Moses called Exodus',
@@ -31,7 +33,20 @@ TITLES = {
     'Jude': 'The General Epistle of Jude', 'Revelation': 'The Revelation of Saint John the Divine',
 }
 
+# Where the dramatized recording opens a book otherwise than with the KJV's title (as heard).
+SPOKEN_TITLES = {
+    'Genesis': 'Genesis', 'Exodus': 'Exodus', 'Leviticus': 'Leviticus The Third Book of Moses called Leviticus',
+    'Numbers': 'Numbers', 'Deuteronomy': 'Deuteronomy', '1 Samuel': 'The First Book of Samuel',
+    '2 Samuel': 'The Second Book of Samuel', '1 Kings': 'The First Book of the Kings', '2 Kings': 'The Second Book of the Kings',
+}
+
+PSALM_TITLES = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'psalm_titles.json'), encoding='utf-8'))
+
 WORD = re.compile(r"[A-Za-z]+(?:'[A-Za-z]+)*")
+
+ONES = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve',
+        'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen']
+TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety']
 
 
 def words(text):
@@ -39,11 +54,41 @@ def words(text):
     return [w.lower() for w in WORD.findall(text.replace('’', "'"))]
 
 
-def opening(book, chapters):
-    """What's said before the book's first verse: its title, and its first chapter's heading if it has more than one."""
-    said = words(TITLES[book])
-    if chapters > 1: said += ['psalm' if book == 'Psalms' else 'chapter', 'one']
-    return said
+def number(n):
+    """A chapter's number as it's said, 1 to 150: ['twenty', 'three']. Over a hundred, 'hundredand' is
+    "hundred" said with "and" after it or without (the aligner's dictionary is given both)."""
+    if n >= 100: return ['one', 'hundred'] if n == 100 else ['one', 'hundredand'] + number(n - 100)
+    if n < 20: return [ONES[n]]
+    return [TENS[n // 10]] + ([ONES[n % 10]] if n % 10 else [])
+
+
+def heading(book, chapter, chapters):
+    """What's said before a chapter's first verse (after the book's title, for its first): "Chapter two",
+    nothing in a book of one chapter; in Psalms "Psalm two" and the psalm's title."""
+    if book == 'Psalms':
+        title = PSALM_TITLES.get(str(chapter))
+        return ['psalm'] + number(chapter) + (words(title) if isinstance(title, str) else [])
+    return ['chapter'] + number(chapter) if chapters > 1 else []
+
+
+def before_verse(book, chapter, verse):
+    """What's said before a verse, within its chapter: Psalm 119's Hebrew letters ("ALEPH." before verse 1)."""
+    title = PSALM_TITLES.get(str(chapter)) if book == 'Psalms' else None
+    return words(title.get(str(verse), '')) if isinstance(title, dict) else []
+
+
+def title(book):
+    """What's said before a book's first chapter."""
+    return words(SPOKEN_TITLES.get(book, TITLES[book]))
+
+
+def said(book, chapters):
+    """Every word said of a book besides its verses' ({chapter: [verse text]}): for the dictionary."""
+    out = title(book)
+    for c, verses in chapters.items():
+        out += heading(book, c, len(chapters))
+        for v in range(1, len(verses) + 1): out += before_verse(book, c, v)
+    return out
 
 
 def load(kjv_tsv):
