@@ -13,7 +13,9 @@ first verse's words can be fitted to the title's ("Paul" in "The Epistle of Paul
 A stretch whose last words look squeezed in (not enough recording for them) is tried again longer. A
 chapter with a word placed as impossibly long has been fitted to speech not its own, from there on, so
 it isn't taken nor anything after it: it's tried again on its own from the end of the one before, and
-taken as it comes then, its verses marked unsure.
+taken as it comes then, its verses marked unsure. A stretch the aligner can't place at all (a chapter
+sung, say) is tried again as its first chapter alone, then longer; then that chapter's verses are
+estimated (see [estimate]).
 
 Words per chapter go to <work>/state.json, with where each book has got to; rounds go on from there.
 usage: chain_align.py <kjv.tsv> <flac dir: NN.flac> <dictionary> <acoustic model> <work dir> [workers]
@@ -98,6 +100,26 @@ def find_heading(book, s, chapter, a, b, flac_dir):
     out = subprocess.run([os.environ.get('KWS_PYTHON', 'python3'), os.path.join(os.path.dirname(os.path.abspath(__file__)), 'find_heading.py'),
                           os.path.join(flac_dir, f'{s["n"]:02d}.flac'), f'{a:.2f}', f'{b:.2f}', *phrases], capture_output=True, text=True)
     return float(out.stdout) if out.returncode == 0 and out.stdout.strip() else None
+
+
+def estimate(s, book, verses, flac_dir):
+    """A chapter the aligner can't place: it runs from where the last one ended to its successor's
+    heading as heard (else for as long as its text would take), its verses spread over that by their
+    text's length (words_to_verses.py)."""
+    c = s['next']
+    expected = s['pace'] * sum(len(v) for v in verses[c])
+    end = None
+    if c < max(verses):
+        end = find_heading(book, s, c + 1, s['pos'] + 0.5 * expected, min(s['duration'], s['pos'] + 2.0 * expected + 60.0), flac_dir)
+    if end is None: end = s['duration'] if c == max(verses) else min(s['duration'], s['pos'] + expected)
+    s['chapters'][str(c)] = {'start': 0.0 if c == 1 else round(s['pos'], 3), 'end': round(end, 3), 'words': [],
+                             'expected': sum(len(words(v)) for v in verses[c]), 'estimated': True}
+    s['pos'] = round(max(s['pos'], end - 0.5), 3)
+    s['next'] = c + 1
+    s['done'] = s['next'] > max(verses)
+    s['tries'] = 0
+    s['odd'] = 0
+    return f'{c} estimated'
 
 
 def take(s, start, end, tokens, aligned, verses, book=None, flac_dir=None):
@@ -206,7 +228,7 @@ def main(kjv_tsv, flac_dir, dictionary, model, work, workers='4'):
     # ONLY=Titus,Jonah: just those books (to try it out).
     only = [b for b in os.environ.get('ONLY', '').split(',') if b]
     while True:
-        todo = [b for b in books if not state[b]['done'] and state[b]['tries'] < 5 and (not only or b in only)]
+        todo = [b for b in books if not state[b]['done'] and (not only or b in only)]
         if not todo: break
         rnd += 1
         corpus, out = os.path.join(work, f'round_{rnd:03d}'), os.path.join(work, f'aligned_{rnd:03d}')
@@ -218,24 +240,18 @@ def main(kjv_tsv, flac_dir, dictionary, model, work, workers='4'):
             a, e, tokens = plan(b, s, bible)
             stretches[b] = (a, e, tokens)
             textgrid(os.path.join(corpus, f'{s["n"]:02d}.TextGrid'), s['duration'], f'b{s["n"]:02d}', a, e, ' '.join(t[0] for t in tokens))
-        for beam, retry in ((20, 100), (100, 400)):
-            missing = [b for b in todo if not os.path.exists(os.path.join(out, f'{state[b]["n"]:02d}.json'))]
-            if not missing: break
-            # Nothing at all: the aligner stopped (its log says why), not a stretch it couldn't fit.
-            if beam > 20 and len(missing) == len(todo):
-                sys.exit(f'round {rnd}: the aligner gave no alignments at all; see {work}/round_{rnd:03d}_b20.log')
-            run = corpus if len(missing) == len(todo) else corpus + f'_beam{beam}'
-            if run != corpus:
-                shutil.rmtree(run, ignore_errors=True)
-                os.makedirs(run)
-                for b in missing: shutil.copy(os.path.join(corpus, f'{state[b]["n"]:02d}.TextGrid'), run)
-            subprocess.run(aligner() + [run, dictionary, model, out, '--audio_directory', flac_dir, '-j', workers, '--clean',
-                                        '--output_format', 'json', '--beam', str(beam), '--retry_beam', str(retry)],
-                           stdout=open(os.path.join(work, f'round_{rnd:03d}_b{beam}.log'), 'w'), stderr=subprocess.STDOUT)
+        # Once, at the usual beam: a stretch it can't place with that is tried otherwise next round (a
+        # wider beam took half an hour for one stretch, with every other book waiting).
+        subprocess.run(aligner() + [corpus, dictionary, model, out, '--audio_directory', flac_dir, '-j', workers, '--clean',
+                                    '--output_format', 'json', '--beam', '20', '--retry_beam', '100'],
+                       stdout=open(os.path.join(work, f'round_{rnd:03d}_b20.log'), 'w'), stderr=subprocess.STDOUT)
+        missing = [b for b in todo if not os.path.exists(os.path.join(out, f'{state[b]["n"]:02d}.json'))]
+        # Nothing at all: the aligner stopped (its log says why), not a stretch it couldn't fit.
+        if len(missing) == len(todo) and len(todo) > 1:
+            sys.exit(f'round {rnd}: the aligner gave no alignments at all; see {work}/round_{rnd:03d}_b20.log')
         # The aligner's working files for the round (its features), large and done with.
         root = os.environ.get('MFA_ROOT_DIR', os.path.expanduser('~/Documents/MFA'))
-        for d in (os.path.basename(corpus), os.path.basename(corpus) + '_beam100'):
-            shutil.rmtree(os.path.join(root, d), ignore_errors=True)
+        shutil.rmtree(os.path.join(root, os.path.basename(corpus)), ignore_errors=True)
         moved = []
         for b in todo:
             s = state[b]
@@ -243,9 +259,15 @@ def main(kjv_tsv, flac_dir, dictionary, model, work, workers='4'):
             a, e, tokens = stretches[b]
             if os.path.exists(path):
                 moved.append(f'{b} ' + take(s, a, e, tokens, path, bible[b], b, flac_dir))
-            else:
+                if s['tries'] >= 3: moved.append(f'{b} ' + estimate(s, b, bible[b], flac_dir))
+            elif not s.get('odd'):
+                s['odd'] = 1
+                moved.append(f'{b} {s["next"]} on its own, not placed')
+            elif s['tries'] < 1:
                 s['tries'] += 1
-                moved.append(f'{b} AGAIN ({s["tries"]})')
+                moved.append(f'{b} AGAIN ({s["tries"]}), not placed')
+            else:
+                moved.append(f'{b} ' + estimate(s, b, bible[b], flac_dir))
         json.dump(state, open(state_path + '.tmp', 'w', encoding='utf-8'), separators=(',', ':'))
         os.replace(state_path + '.tmp', state_path)
         done = sum(1 for b in books if state[b]['done'])

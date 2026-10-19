@@ -64,6 +64,19 @@ def chapter_verses(ws, texts, begin, end, stretched=False):
     return [[s, e] for s, e in zip(starts, ends)], unsure
 
 
+def spread(texts, begin, end):
+    """A chapter the aligner couldn't place (chain_align.estimate): its verses over its span (its heading
+    first) by their text's length, all unsure."""
+    a = begin + min(3.0, 0.1 * (end - begin))
+    total = sum(len(t) for t in texts)
+    verses, at = [], a
+    for t in texts:
+        step = (end - a) * len(t) / total
+        verses.append([round(at + 0.02, 2), round(at + step, 2)])
+        at += step
+    return verses, list(range(1, len(texts) + 1))
+
+
 def main(state_path, kjv_tsv, members_path, lengths_path, out):
     state = json.load(open(state_path, encoding='utf-8'))
     bible = load(kjv_tsv)
@@ -83,7 +96,7 @@ def main(state_path, kjv_tsv, members_path, lengths_path, out):
         for c, texts in chapters.items():
             end = starts[c + 1] if c + 1 in starts else duration
             ch = s['chapters'][str(c)]
-            got = chapter_verses(ch['words'], texts, starts[c], end, ch.get('stretched', False))
+            got = spread(texts, starts[c], end) if ch.get('estimated') else chapter_verses(ch['words'], texts, starts[c], end, ch.get('stretched', False))
             if got is None:
                 bad.append(c)
                 continue
