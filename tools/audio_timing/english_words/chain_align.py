@@ -50,7 +50,13 @@ def textgrid(path, end, tier, a, b, text):
 def entries(path):
     tiers = json.load(open(path, encoding='utf-8'))['tiers']
     t = tiers.get('words') or next(v for k, v in tiers.items() if 'word' in k.lower())
-    return [(e[0], e[1], e[2]) for e in t['entries'] if e[2] not in ('', '<eps>', 'sil', 'sp')]
+    out = []
+    for a, b, w in t['entries']:
+        if w in ('', '<eps>', 'sil', 'sp'): continue
+        # A possessive the dictionary hasn't whole comes back as its word and 's: one word again.
+        if w.startswith("'") and out: out[-1] = (out[-1][0], b, out[-1][2] + w)
+        else: out.append((a, b, w))
+    return out
 
 
 def plan(book, s, bible):
@@ -160,9 +166,9 @@ def take(s, start, end, tokens, aligned, verses, book=None, flac_dir=None):
     s['pos'] = round(last_end + min(0.6 * gap, LEAD_IN), 3)
     if as_is and taken[-1] < max(verses) and flac_dir:
         # Its end isn't to be trusted, nor where the next chapter starts: its heading, heard after the
-        # word stretched, if it's heard by the end of the chapter as placed and a little after.
+        # word stretched and within 20 s of the chapter's end as placed (farther, it's heard wrongly too).
         first_long = min(at[i][0] for i in words_of[taken[-1]] if at[i][1] - at[i][0] > LONG_WORD)
-        found = find_heading(book, s, taken[-1] + 1, first_long, min(s['duration'], last_end + 30.0), flac_dir)
+        found = find_heading(book, s, taken[-1] + 1, max(first_long, last_end - 20.0), min(s['duration'], last_end + 20.0), flac_dir)
         if found is not None:
             s['pos'] = round(max(first_long, found - 0.5), 3)
             s['chapters'][str(taken[-1])]['heard_next'] = round(found, 2)
