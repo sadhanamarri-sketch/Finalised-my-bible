@@ -115,6 +115,13 @@ def take(s, start, end, tokens, aligned, verses):
     return True
 
 
+def aligner():
+    """The command to run the aligner with: mfa_align.py, by the Python the aligner's own `mfa` runs with."""
+    mfa = shutil.which('mfa')
+    python = open(mfa, encoding='utf-8').readline()[2:].strip()
+    return [python, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mfa_align.py')]
+
+
 def main(kjv_tsv, flac_dir, dictionary, model, work, workers='4'):
     bible = load(kjv_tsv)
     books = list(bible)
@@ -147,13 +154,16 @@ def main(kjv_tsv, flac_dir, dictionary, model, work, workers='4'):
         for beam, retry in ((20, 100), (100, 400)):
             missing = [b for b in todo if not os.path.exists(os.path.join(out, f'{state[b]["n"]:02d}.json'))]
             if not missing: break
+            # Nothing at all: the aligner stopped (its log says why), not a stretch it couldn't fit.
+            if beam > 20 and len(missing) == len(todo):
+                sys.exit(f'round {rnd}: the aligner gave no alignments at all; see {work}/round_{rnd:03d}_b20.log')
             run = corpus if len(missing) == len(todo) else corpus + f'_beam{beam}'
             if run != corpus:
                 shutil.rmtree(run, ignore_errors=True)
                 os.makedirs(run)
                 for b in missing: shutil.copy(os.path.join(corpus, f'{state[b]["n"]:02d}.TextGrid'), run)
-            subprocess.run(['mfa', 'align', run, dictionary, model, out, '--audio_directory', flac_dir, '-j', workers, '--clean',
-                            '--output_format', 'json', '--beam', str(beam), '--retry_beam', str(retry)],
+            subprocess.run(aligner() + [run, dictionary, model, out, '--audio_directory', flac_dir, '-j', workers, '--clean',
+                                        '--output_format', 'json', '--beam', str(beam), '--retry_beam', str(retry)],
                            stdout=open(os.path.join(work, f'round_{rnd:03d}_b{beam}.log'), 'w'), stderr=subprocess.STDOUT)
         # The aligner's working files for the round (its features), large and done with.
         root = os.environ.get('MFA_ROOT_DIR', os.path.expanduser('~/Documents/MFA'))
