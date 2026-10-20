@@ -734,8 +734,9 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     1828 sheet over Verse Scroll, as in the Reader; closing it comes back to the card. No button.
     English only, no Greek or Hebrew. As a double-tap still highlights, the sheet opens about a
     third of a second after the tap (once it's clear it isn't a double-tap). A tap on the space
-    around the words isn't a look-up (that's where a tap to pause would go, if 8 is agreed).
-    Reading aloud pauses while a word is looked up and plays on when it's closed (proposed).
+    around the words isn't a look-up (it plays or pauses the reading, 30). Reading aloud pauses
+    while a word's sheet is open and plays on by itself when it's closed ("i like pausing when
+    looking up ... it resumes automatically when word window is closed").
     *To build it:* the card's text becomes tappable word by word, as the Reader's verses are
     (VerseComponents), within the card's own tap handling (double-tap, long press); the Reader's
     openEnglishWordLookup already opens the sheet over any tab.
@@ -764,3 +765,38 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     - *Verse Scroll's links sheet:* the same.
     *To build it:* the list first (tools/, from the cross references, Nave's topics and the KJV,
     reviewed), then the mark's colour, the Cross References order and tag, and the links sheet.
+
+30. **Verse Scroll: a tap to play or pause, and the reading kept through a visit to the Reader.**
+    "Pause/play in scroll verse by tapping the screen and change the stopping of speech after
+    return from reader to scroll verse." — "wait for my tap."
+    *Today:* a single tap on a card only closes the colour box, and reading is started and
+    stopped with the speaker button at the top. Going to the Reader ("Read") stops the reading
+    and forgets where it was; back in Verse Scroll the speaker is off, and the card starts over.
+    *Agreed 20 Oct* (not built yet):
+    - A tap on the card, anywhere but its words (a word is a look-up, 28), plays or pauses the
+      reading, and starts reading the card when nothing is being read. As a double-tap still
+      highlights, it acts about a third of a second after the tap.
+    - Going to the Reader pauses the reading where it is, rather than stopping it.
+    - Coming back, it waits, paused, for your tap, and then plays on from where it paused.
+    *To build it:* the switch to the Reader's tab pauses instead of stopping Verse Scroll's
+    reading, and the controller's own resume-where-it-stopped path plays it on; its speaker-on
+    state becomes the reading's (today a pause turns it off); the tap is the card's onTap, which
+    waits out the double-tap. A Reader reading started meanwhile still ends Verse Scroll's, and
+    then a tap starts the card over.
+
+31. **A one-tap language button: English, Telugu, Both.** "Easy switch for eng, tel and both for
+    scroll verse and reader read aloud." — "replace speaker button (now that we have pause/play
+    feature) with one tap button that cycles."
+    *Today:* the language is chosen only in the reading settings, and with the phone's voice a
+    change waits for the next verse.
+    *Agreed 20 Oct* (not built yet):
+    - In Verse Scroll, the speaker button at the top becomes a language button: a tap cycles
+      English, Telugu, Both (playing and pausing are a tap on the card, 30).
+    - The Reader's reading bar gets the same button.
+    - Changed while reading, the verse being read starts again in the new language at once,
+      from a recording or the phone's voice alike.
+    - Without a Telugu voice or recording, Telugu and Both are left out of the cycle (proposed).
+    *To build it:* the button shows the language and calls updateLanguage, then restartVerse()
+    whenever a reading is going (today only for recordings); the bar needs the settings passed
+    in; restartVerse does nothing while the next verse is being found, so a change then applies
+    from that verse.
