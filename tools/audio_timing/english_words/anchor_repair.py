@@ -5,8 +5,9 @@ alone from its heading to the next one's, so a chapter the aligner gets wrong ca
 A chapter still placed wrongly (a word stretched, words not placed) has its verses estimated.
 
 usage: anchor_repair.py <state.json> <kjv.tsv> <flac dir> <dictionary> <acoustic model> <work dir>
-                        <Book:first-last> [<Book:first-last> ...]
-The state is updated in place. Needs $KWS_PYTHON as chain_align.py does.
+                        [--beam=20,100] <Book:first-last> [<Book:first-last> ...]
+The state is updated in place. Needs $KWS_PYTHON as chain_align.py does. --beam sets the aligner's
+beam and retry beam: wider (100,400) is slower but places chapters the usual one gives up on.
 """
 import sys, os, json, difflib, subprocess, shutil
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -57,6 +58,10 @@ def anchors(book, s, chapters, first, last, t0, t1, flac_dir):
 
 
 def main(state_path, kjv_tsv, flac_dir, dictionary, model, work, *runs):
+    beam, retry_beam = '20', '100'
+    for r in runs:
+        if r.startswith('--beam='): beam, retry_beam = r[len('--beam='):].split(',')
+    runs = [r for r in runs if not r.startswith('--beam=')]
     state = json.load(open(state_path, encoding='utf-8'))
     bible = load(kjv_tsv)
     os.makedirs(work, exist_ok=True)
@@ -90,7 +95,7 @@ def main(state_path, kjv_tsv, flac_dir, dictionary, model, work, *runs):
         plans[book] = (s, items)
         write_textgrid(os.path.join(corpus, f'{s["n"]:02d}.TextGrid'), s['duration'], f'b{s["n"]:02d}', items)
     subprocess.run(aligner() + [corpus, dictionary, model, out, '--audio_directory', flac_dir, '-j', '4', '--clean',
-                                '--output_format', 'json', '--beam', '20', '--retry_beam', '100'],
+                                '--output_format', 'json', '--beam', beam, '--retry_beam', retry_beam],
                    stdout=open(os.path.join(work, 'align.log'), 'w'), stderr=subprocess.STDOUT)
     for book, (s, items) in plans.items():
         path = os.path.join(out, f'{s["n"]:02d}.json')

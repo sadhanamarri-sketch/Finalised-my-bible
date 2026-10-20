@@ -136,6 +136,9 @@ python3 english_words/chain_align.py kjv.tsv drama/flac drama/english_kjv.dict e
 # Runs of chapters timed wrongly (their sampled verses' words not heard): timed again from their headings
 python3 english_words/anchor_repair.py drama/chain/state.json kjv.tsv drama/flac drama/english_kjv.dict english_mfa \
     drama/repair "Exodus:14-26" "Revelation:14-22"
+# Chapters it still couldn't place, again each on its own, with a wider search
+python3 english_words/anchor_repair.py drama/chain/state.json kjv.tsv drama/flac drama/english_kjv.dict english_mfa \
+    drama/retry --beam=100,400 "Exodus:23-23" "1 Samuel:25-26" "Jeremiah:51-52" "Matthew:21-21" "Revelation:17-17"
 python3 english_words/words_to_verses.py drama/chain/state.json kjv.tsv drama/members.json drama/mp4_lengths.json \
     results/drama
 python3 export.py drama results/drama kjv.tsv ../../data/audio_timing/kjv_dramatized.json
@@ -164,7 +167,10 @@ chapter by chapter (book by book for Telugu), so a run that stops can be started
   are far from what it knows: a crowd in Revelation 6, the serpent in Genesis 3, the Song of Moses
   and Sinai in Exodus 15–20. Carried on, that put runs of chapters out of place (Exodus 14–26,
   1 Samuel 25–31, 1 Kings 14–22, Matthew 21–28, Revelation 14–22, found by speech recognition); those
-  50 chapters were timed again from their headings. 26 chapters are taken with a word placed
-  impossibly long and 6 couldn't be placed at all (their verses spread by length): 1,038 verses
-  (3.3%) are marked unsure. The recording also says "This concludes disc number …" here and there,
+  50 chapters were timed again from their headings. The 6 it still couldn't place were timed again
+  each on its own with a wider search (`--beam=100,400`): Exodus 23, 1 Samuel 25 and 26, Matthew 21
+  and Revelation 17 placed, and Jeremiah 52 from its heading, about two and a half minutes earlier
+  than it had been put, which left Jeremiah 51 no room it would fit. 28 chapters are taken with a
+  word placed impossibly long and 1 couldn't be placed (its verses spread by length): 975 verses
+  (3.1%) are marked unsure. The recording also says "This concludes disc number …" here and there,
   from its CDs.
