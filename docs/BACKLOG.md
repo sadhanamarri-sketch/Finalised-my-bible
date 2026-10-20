@@ -646,3 +646,36 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     going (today it can only start a new one). The taps, Blur Mode's focus, where a reading starts
     and the bar's states all build on that.
     అ itself isn't remembered: it starts off at every launch, as now (decided 15 Oct).
+
+## Noted 20 Oct 2026
+
+24. **Reading aloud stops when the app is swiped away.** "Player continued in background even
+    after killing the app."
+    *Today:* the reading's service isn't told when the app is swiped away from Recents (nothing
+    asks Android to stop it with the app, and it doesn't watch for it), and the reader-aloud lasts
+    as long as the app's process does, so a Reader reading plays on. Only Verse Scroll's stops,
+    with its feed.
+    *Agreed 20 Oct* (not built yet): swiping the app away from Recents stops any reading, in the
+    Reader or Verse Scroll, by the phone's voice or a recording, and its notification goes.
+    Turning the screen off or going to another app keeps it playing, as now.
+    *To build it:* ReadAloudService's onTaskRemoved stops the reader-aloud and takes the
+    notification down itself (a stopped reading's own teardown runs in a collector that
+    onDestroy cancels, and a paused reading's notification is detached), then stops the service.
+
+25. **Verse Scroll: a pause between cards, and a gentler slide.** "Provide a setting to set
+    delay(pause for few secs) the scrolling during continue reading(auto-scroll). Also snoother
+    transition instead of quick swap." — "let's add pause duration to settings and i choose
+    gentler, smoother slide(as there is a pause already planned."
+    *Today:* with Continue reading on, the next card is read the moment the last one ends, while
+    the slide to it is still moving, and the slide is Compose's quick default spring.
+    *Agreed 20 Oct* (not built yet):
+    - *Pause between cards*, in Verse Scroll's settings under Reading aloud: Off, 2, 3, 5 or 10
+      seconds (3 to start with, proposed).
+    - *A gentler slide* to the next card: slower and eased, under a second. A slide, not a fade,
+      as the pause already gives a breath.
+    - The next card is read once it has settled. The earbuds' Next during the pause goes on at
+      once; pausing or stopping during it works as now.
+    *To build it:* the wait goes in CardReading.next(), before it moves to the next card, which
+    runs within the reader-aloud's search for the next verse; the slide is the pager's
+    animateScrollToPage with an eased tween; the reading starts when the scroll has finished.
+    Next needs to cut the wait short: today skips are ignored while the next verse is being found.
