@@ -723,3 +723,16 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     it goes), and the first pick puts the colour on through toggleColor; the doubleTapColor
     preference and its settings row go; a quick note in Verse Scroll's verse sheet goes with a
     highlight, as in the Reader (today it falls back to the double-tap colour).
+
+28. **Verse Scroll: the English dictionary.** "Dictionary in verse scroll." — "Only English in
+    scroll verse."
+    *Today:* the Reader looks English words up in Webster's 1828 (about 61,800 words, with Save):
+    a tap on a word opens its sheet. Verse Scroll has no way to it; a card's text is one tap area
+    (a double-tap highlights, a long press opens the verse's sheet).
+    *Agreed 20 Oct* (not built yet): a Words button on the card lays the verse's English out as
+    word chips, and a tap on one opens its Webster's 1828 sheet over Verse Scroll, as in the
+    Reader; closing it comes back to the card. English only, no Greek or Hebrew. Reading aloud
+    pauses while a word is looked up and plays on when it's closed (proposed).
+    *To build it:* the Reader's openEnglishWordLookup already opens the sheet over any tab, so
+    the work is the button and the chips; a button rather than taps on the words themselves,
+    which a double-tap (and a tap to pause, if 8 is agreed) would get in the way of.
