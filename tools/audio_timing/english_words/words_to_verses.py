@@ -8,7 +8,7 @@ speech not its own), its chapter was taken so (chain_align.py), or it takes far 
 its text would at the chapter's pace.
 usage: words_to_verses.py <state.json> <kjv.tsv> <members.json> <mp4_lengths.json> <out dir>
 """
-import sys, os, json, statistics
+import sys, os, json, math, statistics
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from kjv_text import words, load
 
@@ -94,7 +94,8 @@ def main(state_path, kjv_tsv, members_path, lengths_path, out):
         result = {'book': book, 'file': file, 'duration': duration, 'chapters': {}}
         bad, unsure = [], 0
         for c, texts in chapters.items():
-            end = starts[c + 1] if c + 1 in starts else duration
+            # The last chapter ends with the file (to the hundredth below its length: never past it).
+            end = starts[c + 1] if c + 1 in starts else math.floor(duration * 100) / 100
             ch = s['chapters'][str(c)]
             got = spread(texts, starts[c], end) if ch.get('estimated') else chapter_verses(ch['words'], texts, starts[c], end, ch.get('stretched', False))
             if got is None:
