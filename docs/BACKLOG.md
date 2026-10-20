@@ -543,6 +543,19 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     ten files (KJV and Telugu; MP3, M4A and Ruth's MP3 whose bitrate varies) lands on the same
     frame, at the same time, as reading the file from its start, as the timings were made.
     *Not built:* a tap on a verse going there (with the rest of the Reader's reading aloud, 23).
+    *The KJV Dramatized Audio, 19–20 Oct:* "I don't like the english version ao i downloaded a new
+    version from internet archive. org ... you can find that in drive." 66 MP4 videos, one a book
+    (76 hours, 4.6 GB), read by a cast with music. Timed by its words: every word of the KJV placed
+    by a forced aligner, with what's said besides the verses (each chapter's "Chapter seven", the
+    books' openings, and the psalms' titles, which the app's text hasn't). Where the cast's voices,
+    music or effects threw it (a crowd in Revelation 6, the serpent in Genesis 3, Sinai in Exodus),
+    the chapters after could come out late one after another; speech recognition found those runs
+    and they were timed again chapter by chapter from their spoken headings. All 1,189 chapters;
+    1,038 verses (3.3%) are marked unsure, among them 6 chapters spread by their text's length. The
+    app takes an English folder for whichever recording it holds more of (this or Faith Comes By
+    Hearing's), says which it found, and plays only the videos' sound. *To use it:* the 66 MP4s
+    unzipped into one folder, named as they came (their sound alone, as .m4a or .mp3, works too),
+    chosen under Reading aloud › English › Recording.
 
 22. **The Gospels as films, verse by verse.** "Is it possible to stream videos in the same
     way... i found new videos of gospel verse wise no deviation."

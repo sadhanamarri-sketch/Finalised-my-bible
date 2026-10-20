@@ -61,3 +61,22 @@ where they differ by more than 0.3 s. This narrator leaves only 0.37 s between o
 and the next one's first (at the median; the KJV's narrator about 0.9 s), so a verse played on its
 own must play just its own stretch of the file: one stopped by a clock runs on into the next verse's
 first word on a phone, Bluetooth earbuds especially.
+
+## kjv_dramatized.json
+
+The KJV Dramatized Audio, from the Internet Archive: the King James Version read by a cast, with
+music and sound. One MP4 video per book (66 files, 76.1 hours), its chapters
+read one after another: the book's title first, then each chapter's number ("Chapter one", none in a
+book of one chapter; "Psalm two" and the psalm's title in Psalms). A chapter's `start` is where its heading begins;
+a book's first chapter starts at the file's start, with its title. `files` gives each file's length
+as its movie header does; the app takes the files as they came, or their sound alone (`.m4a`, `.mp3`,
+the same name), and plays only the sound.
+
+Every word is placed by a forced aligner (the Montreal Forced Aligner, its pretrained English model),
+with what's said besides the verses; a verse starts 0.05 s before its first word and ends 0.1 s after
+its last. Where the cast's voices, music or effects threw the aligner, a chapter was timed again on
+its own, from its heading as speech recognition hears it, so a mistake stays within its chapter.
+`unsure` lists 1,038 verses (3.3%): those with a word placed impossibly long, in a chapter the aligner
+went wrong in, or spread by their text's length where it couldn't place them at all (6 chapters:
+Exodus 23, 1 Samuel 25 and 26, Jeremiah 52, Matthew 21, Revelation 17).
+

@@ -84,6 +84,13 @@ chapter starts from its heading as pocketsphinx's keyword spotting hears it ("ch
 their text's length, unsure too. Then each verse starts 0.05 s before its first word and ends 0.1 s
 after its last, and each chapter starts with its heading (`words_to_verses.py`).
 
+Even so, where the aligner went wrong at a chapter's end and the heading after it wasn't heard, the
+next chapters could start in the wrong place one after another. Speech recognition finds those
+(pocketsphinx hears about half the longer words of a verse timed rightly, next to none of one timed
+wrongly), and `anchor_repair.py` times such a run again: each chapter's heading looked for near its
+share of the run's span, then each chapter aligned alone from its heading to the next one's. A long
+book can be timed as several chains at once in the same way, each starting from a heading heard.
+
 ## Running it
 
 Needs Python 3 with NumPy, ffmpeg, espeak-ng (with its Telugu voice for Telugu) and a C compiler.
@@ -126,6 +133,9 @@ mfa g2p drama/oov.txt english_us_mfa drama/oov.dict
 python3 english_words/prepare.py dictionary ~/Documents/MFA/pretrained_models/dictionary/english_us_mfa.dict \
     drama/oov.dict drama/english_kjv.dict
 python3 english_words/chain_align.py kjv.tsv drama/flac drama/english_kjv.dict english_mfa drama/chain 4
+# Runs of chapters timed wrongly (their sampled verses' words not heard): timed again from their headings
+python3 english_words/anchor_repair.py drama/chain/state.json kjv.tsv drama/flac drama/english_kjv.dict english_mfa \
+    drama/repair "Exodus:14-26" "Revelation:14-22"
 python3 english_words/words_to_verses.py drama/chain/state.json kjv.tsv drama/members.json drama/mp4_lengths.json \
     results/drama
 python3 export.py drama results/drama kjv.tsv ../../data/audio_timing/kjv_dramatized.json
@@ -149,3 +159,12 @@ chapter by chapter (book by book for Telugu), so a run that stops can be started
   (median correlation 0.98 a chapter). 56 chapters were read on from the one before with no join,
   and were split at their spoken headings. In Deuteronomy 23 every pause had been silenced in
   editing, which at first was taken for joins and put chapters 23 to 28 out of place.
+- KJV Dramatized Audio (19–20 Oct 2026): all 1,189 chapters and 31,102 verses (76.1 hours, 66
+  files), every word placed. The aligner went wrong in places where the cast's voices, music or effects
+  are far from what it knows: a crowd in Revelation 6, the serpent in Genesis 3, the Song of Moses
+  and Sinai in Exodus 15–20. Carried on, that put runs of chapters out of place (Exodus 14–26,
+  1 Samuel 25–31, 1 Kings 14–22, Matthew 21–28, Revelation 14–22, found by speech recognition); those
+  50 chapters were timed again from their headings. 26 chapters are taken with a word placed
+  impossibly long and 6 couldn't be placed at all (their verses spread by length): 1,038 verses
+  (3.3%) are marked unsure. The recording also says "This concludes disc number …" here and there,
+  from its CDs.
