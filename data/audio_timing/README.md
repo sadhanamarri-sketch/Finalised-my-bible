@@ -76,6 +76,6 @@ Every word is placed by a forced aligner (the Montreal Forced Aligner, its pretr
 with what's said besides the verses; a verse starts 0.05 s before its first word and ends 0.1 s after
 its last. Where the cast's voices, music or effects threw the aligner, a chapter was timed again on
 its own, from its heading as speech recognition hears it, so a mistake stays within its chapter.
-`unsure` lists 975 verses (3.1%): those with a word placed impossibly long, in a chapter the aligner
-went wrong in, or spread by their text's length where it couldn't place them at all (Jeremiah 51).
+`unsure` lists 911 verses (2.9%): those with a word placed impossibly long, in a chapter the aligner
+went wrong in.
 

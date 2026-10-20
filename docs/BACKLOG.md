@@ -551,9 +551,9 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     music or effects threw it (a crowd in Revelation 6, the serpent in Genesis 3, Sinai in Exodus),
     the chapters after could come out late one after another; speech recognition found those runs
     and they were timed again chapter by chapter from their spoken headings. All 1,189 chapters;
-    975 verses (3.1%) are marked unsure, among them one chapter (Jeremiah 51) spread by its text's
-    length (20 Oct: five of the six chapters first spread were placed by a wider search, and
-    Jeremiah 52 from its heading). The
+    911 verses (2.9%) are marked unsure (20 Oct: of the six chapters first spread by their text's
+    length, five were placed by a wider search, and Jeremiah 51 once Jeremiah 49 to 52 were timed
+    from their headings). The
     app takes an English folder for whichever recording it holds more of (this or Faith Comes By
     Hearing's), says which it found, and plays only the videos' sound. *To use it:* the 66 MP4s
     unzipped into one folder, named as they came (their sound alone, as .m4a or .mp3, works too),

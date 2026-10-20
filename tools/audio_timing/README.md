@@ -139,6 +139,9 @@ python3 english_words/anchor_repair.py drama/chain/state.json kjv.tsv drama/flac
 # Chapters it still couldn't place, again each on its own, with a wider search
 python3 english_words/anchor_repair.py drama/chain/state.json kjv.tsv drama/flac drama/english_kjv.dict english_mfa \
     drama/retry --beam=100,400 "Exodus:23-23" "1 Samuel:25-26" "Jeremiah:51-52" "Matthew:21-21" "Revelation:17-17"
+# Jeremiah 50, which had taken in a minute of 51 (heard by speech recognition after the retry)
+python3 english_words/anchor_repair.py drama/chain/state.json kjv.tsv drama/flac drama/english_kjv.dict english_mfa \
+    drama/retry2 --beam=100,400 "Jeremiah:49-51"
 python3 english_words/words_to_verses.py drama/chain/state.json kjv.tsv drama/members.json drama/mp4_lengths.json \
     results/drama
 python3 export.py drama results/drama kjv.tsv ../../data/audio_timing/kjv_dramatized.json
@@ -170,7 +173,8 @@ chapter by chapter (book by book for Telugu), so a run that stops can be started
   50 chapters were timed again from their headings. The 6 it still couldn't place were timed again
   each on its own with a wider search (`--beam=100,400`): Exodus 23, 1 Samuel 25 and 26, Matthew 21
   and Revelation 17 placed, and Jeremiah 52 from its heading, about two and a half minutes earlier
-  than it had been put, which left Jeremiah 51 no room it would fit. 28 chapters are taken with a
-  word placed impossibly long and 1 couldn't be placed (its verses spread by length): 975 verses
-  (3.1%) are marked unsure. The recording also says "This concludes disc number …" here and there,
+  than it had been put. Jeremiah 51 still wouldn't fit: Jeremiah 50 had been run on a minute into it,
+  which speech recognition then heard, and Jeremiah 49 to 51 timed again from their headings were
+  all placed. 28 chapters are taken with a word placed impossibly long: 911 verses (2.9%) are
+  marked unsure. The recording also says "This concludes disc number …" here and there,
   from its CDs.
