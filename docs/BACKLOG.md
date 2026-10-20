@@ -725,14 +725,42 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     highlight, as in the Reader (today it falls back to the double-tap colour).
 
 28. **Verse Scroll: the English dictionary.** "Dictionary in verse scroll." — "Only English in
-    scroll verse."
+    scroll verse." — "no seperate button required right? can't we just tap the word like in
+    reader?"
     *Today:* the Reader looks English words up in Webster's 1828 (about 61,800 words, with Save):
     a tap on a word opens its sheet. Verse Scroll has no way to it; a card's text is one tap area
     (a double-tap highlights, a long press opens the verse's sheet).
-    *Agreed 20 Oct* (not built yet): a Words button on the card lays the verse's English out as
-    word chips, and a tap on one opens its Webster's 1828 sheet over Verse Scroll, as in the
-    Reader; closing it comes back to the card. English only, no Greek or Hebrew. Reading aloud
-    pauses while a word is looked up and plays on when it's closed (proposed).
-    *To build it:* the Reader's openEnglishWordLookup already opens the sheet over any tab, so
-    the work is the button and the chips; a button rather than taps on the words themselves,
-    which a double-tap (and a tap to pause, if 8 is agreed) would get in the way of.
+    *Agreed 20 Oct* (not built yet): a tap on an English word on the card opens its Webster's
+    1828 sheet over Verse Scroll, as in the Reader; closing it comes back to the card. No button.
+    English only, no Greek or Hebrew. As a double-tap still highlights, the sheet opens about a
+    third of a second after the tap (once it's clear it isn't a double-tap). A tap on the space
+    around the words isn't a look-up (that's where a tap to pause would go, if 8 is agreed).
+    Reading aloud pauses while a word is looked up and plays on when it's closed (proposed).
+    *To build it:* the card's text becomes tappable word by word, as the Reader's verses are
+    (VerseComponents), within the card's own tap handling (double-tap, long press); the Reader's
+    openEnglishWordLookup already opens the sheet over any tab.
+
+29. **Old Testament quotations in the New, in purple.** "Quotes/references in new testament from
+    old testament." — "We already have cross references right? why can't we use them? the real
+    quotes get new color and cross in reader will also get a different color which has quotes."
+    — "real quotes only. let's go with purple"
+    *Today:* the cross references (openbible.info's, downloaded) don't say which links are
+    quotations. Checked 20 Oct: they hold 68,945 links between the Testaments; Nave's list of the
+    New Testament's quotations ("Quotations and allusions") pairs 243, and 242 of them are among
+    the cross references already. Matching the KJV's words finds only about half of those (114
+    share five words or more in a row: the KJV often words a quote differently in the New
+    Testament, translated from the Greek, as Matthew 2:15 and Hosea 11:1), and it finds clear
+    quotations Nave's lacks (Mark 12:26 and Exodus 3:6, Mark 14:27 and Zechariah 13:7, Hebrews
+    4:7 and Psalm 95:7, Acts 2:34 and Psalm 110:1, about 30), with the odd false one (Luke 7:40
+    and 1 Kings 2:14 share a phrase).
+    *Agreed 20 Oct* (not built yet):
+    - Real quotations only, no allusions or echoes: Nave's pairs that are quotes, and the word
+      matches, checked by hand, about 250 to 300, shipped as a small list that labels links among
+      the cross references (which stay as they are).
+    - *The Reader:* a verse's cross-reference mark (†, gold today) is purple when the verse quotes
+      the Old Testament or is quoted in the New.
+    - *Cross References:* the quotations come first, in purple, with a small "Quote" tag, and
+      always show, however few votes they have (today only the top 20 by votes do).
+    - *Verse Scroll's links sheet:* the same.
+    *To build it:* the list first (tools/, from the cross references, Nave's topics and the KJV,
+    reviewed), then the mark's colour, the Cross References order and tag, and the links sheet.
