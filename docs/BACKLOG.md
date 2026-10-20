@@ -679,3 +679,47 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     runs within the reader-aloud's search for the next verse; the slide is the pager's
     animateScrollToPage with an eased tween; the reading starts when the scroll has finished.
     Next needs to cut the wait short: today skips are ignored while the next verse is being found.
+
+26. **Reading on past the chapter, and a sleep timer.** "Provide setting to continue infinitely in
+    reader mode in read along with sleep timer." — "timer doesn't pause as it's really a sleep
+    timer(provide a notification to disable it or anything that is better than a notification yo
+    cancel the timer), keep reading across books as an option in the settings (end of chapter,
+    end of book, continuous)"
+    *Today:* a Reader reading stops at the chapter's end, and there's no timer.
+    *Agreed 20 Oct* (not built yet):
+    - *Read until*, in the reading-aloud settings: End of chapter (as now), End of book, or
+      Continuous, on into the next book (after Revelation it stops).
+    - Going on, the next chapter starts with its spoken heading when it's played from a
+      recording; the Reader turns to it while you're following along; the reading bar and the
+      notification name the chapter being read.
+    - *Sleep timer:* 15, 30, 45, 60 or 90 minutes, or the end of this chapter (proposed), set from
+      the reading bar or the reading settings. When it runs out the reading stops (a sleep timer,
+      not a pause), fading out over its last seconds (proposed). It works for Verse Scroll's
+      readings too (proposed).
+    - *Cancelling it,* rather than a notification of its own: the time left shows on the reading
+      bar, and a tap there cancels or changes it; and the reading's own notification, which shows
+      on the lock screen, gives the time left and a Cancel timer button.
+    *To build it:* a reading that goes past its chapter (the next-chapter order is in
+    MainViewModel.nextChapter) and whose lookups compare book and chapter, not just the verse
+    number as ChapterReading's do; the reading's title, fixed when it starts today, follows the
+    chapter; the Reader's follow-along changes chapter (today it only scrolls within the one on
+    screen). This replaces 23's "the bar offers Next chapter" when Read until isn't End of
+    chapter. The timer lives in the reader-aloud (a job in its scope, the time left in its state
+    for the bar and the notification); the notification's Cancel timer goes through the service.
+
+27. **Highlighting in Verse Scroll: just the colour box.** "The default color is not necessary as I
+    have unclick the default one always. Exclude that functionality. It just pop up the color
+    selection that's all." — "I'm okay with your suggestion"
+    *Today:* in Verse Scroll a double-tap, or the bottom bar's Highlight, puts the double-tap
+    colour (Sunshine, unless changed) on at once and then opens the colour box, and a colour
+    picked there is added to it, so Sunshine has to be unticked. The Reader already only opens
+    the colours.
+    *Agreed 20 Oct* (not built yet): a double-tap and Highlight only open the colour box, and
+    nothing goes on until a colour is tapped, which is then the verse's colour. The box stays
+    open until a colour is picked or you tap elsewhere (today it hides after 6 seconds). The
+    "Double-tap color" setting goes, the first-time hint says a double-tap chooses a colour, and
+    the little ring burst comes when the colour is picked.
+    *To build it:* doubleTap() and the Highlight button only call showPicker (the setColor before
+    it goes), and the first pick puts the colour on through toggleColor; the doubleTapColor
+    preference and its settings row go; a quick note in Verse Scroll's verse sheet goes with a
+    highlight, as in the Reader (today it falls back to the double-tap colour).
