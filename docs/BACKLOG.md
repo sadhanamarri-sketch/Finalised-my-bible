@@ -556,6 +556,21 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     Hearing's), says which it found, and plays only the videos' sound. *To use it:* the 66 MP4s
     unzipped into one folder, named as they came (their sound alone, as .m4a or .mp3, works too),
     chosen under Reading aloud › English › Recording.
+    *Fixed 20 Oct, Both stopping after a verse's English:* "a bug that stops the playing abruptly
+    ... like john 9 ... if I play both english and telugu ... english plays and it doesn't move to
+    telugu ... if we play english or telugu individually ... there's no problem." Only below 1x
+    (English at 0.85x, Telugu at 0.9x; "I tried with speed x1 for both and it didn't cause the
+    issue"). Media3 1.5.1's speed changer, at the end of a stretch, could owe less than nothing and
+    never finish, so the player never said the stretch had ended and the reading waited on "English
+    recording" for good (fixed in Media3 1.6.0: "Fix underflow in Sonic#getOutputSize() that could
+    cause DefaultAudioSink to stall"). Its own code run over real verses at those speeds, a verse's
+    clip at a time as the player cuts them, left 7 of 132 English (0.85x) and 28 of Hebrews' 303
+    Telugu (0.9x) unfinished, among them Hebrews 8:2 ("stops after telugu in reader"); 1.6's, none.
+    Both ends a stretch after every verse's English and its Telugu, and Verse Scroll after every
+    card, so it showed there; one language in the Reader plays the chapter as one stretch. Now Media3
+    1.6.1, and a stretch that sits still within a second of its end for three seconds while playing
+    is taken as ended (`EndWatch` in RecordingPlayer), so nothing in the player can stop a reading
+    that way again.
 
 22. **The Gospels as films, verse by verse.** "Is it possible to stream videos in the same
     way... i found new videos of gospel verse wise no deviation."

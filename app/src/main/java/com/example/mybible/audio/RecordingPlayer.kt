@@ -2,7 +2,9 @@ package com.example.mybible.audio
 
 import android.content.Context
 import android.net.Uri
+import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -15,6 +17,7 @@ import androidx.media3.exoplayer.PlayerMessage
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.extractor.mp3.Mp3Extractor
+import kotlin.math.abs
 import kotlin.math.roundToLong
 
 /**
@@ -62,6 +65,26 @@ class RecordingPlayer(private val context: Context) : Recorder {
         }
     }
 
+    // The stretch playing, looked in on in case it plays out without the player saying so (see EndWatch):
+    // then it's ended all the same, and the player let go of it.
+    private val main = Handler(Looper.getMainLooper())
+    private var watch: EndWatch? = null
+    private val lookIn = object : Runnable {
+        override fun run() {
+            val exo = player ?: return
+            val id = loaded ?: return
+            val playing = exo.playbackState == Player.STATE_READY && exo.playWhenReady
+            if (watch?.over(SystemClock.elapsedRealtime(), playing, exo.currentPosition) == true) {
+                loaded = null
+                clearMarks()
+                exo.stop()
+                listener?.onEnded(id)
+            } else {
+                main.postDelayed(this, EndWatch.EVERY_MS)
+            }
+        }
+    }
+
     private fun player(): ExoPlayer = player ?: ExoPlayer.Builder(context)
         .setAudioAttributes(
             AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_SPEECH).build(),
@@ -104,6 +127,9 @@ class RecordingPlayer(private val context: Context) : Recorder {
         }
         exo.prepare()
         exo.playWhenReady = true
+        watch = EndWatch(lengthMs = endMs - startMs)
+        main.removeCallbacks(lookIn)
+        main.postDelayed(lookIn, EndWatch.EVERY_MS)
     }
 
     override fun pause() {
@@ -119,6 +145,7 @@ class RecordingPlayer(private val context: Context) : Recorder {
 
     override fun stop() {
         loaded = null
+        main.removeCallbacks(lookIn)
         clearMarks()
         player?.let {
             it.stop()
@@ -146,5 +173,44 @@ class RecordingPlayer(private val context: Context) : Recorder {
     private fun clearMarks() {
         marks.forEach { it.cancel() }
         marks.clear()
+    }
+}
+
+/**
+ * Tells when a stretch has played as far as it ever will without the player saying it's ended: meant
+ * to be playing, near its end, and not moving on. Media3 before 1.6 left stretches played slower than
+ * 1x just so now and then (its speed changer, at the end, owed less than nothing and never finished),
+ * and reading aloud waited there for good; the phone's sound output could yet do the like.
+ */
+internal class EndWatch(private val lengthMs: Long) {
+    // Where the stretch has stayed, and since when; null until it's first looked in on.
+    private var stillAtMs: Long? = null
+    private var stillSinceMs = 0L
+
+    /**
+     * Whether the stretch is over, at [nowMs]: [playing] (ready, not paused) and at [positionMs] in it,
+     * having stayed there, near its end, long enough.
+     */
+    fun over(nowMs: Long, playing: Boolean, positionMs: Long): Boolean {
+        val moving = stillAtMs?.let { abs(positionMs - it) > STILL_WITHIN_MS } ?: true
+        if (!playing || moving || positionMs < lengthMs - NEAR_END_MS) {
+            stillAtMs = positionMs
+            stillSinceMs = nowMs
+            return false
+        }
+        return nowMs - stillSinceMs >= STILL_MS
+    }
+
+    companion object {
+        // How often the stretch playing is looked in on.
+        const val EVERY_MS = 250L
+
+        // How near its end it has to be, and how long still there: well past the time the sound output
+        // takes to finish what it's been given (a few hundred milliseconds over Bluetooth).
+        const val NEAR_END_MS = 1_000L
+        const val STILL_MS = 3_000L
+
+        // Less than this either way is staying put.
+        const val STILL_WITHIN_MS = 50L
     }
 }

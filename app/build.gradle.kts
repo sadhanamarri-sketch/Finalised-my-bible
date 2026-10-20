@@ -175,8 +175,9 @@ dependencies {
     implementation("com.google.android.gms:play-services-auth:21.2.0")
 
     // Plays the narrated recordings kept on the phone (audio/RecordingPlayer): a verse's stretch of a
-    // file and no more, from MP3s and M4As alike.
-    implementation("androidx.media3:media3-exoplayer:1.5.1")
+    // file and no more, from MP3s and M4As alike. 1.6 at least: 1.5's speed changer could hang at the end
+    // of a stretch played slower than 1x, never letting it end.
+    implementation("androidx.media3:media3-exoplayer:1.6.1")
 
     testImplementation("junit:junit:4.13.2")
 }
