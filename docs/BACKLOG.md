@@ -800,3 +800,27 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     whenever a reading is going (today only for recordings); the bar needs the settings passed
     in; restartVerse does nothing while the next verse is being found, so a change then applies
     from that verse.
+
+32. **Verse Scroll: a progress bar on the card, with a dot where the Telugu starts.** "why not a
+    progress bar that can be scrolled just like in the doomscrolling apps? With a dot indicating
+    the switch between english and telugu." — "Verse Scroll only for the progress bar(only if
+    it's a small change)."
+    *Today:* nothing shows how far a card's reading has got, and the only moves are a verse on or
+    back (the earbuds, the notification).
+    *Agreed 20 Oct, kept small* (not built yet):
+    - A thin bar along the bottom of the card fills as the card is read, and a dot marks each
+      switch between English and Telugu (with Both).
+    - A drag or a tap on it moves the reading to that point of the verse being read, from a
+      recording or the phone's voice (the voice from the nearest word); a tap on a dot goes to
+      that language's start. On a card of several verses, a drag into another verse starts that
+      verse from its beginning.
+    - It thickens while held, as a reel's does, in its own strip at the card's foot, apart from
+      the card's taps (28, 30) and the swipes between cards. Verse Scroll only.
+    *To build it:* the reader-aloud shares how far it has got (a recording's position against the
+    verse's timings, the voice's word as it reports it) and takes "go to this point of this part":
+    for a recording, the part again from that second, as a paused one resumes; for the voice,
+    from that character, as a pause picks up at a word. The bar's lengths come from the timings,
+    or the text's length for the voice.
+
+    *Set aside 20 Oct:* AI-made pictures or videos for the cards, for surprise ("let's scrap AI
+    generated content... I don't have the budget right now"): they'd need a paid image service.
