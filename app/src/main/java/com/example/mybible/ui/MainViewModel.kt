@@ -24,6 +24,7 @@ import com.example.mybible.audio.ReadAloud
 import com.example.mybible.audio.ReadAloudHub
 import com.example.mybible.audio.ReadAloudSettings
 import com.example.mybible.audio.ReadAloudState
+import com.example.mybible.audio.ReadLanguage
 import com.example.mybible.audio.ReadingPlace
 import com.example.mybible.audio.VerseToRead
 import com.example.mybible.versescroll.VerseRef
@@ -37,6 +38,7 @@ import com.example.mybible.ui.components.BOOK_CHAPTER_COUNTS
 import com.example.mybible.foundBy
 import com.example.mybible.within
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -45,6 +47,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -113,6 +116,11 @@ private const val DETOUR_SETTLE_MS = 300_000L
 // waits this long — see leaveReaderThenRestore, closeCrossReferences and
 // resetHighlightsPageWhenOffScreen.
 private const val TAB_CHANGE_MS = 400L
+
+// How long the reading bar offers Undo after a tap moved the reading, and Next chapter once a chapter's
+// been read to its end.
+private const val UNDO_OFFER_MS = 5_000L
+private const val NEXT_CHAPTER_OFFER_MS = 8_000L
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -227,6 +235,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _focusedVersePinToTop = MutableStateFlow(false)
     val focusedVersePinToTop: StateFlow<Boolean> = _focusedVersePinToTop.asStateFlow()
 
+    // With pinToTop, how far below the top (px) the verse is put back: 0, flush with the top; the Telugu
+    // lines coming on for a reading put the verse being read back where it was.
+    private val _focusedVerseOffsetPx = MutableStateFlow(0)
+    val focusedVerseOffsetPx: StateFlow<Int> = _focusedVerseOffsetPx.asStateFlow()
+
     // Goes up with every new focusedVerseNumber target (see setJumpTarget), so
     // ReaderScreen can tell its landing for *this* jump apart from the last
     // one's — its "scrolled away" watcher only ever compares the list's
@@ -236,10 +249,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // Sets a new jump target for the Reader: every place that does goes
     // through here, so each one is counted as its own request.
-    private fun setJumpTarget(verse: Int, blur: Boolean, pinToTop: Boolean) {
+    private fun setJumpTarget(verse: Int, blur: Boolean, pinToTop: Boolean, offsetPx: Int = 0) {
         _focusedVerseNumber.value = verse
         _focusedVerseBlurEnabled.value = blur
         _focusedVersePinToTop.value = pinToTop
+        _focusedVerseOffsetPx.value = offsetPx
         _focusRequest.value++
     }
 
@@ -545,14 +559,115 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val readAloudSettings: ReadAloudSettings = ReadAloudHub.settings(application)
     val readAloudState: StateFlow<ReadAloudState> = readAloud.state
 
-    /** The Reader's chapter, read aloud from [fromVerse] to the chapter's end. */
+    /**
+     * The Reader's chapter, read aloud from [fromVerse] to the chapter's end: a reading started (from the
+     * menu, a verse's sheet, the bar's Read here or Next chapter). In Telugu or both, the Reader's Telugu
+     * lines come on with it (see teluguForReading).
+     */
     fun readChapterAloud(book: String, chapter: Int, fromVerse: Int) {
-        readAloud.start(ChapterReading(book, chapter, fromVerse) {
+        startChapterReading(book, chapter, fromVerse)
+        if (readAloud.state.value.active && readAloudSettings.language != ReadLanguage.ENGLISH) {
+            teluguForReadingVerse = fromVerse
+            _teluguForReading.value++
+        }
+    }
+
+    private fun startChapterReading(book: String, chapter: Int, fromVerse: Int) {
+        offerUndo(null)
+        offerNextChapter(null)
+        readAloud.start(ChapterReading(book, chapter, fromVerse, onEnd = { finished -> if (finished) offerNextChapter(book to chapter) }) {
             val verses = repository.getChapterVerses(book, chapter, includeTelugu = true)
             // The bundled Telugu text for any verse the database doesn't have it for yet.
             val telugu = if (verses.any { it.teluguText.isNullOrBlank() }) repository.getTeluguChapterVerses(book, chapter) else emptyMap()
             verses.map { v -> VerseToRead(v.book, v.chapter, v.number, v.text, v.teluguText?.takeIf { it.isNotBlank() } ?: telugu[v.number]) }
         })
+    }
+
+    /**
+     * A tap on a verse while the Reader's reading plays: read from that verse at once, in the same reading
+     * when it's the chapter being read, else that chapter from it. The verse it was on is offered back
+     * for a few seconds (readingMovedFrom).
+     */
+    fun readFromTap(book: String, chapter: Int, verse: Int) {
+        val was = readAloud.state.value.verse
+        moveReading(book, chapter, verse)
+        offerUndo(was?.takeUnless { it.book == book && it.chapter == chapter && it.verse == verse })
+    }
+
+    /** The bar's Undo: back to the verse the reading was on before a tap moved it. */
+    fun undoReadingMove() {
+        val back = _readingMovedFrom.value ?: return
+        offerUndo(null)
+        moveReading(back.book, back.chapter, back.verse)
+    }
+
+    private fun moveReading(book: String, chapter: Int, verse: Int) {
+        val reading = readAloud.session as? ChapterReading
+        if (reading != null && reading.book == book && reading.chapter == chapter) {
+            readAloud.moveTo(book, chapter, verse)
+        } else {
+            startChapterReading(book, chapter, verse)
+        }
+    }
+
+    // After a tap moved the reading: the verse it was on, for the bar's Undo, for a few seconds.
+    private val _readingMovedFrom = MutableStateFlow<VerseToRead?>(null)
+    val readingMovedFrom: StateFlow<VerseToRead?> = _readingMovedFrom.asStateFlow()
+    private var undoOffer: Job? = null
+
+    private fun offerUndo(verse: VerseToRead?) {
+        undoOffer?.cancel()
+        _readingMovedFrom.value = verse
+        if (verse != null) undoOffer = viewModelScope.launch {
+            delay(UNDO_OFFER_MS)
+            _readingMovedFrom.value = null
+        }
+    }
+
+    // A Reader reading come to its chapter's end: that chapter, for a few seconds, for the bar's Next chapter.
+    private val _chapterReadThrough = MutableStateFlow<Pair<String, Int>?>(null)
+    val chapterReadThrough: StateFlow<Pair<String, Int>?> = _chapterReadThrough.asStateFlow()
+    private var nextChapterOffer: Job? = null
+
+    private fun offerNextChapter(chapter: Pair<String, Int>?) {
+        nextChapterOffer?.cancel()
+        _chapterReadThrough.value = chapter
+        if (chapter != null) nextChapterOffer = viewModelScope.launch {
+            delay(NEXT_CHAPTER_OFFER_MS)
+            _chapterReadThrough.value = null
+        }
+    }
+
+    /** The bar's Next chapter, once a chapter's been read to its end: the chapter after it, opened and read from its start. */
+    fun readNextChapter() {
+        val (book, chapter) = _chapterReadThrough.value ?: return
+        offerNextChapter(null)
+        val (nextBook, nextChapter) = chapterAfter(book, chapter) ?: return
+        clearVerseFocus()
+        loadChapter(nextBook, nextChapter)
+        readChapterAloud(nextBook, nextChapter, 1)
+    }
+
+    /**
+     * Goes up each time the Reader's Telugu lines should come on for its reading: one started in Telugu
+     * or both, or switched to either while it reads. The Reader turns them on if they're off, keeping the
+     * verse being read where it is on screen, and notes it in teluguForReadingDone. Turned off by hand
+     * during a reading, they stay off until the next one starts (a tap that moves the reading isn't one).
+     */
+    private val _teluguForReading = MutableStateFlow(0)
+    val teluguForReading: StateFlow<Int> = _teluguForReading.asStateFlow()
+    var teluguForReadingDone = 0
+
+    /** The verse kept where it is as the Telugu lines come on: the one the reading starts from, or the one it's on. */
+    var teluguForReadingVerse: Int? = null
+        private set
+
+    /** The reading's notification, tapped: the Reader at the verse being read (a Verse Scroll reading's, the app as it was). */
+    fun openReadingFromNotification() {
+        val now = readAloud.state.value
+        val verse = now.verse?.takeIf { now.place == ReadingPlace.READER } ?: return
+        selectTab(NavTab.READER)
+        jumpToVerse(verse.book, verse.chapter, verse.verse, focusVerse = false)
     }
 
     fun pauseReading() = readAloud.pause()
@@ -590,6 +705,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // the screen so a trip to the Reader ("Read") and back lands on the
     // same card.
     val verseScroll = VerseScrollController(application, repository, viewModelScope, readAloud)
+
+    // The reading's language changed to Telugu or both while it reads: the Reader's Telugu lines, or
+    // Verse Scroll's Telugu, come on with it.
+    init {
+        viewModelScope.launch {
+            snapshotFlow { readAloudSettings.language }.drop(1).collect { language ->
+                if (language == ReadLanguage.ENGLISH) return@collect
+                when (readAloud.session?.place) {
+                    ReadingPlace.READER -> {
+                        teluguForReadingVerse = readAloud.state.value.verse?.verse
+                        _teluguForReading.value++
+                    }
+                    ReadingPlace.VERSE_SCROLL -> verseScroll.showTeluguForReading()
+                    null -> Unit
+                }
+            }
+        }
+    }
 
     // Same detour pattern as Highlights/Studied above: "Read" on a Verse
     // Scroll card opens that verse in the Reader with a "Return to Verse
@@ -1464,16 +1597,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // old verse instead of the top, with it spotlighted and the rest blurred.
     fun nextChapter() {
         clearVerseFocus()
-        val totalChapters = BOOK_CHAPTER_COUNTS[_currentBook.value] ?: 1
-        if (_currentChapter.value < totalChapters) {
-            loadChapter(_currentBook.value, _currentChapter.value + 1)
-        } else {
-            val bookIndex = BIBLE_BOOKS.indexOf(_currentBook.value)
-            if (bookIndex != -1 && bookIndex < BIBLE_BOOKS.lastIndex) {
-                val nextBook = BIBLE_BOOKS[bookIndex + 1]
-                loadChapter(nextBook, 1)
-            }
-        }
+        chapterAfter(_currentBook.value, _currentChapter.value)?.let { (book, chapter) -> loadChapter(book, chapter) }
+    }
+
+    // The chapter after [book] [chapter]: the book's next, or the next book's first; none after Revelation 22.
+    private fun chapterAfter(book: String, chapter: Int): Pair<String, Int>? {
+        val totalChapters = BOOK_CHAPTER_COUNTS[book] ?: 1
+        if (chapter < totalChapters) return book to chapter + 1
+        val bookIndex = BIBLE_BOOKS.indexOf(book)
+        return if (bookIndex != -1 && bookIndex < BIBLE_BOOKS.lastIndex) BIBLE_BOOKS[bookIndex + 1] to 1 else null
     }
 
     fun prevChapter() {
@@ -1520,9 +1652,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // stays the focused verse, its spotlight ([blur]) kept if it still had
     // one — before, the toggle made the *top* verse the focused one, so the
     // verse being looked at lost its focus and moved.
-    fun toggleTeluguInline(anchorVerse: Int? = null, keepFocus: Boolean = false, blur: Boolean = false) {
+    //
+    // [offsetPx] puts the anchor that far below the top instead (pinned, not centred): reading aloud
+    // turning the lines on keeps the verse being read where it was.
+    fun toggleTeluguInline(anchorVerse: Int? = null, keepFocus: Boolean = false, blur: Boolean = false, offsetPx: Int = 0) {
         _showTeluguInline.value = !_showTeluguInline.value
-        if (anchorVerse != null) setJumpTarget(anchorVerse, blur = blur, pinToTop = !keepFocus)
+        if (anchorVerse != null) setJumpTarget(anchorVerse, blur = blur, pinToTop = !keepFocus, offsetPx = offsetPx)
         loadCurrentChapter()
     }
 

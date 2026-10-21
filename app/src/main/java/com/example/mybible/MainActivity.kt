@@ -79,8 +79,12 @@ class MainActivity : ComponentActivity() {
     // for. Resolved from Compose instead, it landed a frame or more later,
     // after the page left open had been drawn again.
     private fun handleLaunchIntent(intent: android.content.Intent) {
-        // Reading aloud's notification: back to the app as it was, nothing to clear or open.
-        if (intent.getBooleanExtra(ReadAloudService.EXTRA_FROM_READ_ALOUD, false)) return
+        // Reading aloud's notification: the Reader at the verse being read (Verse Scroll's reading, the
+        // app as it was), nothing to clear.
+        if (intent.getBooleanExtra(ReadAloudService.EXTRA_FROM_READ_ALOUD, false)) {
+            viewModel.openReadingFromNotification()
+            return
+        }
 
         // Continue Reading is checked first and handled on its own:
         // it still needs the other five detour flags cleared (same

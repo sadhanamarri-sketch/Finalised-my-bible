@@ -7,6 +7,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -60,6 +61,8 @@ import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.ReaderPickMode
 import com.example.mybible.ui.components.ReadAloudBar
+import com.example.mybible.ui.components.ReadAloudHint
+import com.example.mybible.ui.components.ReadAloudOffer
 import com.example.mybible.ui.components.ReadAloudSheet
 import com.example.mybible.ui.components.rememberReadAloudNotificationAsk
 import com.example.mybible.ui.components.VerseActionToolbar
@@ -95,6 +98,9 @@ private val NoteBannerColor = Color(0xFF3F7D7A) // dusty teal
 private val HighlightedVersesBannerColor = Color(0xFF4C6FA5) // muted steel-blue
 private val StudiedBannerColor = Color(0xFF7D5BA6) // muted violet
 private val VerseScrollBannerColor = Color(0xFF9C5878) // muted plum
+
+// How long the Reader's one-time "Tap a verse to hear it" line stays over the reading bar.
+private const val TAP_HINT_MS = 8_000L
 
 /** Same "subtle container + matching solid button" recipe for all seven
  *  detour banners. */
@@ -135,6 +141,7 @@ fun ReaderScreen(
     val focusRequest by viewModel.focusRequest.collectAsState()
     val focusedVerseBlurEnabled by viewModel.focusedVerseBlurEnabled.collectAsState()
     val focusedVersePinToTop by viewModel.focusedVersePinToTop.collectAsState()
+    val focusedVerseOffsetPx by viewModel.focusedVerseOffsetPx.collectAsState()
     val searchReturnAvailable by viewModel.searchReturnAvailable.collectAsState()
     // A verse opened from a Nave's topic page returns to that page (see TopicScreen).
     val searchTopic by viewModel.openTopic.collectAsState()
@@ -159,9 +166,17 @@ fun ReaderScreen(
     // Reading aloud: a chapter being read in the Reader, the verse being read, and the settings sheet.
     val readAloudState by viewModel.readAloudState.collectAsState()
     val readingInReader = readAloudState.active && readAloudState.place == ReadingPlace.READER
+    // Playing, the page is for listening: a tap on a verse reads it (see the verses below).
+    val listening = readingInReader && readAloudState.status == ReadAloudState.Status.PLAYING
     // The verse being read, when it's in the chapter on screen.
     val verseBeingRead = readAloudState.verse
         ?.takeIf { readingInReader && it.book == currentBook && it.chapter == currentChapter }?.verse
+    // Reading a chapter other than the one on screen (a cross reference looked at while it reads).
+    val readingElsewhere = readingInReader && readAloudState.verse != null && verseBeingRead == null
+    // The bar's offers: Undo after a tap moved the reading, Next chapter once one's been read through.
+    val readingMovedFrom by viewModel.readingMovedFrom.collectAsState()
+    val chapterReadThrough by viewModel.chapterReadThrough.collectAsState()
+    val teluguForReading by viewModel.teluguForReading.collectAsState()
     var readAloudSheetOpen by remember { mutableStateOf(false) }
     var readAloudBarHeightPx by remember { mutableStateOf(0) }
     val readerScope = rememberCoroutineScope()
@@ -335,7 +350,7 @@ fun ReaderScreen(
                 // position *restore* (Telugu/interlinear toggle), where the
                 // point is to leave the anchor verse exactly where it
                 // already was on screen, not spotlight a new one.
-                listState.scrollToItem(targetIndex)
+                listState.scrollToItem(targetIndex, if (focusedVersePinToTop) -focusedVerseOffsetPx else 0)
                 if (!focusedVersePinToTop) {
                     val layoutInfo = listState.layoutInfo
                     val itemInfo = layoutInfo.visibleItemsInfo.find { it.index == targetIndex }
@@ -501,12 +516,40 @@ fun ReaderScreen(
         }
     }
 
+    // Blur Mode, paused or not reading: a blurred verse tapped into focus. It's brought to the middle, as
+    // near as the chapter's ends allow, and stays the sharp one until the page is dragged.
+    var blurPicked by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(isBlurModeEnabled, currentBook, currentChapter) { blurPicked = null }
+
+    // The sharp verse in Blur Mode (outside a reading, which keeps the verse being read sharp).
+    fun blurFocus(): Int? = blurPicked ?: verses.getOrNull(centerItemIndex - 1)?.number
+
+    // Scrolls list item [index] (a verse's index + 1: item 0 is the chapter's title) to the middle of the
+    // page, as near as the chapter's ends allow.
+    suspend fun centre(index: Int) {
+        if (listState.layoutInfo.visibleItemsInfo.none { it.index == index }) {
+            listState.animateScrollToItem(index, -(listState.layoutInfo.viewportSize.height / 3))
+        }
+        val layout = listState.layoutInfo
+        val item = layout.visibleItemsInfo.firstOrNull { it.index == index } ?: return
+        listState.animateScrollBy(item.offset + item.size / 2f - (layout.viewportStartOffset + layout.viewportEndOffset) / 2f)
+    }
+
+    // Where a reading started from the menu (or the bar's Read here) begins: the verse jumped to; in Blur
+    // Mode, the sharp one; otherwise the first verse wholly on screen.
+    fun startingVerse(): Int {
+        focusedVerseNumber?.let { return it }
+        if (isBlurModeEnabled) blurFocus()?.let { return it }
+        val whole = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index >= 1 && it.offset >= 0 }
+        return verses.getOrNull((whole?.index ?: listState.firstVisibleItemIndex) - 1)?.number ?: verses.firstOrNull()?.number ?: 1
+    }
+
     // Turning Telugu or Greek/Hebrew on or off changes every verse's height, so the Reader is put back on
     // one verse: the verse in focus — one jumped to, or Blur Mode's centre verse — stays centred and in
     // focus (its spotlight too, if it still had one); without one, the verse at the top stays at the top.
     fun keepPlaceAcrossToggle(toggle: (anchorVerse: Int?, keepFocus: Boolean, blur: Boolean) -> Unit) {
         val focused = focusedVerseNumber
-            ?: if (isBlurModeEnabled) verses.getOrNull(centerItemIndex - 1)?.number else null
+            ?: if (isBlurModeEnabled) blurFocus() else null
         if (focused != null) {
             toggle(focused, true, xrefFocusActive && focused == focusedVerseNumber)
         } else {
@@ -563,6 +606,8 @@ fun ReaderScreen(
     val nestedScrollConnection = remember(canHideBars) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                // Dragged: Blur Mode's sharp verse is the one in the middle again.
+                if (source == NestedScrollSource.UserInput && available.y != 0f) blurPicked = null
                 if (!canHideBars) return Offset.Zero
                 if (available.y < -hideShowThresholdPx) barsHidden = true
                 else if (available.y > hideShowThresholdPx) barsHidden = false
@@ -590,9 +635,9 @@ fun ReaderScreen(
             if (readingInReader) readAloudBarHeightPx.toDp() + 10.dp else 0.dp
     }
 
-    // Reading aloud: the verse being read is kept on screen as the reading moves on — while it's being
-    // followed (the verse before it was in view), so scrolling off to look at something else isn't
-    // undone with every verse.
+    // Reading aloud: the verse being read is kept on screen as the reading moves on (in Blur Mode, in
+    // the middle) — while it's being followed (the verse before it was in view), so scrolling off to look
+    // at something else isn't undone with every verse; the bar offers Follow to go back to it.
     var lastReadVerse by remember { mutableStateOf<Int?>(null) }
     LaunchedEffect(verseBeingRead) {
         val number = verseBeingRead
@@ -606,8 +651,57 @@ fun ReaderScreen(
         val inView = item != null && item.offset >= layout.viewportStartOffset && item.offset + item.size <= bottomEdge
         val following = previous == null ||
             verses.indexOfFirst { it.number == previous }.let { p -> p >= 0 && layout.visibleItemsInfo.any { it.index == p + 1 } }
-        if (following && !inView) listState.animateScrollToItem(index, -(layout.viewportSize.height / 6))
+        if (!following) return@LaunchedEffect
+        if (isBlurModeEnabled) centre(index) else if (!inView) listState.animateScrollToItem(index, -(layout.viewportSize.height / 6))
     }
+    // The verse being read scrolled out of view (behind the pill and bar counts as out of view).
+    val overlayPx by rememberUpdatedState(with(density) { bottomOverlayPaddingDp.roundToPx() })
+    val beingReadOutOfView by remember(verseBeingRead, verses) {
+        derivedStateOf {
+            val index = verses.indexOfFirst { it.number == verseBeingRead }.takeIf { verseBeingRead != null && it >= 0 }?.plus(1)
+                ?: return@derivedStateOf false
+            val layout = listState.layoutInfo
+            layout.visibleItemsInfo.none { it.index == index && it.offset + it.size > 0 && it.offset < layout.viewportEndOffset - overlayPx }
+        }
+    }
+    // Follow: back to the verse being read, which is then kept in view again.
+    fun followReading() {
+        val index = verses.indexOfFirst { it.number == verseBeingRead }.takeIf { verseBeingRead != null && it >= 0 }?.plus(1) ?: return
+        readerScope.launch {
+            if (isBlurModeEnabled) centre(index) else listState.animateScrollToItem(index, -(listState.layoutInfo.viewportSize.height / 6))
+        }
+    }
+
+    // A reading in Telugu or both started (or switched to either while it reads): the Telugu lines come
+    // on, keeping the verse it reads from where it is on screen. Once per request, so lines turned off by
+    // hand stay off until the next reading starts.
+    LaunchedEffect(teluguForReading) {
+        if (teluguForReading == viewModel.teluguForReadingDone) return@LaunchedEffect
+        viewModel.teluguForReadingDone = teluguForReading
+        if (showTeluguInline) return@LaunchedEffect
+        val anchor = viewModel.teluguForReadingVerse
+        val onScreen = verses.firstOrNull()?.let { it.book == currentBook && it.chapter == currentChapter } == true
+        val item = anchor?.takeIf { onScreen }
+            ?.let { n -> verses.indexOfFirst { it.number == n }.takeIf { it >= 0 } }
+            ?.let { i -> listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == i + 1 } }
+        viewModel.toggleTeluguInline(anchor, keepFocus = false, blur = false, offsetPx = item?.offset ?: 0)
+    }
+
+    // Played again (the bar's Play, the earbuds) with a verse's sheet open: the sheet closes.
+    LaunchedEffect(listening) {
+        if (listening && viewModel.selectedVerse.value != null) viewModel.setSelectedVerse(null)
+    }
+
+    // The first reading after a tap on a verse came to read it: one line over the bar, once.
+    val tapHintDue = listening && !viewModel.readAloudSettings.tapHintShown
+    LaunchedEffect(tapHintDue) {
+        if (!tapHintDue) return@LaunchedEffect
+        delay(TAP_HINT_MS)
+        viewModel.readAloudSettings.markTapHintShown()
+    }
+
+    // For the tap-to-reveal below, which outlives any one composition.
+    val listeningNow by rememberUpdatedState(listening)
 
     // Reader owns the whole screen edge-to-edge now (no Scaffold bars to
     // reserve space) — statusBarsPadding here replaces what the old
@@ -642,7 +736,8 @@ fun ReaderScreen(
                             requireUnconsumed = false,
                             pass = PointerEventPass.Initial
                         )
-                        if (!barsHidden) return@awaitPointerEventScope
+                        // Reading aloud, a tap reads the verse tapped, pill hidden or not.
+                        if (!barsHidden || listeningNow) return@awaitPointerEventScope
 
                         val pointerId = down.id
                         var totalMovement = 0f
@@ -1252,12 +1347,15 @@ fun ReaderScreen(
                         // crossed the screen's center got bolded, and because
                         // bold glyphs are wider, that caused a visible
                         // reflow/jerk on that verse as you scrolled past it.
-                        val isFocused = if (focusedVerseNumber != null) {
-                            verse.number == focusedVerseNumber
-                        } else if (isBlurModeEnabled) {
-                            (idx + 1) == centerItemIndex
-                        } else {
-                            false
+                        //
+                        // Reading aloud in Blur Mode, the verse being read is the sharp one (kept in the
+                        // middle as the reading moves on); otherwise a verse tapped into focus, else the
+                        // one in the middle.
+                        val isFocused = when {
+                            isBlurModeEnabled && listening && verseBeingRead != null -> verse.number == verseBeingRead
+                            focusedVerseNumber != null -> verse.number == focusedVerseNumber
+                            isBlurModeEnabled -> verse.number == (blurPicked ?: verses.getOrNull(centerItemIndex - 1)?.number)
+                            else -> false
                         }
 
                         // Manual Blur Mode is always on once toggled; the
@@ -1277,12 +1375,30 @@ fun ReaderScreen(
                         // onVerseClick had any blur awareness, so a word tap
                         // could still open a lookup for a verse you couldn't
                         // even read.
+                        //
+                        // In Blur Mode a tap on a blurred verse brings it into focus (a second then acts
+                        // on it): Blur Mode turns off only from its own button.
+                        //
+                        // Reading aloud (playing), the page is for listening: a tap anywhere on a verse —
+                        // its words, its Telugu, a Greek or Hebrew word, its cross-reference mark — reads
+                        // from it at once, and nothing opens. Picking verses still picks.
+                        val readsOnTap = listening && readerPickMode == ReaderPickMode.NONE
                         fun runUnlessBlurred(action: () -> Unit) {
-                            if (effectiveBlurEnabled && !isFocused) {
-                                if (isBlurModeEnabled) viewModel.toggleBlurMode()
+                            if (readsOnTap) {
                                 if (xrefFocusActive) {
                                     xrefFocusActive = false
                                     viewModel.clearVerseFocus()
+                                }
+                                viewModel.readAloudSettings.markTapHintShown()
+                                viewModel.readFromTap(verse.book, verse.chapter, verse.number)
+                            } else if (effectiveBlurEnabled && !isFocused) {
+                                if (xrefFocusActive) {
+                                    xrefFocusActive = false
+                                    viewModel.clearVerseFocus()
+                                }
+                                if (isBlurModeEnabled) {
+                                    blurPicked = verse.number
+                                    readerScope.launch { centre(idx + 1) }
                                 }
                             } else {
                                 action()
@@ -1321,6 +1437,7 @@ fun ReaderScreen(
                             isBlurModeEnabled = effectiveBlurEnabled,
                             isFocusedVerse = isFocused,
                             isBeingRead = verse.number == verseBeingRead,
+                            readingTelugu = readAloudState.telugu,
                             verseSpacingDp = verseSpacingDp,
                             englishLineHeightMultiplier = englishLineHeightMultiplier,
                             teluguLineHeightMultiplier = teluguLineHeightMultiplier,
@@ -1340,7 +1457,9 @@ fun ReaderScreen(
                                 }
                             },
                             onVerseLongClick = {
-                                if (readerPickMode == ReaderPickMode.NONE) {
+                                if (readsOnTap) {
+                                    // Listening: a long press (marking studied) does nothing.
+                                } else if (readerPickMode == ReaderPickMode.NONE) {
                                     viewModel.startStudyPickingFromLongPress(verse)
                                 } else {
                                     // Already in a picking session (note or
@@ -1397,6 +1516,31 @@ fun ReaderScreen(
         // toolbar branch below so it isn't torn down if the toolbar itself
         // closes while the rename dialog is still open.
         var colorToRename by remember { mutableStateOf<HighlightColorDef?>(null) }
+
+        // Reading aloud's bar: previous and next (held, the chapter's start), play or pause, the verse being
+        // read (a tap goes to it), its settings, and stop.
+        val readingBar: @Composable (Modifier) -> Unit = { barModifier ->
+            ReadAloudBar(
+                state = readAloudState,
+                onPlayPause = {
+                    if (readAloudState.status == ReadAloudState.Status.PLAYING) viewModel.pauseReading() else viewModel.resumeReading()
+                },
+                onPrevious = { viewModel.readPreviousVerse() },
+                onNext = { viewModel.readNextVerse() },
+                onChapterStart = { viewModel.readFromChapterStart() },
+                onOpenVerse = {
+                    val reading = readAloudState.verse
+                    if (reading != null && reading.book == currentBook && reading.chapter == currentChapter) {
+                        followReading()
+                    } else if (reading != null) {
+                        viewModel.jumpToVerse(reading.book, reading.chapter, reading.verse, focusVerse = false)
+                    }
+                },
+                onSettings = { readAloudSheetOpen = true },
+                onStop = { viewModel.stopReading() },
+                modifier = barModifier
+            )
+        }
 
         if (readAloudSheetOpen) {
             ReadAloudSheet(
@@ -1488,45 +1632,66 @@ fun ReaderScreen(
                 onRenameColor = { def -> colorToRename = def },
                 onReadAloud = {
                     viewModel.setSelectedVerse(null)
-                    readAloudFrom(verse.number)
-                }
+                    // Paused on another verse of this chapter: on from this one in the same reading.
+                    if (readingInReader && verseBeingRead != null) {
+                        viewModel.readFromTap(verse.book, verse.chapter, verse.number)
+                    } else {
+                        readAloudFrom(verse.number)
+                    }
+                },
+                // Paused, the reading bar stays with the sheet: its Play goes on (and closes the sheet).
+                readingBar = if (readingInReader) ({ readingBar(Modifier) }) else null
             )
         } else {
-            // Reading aloud: its bar just over the pill, hiding and showing with it.
-            if (readingInReader) {
+            // Reading aloud: its bar just over the pill — staying on screen while the pill hides, down where
+            // the pill was — and over it, what the bar offers for now: the one-time hint, Next chapter once
+            // a chapter's been read through, Back and Read here while another chapter is on screen, Follow
+            // when the verse being read is scrolled out of view, and Undo after a tap moved the reading.
+            val nextChapterOffer = chapterReadThrough?.takeIf { !readingInReader }
+            if (readingInReader || nextChapterOffer != null) {
                 val pillHeight = with(density) { bottomOverlayHeightPx.toDp() }
-                ReadAloudBar(
-                    state = readAloudState,
-                    onPlayPause = {
-                        if (readAloudState.status == ReadAloudState.Status.PLAYING) viewModel.pauseReading() else viewModel.resumeReading()
-                    },
-                    onPrevious = { viewModel.readPreviousVerse() },
-                    onNext = { viewModel.readNextVerse() },
-                    onChapterStart = { viewModel.readFromChapterStart() },
-                    onOpenVerse = {
-                        val reading = readAloudState.verse
-                        if (reading != null && reading.book == currentBook && reading.chapter == currentChapter) {
-                            val index = verses.indexOfFirst { it.number == reading.verse }
-                            if (index >= 0) {
-                                readerScope.launch { listState.animateScrollToItem(index + 1, -(listState.layoutInfo.viewportSize.height / 6)) }
-                            }
-                        } else if (reading != null) {
-                            viewModel.jumpToVerse(reading.book, reading.chapter, reading.verse, focusVerse = false)
-                        }
-                    },
-                    onSettings = { readAloudSheetOpen = true },
-                    onStop = { viewModel.stopReading() },
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()
                         .padding(bottom = 16.dp + pillHeight + 10.dp)
-                        .graphicsLayer {
-                            translationY = barsHiddenProgress * (size.height + pillHeight.toPx() + 140.dp.toPx())
-                            alpha = 1f - barsHiddenProgress
-                        }
-                        .onGloballyPositioned { readAloudBarHeightPx = it.size.height }
-                        .testTag("read_aloud_bar")
-                )
+                        .graphicsLayer { translationY = barsHiddenProgress * (pillHeight + 10.dp).toPx() }
+                ) {
+                    if (tapHintDue) {
+                        ReadAloudHint("Tap a verse to hear it \u00b7 Pause for highlights and notes", Modifier.padding(horizontal = 32.dp))
+                    }
+                    val reading = readAloudState.verse
+                    when {
+                        nextChapterOffer != null -> ReadAloudOffer(
+                            text = "End of ${nextChapterOffer.first} ${nextChapterOffer.second}",
+                            actions = listOf("Next chapter" to { viewModel.readNextChapter() })
+                        )
+                        readingElsewhere && reading != null -> ReadAloudOffer(
+                            text = "Reading ${reading.label}",
+                            actions = listOf(
+                                "Back" to { viewModel.jumpToVerse(reading.book, reading.chapter, reading.verse, focusVerse = false) },
+                                "Read here" to { readAloudFrom(startingVerse()) }
+                            )
+                        )
+                        beingReadOutOfView -> ReadAloudOffer(text = null, actions = listOf("Follow" to { followReading() }))
+                    }
+                    readingMovedFrom?.let { from ->
+                        val here = reading != null && from.book == reading.book && from.chapter == reading.chapter
+                        ReadAloudOffer(
+                            text = "From " + if (here) "${from.chapter}:${from.verse}" else from.label,
+                            actions = listOf("Undo" to { viewModel.undoReadingMove() })
+                        )
+                    }
+                    if (readingInReader) {
+                        readingBar(
+                            Modifier
+                                .onGloballyPositioned { readAloudBarHeightPx = it.size.height }
+                                .testTag("read_aloud_bar")
+                        )
+                    }
+                }
             }
 
             // The only chrome Reader has now — book label plus quick
@@ -1660,15 +1825,27 @@ fun ReaderScreen(
                             expanded = showReaderMenu,
                             onDismissRequest = { showReaderMenu = false }
                         ) {
-                            // The chapter read aloud in the phone's voice, from the verse at the top of the screen.
-                            DropdownMenuItem(
-                                text = { Text("Read aloud") },
-                                leadingIcon = { Icon(Icons.Default.Headphones, contentDescription = null) },
-                                onClick = {
-                                    showReaderMenu = false
-                                    readAloudFrom(verses.getOrNull(listState.firstVisibleItemIndex - 1)?.number ?: 1)
-                                }
-                            )
+                            // The chapter read aloud: from the verse jumped to, Blur Mode's sharp one, or the first
+                            // wholly on screen. While it reads, Stop reading aloud instead.
+                            if (readingInReader) {
+                                DropdownMenuItem(
+                                    text = { Text("Stop reading aloud") },
+                                    leadingIcon = { Icon(Icons.Default.HeadsetOff, contentDescription = null) },
+                                    onClick = {
+                                        showReaderMenu = false
+                                        viewModel.stopReading()
+                                    }
+                                )
+                            } else {
+                                DropdownMenuItem(
+                                    text = { Text("Read aloud") },
+                                    leadingIcon = { Icon(Icons.Default.Headphones, contentDescription = null) },
+                                    onClick = {
+                                        showReaderMenu = false
+                                        readAloudFrom(startingVerse())
+                                    }
+                                )
+                            }
                             DropdownMenuItem(
                                 text = { Text("Notes") },
                                 leadingIcon = { Icon(Icons.Default.EditNote, contentDescription = null) },

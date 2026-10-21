@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import com.example.mybible.audio.ReadAloud
 import com.example.mybible.audio.ReadAloudState
+import com.example.mybible.audio.ReadLanguage
 import com.example.mybible.audio.ReadingPlace
 import com.example.mybible.audio.ReadingSession
 import com.example.mybible.audio.VerseToRead
@@ -456,12 +457,21 @@ class VerseScrollController(
             return
         }
         speakerOn = true
+        showTeluguForReading()
         // Paused on the card still on screen: on from where it stopped. Otherwise the card on screen.
         val paused = reading?.takeIf {
             readAloud.session === it && readAloud.state.value.status == ReadAloudState.Status.PAUSED &&
                 it.uid == cards.getOrNull(currentIndex)?.uid
         }
         if (paused != null) readAloud.resume() else readCard(currentIndex)
+    }
+
+    /**
+     * Read in Telugu or both, the Telugu shows under each verse, as the Reader's అ comes on for its
+     * readings: as the reading starts, or its language is changed while it reads.
+     */
+    fun showTeluguForReading() {
+        if (readAloud.prefs.language != ReadLanguage.ENGLISH && !showTelugu) updateShowTelugu(true)
     }
 
     /** The speaker off: stops reading the cards aloud. */

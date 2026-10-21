@@ -64,6 +64,9 @@ class ReadAloudTest {
 
         override suspend fun back(current: VerseToRead): VerseToRead? = verses.getOrNull(verses.indexOf(current) - 1)
 
+        override suspend fun verse(book: String, chapter: Int, verse: Int): VerseToRead? =
+            verses.firstOrNull { it.book == book && it.chapter == chapter && it.verse == verse }
+
         override fun onStopped(finished: Boolean) { stopped = finished }
         override fun onPaused() { paused++ }
         override fun onResumed() { resumed++ }
@@ -410,6 +413,59 @@ class ReadAloudTest {
         assertEquals(ReadAloudState.Status.IDLE, reader.state.value.status)
         assertEquals(listOf("For God sent not his Son", "He that believeth on him is not condemned"), speaker.said.map { it.text })
         assertEquals(1, loads)
+    }
+
+    @Test
+    fun aTapOnAVerseReadsFromItAtOnceAndOnFromThere() {
+        val speaker = FakeSpeaker()
+        val reader = reader(speaker, FakePrefs(ReadLanguage.BOTH))
+        var ended: Boolean? = null
+        reader.start(ChapterReading("John", 3, from = 16, onEnd = { ended = it }) { john3 })
+        speaker.reachWord(4)
+        // 3:18 tapped part way through 3:16: its English from the start, at once.
+        val stops = speaker.stops
+        reader.moveTo("John", 3, 18)
+        assertTrue(speaker.stops > stops)
+        assertEquals("John 3:18", reader.state.value.verse?.label)
+        assertEquals(false to "He that believeth on him is not condemned", speaker.said.last().let { it.telugu to it.text })
+        // Back to 3:16 (the bar's Undo): from its start, then on as the reading goes, in both languages.
+        reader.moveTo("John", 3, 16)
+        assertEquals("For God so loved the world", speaker.said.last().text)
+        speaker.finish()
+        assertTrue(speaker.said.last().telugu)
+        speaker.finish()
+        assertEquals("John 3:17", reader.state.value.verse?.label)
+        // The verse being read, tapped: again from its start.
+        speaker.reachWord(8)
+        reader.moveTo("John", 3, 17)
+        assertEquals("For God sent not his Son", speaker.said.last().text)
+        // Not one of the reading's verses: nothing changes.
+        val said = speaker.said.size
+        reader.moveTo("John", 4, 1)
+        assertEquals(said, speaker.said.size)
+        assertEquals("John 3:17", reader.state.value.verse?.label)
+        assertEquals(ReadAloudState.Status.PLAYING, reader.state.value.status)
+        assertNull(ended)
+        // On to the chapter's end: finished.
+        reader.moveTo("John", 3, 18)
+        repeat(2) { speaker.finish() }
+        assertEquals(true, ended)
+    }
+
+    @Test
+    fun pausedATapOnAVersePlaysFromIt() {
+        val speaker = FakeSpeaker()
+        var playing = 0
+        val reader = ReadAloud(speaker, FakePrefs(), CoroutineScope(Dispatchers.Unconfined), onPlaying = { playing++ }, clock = { 0L })
+        val chapter = Chapter(john3, from = 16)
+        reader.start(chapter)
+        reader.pause()
+        reader.moveTo("John", 3, 18)
+        assertEquals(ReadAloudState.Status.PLAYING, reader.state.value.status)
+        assertEquals("John 3:18", reader.state.value.verse?.label)
+        assertEquals("He that believeth on him is not condemned", speaker.said.last().text)
+        assertEquals(1, chapter.resumed)
+        assertEquals(2, playing)
     }
 
     @Test

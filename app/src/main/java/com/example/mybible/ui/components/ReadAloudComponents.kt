@@ -53,6 +53,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -66,10 +67,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -134,7 +137,7 @@ fun ReadAloudBar(
             ) {
                 Icon(Icons.Default.SkipPrevious, contentDescription = "Previous verse", tint = MaterialTheme.colorScheme.onSurface)
             }
-            IconButton(onClick = onPlayPause, modifier = Modifier.size(38.dp)) {
+            IconButton(onClick = onPlayPause, modifier = Modifier.size(38.dp).testTag("read_aloud_play")) {
                 Icon(
                     imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
                     contentDescription = if (playing) "Pause reading aloud" else "Go on reading aloud",
@@ -182,6 +185,65 @@ fun ReadAloudBar(
                 Icon(Icons.Default.Close, contentDescription = "Stop reading aloud", tint = MaterialTheme.colorScheme.onSurface)
             }
         }
+    }
+}
+
+/**
+ * What the reading bar offers for now, over it: a few words ([text], if any) and a button or two
+ * ("Undo", "Follow", "Back" and "Read here", "Next chapter").
+ */
+@Composable
+fun ReadAloudOffer(
+    text: String?,
+    actions: List<Pair<String, () -> Unit>>,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f),
+        shadowElevation = 6.dp,
+        modifier = modifier
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(start = if (text != null) 16.dp else 4.dp, end = 4.dp)
+        ) {
+            if (text != null) {
+                Text(
+                    text = text,
+                    fontFamily = WorkSansFontFamily,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.widthIn(max = 180.dp)
+                )
+            }
+            for ((label, onClick) in actions) {
+                TextButton(onClick = onClick) {
+                    Text(label, fontFamily = WorkSansFontFamily, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                }
+            }
+        }
+    }
+}
+
+/** A line of help over the reading bar, shown once: "Tap a verse to hear it · Pause for highlights and notes". */
+@Composable
+fun ReadAloudHint(text: String, modifier: Modifier = Modifier) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.inverseSurface,
+        modifier = modifier
+    ) {
+        Text(
+            text = text,
+            fontFamily = WorkSansFontFamily,
+            fontSize = 13.sp,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.inverseOnSurface,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+        )
     }
 }
 

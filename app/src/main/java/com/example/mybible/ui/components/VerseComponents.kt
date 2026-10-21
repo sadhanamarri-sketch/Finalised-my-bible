@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -122,8 +123,10 @@ fun VerseCard(
     onCrossReferenceMarkerClick: (() -> Unit)? = null,
     isBlurModeEnabled: Boolean = false,
     isFocusedVerse: Boolean = false,
-    // Being read aloud right now: softly marked, and clear of Blur Mode's dimming.
+    // Being read aloud right now: the line being said softly lit — its Telugu ([readingTelugu]) when
+    // that's shown, else its English.
     isBeingRead: Boolean = false,
+    readingTelugu: Boolean = false,
     englishFontFamilyName: String = "Serif",
     teluguFontSizeSp: Int = 16,
     greekFontSizeSp: Int = 15,
@@ -153,11 +156,17 @@ fun VerseCard(
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val redLetterColor = if (isDark) DarkRedLetter else PaperRedLetter
     val textColor = MaterialTheme.colorScheme.onBackground
-    val isDimmedByBlur = isBlurModeEnabled && !isFocusedVerse && !isSelected && !isBeingRead
-    val readTint by animateColorAsState(
-        targetValue = if (isBeingRead) MaterialTheme.colorScheme.primary.copy(alpha = 0.09f) else Color.Transparent,
+    val isDimmedByBlur = isBlurModeEnabled && !isFocusedVerse && !isSelected
+    val teluguLit = isBeingRead && readingTelugu && !verse.teluguText.isNullOrEmpty()
+    val englishTint by animateColorAsState(
+        targetValue = if (isBeingRead && !teluguLit) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f) else Color.Transparent,
         animationSpec = tween(durationMillis = 300),
-        label = "verseBeingRead"
+        label = "englishBeingRead"
+    )
+    val teluguTint by animateColorAsState(
+        targetValue = if (teluguLit) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f) else Color.Transparent,
+        animationSpec = tween(durationMillis = 300),
+        label = "teluguBeingRead"
     )
 
     // Eased rather than instant — the focused verse can jump by more than
@@ -203,7 +212,7 @@ fun VerseCard(
             )
             .background(
                 if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                else readTint
+                else Color.Transparent
             )
             .combinedClickable(
                 onClick = onVerseClick,
@@ -320,6 +329,7 @@ fun VerseCard(
                     }
 
                     ClickableText(
+                        modifier = Modifier.litBehind(englishTint),
                         text = verseTextAnnotated,
                         style = TextStyle(
                             fontSize = fontSizeSp.sp,
@@ -354,7 +364,8 @@ fun VerseCard(
                             text = verse.teluguText,
                             fontSize = teluguFontSizeSp.sp,
                             lineHeight = (teluguFontSizeSp * teluguLineHeightMultiplier).sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.litBehind(teluguTint)
                         )
                     }
 
@@ -524,6 +535,19 @@ fun VerseCard(
     }
 }
 
+// The line being read aloud: a soft band behind it, a little past its edges, that doesn't move the text.
+private fun Modifier.litBehind(color: Color): Modifier = drawBehind {
+    if (color.alpha == 0f) return@drawBehind
+    val outX = 5.dp.toPx()
+    val outY = 3.dp.toPx()
+    drawRoundRect(
+        color = color,
+        topLeft = Offset(-outX, -outY),
+        size = Size(size.width + 2 * outX, size.height + 2 * outY),
+        cornerRadius = CornerRadius(6.dp.toPx())
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VerseActionToolbar(
@@ -567,7 +591,9 @@ fun VerseActionToolbar(
     // makes long-press a no-op.
     onRenameColor: ((HighlightColorDef) -> Unit)? = null,
     // Reads the chapter aloud from this verse; null hides the button.
-    onReadAloud: (() -> Unit)? = null
+    onReadAloud: (() -> Unit)? = null,
+    // A reading paused in the Reader: its bar, at the sheet's top, to play on from there.
+    readingBar: (@Composable () -> Unit)? = null
 ) {
     // A real modal bottom sheet (dimmed scrim, swipe-down-to-dismiss, drag
     // handle) rather than a floating Surface pinned above the nav bar —
@@ -603,6 +629,9 @@ fun VerseActionToolbar(
                 .padding(bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            if (readingBar != null) {
+                Box(modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp), contentAlignment = Alignment.Center) { readingBar() }
+            }
             val currentColorDefs = currentHighlightColorHexes.mapNotNull { hex ->
                 highlightColorDefs.find { it.colorHex.equals(hex, ignoreCase = true) }
             }

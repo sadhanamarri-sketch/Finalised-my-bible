@@ -108,6 +108,15 @@ class ReadAloudSettings(context: Context) : ReadAloudPrefs {
         prefs.edit().putBoolean(KEY_CONTINUE, on).apply()
     }
 
+    /** The Reader's one-line hint over its reading bar ("Tap a verse to hear it"), shown once. */
+    var tapHintShown by mutableStateOf(prefs.getBoolean(KEY_TAP_HINT, false))
+        private set
+
+    fun markTapHintShown() {
+        tapHintShown = true
+        prefs.edit().putBoolean(KEY_TAP_HINT, true).apply()
+    }
+
     companion object {
         const val PREFS_NAME = "read_aloud"
 
@@ -135,5 +144,6 @@ class ReadAloudSettings(context: Context) : ReadAloudPrefs {
         private const val KEY_TELUGU_ENGINE = "telugu_engine"
         private const val KEY_ENGLISH_RECORDING = "english_recording"
         private const val KEY_TELUGU_RECORDING = "telugu_recording"
+        private const val KEY_TAP_HINT = "tap_hint_shown"
     }
 }

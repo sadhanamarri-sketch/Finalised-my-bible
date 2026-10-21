@@ -108,6 +108,8 @@ class ReadAloudRecordingTest {
             return if (after == null) verses.firstOrNull { it.verse == from } else verses.getOrNull(verses.indexOf(after) + 1)
         }
         override suspend fun back(current: VerseToRead): VerseToRead? = verses.getOrNull(verses.indexOf(current) - 1)
+        override suspend fun verse(book: String, chapter: Int, verse: Int): VerseToRead? =
+            verses.firstOrNull { it.book == book && it.chapter == chapter && it.verse == verse }
         override suspend fun following(verse: VerseToRead): List<VerseToRead> = verses.drop(verses.indexOf(verse) + 1)
         override fun onStopped(finished: Boolean) { stopped = finished }
     }
@@ -151,6 +153,33 @@ class ReadAloudRecordingTest {
         assertEquals(ReadAloudState.Status.IDLE, reader.state.value.status)
         assertEquals(true, chapter.stopped)
         assertTrue(speaker.said.isEmpty())
+    }
+
+    @Test
+    fun aTapOnAVersePlaysOnFromItsOwnStartInTheRecording() {
+        val recorder = FakeRecorder()
+        val reader = reader(FakeSpeaker(), FakePrefs(), FakeRecordings(), recorder)
+        val chapter = Chapter(john3, from = 15)
+        reader.start(chapter)
+        recorder.reach(0)
+        assertEquals("John 3:16", reader.state.value.verse?.label)
+        // 3:18 tapped: what's playing stops, and 3:18 plays from its own start to the chapter's end.
+        val stops = recorder.stops
+        reader.moveTo("John", 3, 18)
+        assertTrue(recorder.stops > stops)
+        assertEquals("John 3:18", reader.state.value.verse?.label)
+        assertEquals(179.96, recorder.played.last().from, 1e-9)
+        assertEquals(188.0, recorder.played.last().to, 1e-9)
+        // Back to 3:16 (Undo): from its start, on into 3:17 and 3:18 without a break.
+        reader.moveTo("John", 3, 16)
+        assertEquals(159.96, recorder.played.last().from, 1e-9)
+        assertEquals(listOf(170.0, 180.0), recorder.played.last().marks)
+        // Paused, then a verse tapped: it plays from there.
+        reader.pause()
+        reader.moveTo("John", 3, 17)
+        assertEquals(ReadAloudState.Status.PLAYING, reader.state.value.status)
+        assertEquals(169.96, recorder.played.last().from, 1e-9)
+        assertNull(chapter.stopped)
     }
 
     @Test

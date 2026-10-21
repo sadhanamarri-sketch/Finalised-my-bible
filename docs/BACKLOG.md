@@ -591,7 +591,7 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
 
 ## Noted 15 Oct 2026
 
-23. **Reading aloud in the Reader: any verse, any time.** "right now I dont have the provision to
+23. **Done 21 Oct.** **Reading aloud in the Reader: any verse, any time.** "right now I dont have the provision to
     go back to verse I wanted (meaning if it's reading from verse 1 and it's on verse 14 and I
     want to hear verse 4 now), that doesn't work. And also assess how jump to verse and clicking
     read aloud. And in blur mode. Let's access every possibility and resolve it in reader tab for
@@ -652,6 +652,19 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     going (today it can only start a new one). The taps, Blur Mode's focus, where a reading starts
     and the bar's states all build on that.
     అ itself isn't remembered: it starts off at every launch, as now (decided 15 Oct).
+    *Built 21 Oct* ("start with the list one by one"), as agreed. The reader-aloud's moveTo goes
+    to a verse of the reading at once and reads on from it, from a recording or the phone's voice
+    alike (paused, it plays). What the bar offers sits over it in small pills: Undo ("From 3:16")
+    for five seconds after a tap moved the reading; Follow while the verse being read is out of
+    view; "Reading John 3:16" with Back and Read here while another chapter is on screen; "End of
+    John 3" with Next chapter for eight seconds once a chapter's been read through (it opens the
+    next chapter and reads it from its heading). The sheet's "Read aloud from here", paused in the
+    same chapter, moves the reading too, and the paused bar sits at the top of the sheet. With
+    the pill hidden the bar stays, down where the pill was. The line being said is lit rather
+    than the whole verse (its Telugu when that's shown). In Blur Mode, outside a reading, a tap on
+    a blurred verse brings it to the middle as the sharp one (a drag hands focus back to the
+    middle). A reading in Telugu or both turns అ on keeping the verse it reads from where it is
+    on screen; Verse Scroll's Telugu comes on the same way.
 
 ## Noted 20 Oct 2026
 

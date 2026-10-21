@@ -62,6 +62,9 @@ interface ReadingSession {
     /** Where touching and holding "previous" goes: the reading's first verse (the Reader's, its chapter's first). None by default. */
     suspend fun first(): VerseToRead? = null
 
+    /** The reading's own verse [verse] of [book] [chapter], for a tap that moves it there; null when it isn't one of its verses. None by default. */
+    suspend fun verse(book: String, chapter: Int, verse: Int): VerseToRead? = null
+
     /**
      * The verses [next] would give one after another from [verse], as far as that's known without moving
      * anything on (the Reader's, the rest of its chapter; a Verse Scroll card's, the rest of its verses):
@@ -434,6 +437,29 @@ class ReadAloud(
         _state.value = ReadAloudState()
         current?.onStopped(finished = false)
         measureSoon()
+    }
+
+    /**
+     * A tap on one of the reading's verses ([ReadingSession.verse]): on from that verse at once, from its
+     * start (the one being read starts again), in the same language and speed, the reading going on from
+     * there as usual. Paused, it plays. A verse that isn't the reading's is left alone.
+     */
+    fun moveTo(book: String, chapter: Int, verse: Int) {
+        val current = session ?: return
+        scope.launch {
+            val there = current.verse(book, chapter, verse) ?: return@launch
+            if (session !== current) return@launch
+            advancing?.cancel()
+            utterances++
+            speaker.stop()
+            stopRecording()
+            if (_state.value.status == ReadAloudState.Status.PAUSED) {
+                _state.update { it.copy(status = ReadAloudState.Status.PLAYING) }
+                onPlaying()
+                current.onResumed()
+            }
+            readFrom(there)
+        }
     }
 
     /**
