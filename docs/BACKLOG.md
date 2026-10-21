@@ -711,7 +711,7 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     card it was leaving could be taken for the one shown and read again; and a slide a swipe
     interrupted was never let go of.
 
-26. **Reading on past the chapter, and a sleep timer.** "Provide setting to continue infinitely in
+26. **Done 21 Oct.** **Reading on past the chapter, and a sleep timer.** "Provide setting to continue infinitely in
     reader mode in read along with sleep timer." — "timer doesn't pause as it's really a sleep
     timer(provide a notification to disable it or anything that is better than a notification yo
     cancel the timer), keep reading across books as an option in the settings (end of chapter,
@@ -737,6 +737,26 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     screen). This replaces 23's "the bar offers Next chapter" when Read until isn't End of
     chapter. The timer lives in the reader-aloud (a job in its scope, the time left in its state
     for the bar and the notification); the notification's Cancel timer goes through the service.
+    *Built 21 Oct:* *Read until* comes second in the reading-aloud settings (from the Reader or
+    the app's Settings), after Read in: End of chapter (to start with), End of book, Continuous.
+    Going on, the reading's name follows the chapter (the bar, the notification, the lock
+    screen), a recording starts each chapter from its spoken heading, previous at a chapter's
+    first verse goes back into the chapter it came from, and held, it goes to the first verse of
+    the chapter it's in now. Followed along (the verse being read last seen on screen), the
+    Reader turns to the next chapter as the reading comes to it (with the screen off meanwhile,
+    as it comes back on); looking at another chapter, the bar offers Back and Read here instead.
+    Next chapter is offered only with End of chapter.
+    *The sleep timer:* a moon on the reading bar opens 15, 30 or 45 minutes, 1 hour, 1½ hours,
+    or End of this chapter; once set, the moon shows the time left ("23 min", "40 s", "Chapter")
+    and its menu has Cancel timer too. The reading settings have it while something is read
+    (Off to 90 minutes side by side, End of this chapter a switch). In Verse Scroll, set from its
+    reading settings, a chip under the top bar shows the time left and opens the same menu. It
+    runs on while paused; over its last 8 seconds the reading fades out (a recording smoothly,
+    the phone's voice from verse to verse), and then it stops. A reading started before it runs
+    out keeps it; one that stops takes it with it. The notification says "sleep timer: 23 min
+    left" and has Cancel timer, as do the lock screen's controls. End of this chapter stops
+    there even with Read until set further; Next pressed at the chapter's last verse still goes
+    on.
 
 27. **Highlighting in Verse Scroll: just the colour box.** "The default color is not necessary as I
     have unclick the default one always. Exclude that functionality. It just pop up the color

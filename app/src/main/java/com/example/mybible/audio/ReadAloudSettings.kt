@@ -109,6 +109,15 @@ class ReadAloudSettings(context: Context) : ReadAloudPrefs {
         prefs.edit().putBoolean(KEY_CONTINUE, on).apply()
     }
 
+    /** Where a reading in the Reader stops: at its chapter's end (as it started), its book's, or never. */
+    var readUntil by mutableStateOf(ReadUntil.from(prefs.getString(KEY_READ_UNTIL, null)))
+        private set
+
+    fun updateReadUntil(value: ReadUntil) {
+        readUntil = value
+        prefs.edit().putString(KEY_READ_UNTIL, value.name).apply()
+    }
+
     override var pauseBetweenCards by mutableIntStateOf(prefs.getInt(KEY_PAUSE, DEFAULT_PAUSE).takeIf { it in PAUSE_CHOICES } ?: DEFAULT_PAUSE)
         private set
 
@@ -138,6 +147,9 @@ class ReadAloudSettings(context: Context) : ReadAloudPrefs {
         const val MIN_PITCH = 0.5f
         const val MAX_PITCH = 1.5f
 
+        // A sleep timer's choices, in minutes.
+        val SLEEP_CHOICES = listOf(15, 30, 45, 60, 90)
+
         // Verse Scroll's pause between cards, in seconds: Off (0) and these.
         val PAUSE_CHOICES = listOf(0, 2, 3, 5, 10)
         const val DEFAULT_PAUSE = 3
@@ -159,5 +171,6 @@ class ReadAloudSettings(context: Context) : ReadAloudPrefs {
         private const val KEY_TELUGU_RECORDING = "telugu_recording"
         private const val KEY_TAP_HINT = "tap_hint_shown"
         private const val KEY_PAUSE = "pause_between_cards"
+        private const val KEY_READ_UNTIL = "read_until"
     }
 }

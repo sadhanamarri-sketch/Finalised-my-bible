@@ -664,6 +664,21 @@ fun ReaderScreen(
             layout.visibleItemsInfo.none { it.index == index && it.offset + it.size > 0 && it.offset < layout.viewportEndOffset - overlayPx }
         }
     }
+    // Followed along (the verse being read last seen in view), the reading going on into the next chapter
+    // turns the Reader to it — with the screen off meanwhile, as it comes back on. Looking elsewhere, the
+    // bar offers to go back to it instead.
+    var followingAlong by remember { mutableStateOf(true) }
+    LaunchedEffect(verseBeingRead, beingReadOutOfView) {
+        if (verseBeingRead != null) followingAlong = !beingReadOutOfView
+    }
+    val readingChapter = readAloudState.verse?.takeIf { readingInReader }?.let { it.book to it.chapter }
+    var lastReadingChapter by remember { mutableStateOf<Pair<String, Int>?>(null) }
+    LaunchedEffect(readingChapter) {
+        val before = lastReadingChapter
+        lastReadingChapter = readingChapter
+        if (readingChapter == null || before == null || before == readingChapter) return@LaunchedEffect
+        if (followingAlong && before == currentBook to currentChapter) viewModel.turnToReading()
+    }
     // Follow: back to the verse being read, which is then kept in view again.
     fun followReading() {
         val index = verses.indexOfFirst { it.number == verseBeingRead }.takeIf { verseBeingRead != null && it >= 0 }?.plus(1) ?: return
@@ -1538,6 +1553,10 @@ fun ReaderScreen(
                 },
                 onSettings = { readAloudSheetOpen = true },
                 onStop = { viewModel.stopReading() },
+                sleepLeft = viewModel.readAloud::sleepLeftMs,
+                onSleepIn = viewModel::sleepIn,
+                onSleepAtChapterEnd = viewModel::sleepAtChapterEnd,
+                onCancelSleep = viewModel::cancelSleep,
                 modifier = barModifier
             )
         }

@@ -98,6 +98,7 @@ class RecordingPlayer(private val context: Context) : Recorder {
             // A video's sound only (the dramatized KJV's files are videos): its pictures aren't decoded.
             it.trackSelectionParameters = it.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, true).build()
             it.addListener(events)
+            it.volume = loudness
             player = it
         }
 
@@ -155,6 +156,14 @@ class RecordingPlayer(private val context: Context) : Recorder {
 
     override fun speed(speed: Float) {
         player?.playbackParameters = PlaybackParameters(speed)
+    }
+
+    // How loud it plays (see Recorder.volume), kept for a player made later.
+    private var loudness = 1f
+
+    override fun volume(level: Float) {
+        loudness = level
+        player?.volume = level
     }
 
     override val position: Double?

@@ -20,6 +20,20 @@ enum class ReadLanguage(val label: String) {
     }
 }
 
+/**
+ * Where a reading in the Reader stops: at the end of its chapter, at the end of its book, or never, on
+ * from book to book (to the end of Revelation).
+ */
+enum class ReadUntil(val label: String) {
+    CHAPTER("End of chapter"),
+    BOOK("End of book"),
+    CONTINUOUS("Continuous");
+
+    companion object {
+        fun from(name: String?): ReadUntil = entries.firstOrNull { it.name == name } ?: CHAPTER
+    }
+}
+
 /** A verse to read aloud: where it is, its King James text and its Telugu (none for a verse it lacks). */
 data class VerseToRead(
     val book: String,
@@ -148,6 +162,9 @@ interface Speaker {
 
     fun stop()
 
+    /** How loud what's said from now on is: 1 as usual, less as a sleep timer runs out. */
+    fun volume(level: Float) {}
+
     fun voices(telugu: Boolean): List<VoiceOption>
 
     /**
@@ -177,11 +194,21 @@ data class ReadAloudState(
     /** The phone has no Telugu voice, so Telugu was left out — or, with Telugu alone, nothing could be read. */
     val noTeluguVoice: Boolean = false,
     /** The phone has no voice at all (no speech engine). */
-    val noVoice: Boolean = false
+    val noVoice: Boolean = false,
+    /** The sleep timer, while one is set: the reading stops when it runs out. */
+    val sleep: SleepTimer? = null
 ) {
     enum class Status { IDLE, PLAYING, PAUSED }
 
     val active: Boolean get() = status != Status.IDLE
+}
+
+/**
+ * A sleep timer: the reading stops [at] (milliseconds, on the reader-aloud's sleep clock), set for
+ * [minutes] with [minutesLeft] of them still to go; or, [at] null, at the end of the chapter it's in.
+ */
+data class SleepTimer(val at: Long?, val minutes: Int? = null, val minutesLeft: Int? = null) {
+    val atChapterEnd: Boolean get() = at == null
 }
 
 /**
@@ -208,7 +235,9 @@ class ReadAloud(
     /** The narrated recordings on the phone, played instead of the phone's voice where the settings say. */
     val recordings: RecordedVerses = RecordedVerses.None,
     /** Plays them. */
-    private val recorder: Recorder = Recorder.None
+    private val recorder: Recorder = Recorder.None,
+    /** The time for a sleep timer, in milliseconds, going on while the phone sleeps. */
+    private val sleepClock: () -> Long = { android.os.SystemClock.elapsedRealtime() }
 ) : Speaker.Listener, Recorder.Listener {
 
     private val _state = MutableStateFlow(ReadAloudState())
@@ -236,6 +265,12 @@ class ReadAloud(
     private val currentId: String get() = "read-$utterances"
 
     private var advancing: Job? = null
+
+    // The sleep timer counting down, while one is set for so many minutes (see sleepIn).
+    private var sleeping: Job? = null
+
+    // How loud the reading is: 1 as usual, lowered as a sleep timer runs out.
+    private var loudness = 1f
 
     // The Telugu voice failed during this reading (say, an online voice with no connection).
     private var teluguFailed = false
@@ -392,18 +427,22 @@ class ReadAloud(
         session = null
         if (previous != null && previous !== next) previous.onStopped(finished = false)
         if (speaker.ready == false && !recordingsOnly()) {
+            endSleep()
             _state.value = ReadAloudState(noVoice = true)
             next.onStopped(finished = false)
             return
         }
         if (prefs.language == ReadLanguage.TELUGU && speaker.hasTelugu() == false && !reads(telugu = true)) {
+            endSleep()
             _state.value = ReadAloudState(noTeluguVoice = true)
             next.onStopped(finished = false)
             return
         }
         session = next
         teluguFailed = false
-        _state.value = ReadAloudState(status = ReadAloudState.Status.PLAYING, place = next.place, title = next.title)
+        // A sleep timer goes on with the reading started next (one for a chapter's end, in the Reader only).
+        val sleep = _state.value.sleep?.takeUnless { it.atChapterEnd && next.place != ReadingPlace.READER }
+        _state.value = ReadAloudState(status = ReadAloudState.Status.PLAYING, place = next.place, title = next.title, sleep = sleep)
         onPlaying()
         advance(after = null)
     }
@@ -444,6 +483,7 @@ class ReadAloud(
     fun stop() {
         val current = session
         halt()
+        endSleep()
         recorder.release()
         session = null
         _state.value = ReadAloudState()
@@ -481,6 +521,70 @@ class ReadAloud(
     fun restartVerse() {
         val verse = skippableVerse() ?: return
         readFrom(verse)
+    }
+
+    /**
+     * A sleep timer for the reading going on: it stops [minutes] from now, fading out over its last few
+     * seconds. A sleep timer, not a pause: paused meanwhile, it still runs out, and the reading stops.
+     * It goes on with a reading started before then, and goes with the reading. Replaces any set before.
+     */
+    fun sleepIn(minutes: Int) {
+        if (session == null) return
+        endSleep()
+        val at = sleepClock() + minutes * 60_000L
+        _state.update { it.copy(sleep = SleepTimer(at, minutes, minutesLeft(at - sleepClock()))) }
+        sleeping = scope.launch { countDown(at) }
+    }
+
+    /** A sleep timer for the Reader's reading: it stops at the end of the chapter it's in. */
+    fun sleepAtChapterEnd() {
+        if (session?.place != ReadingPlace.READER) return
+        endSleep()
+        _state.update { it.copy(sleep = SleepTimer(at = null)) }
+    }
+
+    /** The sleep timer off: the reading goes on, as loud as usual. */
+    fun cancelSleep() {
+        endSleep()
+        _state.update { it.copy(sleep = null) }
+    }
+
+    /** How long until the sleep timer stops the reading, in milliseconds; null with none set, or one for a chapter's end. */
+    fun sleepLeftMs(): Long? = _state.value.sleep?.at?.let { (it - sleepClock()).coerceAtLeast(0) }
+
+    // The sleep timer counting down to [at]: the minutes left kept up to date (for the notification), the
+    // sound fading out over its last seconds, then the reading stops.
+    private suspend fun countDown(at: Long) {
+        while (true) {
+            val left = at - sleepClock()
+            if (left <= 0) break
+            if (left <= FADE_MS) {
+                volume(left.toFloat() / FADE_MS)
+                delay(minOf(left, FADE_STEP_MS))
+            } else {
+                val minutes = minutesLeft(left)
+                _state.update { s -> s.sleep?.takeIf { it.at == at }?.let { s.copy(sleep = it.copy(minutesLeft = minutes)) } ?: s }
+                // Until a minute fewer are left, or the fading begins.
+                delay(minOf(left - FADE_MS, (left - 1) % 60_000L + 1))
+            }
+        }
+        sleeping = null
+        stop()
+    }
+
+    private fun minutesLeft(ms: Long): Int = ((ms + 59_999) / 60_000).toInt()
+
+    // No sleep timer (the reading over, or another set): its countdown stops, and the sound is as loud as usual.
+    private fun endSleep() {
+        sleeping?.cancel()
+        sleeping = null
+        if (loudness < 1f) volume(1f)
+    }
+
+    private fun volume(level: Float) {
+        loudness = level.coerceIn(0f, 1f)
+        speaker.volume(loudness)
+        recorder.volume(loudness)
     }
 
     /**
@@ -605,10 +709,12 @@ class ReadAloud(
     }
 
     // Reads the verse after [after] in the reading (its first, without one), or ends the reading. [step]
-    // finds it: the reading's next verse, or for a headset's next or previous, the one to skip to.
+    // finds it: without one, the reading's next verse (going on by itself); for a headset's next or
+    // previous, the one to skip to. Going on by itself into another chapter, with the sleep timer set for
+    // the end of this one, the reading stops.
     private fun advance(
         after: VerseToRead?,
-        step: suspend (ReadingSession, VerseToRead?) -> VerseToRead? = { reading, from -> reading.next(from) }
+        step: (suspend (ReadingSession, VerseToRead?) -> VerseToRead?)? = null
     ) {
         val current = session ?: return
         parts = emptyList()
@@ -619,10 +725,16 @@ class ReadAloud(
             var previous = after
             var skipped = 0
             while (true) {
-                val verse = step(current, previous)
+                val verse = if (step != null) step(current, previous) else current.next(previous)
                 if (session !== current) return@launch
                 if (verse == null) {
                     end(current, finished = true)
+                    return@launch
+                }
+                if (step == null && previous != null && _state.value.sleep?.atChapterEnd == true &&
+                    (verse.book != previous.book || verse.chapter != previous.chapter)
+                ) {
+                    end(current, finished = false)
                     return@launch
                 }
                 val read = partsOf(verse, current)
@@ -647,7 +759,8 @@ class ReadAloud(
                 parts = if (alone is Recorded) listOf(alone.copy(ahead = aheadOf(current, verse, alone))) else read
                 if (session !== current) return@launch
                 verseStartedAt = clock()
-                _state.update { it.copy(verse = verse, telugu = read[0].telugu, recording = read[0] is Recorded) }
+                // The reading's name follows it (the Reader's, from chapter to chapter).
+                _state.update { it.copy(verse = verse, telugu = read[0].telugu, recording = read[0] is Recorded, title = current.title) }
                 break
             }
             if (_state.value.status == ReadAloudState.Status.PLAYING) speakPart()
@@ -656,6 +769,7 @@ class ReadAloud(
 
     private fun end(current: ReadingSession, finished: Boolean, noTeluguVoice: Boolean = false) {
         halt()
+        endSleep()
         recorder.release()
         session = null
         _state.value = ReadAloudState(noTeluguVoice = noTeluguVoice || _state.value.noTeluguVoice)
@@ -844,6 +958,7 @@ class ReadAloud(
         } else {
             val current = session
             halt()
+            endSleep()
             session = null
             _state.value = ReadAloudState(noVoice = true)
             current?.onStopped(finished = false)
@@ -859,6 +974,10 @@ class ReadAloud(
 
         // Verses in a row with nothing to read before giving up (a list of verses with no Telugu at all).
         const val MAX_SKIPPED = 50
+
+        // A sleep timer fades the reading out over this long, in steps this far apart.
+        const val FADE_MS = 8_000L
+        const val FADE_STEP_MS = 250L
 
         // A word said on its own goes a little slower, to be heard clearly.
         const val WORD_RATE = 0.8f

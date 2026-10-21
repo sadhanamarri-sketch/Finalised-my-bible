@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -46,6 +47,9 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -82,7 +86,10 @@ import com.example.mybible.audio.ReadAloud
 import com.example.mybible.audio.ReadAloudSettings
 import com.example.mybible.audio.ReadAloudState
 import com.example.mybible.audio.ReadLanguage
+import com.example.mybible.audio.ReadUntil
+import com.example.mybible.audio.ReadingPlace
 import com.example.mybible.audio.Recordings
+import com.example.mybible.audio.SleepTimer
 import com.example.mybible.audio.VoiceOption
 import com.example.mybible.ui.theme.WorkSansFontFamily
 import kotlinx.coroutines.delay
@@ -90,8 +97,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
  * The Reader's reading-aloud bar, over its bottom pill while a chapter is read aloud: previous (held, back
- * to the chapter's first verse), play or pause, next, the verse being read (tap it to go to it), the
- * settings, and stop.
+ * to the chapter's first verse), play or pause, next, the verse being read (tap it to go to it), the sleep
+ * timer (the time left while one's set), the settings, and stop.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -104,6 +111,10 @@ fun ReadAloudBar(
     onOpenVerse: () -> Unit,
     onSettings: () -> Unit,
     onStop: () -> Unit,
+    sleepLeft: () -> Long?,
+    onSleepIn: (Int) -> Unit,
+    onSleepAtChapterEnd: () -> Unit,
+    onCancelSleep: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val playing = state.status == ReadAloudState.Status.PLAYING
@@ -147,8 +158,10 @@ fun ReadAloudBar(
             IconButton(onClick = onNext, modifier = Modifier.size(38.dp)) {
                 Icon(Icons.Default.SkipNext, contentDescription = "Next verse", tint = MaterialTheme.colorScheme.onSurface)
             }
+            // The verse being read gives way first on a narrow screen.
             Column(
                 modifier = Modifier
+                    .weight(1f, fill = false)
                     .widthIn(max = 132.dp)
                     .clip(CircleShape)
                     .clickable(onClick = onOpenVerse)
@@ -175,9 +188,11 @@ fun ReadAloudBar(
                     fontFamily = WorkSansFontFamily,
                     fontSize = 12.sp,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            SleepTimerButton(state, sleepLeft, onSleepIn, onSleepAtChapterEnd, onCancelSleep)
             IconButton(onClick = onSettings, modifier = Modifier.size(38.dp)) {
                 Icon(Icons.Default.Tune, contentDescription = "Reading aloud settings", tint = MaterialTheme.colorScheme.onSurface)
             }
@@ -186,6 +201,122 @@ fun ReadAloudBar(
             }
         }
     }
+}
+
+/**
+ * The reading's sleep timer on its bar: a moon, and while one's set the time left under it ("Chapter", set
+ * for the chapter's end). A tap opens its choices: so many minutes, the end of this chapter
+ * ([onChapterEnd], in the Reader), or off.
+ */
+@Composable
+fun SleepTimerButton(
+    state: ReadAloudState,
+    sleepLeft: () -> Long?,
+    onSleepIn: (Int) -> Unit,
+    onChapterEnd: (() -> Unit)?,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val sleep = state.sleep
+    val left = rememberSleepLeft(sleep, sleepLeft)
+    var open by remember { mutableStateOf(false) }
+    Box(modifier) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .height(38.dp)
+                .widthIn(min = 38.dp)
+                .clip(CircleShape)
+                .clickable(role = Role.Button) { open = true }
+                .semantics { contentDescription = if (sleep == null) "Sleep timer" else "Sleep timer: ${sleepLeftLabel(sleep, left)}" }
+                .padding(horizontal = 4.dp)
+        ) {
+            if (sleep == null) {
+                Icon(Icons.Outlined.Bedtime, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(21.dp))
+            } else {
+                // Narrow, to leave the verse being read its room.
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Outlined.Bedtime, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(17.dp))
+                    Text(
+                        text = sleepLeftLabel(sleep, left),
+                        fontFamily = WorkSansFontFamily,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 10.sp,
+                        lineHeight = 11.sp,
+                        maxLines = 1,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+        SleepTimerMenu(open, { open = false }, state, left, onSleepIn, onChapterEnd, onCancel)
+    }
+}
+
+/**
+ * A sleep timer's choices, dropping down from what opened them: so many minutes, the end of this chapter
+ * ([onChapterEnd], in the Reader), and while one's set, when it stops and Cancel timer.
+ */
+@Composable
+fun SleepTimerMenu(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    state: ReadAloudState,
+    left: Long?,
+    onSleepIn: (Int) -> Unit,
+    onChapterEnd: (() -> Unit)?,
+    onCancel: () -> Unit
+) {
+    val sleep = state.sleep
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        Text(
+            text = when {
+                sleep == null -> "Sleep timer: stop reading in"
+                sleep.atChapterEnd -> "Stops at the end of ${state.title}"
+                else -> "Stops in ${sleepLeftLabel(sleep, left)}"
+            },
+            fontFamily = WorkSansFontFamily,
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+        if (sleep != null) {
+            DropdownMenuItem(text = { Text("Cancel timer") }, onClick = { onDismiss(); onCancel() })
+        }
+        for (minutes in ReadAloudSettings.SLEEP_CHOICES) {
+            DropdownMenuItem(text = { Text(sleepChoiceLabel(minutes)) }, onClick = { onDismiss(); onSleepIn(minutes) })
+        }
+        if (onChapterEnd != null) {
+            DropdownMenuItem(text = { Text("End of this chapter") }, onClick = { onDismiss(); onChapterEnd() })
+        }
+    }
+}
+
+/** The sleep timer's time left, in milliseconds, kept up a second at a time while one's set for so many minutes. */
+@Composable
+fun rememberSleepLeft(sleep: SleepTimer?, sleepLeft: () -> Long?): Long? {
+    val left by produceState(sleepLeft(), sleep) {
+        value = sleepLeft()
+        while (sleep?.at != null) {
+            delay(1_000)
+            value = sleepLeft()
+        }
+    }
+    return left
+}
+
+/** The time a sleep timer has left, short: "23 min", "40 s", or "Chapter" (set for the chapter's end). */
+fun sleepLeftLabel(sleep: SleepTimer, left: Long?): String = when {
+    sleep.atChapterEnd -> "Chapter"
+    left == null -> "${sleep.minutesLeft ?: sleep.minutes} min"
+    left < 60_000 -> "${(left + 999) / 1000} s"
+    else -> "${(left + 59_999) / 60_000} min"
+}
+
+private fun sleepChoiceLabel(minutes: Int): String = when (minutes) {
+    60 -> "1 hour"
+    90 -> "1\u00bd hours"
+    else -> "$minutes minutes"
 }
 
 /**
@@ -373,6 +504,37 @@ fun ReadAloudSheet(
                 },
                 modifier = Modifier.padding(top = 10.dp)
             )
+            // How far a reading in the Reader goes.
+            if (!inVerseScroll) {
+                DsSectionDivider()
+                DsSectionLabel("Read until")
+                DsSegmentedRow(
+                    options = ReadUntil.entries,
+                    selected = settings.readUntil,
+                    label = { it.label },
+                    onSelect = settings::updateReadUntil
+                )
+                DsNote(
+                    when (settings.readUntil) {
+                        ReadUntil.CHAPTER -> "A reading in the Reader stops at the end of its chapter."
+                        ReadUntil.BOOK -> "A reading in the Reader goes on from chapter to chapter, to the end of the book."
+                        ReadUntil.CONTINUOUS -> "A reading in the Reader goes on from chapter to chapter and book to book, to the end of Revelation."
+                    },
+                    modifier = Modifier.padding(top = 10.dp)
+                )
+            }
+            // While something's read: a sleep timer for it.
+            if (state.active) {
+                DsSectionDivider()
+                DsSectionLabel("Sleep timer")
+                SleepTimerChoices(
+                    state = state,
+                    sleepLeft = readAloud::sleepLeftMs,
+                    onSleepIn = readAloud::sleepIn,
+                    onChapterEnd = if (state.place == ReadingPlace.READER) readAloud::sleepAtChapterEnd else null,
+                    onCancel = readAloud::cancelSleep
+                )
+            }
             // Each language read, with its own speed, pitch and voice.
             val read = when (settings.language) {
                 ReadLanguage.ENGLISH -> listOf(false)
@@ -462,6 +624,47 @@ fun PauseBetweenCardsRow(seconds: Int, onSelect: (Int) -> Unit, modifier: Modifi
             onSelect = onSelect
         )
     }
+}
+
+// The sleep timer in the reading-aloud settings: off or so many minutes, side by side, and in the Reader
+// ([onChapterEnd]) the end of this chapter; a note says when it stops.
+@Composable
+private fun SleepTimerChoices(
+    state: ReadAloudState,
+    sleepLeft: () -> Long?,
+    onSleepIn: (Int) -> Unit,
+    onChapterEnd: (() -> Unit)?,
+    onCancel: () -> Unit
+) {
+    val sleep = state.sleep
+    val left = rememberSleepLeft(sleep, sleepLeft)
+    DsSegmentedRow(
+        options = listOf(0) + ReadAloudSettings.SLEEP_CHOICES,
+        selected = when {
+            sleep == null -> 0
+            sleep.atChapterEnd -> -1
+            else -> sleep.minutes ?: -1
+        },
+        label = { if (it == 0) "Off" else "$it" },
+        onSelect = { if (it == 0) onCancel() else onSleepIn(it) }
+    )
+    if (onChapterEnd != null) {
+        DsToggleRow(
+            label = "End of this chapter",
+            subLabel = "Stops once ${state.title} has been read.",
+            checked = sleep?.atChapterEnd == true,
+            onCheckedChange = { if (it) onChapterEnd() else onCancel() },
+            modifier = Modifier.padding(top = 10.dp)
+        )
+    }
+    DsNote(
+        when {
+            sleep == null -> "Minutes until the reading stops, fading out at the end. Paused, the timer still runs."
+            sleep.atChapterEnd -> "The reading stops at the end of ${state.title}."
+            else -> "The reading stops in ${sleepLeftLabel(sleep, left)}, fading out at the end. Paused, the timer still runs."
+        },
+        modifier = Modifier.padding(top = 10.dp)
+    )
 }
 
 // Each language's engine's voices, and whether there's a Telugu one: null until the engines have started.

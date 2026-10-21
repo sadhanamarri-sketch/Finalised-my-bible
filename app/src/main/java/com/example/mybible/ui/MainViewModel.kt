@@ -25,6 +25,7 @@ import com.example.mybible.audio.ReadAloudHub
 import com.example.mybible.audio.ReadAloudSettings
 import com.example.mybible.audio.ReadAloudState
 import com.example.mybible.audio.ReadLanguage
+import com.example.mybible.audio.ReadUntil
 import com.example.mybible.audio.ReadingPlace
 import com.example.mybible.audio.VerseToRead
 import com.example.mybible.versescroll.VerseRef
@@ -560,9 +561,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val readAloudState: StateFlow<ReadAloudState> = readAloud.state
 
     /**
-     * The Reader's chapter, read aloud from [fromVerse] to the chapter's end: a reading started (from the
-     * menu, a verse's sheet, the bar's Read here or Next chapter). In Telugu or both, the Reader's Telugu
-     * lines come on with it (see teluguForReading).
+     * The Reader's chapter, read aloud from [fromVerse] to the chapter's end, or on past it as Read until
+     * says: a reading started (from the menu, a verse's sheet, the bar's Read here or Next chapter). In
+     * Telugu or both, the Reader's Telugu lines come on with it (see teluguForReading).
      */
     fun readChapterAloud(book: String, chapter: Int, fromVerse: Int) {
         startChapterReading(book, chapter, fromVerse)
@@ -575,13 +576,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun startChapterReading(book: String, chapter: Int, fromVerse: Int) {
         offerUndo(null)
         offerNextChapter(null)
-        readAloud.start(ChapterReading(book, chapter, fromVerse, onEnd = { finished -> if (finished) offerNextChapter(book to chapter) }) {
-            val verses = repository.getChapterVerses(book, chapter, includeTelugu = true)
+        lateinit var reading: ChapterReading
+        reading = ChapterReading(
+            book, chapter, fromVerse,
+            until = { readAloudSettings.readUntil },
+            chapterAfter = ::chapterAfter,
+            // Read to its chapter's end, Next chapter is offered (read on to a book's end, or the Bible's, not).
+            onEnd = { finished ->
+                if (finished && readAloudSettings.readUntil == ReadUntil.CHAPTER) offerNextChapter(reading.book to reading.chapter)
+            }
+        ) { b, c ->
+            val verses = repository.getChapterVerses(b, c, includeTelugu = true)
             // The bundled Telugu text for any verse the database doesn't have it for yet.
-            val telugu = if (verses.any { it.teluguText.isNullOrBlank() }) repository.getTeluguChapterVerses(book, chapter) else emptyMap()
+            val telugu = if (verses.any { it.teluguText.isNullOrBlank() }) repository.getTeluguChapterVerses(b, c) else emptyMap()
             verses.map { v -> VerseToRead(v.book, v.chapter, v.number, v.text, v.teluguText?.takeIf { it.isNotBlank() } ?: telugu[v.number]) }
-        })
+        }
+        readAloud.start(reading)
     }
+
+    /**
+     * The Reader's reading gone on into the next chapter while it was followed along: the Reader turns to
+     * that chapter (and keeps up with its verse, as ever).
+     */
+    fun turnToReading() {
+        val verse = readAloud.state.value.verse?.takeIf { readAloud.state.value.place == ReadingPlace.READER } ?: return
+        clearVerseFocus()
+        loadChapter(verse.book, verse.chapter)
+    }
+
+    /** A sleep timer for the reading going on: it stops in [minutes] (see ReadAloud.sleepIn). */
+    fun sleepIn(minutes: Int) = readAloud.sleepIn(minutes)
+
+    /** A sleep timer that stops the Reader's reading at the end of the chapter it's in. */
+    fun sleepAtChapterEnd() = readAloud.sleepAtChapterEnd()
+
+    fun cancelSleep() = readAloud.cancelSleep()
 
     /**
      * A tap on a verse while the Reader's reading plays: read from that verse at once, in the same reading

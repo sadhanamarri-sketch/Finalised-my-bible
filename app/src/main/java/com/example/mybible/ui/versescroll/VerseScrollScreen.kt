@@ -456,6 +456,14 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                 backTo = controller.rabbitHoleRoot(pagerState.settledPage)?.content?.label,
                 modeLabel = controller.source.label,
                 speakerOn = controller.speakerOn,
+                sleepChip = if (readAloudState.place == ReadingPlace.VERSE_SCROLL && readAloudState.sleep != null) {
+                    {
+                        SleepChip(
+                            readAloudState, colors, scenes && verseCard != null, viewModel.readAloud::sleepLeftMs,
+                            onSleepIn = viewModel::sleepIn, onCancel = viewModel::cancelSleep
+                        )
+                    }
+                } else null,
                 onBack = {
                     if (inRabbitHole) {
                         leave(toRoot = true) { root -> if (root != null) "Out of the Rabbit hole \u00b7 back at $root" else "Out of the Rabbit hole" }

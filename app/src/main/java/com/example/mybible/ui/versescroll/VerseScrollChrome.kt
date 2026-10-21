@@ -39,6 +39,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
@@ -79,6 +80,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import com.example.mybible.audio.ReadAloudState
 import com.example.mybible.model.HighlightColorDef
 import com.example.mybible.model.MatchedWord
 import com.example.mybible.ui.theme.GelasioFontFamily
@@ -93,6 +95,9 @@ import com.example.mybible.ui.components.DsSectionLabel
 import com.example.mybible.ui.components.DsSizeAdjustRow
 import com.example.mybible.ui.components.DsToggleRow
 import com.example.mybible.ui.components.PauseBetweenCardsRow
+import com.example.mybible.ui.components.SleepTimerMenu
+import com.example.mybible.ui.components.rememberSleepLeft
+import com.example.mybible.ui.components.sleepLeftLabel
 import com.example.mybible.ui.components.PickerDarkGold
 import com.example.mybible.ui.components.PickerPaperGold
 import com.example.mybible.versescroll.VerseRef
@@ -132,7 +137,8 @@ internal fun BoxScope.VerseScrollTopBar(
     onRabbitHole: () -> Unit,
     onBackTo: () -> Unit,
     onSpeaker: () -> Unit,
-    onSettings: () -> Unit
+    onSettings: () -> Unit,
+    sleepChip: (@Composable () -> Unit)? = null
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -165,24 +171,74 @@ internal fun BoxScope.VerseScrollTopBar(
             )
             RoundIconButton(VerseScrollIcons.Settings, "Verse Scroll settings", colors.ink, onSettings)
         }
+        if (sleepChip != null) {
+            Box(Modifier.fillMaxWidth().padding(top = 4.dp), contentAlignment = Alignment.CenterEnd) { sleepChip() }
+        }
         if (backTo != null) {
             BackToChip(backTo, colors, scenes, onBackTo, Modifier.padding(top = 4.dp))
         }
     }
 }
 
+// A chip's ground and edge under the top bar, over a photo or the plain page.
+private fun chipBackground(colors: VsColors, scenes: Boolean): Color = when {
+    !scenes -> colors.surface
+    colors.dark -> Color(0x73141210)
+    else -> Color.White.copy(alpha = 0.62f)
+}
+
+private fun chipBorder(colors: VsColors, scenes: Boolean): Color = when {
+    !scenes -> colors.line
+    colors.dark -> Color.White.copy(alpha = 0.16f)
+    else -> Color.Black.copy(alpha = 0.08f)
+}
+
+/**
+ * A Verse Scroll reading's sleep timer, under the top bar while one's set: a moon and the time left. A tap
+ * opens its choices: so many minutes, or Cancel timer.
+ */
+@Composable
+internal fun SleepChip(
+    state: ReadAloudState,
+    colors: VsColors,
+    scenes: Boolean,
+    sleepLeft: () -> Long?,
+    onSleepIn: (Int) -> Unit,
+    onCancel: () -> Unit
+) {
+    val sleep = state.sleep ?: return
+    val left = rememberSleepLeft(sleep, sleepLeft)
+    var open by remember { mutableStateOf(false) }
+    Box {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            modifier = Modifier
+                .clip(CircleShape)
+                .background(chipBackground(colors, scenes))
+                .border(1.dp, chipBorder(colors, scenes), CircleShape)
+                .clickable(role = Role.Button) { open = true }
+                .semantics { contentDescription = "Sleep timer: ${sleepLeftLabel(sleep, left)}" }
+                .padding(start = 9.dp, end = 12.dp, top = 6.dp, bottom = 6.dp)
+        ) {
+            Icon(Icons.Outlined.Bedtime, contentDescription = null, tint = colors.gold, modifier = Modifier.size(15.dp))
+            Text(
+                text = sleepLeftLabel(sleep, left),
+                color = colors.ink,
+                fontFamily = WorkSansFontFamily,
+                fontWeight = FontWeight.Medium,
+                fontSize = 12.sp,
+                maxLines = 1
+            )
+        }
+        SleepTimerMenu(open, { open = false }, state, left, onSleepIn, onChapterEnd = null, onCancel = onCancel)
+    }
+}
+
 @Composable
 private fun BackToChip(label: String, colors: VsColors, scenes: Boolean, onClick: () -> Unit, modifier: Modifier) {
-    val background = when {
-        !scenes -> colors.surface
-        colors.dark -> Color(0x73141210)
-        else -> Color.White.copy(alpha = 0.62f)
-    }
-    val border = when {
-        !scenes -> colors.line
-        colors.dark -> Color.White.copy(alpha = 0.16f)
-        else -> Color.Black.copy(alpha = 0.08f)
-    }
+    val background = chipBackground(colors, scenes)
+    val border = chipBorder(colors, scenes)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),

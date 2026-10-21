@@ -31,7 +31,8 @@ import kotlinx.coroutines.launch
 /**
  * Keeps a reading aloud going with the screen off or the app out of view: a notification (and the lock
  * screen's media controls, and a headset's buttons or earbuds' taps) to pause, play, go to the next or
- * previous verse (Verse Scroll's next or previous card) and stop. It runs while something is being read
+ * previous verse (Verse Scroll's next or previous card) and stop, and with a sleep timer set, the time
+ * it has left and Cancel timer. It runs while something is being read
  * and stops itself once nothing is. It also gives way to other sound: a call or another app's audio
  * pauses the reading (picking up after a short interruption), as do headphones coming out.
  */
@@ -96,7 +97,10 @@ class ReadAloudService : Service() {
                 override fun onSkipToNext() = engine.skipToNext()
                 override fun onSkipToPrevious() = engine.skipToPrevious()
                 override fun onCustomAction(action: String, extras: Bundle?) {
-                    if (action == ACTION_STOP) engine.stop()
+                    when (action) {
+                        ACTION_STOP -> engine.stop()
+                        ACTION_CANCEL_TIMER -> engine.cancelSleep()
+                    }
                 }
             })
             setSessionActivity(openApp())
@@ -114,6 +118,7 @@ class ReadAloudService : Service() {
             ACTION_STOP -> engine.stop()
             ACTION_NEXT -> engine.skipToNext()
             ACTION_PREVIOUS -> engine.skipToPrevious()
+            ACTION_CANCEL_TIMER -> engine.cancelSleep()
         }
         render(engine.state.value)
         return START_NOT_STICKY
@@ -146,7 +151,8 @@ class ReadAloudService : Service() {
         media.setMetadata(
             MediaMetadata.Builder()
                 .putString(MediaMetadata.METADATA_KEY_TITLE, titleOf(state))
-                .putString(MediaMetadata.METADATA_KEY_ARTIST, getString(R.string.app_name))
+                // Under the verse on the lock screen: the sleep timer, while one's set.
+                .putString(MediaMetadata.METADATA_KEY_ARTIST, sleepNote(state)?.let { "Sleep timer: $it" } ?: getString(R.string.app_name))
                 .putString(MediaMetadata.METADATA_KEY_ALBUM, state.title)
                 .build()
         )
@@ -255,6 +261,9 @@ class ReadAloudService : Service() {
                 PlaybackState.ACTION_SKIP_TO_NEXT or PlaybackState.ACTION_SKIP_TO_PREVIOUS
         )
         .addCustomAction(PlaybackState.CustomAction.Builder(ACTION_STOP, "Stop", R.drawable.ic_read_stop).build())
+        .apply {
+            if (state.sleep != null) addCustomAction(PlaybackState.CustomAction.Builder(ACTION_CANCEL_TIMER, "Cancel timer", R.drawable.ic_read_timer_off).build())
+        }
         .setState(
             when (state.status) {
                 ReadAloudState.Status.PLAYING -> PlaybackState.STATE_PLAYING
@@ -268,6 +277,12 @@ class ReadAloudService : Service() {
 
     private fun titleOf(state: ReadAloudState): String = state.verse?.label ?: state.title.ifEmpty { getString(R.string.app_name) }
 
+    // The sleep timer, in a few words, while one's set: "23 min left", "at the end of John 3".
+    private fun sleepNote(state: ReadAloudState): String? {
+        val sleep = state.sleep ?: return null
+        return if (sleep.atChapterEnd) "at the end of ${state.title}" else "${sleep.minutesLeft ?: sleep.minutes} min left"
+    }
+
     private fun notification(state: ReadAloudState): Notification {
         val playing = state.status != ReadAloudState.Status.PAUSED
         val toggle = Notification.Action.Builder(
@@ -278,17 +293,16 @@ class ReadAloudService : Service() {
         val stop = Notification.Action.Builder(Icon.createWithResource(this, R.drawable.ic_read_stop), "Stop", command(ACTION_STOP)).build()
         val previous = Notification.Action.Builder(Icon.createWithResource(this, R.drawable.ic_read_previous), "Previous", command(ACTION_PREVIOUS)).build()
         val next = Notification.Action.Builder(Icon.createWithResource(this, R.drawable.ic_read_next), "Next", command(ACTION_NEXT)).build()
+        val reading = when {
+            !playing -> "Paused"
+            state.recording -> if (state.telugu) "Playing the Telugu recording" else "Playing the English recording"
+            state.telugu -> "Reading aloud in Telugu"
+            else -> "Reading aloud in English"
+        }
         return Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(titleOf(state))
-            .setContentText(
-                when {
-                    !playing -> "Paused"
-                    state.recording -> if (state.telugu) "Playing the Telugu recording" else "Playing the English recording"
-                    state.telugu -> "Reading aloud in Telugu"
-                    else -> "Reading aloud in English"
-                }
-            )
+            .setContentText(sleepNote(state)?.let { "$reading \u00b7 sleep timer: $it" } ?: reading)
             .setSubText(state.title.takeIf { it.isNotEmpty() })
             .setContentIntent(openApp())
             // Swiping a paused one away stops the reading.
@@ -300,6 +314,11 @@ class ReadAloudService : Service() {
             .addAction(toggle)
             .addAction(next)
             .addAction(stop)
+            .apply {
+                if (state.sleep != null) {
+                    addAction(Notification.Action.Builder(Icon.createWithResource(this@ReadAloudService, R.drawable.ic_read_timer_off), "Cancel timer", command(ACTION_CANCEL_TIMER)).build())
+                }
+            }
             .setStyle(Notification.MediaStyle().setMediaSession(media.sessionToken).setShowActionsInCompactView(0, 1, 2))
             .build()
     }
@@ -333,6 +352,7 @@ class ReadAloudService : Service() {
         private const val ACTION_STOP = "com.example.mybible.audio.STOP"
         private const val ACTION_NEXT = "com.example.mybible.audio.NEXT"
         private const val ACTION_PREVIOUS = "com.example.mybible.audio.PREVIOUS"
+        private const val ACTION_CANCEL_TIMER = "com.example.mybible.audio.CANCEL_TIMER"
 
         /** Something started playing: show the notification and keep the reading going. */
         fun start(context: Context) {

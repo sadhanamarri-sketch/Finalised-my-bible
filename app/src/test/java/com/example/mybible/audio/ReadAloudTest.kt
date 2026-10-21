@@ -79,6 +79,23 @@ class ReadAloudTest {
         VerseToRead("John", 3, 18, "He that believeth on him is not condemned", "ఆయనయందు విశ్వాసముంచువానికి తీర్పు తీర్చబడదు")
     )
 
+    // A Bible of three chapters: John 3 (16 to 18) and 4, then Acts 1, the last.
+    private val john4 = listOf(
+        VerseToRead("John", 4, 1, "When therefore the Lord knew", null),
+        VerseToRead("John", 4, 2, "Though Jesus himself baptized not", null)
+    )
+    private val acts1 = listOf(VerseToRead("Acts", 1, 1, "The former treatise have I made", null))
+    private val bible by lazy { mapOf(("John" to 3) to john3, ("John" to 4) to john4, ("Acts" to 1) to acts1) }
+
+    private fun chapterAfter(book: String, chapter: Int): Pair<String, Int>? = when (book to chapter) {
+        "John" to 3 -> "John" to 4
+        "John" to 4 -> "Acts" to 1
+        else -> null
+    }
+
+    private fun reading(from: Int, until: ReadUntil, onEnd: (Boolean) -> Unit = {}) =
+        ChapterReading("John", 3, from, until = { until }, chapterAfter = ::chapterAfter, onEnd = onEnd) { b, c -> bible.getValue(b to c) }
+
     private fun reader(speaker: FakeSpeaker, prefs: FakePrefs = FakePrefs(), depths: VoiceDepths = VoiceDepths(), clock: () -> Long = { 0L }) =
         ReadAloud(speaker, prefs, CoroutineScope(Dispatchers.Unconfined), depths = depths, clock = clock)
 
@@ -349,6 +366,100 @@ class ReadAloudTest {
     }
 
     @Test
+    fun aReadingGoesOnPastItsChapterAsFarAsReadUntilSays() {
+        fun read(until: ReadUntil): Pair<List<String>, Boolean?> {
+            val speaker = FakeSpeaker()
+            val reader = reader(speaker)
+            var ended: Boolean? = null
+            reader.start(reading(from = 18, until = until) { ended = it })
+            val read = mutableListOf<String>()
+            repeat(10) {
+                if (reader.state.value.active) {
+                    read += reader.state.value.verse!!.label
+                    speaker.finish()
+                }
+            }
+            return read to ended
+        }
+        assertEquals(listOf("John 3:18") to true, read(ReadUntil.CHAPTER))
+        assertEquals(listOf("John 3:18", "John 4:1", "John 4:2") to true, read(ReadUntil.BOOK))
+        // On into the next book, and to the end of the last.
+        assertEquals(listOf("John 3:18", "John 4:1", "John 4:2", "Acts 1:1") to true, read(ReadUntil.CONTINUOUS))
+    }
+
+    @Test
+    fun goingOnIntoTheNextChapterItsNameFollowsAndPreviousGoesBack() {
+        val speaker = FakeSpeaker()
+        val reader = reader(speaker)
+        reader.start(reading(from = 18, until = ReadUntil.CONTINUOUS))
+        assertEquals("John 3", reader.state.value.title)
+        speaker.finish()
+        assertEquals("John 4:1", reader.state.value.verse?.label)
+        assertEquals("John 4", reader.state.value.title)
+        // Previous early in John 4:1: back to the end of the chapter it came from.
+        reader.skipToPrevious()
+        assertEquals("John 3:18", reader.state.value.verse?.label)
+        assertEquals("John 3", reader.state.value.title)
+        repeat(2) { speaker.finish() }
+        assertEquals("John 4:2", reader.state.value.verse?.label)
+        // Holding previous: the first verse of the chapter it's in now.
+        reader.skipToStart()
+        assertEquals("John 4:1", reader.state.value.verse?.label)
+    }
+
+    @Test
+    fun aSleepTimerForTheChaptersEndStopsTheReadingThere() {
+        val speaker = FakeSpeaker()
+        val reader = reader(speaker)
+        var ended: Boolean? = null
+        reader.start(reading(from = 17, until = ReadUntil.CONTINUOUS) { ended = it })
+        reader.sleepAtChapterEnd()
+        assertEquals(true, reader.state.value.sleep?.atChapterEnd)
+        repeat(2) { speaker.finish() }
+        // John 3 read to its end, and not on into John 4.
+        assertEquals(ReadAloudState.Status.IDLE, reader.state.value.status)
+        assertNull(reader.state.value.sleep)
+        assertEquals(false, ended)
+        assertEquals(listOf("For God sent not his Son", "He that believeth on him is not condemned"), speaker.said.map { it.text })
+        // Next pressed at the chapter's last verse goes on all the same (whoever pressed it is awake).
+        reader.start(reading(from = 18, until = ReadUntil.CONTINUOUS))
+        reader.sleepAtChapterEnd()
+        reader.skipToNext()
+        assertEquals("John 4:1", reader.state.value.verse?.label)
+        assertEquals(ReadAloudState.Status.PLAYING, reader.state.value.status)
+    }
+
+    @Test
+    fun aSleepTimerGoesOnWithTheNextReadingAndGoesWithTheReading() {
+        val now = 1_000_000L
+        val reader = ReadAloud(FakeSpeaker(), FakePrefs(), CoroutineScope(Dispatchers.Unconfined), clock = { 0L }, sleepClock = { now })
+        // Nothing being read: no timer.
+        reader.sleepIn(30)
+        assertNull(reader.state.value.sleep)
+        reader.start(Chapter(john3, from = 16))
+        reader.sleepIn(30)
+        assertEquals(SleepTimer(now + 30 * 60_000L, minutes = 30, minutesLeft = 30), reader.state.value.sleep)
+        assertEquals(30 * 60_000L, reader.sleepLeftMs())
+        // Another reading started before it runs out: the timer goes on with it.
+        reader.start(Chapter(john3, from = 17))
+        assertEquals(30, reader.state.value.sleep?.minutes)
+        reader.cancelSleep()
+        assertNull(reader.state.value.sleep)
+        // One for the chapter's end replaces one for so many minutes, and goes with a Verse Scroll reading.
+        reader.sleepIn(15)
+        reader.sleepAtChapterEnd()
+        assertEquals(SleepTimer(at = null), reader.state.value.sleep)
+        assertNull(reader.sleepLeftMs())
+        reader.start(Pausing(john3))
+        assertNull(reader.state.value.sleep)
+        // Stopped, the reading takes its timer with it.
+        reader.sleepIn(45)
+        assertEquals(45, reader.state.value.sleep?.minutes)
+        reader.stop()
+        assertNull(reader.state.value.sleep)
+    }
+
+    @Test
     fun aHeadsetsPreviousStartsTheVerseAgainOrGoesBack() {
         val speaker = FakeSpeaker()
         var now = 0L
@@ -378,7 +489,7 @@ class ReadAloudTest {
     fun theReadersChapterGoesBackEvenBeforeTheVerseItStartedFrom() {
         val speaker = FakeSpeaker()
         val reader = reader(speaker)
-        reader.start(ChapterReading("John", 3, from = 17) { john3 })
+        reader.start(ChapterReading("John", 3, from = 17) { _, _ -> john3 })
         reader.skipToPrevious()
         assertEquals("John 3:16", reader.state.value.verse?.label)
         repeat(2) { reader.skipToNext() }
@@ -390,7 +501,7 @@ class ReadAloudTest {
     fun holdingPreviousReadsTheChapterFromItsFirstVerse() {
         val speaker = FakeSpeaker()
         val reader = reader(speaker)
-        reader.start(ChapterReading("John", 3, from = 18) { john3 })
+        reader.start(ChapterReading("John", 3, from = 18) { _, _ -> john3 })
         reader.skipToStart()
         assertEquals("John 3:16", reader.state.value.verse?.label)
         assertEquals("For God so loved the world", speaker.said.last().text)
@@ -403,7 +514,7 @@ class ReadAloudTest {
         // Read in Telugu, a first verse without any: on to the first with it.
         val telugu = FakeSpeaker()
         val inTelugu = reader(telugu, FakePrefs(ReadLanguage.TELUGU))
-        inTelugu.start(ChapterReading("John", 3, from = 18) { john3.drop(1) })
+        inTelugu.start(ChapterReading("John", 3, from = 18) { _, _ -> john3.drop(1) })
         inTelugu.skipToStart()
         assertEquals("John 3:18", inTelugu.state.value.verse?.label)
         assertEquals(ReadAloudState.Status.PLAYING, inTelugu.state.value.status)
@@ -457,7 +568,7 @@ class ReadAloudTest {
         val speaker = FakeSpeaker()
         val reader = reader(speaker)
         var loads = 0
-        val chapter = ChapterReading("John", 3, from = 17) { loads++; john3 }
+        val chapter = ChapterReading("John", 3, from = 17) { _, _ -> loads++; john3 }
         reader.start(chapter)
         assertEquals("John 3:17", reader.state.value.verse?.label)
         assertEquals("John 3", reader.state.value.title)
@@ -474,7 +585,7 @@ class ReadAloudTest {
         val speaker = FakeSpeaker()
         val reader = reader(speaker, FakePrefs(ReadLanguage.BOTH))
         var ended: Boolean? = null
-        reader.start(ChapterReading("John", 3, from = 16, onEnd = { ended = it }) { john3 })
+        reader.start(ChapterReading("John", 3, from = 16, onEnd = { ended = it }) { _, _ -> john3 })
         speaker.reachWord(4)
         // 3:18 tapped part way through 3:16: its English from the start, at once.
         val stops = speaker.stops

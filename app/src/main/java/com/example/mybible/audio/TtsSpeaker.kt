@@ -148,13 +148,22 @@ class TtsSpeaker(context: Context, private val engineFor: (telugu: Boolean) -> S
                 c.tts.setSpeechRate(rate)
                 // Always set: left alone, it's the phone's own speech pitch, which may have been raised.
                 c.tts.setPitch(pitch)
-                if (c.tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, id) != TextToSpeech.SUCCESS) listener?.onError(id)
+                // Quieter as a sleep timer runs out.
+                val params = loudness.takeIf { it < 1f }?.let { Bundle().apply { putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, it) } }
+                if (c.tts.speak(text, TextToSpeech.QUEUE_FLUSH, params, id) != TextToSpeech.SUCCESS) listener?.onError(id)
             }
         }, fail = { listener?.onError(id) })
     }
 
     override fun stop() {
         speaking.values.forEach { it.stop() }
+    }
+
+    // How loud what's said from now on is (see Speaker.volume).
+    private var loudness = 1f
+
+    override fun volume(level: Float) {
+        loudness = level
     }
 
     // Only the usual engine's voices are measured (see ReadAloud.measureVoices).

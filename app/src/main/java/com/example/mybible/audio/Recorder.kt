@@ -62,6 +62,9 @@ interface Recorder {
 
     fun speed(speed: Float)
 
+    /** How loud it plays, from now on and what's playing: 1 as recorded, less as a sleep timer runs out. */
+    fun volume(level: Float) {}
+
     /** Where in its file it's playing (or paused), in seconds; null when it isn't. */
     val position: Double?
 
