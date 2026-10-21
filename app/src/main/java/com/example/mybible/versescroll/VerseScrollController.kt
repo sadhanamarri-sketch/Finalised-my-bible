@@ -20,14 +20,21 @@ import com.example.mybible.audio.ReadingSession
 import com.example.mybible.audio.VerseToRead
 import com.example.mybible.data.BibleRepository
 import com.example.mybible.model.MatchedWord
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -229,13 +236,20 @@ class VerseScrollController(
     var mode by mutableStateOf(FeedMode.DISCOVER)
         private set
 
-    /** A card the screen should move to; it calls [consumeScrollRequest] once it has. */
+    /** A card the screen should move to; it calls [consumeScrollRequest] once it has, or a swipe took over. */
     var scrollRequest by mutableStateOf<ScrollRequest?>(null)
         private set
 
-    fun consumeScrollRequest() {
-        scrollRequest = null
+    // The last scroll request the screen has moved to, for a reading waiting to read the card it slid to.
+    private val settled = MutableStateFlow(0L)
+
+    fun consumeScrollRequest(request: ScrollRequest) {
+        if (request.id > settled.value) settled.value = request.id
+        if (scrollRequest?.id == request.id) scrollRequest = null
     }
+
+    /** Whether Verse Scroll is on screen (started and not stopped), to slide to the cards a reading moves to. */
+    var screenShowing = false
 
     private var thread: Thread? = null
     private var scrollIds = 0L
@@ -509,6 +523,11 @@ class VerseScrollController(
         // Which of the card's verses (a passage has several) is being read.
         private var line = -1
 
+        // The pause between cards, while it lasts: completed to go on at once (a headset's next).
+        private var pausing: CompletableDeferred<Unit>? = null
+
+        override val waiting: Boolean get() = pausing != null
+
         override suspend fun next(after: VerseToRead?): VerseToRead? {
             val card = cards.getOrNull(index) as? VerseFeedCard
             if (card != null && card.uid == uid && line + 1 < card.content.lines.size) {
@@ -516,7 +535,28 @@ class VerseScrollController(
                 return toRead(card, line)
             }
             if (after == null || !readAloud.prefs.continueReading) return null
-            return moveTo(nextVerseCard(index) ?: return null)
+            val to = nextVerseCard(index) ?: return null
+            pauseBetweenCards()
+            return moveTo(to, gentle = true)
+        }
+
+        // Going on by itself: a breath before the next card (Off, or a few seconds), cut short by a
+        // headset's next. Paused meanwhile, it stays on this card until it's played again.
+        private suspend fun pauseBetweenCards() {
+            val wait = CompletableDeferred<Unit>().also { pausing = it }
+            try {
+                val seconds = readAloud.prefs.pauseBetweenCards
+                if (seconds > 0) withTimeoutOrNull(seconds * 1000L) { wait.await() }
+                if (!wait.isCompleted && readAloud.state.value.status == ReadAloudState.Status.PAUSED) {
+                    merge(flow { emit(wait.await()) }, readAloud.state.filter { it.status != ReadAloudState.Status.PAUSED }.map { }).first()
+                }
+            } finally {
+                pausing = null
+            }
+        }
+
+        override fun hurry() {
+            pausing?.complete(Unit)
         }
 
         // The next card, whatever's left of this one and with Continue reading on or off.
@@ -537,14 +577,17 @@ class VerseScrollController(
             return (line + 1 until card.content.lines.size).map { toRead(card, it) }
         }
 
-        // On to the verse card at [to], from its first verse, the screen going with it.
-        private suspend fun moveTo(to: Int): VerseToRead {
+        // On to the verse card at [to], from its first verse, the screen going with it. [gentle]: going on
+        // by itself, it slides there slowly, and the card is read once it has settled.
+        private suspend fun moveTo(to: Int, gentle: Boolean = false): VerseToRead {
             val card = cards[to] as VerseFeedCard
             index = to
             uid = card.uid
             line = 0
             onCardShown(to)
-            scrollRequest = ScrollRequest(to, ++scrollIds)
+            val request = ScrollRequest(to, ++scrollIds, gentle)
+            scrollRequest = request
+            if (gentle && screenShowing) withTimeoutOrNull(SETTLE_LIMIT_MS) { settled.first { it >= request.id } }
             return toRead(card, 0)
         }
 
@@ -858,6 +901,9 @@ class VerseScrollController(
 
         // Coming back after longer than this starts a fresh feed rather than the old position.
         private const val FRESH_FEED_AFTER_MS = 30 * 60_000L
+
+        // How long a reading waits for the slide to the next card to settle before reading it anyway.
+        private const val SETTLE_LIMIT_MS = 2_000L
 
         private val PILCROW = Regex("¶")
         private val SPACES = Regex("\\s+")

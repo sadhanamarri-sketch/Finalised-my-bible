@@ -72,6 +72,15 @@ interface ReadingSession {
      */
     suspend fun following(verse: VerseToRead): List<VerseToRead> = emptyList()
 
+    /**
+     * Whether it's waiting to go on to its next verse (Verse Scroll's pause between cards) rather than
+     * finding it: a headset's next and previous act at once, rather than being let go. Never, by default.
+     */
+    val waiting: Boolean get() = false
+
+    /** A headset's "next" while [waiting]: the wait is cut short. */
+    fun hurry() {}
+
     /** It ended: [finished] when it came to its end, otherwise stopped (a tap, another reading starting). */
     fun onStopped(finished: Boolean) {}
 
@@ -101,6 +110,9 @@ interface ReadAloudPrefs {
 
     /** Verse Scroll: once a card has been read, move on to the next and read that. */
     val continueReading: Boolean
+
+    /** Verse Scroll, going on by itself: seconds to wait between one card and the next (0, none). */
+    val pauseBetweenCards: Int get() = 0
 }
 
 /**
@@ -473,9 +485,14 @@ class ReadAloud(
 
     /**
      * A headset's "next" (a double tap on most earbuds), or the notification's: on to the next verse —
-     * in Verse Scroll, the next card — from its start. Paused, it waits there to be played.
+     * in Verse Scroll, the next card — from its start. Paused, it waits there to be played. Waiting to
+     * go on (Verse Scroll's pause between cards), it goes on at once.
      */
     fun skipToNext() {
+        if (advancing?.isActive == true && session?.waiting == true) {
+            session?.hurry()
+            return
+        }
         val verse = skippableVerse() ?: return
         advance(after = verse) { reading, from -> from?.let { reading.skip(it) } }
     }
@@ -483,9 +500,19 @@ class ReadAloud(
     /**
      * A headset's "previous" (a triple tap on most earbuds), or the notification's: the verse being read
      * again from its start — or, in its first few seconds, the verse before it (in Verse Scroll, the
-     * card before), as a music player's "previous" goes back a song.
+     * card before), as a music player's "previous" goes back a song. Waiting to go on (Verse Scroll's
+     * pause between cards), the verse just read, again.
      */
     fun skipToPrevious() {
+        if (advancing?.isActive == true && session?.waiting == true) {
+            val verse = _state.value.verse ?: return
+            advancing?.cancel()
+            utterances++
+            speaker.stop()
+            stopRecording()
+            readFrom(verse)
+            return
+        }
         val verse = skippableVerse() ?: return
         if (clock() - verseStartedAt > BACK_WITHIN_MS) {
             partIndex = 0

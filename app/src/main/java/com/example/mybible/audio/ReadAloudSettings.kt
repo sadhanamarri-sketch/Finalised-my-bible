@@ -3,6 +3,7 @@ package com.example.mybible.audio
 import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
@@ -108,6 +109,14 @@ class ReadAloudSettings(context: Context) : ReadAloudPrefs {
         prefs.edit().putBoolean(KEY_CONTINUE, on).apply()
     }
 
+    override var pauseBetweenCards by mutableIntStateOf(prefs.getInt(KEY_PAUSE, DEFAULT_PAUSE).takeIf { it in PAUSE_CHOICES } ?: DEFAULT_PAUSE)
+        private set
+
+    fun updatePauseBetweenCards(seconds: Int) {
+        pauseBetweenCards = seconds
+        prefs.edit().putInt(KEY_PAUSE, seconds).apply()
+    }
+
     /** The Reader's one-line hint over its reading bar ("Tap a verse to hear it"), shown once. */
     var tapHintShown by mutableStateOf(prefs.getBoolean(KEY_TAP_HINT, false))
         private set
@@ -129,6 +138,10 @@ class ReadAloudSettings(context: Context) : ReadAloudPrefs {
         const val MIN_PITCH = 0.5f
         const val MAX_PITCH = 1.5f
 
+        // Verse Scroll's pause between cards, in seconds: Off (0) and these.
+        val PAUSE_CHOICES = listOf(0, 2, 3, 5, 10)
+        const val DEFAULT_PAUSE = 3
+
         private const val KEY_LANGUAGE = "language"
         private const val KEY_ENGLISH_SPEED = "english_speed"
         private const val KEY_TELUGU_SPEED = "telugu_speed"
@@ -145,5 +158,6 @@ class ReadAloudSettings(context: Context) : ReadAloudPrefs {
         private const val KEY_ENGLISH_RECORDING = "english_recording"
         private const val KEY_TELUGU_RECORDING = "telugu_recording"
         private const val KEY_TAP_HINT = "tap_hint_shown"
+        private const val KEY_PAUSE = "pause_between_cards"
     }
 }

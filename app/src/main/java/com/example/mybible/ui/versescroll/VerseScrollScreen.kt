@@ -4,6 +4,7 @@ import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -50,6 +51,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.mybible.audio.ReadingPlace
 import com.example.mybible.data.MAX_VERSE_COLORS
 import com.example.mybible.model.HIGHLIGHT_COLOR_DEFS
@@ -152,6 +156,22 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
     val notes by viewModel.notes.collectAsState(initial = emptyList())
     val colors = verseScrollColors()
     val reduceMotion = rememberReduceMotion()
+    // Whether Verse Scroll is up (started), for a reading going on by itself to slide along to the next card.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> controller.screenShowing = true
+                Lifecycle.Event.ON_STOP -> controller.screenShowing = false
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            controller.screenShowing = false
+        }
+    }
     val scenes = controller.backgroundPhotos
     val motion = scenes && controller.motion && !reduceMotion
     val haptics = LocalHapticFeedback.current
@@ -283,12 +303,23 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
         val cards = controller.cards
         key(controller.feedId) {
             val pagerState = rememberPagerState(initialPage = controller.currentIndex) { cards.size }
-            // The controller asks to move on after following a link or leaving a Rabbit hole.
+            // The controller asks to move on after following a link or leaving a Rabbit hole, or as reading
+            // aloud goes on by itself to the next card: then a slower, eased slide.
             val request = controller.scrollRequest
             LaunchedEffect(request) {
                 if (request == null) return@LaunchedEffect
-                if (request.index < cards.size) pagerState.animateScrollToPage(request.index)
-                controller.consumeScrollRequest()
+                try {
+                    if (request.index < cards.size) {
+                        if (request.gentle && !reduceMotion) {
+                            pagerState.animateScrollToPage(request.index, animationSpec = tween(GENTLE_SLIDE_MS, easing = FastOutSlowInEasing))
+                        } else {
+                            pagerState.animateScrollToPage(request.index)
+                        }
+                    }
+                } finally {
+                    // There, or a swipe took over: done with it either way.
+                    controller.consumeScrollRequest(request)
+                }
             }
 
             // Leaving a Rabbit hole: a quick fade when it jumps back to where the hole started.
@@ -312,8 +343,10 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
             }
             // Also re-checked as cards arrive: the first ones load after the pager has already settled on page 0.
             LaunchedEffect(pagerState) {
-                snapshotFlow { pagerState.settledPage to cards.size }.collect { (page, size) ->
-                    if (page < size) controller.onCardShown(page)
+                // On the way to a card asked for (the reading going on to it), the card being left isn't
+                // shown again as more cards are dealt; once there, or a swipe took over, the card settled on is.
+                snapshotFlow { Triple(pagerState.settledPage, cards.size, controller.scrollRequest) }.collect { (page, size, moving) ->
+                    if (page < size && (moving == null || moving.index == page)) controller.onCardShown(page)
                 }
             }
             // A swipe closes the color box, as does touching the verse (see onPress below).
@@ -677,6 +710,8 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
             onTeluguSize = controller::adjustTeluguSize,
             continueReading = viewModel.readAloudSettings.continueReading,
             onContinueReading = viewModel.readAloudSettings::updateContinueReading,
+            pauseBetweenCards = viewModel.readAloudSettings.pauseBetweenCards,
+            onPauseBetweenCards = viewModel.readAloudSettings::updatePauseBetweenCards,
             onReadAloudSettings = {
                 settingsOpen = false
                 readAloudOpen = true
@@ -697,5 +732,8 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
 
 // The color box stays up this long after a double-tap, and closes this soon after a pick.
 private const val PICKER_MS = 6000L
+
+// The slide to the next card as reading aloud goes on by itself: slower than a swipe's, and eased.
+private const val GENTLE_SLIDE_MS = 700
 private const val PICKER_AFTER_PICK_MS = 380L
 private const val TOAST_MS = 3800L

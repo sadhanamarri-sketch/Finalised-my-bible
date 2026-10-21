@@ -55,8 +55,11 @@ data class EndFeedCard(override val uid: Long, val label: String) : FeedCard
 
 enum class FeedMode { DISCOVER, RABBIT_HOLE }
 
-/** Asks the screen to move to a card (after following a link, or on leaving a Rabbit hole). */
-data class ScrollRequest(val index: Int, val id: Long)
+/**
+ * Asks the screen to move to a card (after following a link, or on leaving a Rabbit hole); [gentle], the
+ * reading going on by itself to the next card, with a slower, eased slide.
+ */
+data class ScrollRequest(val index: Int, val id: Long, val gentle: Boolean = false)
 
 /** A label for a verse or short passage: "Isaiah 41:10", "Isaiah 40:29–31". */
 fun labelOf(refs: List<VerseRef>): String =

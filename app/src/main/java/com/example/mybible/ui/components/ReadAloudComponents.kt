@@ -433,6 +433,9 @@ fun ReadAloudSheet(
                     checked = settings.continueReading,
                     onCheckedChange = settings::updateContinueReading
                 )
+                if (settings.continueReading) {
+                    PauseBetweenCardsRow(settings.pauseBetweenCards, settings::updatePauseBetweenCards, Modifier.padding(top = 14.dp))
+                }
             }
             DsSectionDivider()
             DsNote(
@@ -440,6 +443,24 @@ fun ReadAloudSheet(
                 modifier = Modifier.padding(top = 14.dp)
             )
         }
+    }
+}
+
+/**
+ * Verse Scroll reading on by itself (Continue reading): how long it waits with a card once it's been
+ * read, before the next slides up. Off, or a few seconds.
+ */
+@Composable
+fun PauseBetweenCardsRow(seconds: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier) {
+        SettingName("Pause between cards")
+        DsNote("A moment with each verse once it's been read, before the next card slides up.", modifier = Modifier.padding(top = 2.dp, bottom = 10.dp))
+        DsSegmentedRow(
+            options = ReadAloudSettings.PAUSE_CHOICES,
+            selected = seconds,
+            label = { if (it == 0) "Off" else "$it s" },
+            onSelect = onSelect
+        )
     }
 }
 

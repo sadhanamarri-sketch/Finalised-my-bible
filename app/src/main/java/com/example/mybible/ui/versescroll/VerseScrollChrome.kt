@@ -92,6 +92,7 @@ import com.example.mybible.ui.components.DsSectionDivider
 import com.example.mybible.ui.components.DsSectionLabel
 import com.example.mybible.ui.components.DsSizeAdjustRow
 import com.example.mybible.ui.components.DsToggleRow
+import com.example.mybible.ui.components.PauseBetweenCardsRow
 import com.example.mybible.ui.components.PickerDarkGold
 import com.example.mybible.ui.components.PickerPaperGold
 import com.example.mybible.versescroll.VerseRef
@@ -636,12 +637,14 @@ internal fun VerseScrollSettingsSheet(
     teluguSize: Int,
     sceneCount: Int,
     continueReading: Boolean,
+    pauseBetweenCards: Int,
     onPhotos: (Boolean) -> Unit,
     onMotion: (Boolean) -> Unit,
     onDoubleTapColor: (String) -> Unit,
     onShowTelugu: (Boolean) -> Unit,
     onTeluguSize: (Int) -> Unit,
     onContinueReading: (Boolean) -> Unit,
+    onPauseBetweenCards: (Int) -> Unit,
     onReadAloudSettings: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -734,6 +737,7 @@ internal fun VerseScrollSettingsSheet(
                 checked = continueReading,
                 onCheckedChange = onContinueReading
             )
+            if (continueReading) PauseBetweenCardsRow(pauseBetweenCards, onPauseBetweenCards, Modifier.padding(top = 14.dp))
             DsNote(
                 "Earbuds and headsets: a tap pauses or plays; next and previous (often a double and a triple tap) go a card on or back.",
                 modifier = Modifier.padding(top = 10.dp)

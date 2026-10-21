@@ -1,5 +1,6 @@
 package com.example.mybible.audio
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
@@ -292,6 +293,59 @@ class ReadAloudTest {
         reader.skipToNext()
         assertEquals(ReadAloudState.Status.IDLE, reader.state.value.status)
         assertEquals(true, chapter.stopped)
+    }
+
+    @Test
+    fun waitingToGoOnNextGoesOnAtOnceAndPreviousReadsTheLastVerseAgain() {
+        val speaker = FakeSpeaker()
+        val reader = reader(speaker)
+        val cards = Pausing(john3)
+        reader.start(cards)
+        speaker.finish()
+        // 3:16 read, and a wait before 3:17 (Verse Scroll's pause between cards): nothing more said yet.
+        assertEquals(1, speaker.said.size)
+        assertTrue(cards.waiting)
+        // Next goes on at once, to the verse it was waiting for, not past it.
+        reader.skipToNext()
+        assertFalse(cards.waiting)
+        assertEquals("John 3:17", reader.state.value.verse?.label)
+        assertEquals("For God sent not his Son", speaker.said.last().text)
+        // Previous while it waits: the verse just read, again.
+        speaker.finish()
+        assertTrue(cards.waiting)
+        reader.skipToPrevious()
+        assertFalse(cards.waiting)
+        assertEquals(3, speaker.said.size)
+        assertEquals("For God sent not his Son", speaker.said.last().text)
+        // Being read, Next skips to the next at once, as Verse Scroll's goes a card on.
+        reader.skipToNext()
+        assertFalse(cards.waiting)
+        assertEquals("John 3:18", reader.state.value.verse?.label)
+        assertEquals("He that believeth on him is not condemned", speaker.said.last().text)
+    }
+
+    // Waits before each verse after its first, as Verse Scroll's pause between cards, until hurried.
+    private class Pausing(val verses: List<VerseToRead>) : ReadingSession {
+        override val place = ReadingPlace.VERSE_SCROLL
+        override val title = "Verse Scroll"
+        private var wait: CompletableDeferred<Unit>? = null
+        override val waiting: Boolean get() = wait != null
+
+        override suspend fun next(after: VerseToRead?): VerseToRead? {
+            if (after == null) return verses.first()
+            try {
+                CompletableDeferred<Unit>().also { wait = it }.await()
+            } finally {
+                wait = null
+            }
+            return verses.getOrNull(verses.indexOf(after) + 1)
+        }
+
+        override suspend fun skip(current: VerseToRead): VerseToRead? = verses.getOrNull(verses.indexOf(current) + 1)
+
+        override fun hurry() {
+            wait?.complete(Unit)
+        }
     }
 
     @Test

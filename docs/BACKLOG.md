@@ -683,7 +683,7 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     *Built 21 Oct,* just so: swiped away playing or paused, the reading stops, its notification
     goes, and the service stops.
 
-25. **Verse Scroll: a pause between cards, and a gentler slide.** "Provide a setting to set
+25. **Done 21 Oct.** **Verse Scroll: a pause between cards, and a gentler slide.** "Provide a setting to set
     delay(pause for few secs) the scrolling during continue reading(auto-scroll). Also snoother
     transition instead of quick swap." — "let's add pause duration to settings and i choose
     gentler, smoother slide(as there is a pause already planned."
@@ -700,6 +700,16 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     runs within the reader-aloud's search for the next verse; the slide is the pager's
     animateScrollToPage with an eased tween; the reading starts when the scroll has finished.
     Next needs to cut the wait short: today skips are ignored while the next verse is being found.
+    *Built 21 Oct:* *Pause between cards* shows under Continue reading while it's on, in Verse
+    Scroll's settings and in the reading-aloud sheet opened from Verse Scroll: Off, 2 s, 3 s (to
+    start with), 5 s or 10 s. The slide to the next card takes 0.7 s, eased in and out, and the
+    card is read once it has settled (waiting 2 s at most; with the screen off, not at all).
+    During the pause the earbuds' or the notification's Next goes on at once, and Previous reads
+    the card's verse again. Paused during it, the reading stays on its card until it's played
+    again (then it slides on and reads), rather than moving on while paused; stopping stops.
+    Fixed on the way: as more cards were dealt during a slide the reading had asked for, the
+    card it was leaving could be taken for the one shown and read again; and a slide a swipe
+    interrupted was never let go of.
 
 26. **Reading on past the chapter, and a sleep timer.** "Provide setting to continue infinitely in
     reader mode in read along with sleep timer." — "timer doesn't pause as it's really a sleep
