@@ -5,9 +5,11 @@ alone from its heading to the next one's, so a chapter the aligner gets wrong ca
 A chapter still placed wrongly (a word stretched, words not placed) has its verses estimated.
 
 usage: anchor_repair.py <state.json> <kjv.tsv> <flac dir> <dictionary> <acoustic model> <work dir>
-                        [--beam=20,100] <Book:first-last> [<Book:first-last> ...]
+                        [--beam=20,100] <Book:first-last[@from-to]> [<Book:first-last[@from-to]> ...]
 The state is updated in place. Needs $KWS_PYTHON as chain_align.py does. --beam sets the aligner's
-beam and retry beam: wider (100,400) is slower but places chapters the usual one gives up on.
+beam and retry beam: wider (100,400) is slower but places chapters the usual one gives up on. A run
+spans from just after the last word before it to the next chapter's heading, or @from-to (seconds)
+where the chapters round it were placed wrongly too.
 """
 import sys, os, json, difflib, subprocess, shutil
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -71,6 +73,7 @@ def main(state_path, kjv_tsv, flac_dir, dictionary, model, work, *runs):
     os.makedirs(corpus)
     plans = {}
     for run in runs:
+        run, _, at = run.partition('@')
         book, span = run.split(':')
         first, last = map(int, span.split('-'))
         s, chapters = state[book], bible[book]
@@ -78,6 +81,7 @@ def main(state_path, kjv_tsv, flac_dir, dictionary, model, work, *runs):
         t0 = (prev['words'][-1][1] if prev and prev['words'] else prev['end'] if prev else 0.0) + 0.3
         nxt = s['chapters'].get(str(last + 1))
         t1 = nxt['start'] if nxt else s['duration']
+        if at: t0, t1 = map(float, at.split('-'))
         heads, heard = anchors(book, s, chapters, first, last, t0, t1, flac_dir)
         print(f'{book} {first}-{last}: headings heard {sorted(heard)} of {last - first + 1}', flush=True)
         items = []

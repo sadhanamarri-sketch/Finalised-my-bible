@@ -142,9 +142,16 @@ python3 english_words/anchor_repair.py drama/chain/state.json kjv.tsv drama/flac
 # Jeremiah 50, which had taken in a minute of 51 (heard by speech recognition after the retry)
 python3 english_words/anchor_repair.py drama/chain/state.json kjv.tsv drama/flac drama/english_kjv.dict english_mfa \
     drama/retry2 --beam=100,400 "Jeremiah:49-51"
+# 1 Samuel 25, whose first verses had been put up to half a minute late (found by the checks by ear
+# below), between where 24 ends and 26's heading as heard
+python3 english_words/anchor_repair.py drama/chain/state.json kjv.tsv drama/flac drama/english_kjv.dict english_mfa \
+    drama/retry3 --beam=100,400 "1 Samuel:25-25@6103.5-6541.8"
 python3 english_words/words_to_verses.py drama/chain/state.json kjv.tsv drama/members.json drama/mp4_lengths.json \
     results/drama
 python3 export.py drama results/drama kjv.tsv ../../data/audio_timing/kjv_dramatized.json
+# The verses it was unsure of, checked by ear on a page that played each one (english_words/checked_by_ear.json)
+python3 english_words/fold_checked.py ../../data/audio_timing/kjv_dramatized.json english_words/checked_by_ear.json \
+    ../../data/audio_timing/kjv_dramatized.json
 ```
 
 `kjv.tsv` is the app's KJV text, one verse per line: book, chapter, verse, text. Results are kept
@@ -175,6 +182,10 @@ chapter by chapter (book by book for Telugu), so a run that stops can be started
   and Revelation 17 placed, and Jeremiah 52 from its heading, about two and a half minutes earlier
   than it had been put. Jeremiah 51 still wouldn't fit: Jeremiah 50 had been run on a minute into it,
   which speech recognition then heard, and Jeremiah 49 to 51 timed again from their headings were
-  all placed. 28 chapters are taken with a word placed impossibly long: 911 verses (2.9%) are
-  marked unsure. The recording also says "This concludes disc number …" here and there,
+  all placed. 28 chapters were taken with a word placed impossibly long, and their 911 verses
+  (2.9%) marked unsure. Every one of those was then played and checked by ear (20 Oct): 667 passed,
+  the starts of 100 confirmed or moved a quarter second at a time, and 144 given new starts where
+  the aligner had them wrong, by up to 38 s (1 Samuel 24 and 26, 1 Chronicles 4, John 12 and
+  Exodus 24 above all). That turned up 1 Samuel 25, which had been taken as placed: its first 17
+  verses were up to 32 s late, and it was timed again between its neighbours. No verse is unsure. The recording also says "This concludes disc number …" here and there,
   from its CDs.
