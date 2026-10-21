@@ -151,6 +151,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _verseNumbersWithXrefs = MutableStateFlow<Set<Int>>(emptySet())
     val verseNumbersWithXrefs: StateFlow<Set<Int>> = _verseNumbersWithXrefs.asStateFlow()
 
+    // Of those, the verses that quote the Old Testament or are quoted in the New: their dagger is purple.
+    private val _quotedVerseNumbers = MutableStateFlow<Set<Int>>(emptySet())
+    val quotedVerseNumbers: StateFlow<Set<Int>> = _quotedVerseNumbers.asStateFlow()
+
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
@@ -1614,6 +1618,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val result = repository.getChapterVerses(bookName, chap, includeTelugu = _showTeluguInline.value)
         _verses.value = result
         _verseNumbersWithXrefs.value = repository.getCrossReferenceVerseNumbers(bookName, chap)
+        _quotedVerseNumbers.value = repository.quotedVerses(bookName, chap)
         _isLoading.value = false
     }
 

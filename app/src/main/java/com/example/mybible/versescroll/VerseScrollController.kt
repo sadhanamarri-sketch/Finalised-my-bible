@@ -723,12 +723,16 @@ class VerseScrollController(
 
     data class LinkPreview(val link: Link, val content: VerseCardContent, val seen: Boolean)
 
-    /** A verse's strongest links for its Links sheet, with their text and whether they've been shown already. */
+    /**
+     * A verse's links for its Links sheet, its quotations first (all of them) and then its strongest, with
+     * their text and whether they've been shown already.
+     */
     suspend fun linkPreviews(card: VerseFeedCard): List<LinkPreview> {
         val seen = cards.take(currentIndex + 1)
             .flatMap { (it as? VerseFeedCard)?.content?.refs.orEmpty() }
             .mapTo(HashSet()) { it.key }
-        return linkSource.links(card.content.ref).take(LINKS_SHOWN).mapNotNull { link ->
+        val links = linkSource.links(card.content.ref)
+        return (links.filter { it.quote } + links.filterNot { it.quote }.take(LINKS_SHOWN)).mapNotNull { link ->
             loadContent(link.ref, link.count)?.let { LinkPreview(link, it, link.ref.key in seen) }
         }
     }
@@ -765,14 +769,15 @@ class VerseScrollController(
 
     /**
      * A verse's links worth suggesting, strongest first: each to one verse, or to a short passage when
-     * the link names 2 or 3 verses that together stay short. Leaves out links back to the verse itself,
-     * and repeats.
+     * the link names 2 or 3 verses that together stay short; a quotation however weak. Leaves out links
+     * back to the verse itself, and repeats.
      */
     private suspend fun resolveLinks(ref: VerseRef): List<Link> {
         val out = mutableListOf<Link>()
         val seen = HashSet<String>()
         for (row in repository.getCrossReferenceRows(ref.book, ref.chapter, ref.verse)) {
-            if (row.votes < MIN_SUGGESTED_VOTES) break
+            val quote = repository.quotations.isQuote(ref.book, ref.chapter, ref.verse, row.toBook, row.toChapter, row.toVerse, row.toVerseEnd)
+            if (row.votes < MIN_SUGGESTED_VOTES && !quote) continue
             val first = VerseRef(row.toBook, row.toChapter, row.toVerse)
             if (first == ref || !seen.add(first.key)) continue
             val span = row.toVerseEnd - row.toVerse + 1
@@ -781,7 +786,7 @@ class VerseScrollController(
             val passage = (0 until span).map { found[first.verse + it] }
             val isPassage = span in 2..MAX_PASSAGE && passage.all { it != null } &&
                 passage.sumOf { wordCount(it!!) } <= MAX_PASSAGE_WORDS
-            out.add(Link(first, row.votes, if (isPassage) span else 1))
+            out.add(Link(first, row.votes, if (isPassage) span else 1, quote))
         }
         return out
     }

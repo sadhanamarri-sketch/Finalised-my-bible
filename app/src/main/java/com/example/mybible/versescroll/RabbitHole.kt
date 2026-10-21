@@ -16,10 +16,10 @@ const val MIN_SUGGESTED_VOTES = 3
 private const val PER_HUB = 3
 
 /**
- * Where a link points: one verse, or the first of a short passage ([count] verses, 2 or 3), and how
- * strong it is.
+ * Where a link points: one verse, or the first of a short passage ([count] verses, 2 or 3), how strong
+ * it is, and whether it's one of the Old Testament's quotations in the New ([quote]).
  */
-data class Link(val ref: VerseRef, val votes: Int, val count: Int = 1) {
+data class Link(val ref: VerseRef, val votes: Int, val count: Int = 1, val quote: Boolean = false) {
     val refs: List<VerseRef> get() = (0 until count).map { VerseRef(ref.book, ref.chapter, ref.verse + it) }
 }
 

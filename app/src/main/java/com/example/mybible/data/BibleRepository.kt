@@ -1450,18 +1450,33 @@ class BibleRepository(private val context: Context) {
     suspend fun getCrossReferences(book: String, chapter: Int, verse: Int): List<CrossReferenceItem> = withContext(Dispatchers.IO) {
         val rows = bibleDao.getCrossReferences(book, chapter, verse)
         if (rows.isNotEmpty()) {
-            return@withContext rows.take(20).map { row ->
+            // The quotations first, however few votes they have; then the strongest 20 of the rest.
+            val (quotes, rest) = rows.partition { quotations.isQuote(book, chapter, verse, it.toBook, it.toChapter, it.toVerse, it.toVerseEnd) }
+            return@withContext (quotes.map { it to true } + rest.take(20).map { it to false }).map { (row, quote) ->
                 val preview = bibleDao.getVerseText(row.toBook, row.toChapter, row.toVerse) ?: ""
                 CrossReferenceItem(
                     targetBook = row.toBook,
                     targetChapter = row.toChapter,
                     targetVerse = row.toVerse,
-                    previewText = preview
+                    previewText = preview,
+                    quote = quote
                 )
             }
         }
         fallbackCrossReferences(book, chapter, verse)
     }
+
+    /** The Old Testament's quotations in the New, checked by hand (assets/quotations.tsv). */
+    val quotations: Quotations by lazy {
+        try {
+            Quotations.parse(context.assets.open("quotations.tsv").bufferedReader().use { it.readText() })
+        } catch (e: java.io.IOException) {
+            Quotations.None
+        }
+    }
+
+    /** The verses of [book] [chapter] that quote the Old Testament or are quoted in the New. */
+    fun quotedVerses(book: String, chapter: Int): Set<Int> = quotations.versesIn(book, chapter)
 
     // Chapter-scoped: which verse numbers have at least one cross-reference,
     // loaded once per chapter so VerseCard can mark them with a dagger

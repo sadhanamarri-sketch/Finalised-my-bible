@@ -21,7 +21,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.components.BackTopBar
+import com.example.mybible.ui.components.QuoteTag
 import com.example.mybible.ui.theme.WorkSansFontFamily
+import com.example.mybible.ui.theme.quotePurple
 
 /**
  * Full-page cross-reference list, replacing the old CrossReferenceSheet
@@ -214,14 +216,18 @@ fun CrossReferenceScreen(
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text(
-                                                text = "${item.targetBook} ${item.targetChapter}:${item.targetVerse}".uppercase(),
-                                                fontSize = 13.sp,
-                                                fontFamily = WorkSansFontFamily,
-                                                fontWeight = FontWeight.SemiBold,
-                                                letterSpacing = 0.5.sp,
-                                                color = MaterialTheme.colorScheme.tertiary
-                                            )
+                                            // A quotation (always first): its reference in purple, tagged.
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    text = "${item.targetBook} ${item.targetChapter}:${item.targetVerse}".uppercase(),
+                                                    fontSize = 13.sp,
+                                                    fontFamily = WorkSansFontFamily,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    letterSpacing = 0.5.sp,
+                                                    color = if (item.quote) quotePurple() else MaterialTheme.colorScheme.tertiary
+                                                )
+                                                if (item.quote) QuoteTag(quotePurple(), Modifier.padding(start = 8.dp))
+                                            }
                                             Icon(
                                                 imageVector = Icons.Default.ArrowForward,
                                                 contentDescription = "Navigate",

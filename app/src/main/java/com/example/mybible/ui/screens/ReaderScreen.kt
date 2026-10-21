@@ -119,6 +119,7 @@ fun ReaderScreen(
 ) {
     val verses by viewModel.verses.collectAsState()
     val verseNumbersWithXrefs by viewModel.verseNumbersWithXrefs.collectAsState()
+    val quotedVerseNumbers by viewModel.quotedVerseNumbers.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val currentBook by viewModel.currentBook.collectAsState()
     val currentChapter by viewModel.currentChapter.collectAsState()
@@ -1449,6 +1450,7 @@ fun ReaderScreen(
                             fontSizeSp = fontSizeSp,
                             hasNotes = hasNote,
                             hasXref = verse.number in verseNumbersWithXrefs,
+                            isQuotation = verse.number in quotedVerseNumbers,
                             isBlurModeEnabled = effectiveBlurEnabled,
                             isFocusedVerse = isFocused,
                             isBeingRead = verse.number == verseBeingRead,

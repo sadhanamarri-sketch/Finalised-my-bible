@@ -116,6 +116,8 @@ fun VerseCard(
     fontSizeSp: Int,
     hasNotes: Boolean,
     hasXref: Boolean = false,
+    // The verse quotes the Old Testament, or is quoted in the New: its dagger is purple.
+    isQuotation: Boolean = false,
     onVerseClick: () -> Unit,
     onVerseLongClick: () -> Unit,
     onGreekWordClick: (GreekWord) -> Unit,
@@ -262,11 +264,12 @@ fun VerseCard(
                     // Greek word chips below — so it doesn't fall through to
                     // the row's combinedClickable (select/long-press) or
                     // require threading it through the annotated verse text.
+                    // Purple for a quotation (see Quotations).
                     if (hasXref && onCrossReferenceMarkerClick != null) {
                         Text(
                             text = "\u2020",
                             fontSize = 11.5.sp,
-                            color = if (isDark) DarkGold else PaperGold,
+                            color = if (isQuotation) quotePurple(isDark) else if (isDark) DarkGold else PaperGold,
                             modifier = Modifier
                                 .padding(start = 2.dp)
                                 .clickable(onClick = onCrossReferenceMarkerClick)

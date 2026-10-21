@@ -417,7 +417,9 @@ data class CrossReferenceItem(
     val targetBook: String,
     val targetChapter: Int,
     val targetVerse: Int,
-    val previewText: String
+    val previewText: String,
+    /** One of the Old Testament's quotations in the New (see Quotations). */
+    val quote: Boolean = false
 )
 
 enum class ThemeMode {
