@@ -1,0 +1,463 @@
+# The Old Testament's quotations in the New: the New Testament verses, then those they quote.
+# Made by tools/quotations/make_quotations.py from the reviewed list there.
+Matthew 1:23	Isaiah 7:14
+Matthew 2:6	2 Samuel 5:2
+Matthew 2:6	Micah 5:2
+Matthew 2:15	Hosea 11:1
+Matthew 2:18	Jeremiah 31:15
+Matthew 3:3	Isaiah 40:3
+Matthew 4:4	Deuteronomy 8:3
+Matthew 4:6	Psalms 91:11-12
+Matthew 4:7	Deuteronomy 6:16
+Matthew 4:10	Deuteronomy 6:13
+Matthew 4:10	Deuteronomy 10:20
+Matthew 4:15	Isaiah 9:1
+Matthew 4:16	Isaiah 9:2
+Matthew 5:5	Psalms 37:11
+Matthew 5:21	Exodus 20:13
+Matthew 5:21	Deuteronomy 5:17
+Matthew 5:27	Exodus 20:14
+Matthew 5:27	Deuteronomy 5:18
+Matthew 5:31	Deuteronomy 24:1
+Matthew 5:33	Leviticus 19:12
+Matthew 5:38	Exodus 21:24
+Matthew 5:38	Leviticus 24:20
+Matthew 5:38	Deuteronomy 19:21
+Matthew 5:43	Leviticus 19:18
+Matthew 7:23	Psalms 6:8
+Matthew 8:17	Isaiah 53:4
+Matthew 9:13	Hosea 6:6
+Matthew 10:35-36	Micah 7:6
+Matthew 11:10	Malachi 3:1
+Matthew 11:23	Isaiah 14:15
+Matthew 11:29	Jeremiah 6:16
+Matthew 12:7	Hosea 6:6
+Matthew 12:18	Isaiah 42:1
+Matthew 12:19	Isaiah 42:2
+Matthew 12:20	Isaiah 42:3-4
+Matthew 12:21	Isaiah 42:4
+Matthew 12:40	Jonah 1:17
+Matthew 13:14	Isaiah 6:9
+Matthew 13:15	Isaiah 6:10
+Matthew 13:35	Psalms 78:2
+Matthew 15:4	Exodus 20:12
+Matthew 15:4	Exodus 21:17
+Matthew 15:4	Leviticus 20:9
+Matthew 15:4	Deuteronomy 5:16
+Matthew 15:8-9	Isaiah 29:13
+Matthew 16:27	Psalms 62:12
+Matthew 16:27	Proverbs 24:12
+Matthew 18:16	Deuteronomy 19:15
+Matthew 19:4	Genesis 1:27
+Matthew 19:4	Genesis 5:2
+Matthew 19:5	Genesis 2:24
+Matthew 19:7	Deuteronomy 24:1
+Matthew 19:18	Exodus 20:13-16
+Matthew 19:18	Deuteronomy 5:17-20
+Matthew 19:19	Exodus 20:12
+Matthew 19:19	Leviticus 19:18
+Matthew 19:19	Deuteronomy 5:16
+Matthew 21:5	Isaiah 62:11
+Matthew 21:5	Zechariah 9:9
+Matthew 21:9	Psalms 118:25-26
+Matthew 21:13	Isaiah 56:7
+Matthew 21:13	Jeremiah 7:11
+Matthew 21:16	Psalms 8:2
+Matthew 21:42	Psalms 118:22-23
+Matthew 22:24	Deuteronomy 25:5
+Matthew 22:32	Exodus 3:6
+Matthew 22:37	Deuteronomy 6:5
+Matthew 22:39	Leviticus 19:18
+Matthew 22:44	Psalms 110:1
+Matthew 23:39	Psalms 118:26
+Matthew 24:15	Daniel 9:27
+Matthew 24:15	Daniel 11:31
+Matthew 24:15	Daniel 12:11
+Matthew 24:29	Isaiah 13:10
+Matthew 24:29	Isaiah 34:4
+Matthew 24:30	Daniel 7:13
+Matthew 26:31	Zechariah 13:7
+Matthew 26:64	Psalms 110:1
+Matthew 26:64	Daniel 7:13
+Matthew 27:9	Zechariah 11:12-13
+Matthew 27:10	Zechariah 11:13
+Matthew 27:35	Psalms 22:18
+Matthew 27:43	Psalms 22:8
+Matthew 27:46	Psalms 22:1
+Mark 1:2	Malachi 3:1
+Mark 1:3	Isaiah 40:3
+Mark 4:12	Isaiah 6:9-10
+Mark 7:6-7	Isaiah 29:13
+Mark 7:10	Exodus 20:12
+Mark 7:10	Exodus 21:17
+Mark 7:10	Leviticus 20:9
+Mark 7:10	Deuteronomy 5:16
+Mark 9:44	Isaiah 66:24
+Mark 9:46	Isaiah 66:24
+Mark 9:48	Isaiah 66:24
+Mark 10:4	Deuteronomy 24:1
+Mark 10:6	Genesis 1:27
+Mark 10:6	Genesis 5:2
+Mark 10:7-8	Genesis 2:24
+Mark 10:19	Exodus 20:12-16
+Mark 10:19	Deuteronomy 5:16-20
+Mark 11:9	Psalms 118:25-26
+Mark 11:17	Isaiah 56:7
+Mark 11:17	Jeremiah 7:11
+Mark 12:10	Psalms 118:22
+Mark 12:11	Psalms 118:23
+Mark 12:19	Deuteronomy 25:5
+Mark 12:26	Exodus 3:6
+Mark 12:29	Deuteronomy 6:4
+Mark 12:30	Deuteronomy 6:5
+Mark 12:31	Leviticus 19:18
+Mark 12:36	Psalms 110:1
+Mark 13:14	Daniel 9:27
+Mark 13:14	Daniel 11:31
+Mark 13:14	Daniel 12:11
+Mark 13:24	Isaiah 13:10
+Mark 13:25	Isaiah 34:4
+Mark 13:26	Daniel 7:13
+Mark 14:27	Zechariah 13:7
+Mark 14:62	Psalms 110:1
+Mark 14:62	Daniel 7:13
+Mark 15:34	Psalms 22:1
+Luke 1:17	Malachi 4:5-6
+Luke 2:23	Exodus 13:2
+Luke 2:23	Exodus 13:12
+Luke 2:24	Leviticus 12:8
+Luke 3:4	Isaiah 40:3
+Luke 3:5	Isaiah 40:4
+Luke 3:6	Isaiah 40:5
+Luke 4:4	Deuteronomy 8:3
+Luke 4:8	Deuteronomy 6:13
+Luke 4:8	Deuteronomy 10:20
+Luke 4:10	Psalms 91:11
+Luke 4:11	Psalms 91:12
+Luke 4:12	Deuteronomy 6:16
+Luke 4:18	Isaiah 61:1
+Luke 4:19	Isaiah 61:2
+Luke 7:27	Malachi 3:1
+Luke 8:10	Isaiah 6:9
+Luke 10:15	Isaiah 14:15
+Luke 10:27	Leviticus 19:18
+Luke 10:27	Deuteronomy 6:5
+Luke 12:53	Micah 7:6
+Luke 13:27	Psalms 6:8
+Luke 13:35	Psalms 118:26
+Luke 18:20	Exodus 20:12-16
+Luke 18:20	Deuteronomy 5:16-20
+Luke 19:38	Psalms 118:26
+Luke 19:46	Isaiah 56:7
+Luke 19:46	Jeremiah 7:11
+Luke 20:17	Psalms 118:22
+Luke 20:28	Deuteronomy 25:5
+Luke 20:37	Exodus 3:6
+Luke 20:42-43	Psalms 110:1
+Luke 21:27	Daniel 7:13
+Luke 22:37	Isaiah 53:12
+Luke 22:69	Psalms 110:1
+Luke 23:30	Hosea 10:8
+Luke 23:46	Psalms 31:5
+John 1:23	Isaiah 40:3
+John 2:17	Psalms 69:9
+John 6:31	Exodus 16:4
+John 6:31	Nehemiah 9:15
+John 6:31	Psalms 78:24
+John 6:45	Isaiah 54:13
+John 10:34	Psalms 82:6
+John 12:13	Psalms 118:25-26
+John 12:15	Zechariah 9:9
+John 12:38	Isaiah 53:1
+John 12:40	Isaiah 6:10
+John 13:18	Psalms 41:9
+John 15:25	Psalms 35:19
+John 15:25	Psalms 69:4
+John 19:24	Psalms 22:18
+John 19:36	Exodus 12:46
+John 19:36	Numbers 9:12
+John 19:36	Psalms 34:20
+John 19:37	Zechariah 12:10
+Acts 1:20	Psalms 69:25
+Acts 1:20	Psalms 109:8
+Acts 2:17	Joel 2:28
+Acts 2:19	Joel 2:30
+Acts 2:21	Joel 2:32
+Acts 2:25	Psalms 16:8
+Acts 2:26	Psalms 16:9
+Acts 2:27	Psalms 16:10
+Acts 2:28	Psalms 16:11
+Acts 2:31	Psalms 16:10
+Acts 2:34-35	Psalms 110:1
+Acts 3:22	Deuteronomy 18:15
+Acts 3:23	Leviticus 23:29
+Acts 3:23	Deuteronomy 18:19
+Acts 3:25	Genesis 12:3
+Acts 3:25	Genesis 22:18
+Acts 4:11	Psalms 118:22
+Acts 4:25	Psalms 2:1
+Acts 4:26	Psalms 2:2
+Acts 7:3	Genesis 12:1
+Acts 7:6	Genesis 15:13
+Acts 7:7	Genesis 15:14
+Acts 7:7	Exodus 3:12
+Acts 7:18	Exodus 1:8
+Acts 7:27-28	Exodus 2:14
+Acts 7:32	Exodus 3:6
+Acts 7:33	Exodus 3:5
+Acts 7:34	Exodus 3:7-8
+Acts 7:34	Exodus 3:10
+Acts 7:35	Exodus 2:14
+Acts 7:37	Deuteronomy 18:15
+Acts 7:40	Exodus 32:1
+Acts 7:40	Exodus 32:23
+Acts 7:42	Amos 5:25
+Acts 7:43	Amos 5:26-27
+Acts 7:49	Isaiah 66:1
+Acts 7:50	Isaiah 66:2
+Acts 8:32	Isaiah 53:7
+Acts 8:33	Isaiah 53:8
+Acts 13:22	1 Samuel 13:14
+Acts 13:22	Psalms 89:20
+Acts 13:33	Psalms 2:7
+Acts 13:34	Isaiah 55:3
+Acts 13:35	Psalms 16:10
+Acts 13:41	Habakkuk 1:5
+Acts 13:47	Isaiah 49:6
+Acts 15:16	Amos 9:11
+Acts 15:17	Amos 9:12
+Acts 23:5	Exodus 22:28
+Acts 28:26	Isaiah 6:9
+Acts 28:27	Isaiah 6:10
+Romans 1:17	Habakkuk 2:4
+Romans 2:6	Psalms 62:12
+Romans 2:6	Proverbs 24:12
+Romans 2:24	Isaiah 52:5
+Romans 3:4	Psalms 51:4
+Romans 3:10	Psalms 14:1
+Romans 3:10	Psalms 14:3
+Romans 3:10	Psalms 53:1
+Romans 3:10	Psalms 53:3
+Romans 3:11	Psalms 14:2
+Romans 3:11	Psalms 53:2
+Romans 3:12	Psalms 14:3
+Romans 3:12	Psalms 53:3
+Romans 3:13	Psalms 5:9
+Romans 3:13	Psalms 140:3
+Romans 3:14	Psalms 10:7
+Romans 3:15-16	Proverbs 1:16
+Romans 3:15-16	Isaiah 59:7
+Romans 3:17	Isaiah 59:8
+Romans 3:18	Psalms 36:1
+Romans 4:3	Genesis 15:6
+Romans 4:7	Psalms 32:1
+Romans 4:8	Psalms 32:2
+Romans 4:9	Genesis 15:6
+Romans 4:17	Genesis 17:5
+Romans 4:18	Genesis 15:5
+Romans 4:22	Genesis 15:6
+Romans 7:7	Exodus 20:17
+Romans 7:7	Deuteronomy 5:21
+Romans 8:36	Psalms 44:22
+Romans 9:7	Genesis 21:12
+Romans 9:9	Genesis 18:10
+Romans 9:9	Genesis 18:14
+Romans 9:12	Genesis 25:23
+Romans 9:13	Malachi 1:2-3
+Romans 9:15	Exodus 33:19
+Romans 9:17	Exodus 9:16
+Romans 9:25	Hosea 2:23
+Romans 9:26	Hosea 1:10
+Romans 9:27	Isaiah 10:22
+Romans 9:27	Hosea 1:10
+Romans 9:28	Isaiah 10:23
+Romans 9:29	Isaiah 1:9
+Romans 9:33	Isaiah 8:14
+Romans 9:33	Isaiah 28:16
+Romans 10:5	Leviticus 18:5
+Romans 10:6	Deuteronomy 30:12
+Romans 10:8	Deuteronomy 30:14
+Romans 10:11	Isaiah 28:16
+Romans 10:13	Joel 2:32
+Romans 10:15	Isaiah 52:7
+Romans 10:16	Isaiah 53:1
+Romans 10:18	Psalms 19:4
+Romans 10:19	Deuteronomy 32:21
+Romans 10:20	Isaiah 65:1
+Romans 10:21	Isaiah 65:2
+Romans 11:3	1 Kings 19:10
+Romans 11:3	1 Kings 19:14
+Romans 11:4	1 Kings 19:18
+Romans 11:8	Deuteronomy 29:4
+Romans 11:8	Isaiah 29:10
+Romans 11:9	Psalms 69:22
+Romans 11:10	Psalms 69:23
+Romans 11:26	Isaiah 59:20
+Romans 11:27	Isaiah 27:9
+Romans 11:27	Isaiah 59:21
+Romans 11:34	Isaiah 40:13
+Romans 11:35	Job 41:11
+Romans 12:19	Deuteronomy 32:35
+Romans 12:20	Proverbs 25:21-22
+Romans 13:9	Exodus 20:13-17
+Romans 13:9	Leviticus 19:18
+Romans 13:9	Deuteronomy 5:17-21
+Romans 14:11	Isaiah 45:23
+Romans 14:11	Isaiah 49:18
+Romans 15:3	Psalms 69:9
+Romans 15:9	2 Samuel 22:50
+Romans 15:9	Psalms 18:49
+Romans 15:10	Deuteronomy 32:43
+Romans 15:11	Psalms 117:1
+Romans 15:12	Isaiah 11:10
+Romans 15:21	Isaiah 52:15
+1 Corinthians 1:19	Isaiah 29:14
+1 Corinthians 1:31	Jeremiah 9:24
+1 Corinthians 2:9	Isaiah 64:4
+1 Corinthians 2:16	Isaiah 40:13
+1 Corinthians 3:19	Job 5:13
+1 Corinthians 3:20	Psalms 94:11
+1 Corinthians 5:13	Deuteronomy 17:7
+1 Corinthians 6:16	Genesis 2:24
+1 Corinthians 9:9	Deuteronomy 25:4
+1 Corinthians 10:7	Exodus 32:6
+1 Corinthians 10:20	Deuteronomy 32:17
+1 Corinthians 10:26	Psalms 24:1
+1 Corinthians 10:28	Psalms 24:1
+1 Corinthians 14:21	Isaiah 28:11-12
+1 Corinthians 15:27	Psalms 8:6
+1 Corinthians 15:32	Isaiah 22:13
+1 Corinthians 15:45	Genesis 2:7
+1 Corinthians 15:54	Isaiah 25:8
+1 Corinthians 15:55	Hosea 13:14
+2 Corinthians 4:13	Psalms 116:10
+2 Corinthians 6:2	Isaiah 49:8
+2 Corinthians 6:16	Leviticus 26:12
+2 Corinthians 6:16	Ezekiel 37:27
+2 Corinthians 6:17	Isaiah 52:11
+2 Corinthians 6:18	2 Samuel 7:14
+2 Corinthians 8:15	Exodus 16:18
+2 Corinthians 9:9	Psalms 112:9
+2 Corinthians 10:17	Jeremiah 9:24
+2 Corinthians 13:1	Deuteronomy 19:15
+Galatians 3:6	Genesis 15:6
+Galatians 3:8	Genesis 12:3
+Galatians 3:8	Genesis 18:18
+Galatians 3:10	Deuteronomy 27:26
+Galatians 3:11	Habakkuk 2:4
+Galatians 3:12	Leviticus 18:5
+Galatians 3:13	Deuteronomy 21:23
+Galatians 3:16	Genesis 12:7
+Galatians 3:16	Genesis 13:15
+Galatians 3:16	Genesis 17:8
+Galatians 4:27	Isaiah 54:1
+Galatians 4:30	Genesis 21:10
+Galatians 5:14	Leviticus 19:18
+Ephesians 1:22	Psalms 8:6
+Ephesians 4:8	Psalms 68:18
+Ephesians 4:25	Zechariah 8:16
+Ephesians 4:26	Psalms 4:4
+Ephesians 5:31	Genesis 2:24
+Ephesians 6:2-3	Exodus 20:12
+Ephesians 6:2-3	Deuteronomy 5:16
+1 Timothy 5:18	Deuteronomy 25:4
+2 Timothy 2:19	Numbers 16:5
+Hebrews 1:5	2 Samuel 7:14
+Hebrews 1:5	1 Chronicles 17:13
+Hebrews 1:5	Psalms 2:7
+Hebrews 1:6	Psalms 97:7
+Hebrews 1:7	Psalms 104:4
+Hebrews 1:8	Psalms 45:6
+Hebrews 1:9	Psalms 45:7
+Hebrews 1:10	Psalms 102:25
+Hebrews 1:12	Psalms 102:26-27
+Hebrews 1:13	Psalms 110:1
+Hebrews 2:6	Psalms 8:4
+Hebrews 2:7	Psalms 8:5-6
+Hebrews 2:8	Psalms 8:6
+Hebrews 2:9	Psalms 8:5
+Hebrews 2:12	Psalms 22:22
+Hebrews 2:13	Isaiah 8:17
+Hebrews 2:13	Isaiah 8:18
+Hebrews 3:7	Psalms 95:7
+Hebrews 3:8	Psalms 95:8
+Hebrews 3:10	Psalms 95:10
+Hebrews 3:11	Psalms 95:11
+Hebrews 3:15	Psalms 95:7-8
+Hebrews 3:18	Psalms 95:11
+Hebrews 4:3	Psalms 95:11
+Hebrews 4:4	Genesis 2:2
+Hebrews 4:5	Psalms 95:11
+Hebrews 4:7	Psalms 95:7-8
+Hebrews 5:5	Psalms 2:7
+Hebrews 5:6	Psalms 110:4
+Hebrews 6:14	Genesis 22:17
+Hebrews 6:20	Psalms 110:4
+Hebrews 7:17	Psalms 110:4
+Hebrews 7:21	Psalms 110:4
+Hebrews 8:5	Exodus 25:40
+Hebrews 8:8	Jeremiah 31:31
+Hebrews 8:9	Jeremiah 31:32
+Hebrews 8:10	Jeremiah 31:33
+Hebrews 8:11	Jeremiah 31:34
+Hebrews 8:12	Jeremiah 31:34
+Hebrews 9:20	Exodus 24:8
+Hebrews 10:5	Psalms 40:6
+Hebrews 10:6	Psalms 40:6
+Hebrews 10:7	Psalms 40:7-8
+Hebrews 10:8	Psalms 40:6
+Hebrews 10:9	Psalms 40:7-8
+Hebrews 10:16	Jeremiah 31:33
+Hebrews 10:17	Jeremiah 31:34
+Hebrews 10:30	Deuteronomy 32:35
+Hebrews 10:30	Deuteronomy 32:36
+Hebrews 10:37	Habakkuk 2:3
+Hebrews 10:38	Habakkuk 2:4
+Hebrews 11:5	Genesis 5:24
+Hebrews 11:18	Genesis 21:12
+Hebrews 11:21	Genesis 47:31
+Hebrews 12:5	Proverbs 3:11
+Hebrews 12:6	Proverbs 3:12
+Hebrews 12:20	Exodus 19:13
+Hebrews 12:21	Deuteronomy 9:19
+Hebrews 12:26	Haggai 2:6
+Hebrews 12:29	Deuteronomy 4:24
+Hebrews 13:5	Deuteronomy 31:6
+Hebrews 13:5	Deuteronomy 31:8
+Hebrews 13:5	Joshua 1:5
+Hebrews 13:6	Psalms 118:6
+James 2:8	Leviticus 19:18
+James 2:11	Exodus 20:13-14
+James 2:11	Deuteronomy 5:17-18
+James 2:23	Genesis 15:6
+James 4:6	Proverbs 3:34
+1 Peter 1:16	Leviticus 11:44
+1 Peter 1:16	Leviticus 11:45
+1 Peter 1:16	Leviticus 19:2
+1 Peter 1:16	Leviticus 20:7
+1 Peter 1:24	Isaiah 40:6-8
+1 Peter 1:25	Isaiah 40:8
+1 Peter 2:6	Isaiah 28:16
+1 Peter 2:7	Psalms 118:22
+1 Peter 2:8	Isaiah 8:14
+1 Peter 2:9	Exodus 19:6
+1 Peter 2:9	Isaiah 43:21
+1 Peter 2:22	Isaiah 53:9
+1 Peter 2:24	Isaiah 53:5
+1 Peter 3:10	Psalms 34:12-13
+1 Peter 3:11	Psalms 34:14
+1 Peter 3:12	Psalms 34:15-16
+1 Peter 3:14	Isaiah 8:12
+1 Peter 4:8	Proverbs 10:12
+1 Peter 4:18	Proverbs 11:31
+1 Peter 5:5	Proverbs 3:34
+2 Peter 2:22	Proverbs 26:11
+Revelation 1:7	Daniel 7:13
+Revelation 1:7	Zechariah 12:10
+Revelation 2:27	Psalms 2:9
+Revelation 6:16	Hosea 10:8
+Revelation 12:5	Psalms 2:9
+Revelation 14:8	Isaiah 21:9
+Revelation 15:4	Psalms 86:9
+Revelation 18:2	Isaiah 21:9
+Revelation 19:15	Psalms 2:9

@@ -2,6 +2,7 @@ package com.example.mybible.data
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -42,5 +43,13 @@ class QuotationsTest {
         assertFalse(quotations.isQuote("Matthew", 2, 15, "Hosea", 11, 2, 3))
         assertFalse(quotations.isQuote("Matthew", 2, 14, "Hosea", 11, 1, 1))
         assertFalse(Quotations.None.isQuote("Matthew", 2, 15, "Hosea", 11, 1, 1))
+    }
+
+    @Test
+    fun aLinkToALongerPassageShowsTheVersesHoldingTheQuotation() {
+        assertEquals(15..15, quotations.quotedPart("Hosea", 11, 1, "Matthew", 2, 13, 18))
+        assertEquals(1..2, quotations.quotedPart("Matthew", 27, 46, "Psalms", 22, 1, 8))
+        assertEquals(55..55, quotations.quotedPart("Isaiah", 25, 8, "1 Corinthians", 15, 55, 58))
+        assertNull(quotations.quotedPart("Hosea", 11, 1, "Matthew", 2, 16, 18))
     }
 }

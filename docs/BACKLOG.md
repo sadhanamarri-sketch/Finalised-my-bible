@@ -803,7 +803,7 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     Reading aloud, whether a card's or the Reader's, pauses while the sheet is open and plays on
     when it closes.
 
-29. **Old Testament quotations in the New, in purple.** "Quotes/references in new testament from
+29. **Done 21 Oct.** **Old Testament quotations in the New, in purple.** "Quotes/references in new testament from
     old testament." — "We already have cross references right? why can't we use them? the real
     quotes get new color and cross in reader will also get a different color which has quotes."
     — "real quotes only. let's go with purple"
@@ -827,6 +827,18 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     - *Verse Scroll's links sheet:* the same.
     *To build it:* the list first (tools/, from the cross references, Nave's topics and the KJV,
     reviewed), then the mark's colour, the Cross References order and tag, and the links sheet.
+    *Built 21 Oct,* just so: 461 quotations over 379 New Testament verses (tools/quotations). The
+    672 New Testament verses and passages the cross references, Nave's and the KJV's words put
+    forward were each read and judged, and clear quotations they missed were added by hand (Matthew 19:5 and Genesis 2:24
+    share no five words in a row). A verse counts when it reproduces a passage's words as a
+    citation, introduced as one or close to word for word; each verse holding quoted words is
+    marked, on both sides (Matthew 2:15 and Hosea 11:1 alike). Revelation's images, titles and
+    scenes count as allusions, so only 8 of its verses are in (14:8, "Babylon is fallen, is
+    fallen", from Isaiah 21:9). The Reader's † is purple on those verses. Cross References and the
+    links sheet list them first, tagged "Quote", and when a link names a longer passage they show
+    the verse holding the quotation (Psalm 110:1's link to Matthew 22:42-46 shows 22:44). 13
+    quotations the cross references don't link at all, such as Mark 15:28 and Isaiah 53:12, can't
+    be labelled and are left out.
 
 30. **Done 21 Oct.** **Verse Scroll: a tap to play or pause, and the reading kept through a visit to the Reader.**
     "Pause/play in scroll verse by tapping the screen and change the stopping of speech after

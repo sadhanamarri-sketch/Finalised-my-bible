@@ -796,18 +796,19 @@ class VerseScrollController(
 
     /**
      * A verse's links worth suggesting, strongest first: each to one verse, or to a short passage when
-     * the link names 2 or 3 verses that together stay short; a quotation however weak. Leaves out links
-     * back to the verse itself, and repeats.
+     * the link names 2 or 3 verses that together stay short; a quotation however weak, from the verses
+     * holding it (of a longer passage). Leaves out links back to the verse itself, and repeats.
      */
     private suspend fun resolveLinks(ref: VerseRef): List<Link> {
         val out = mutableListOf<Link>()
         val seen = HashSet<String>()
         for (row in repository.getCrossReferenceRows(ref.book, ref.chapter, ref.verse)) {
-            val quote = repository.quotations.isQuote(ref.book, ref.chapter, ref.verse, row.toBook, row.toChapter, row.toVerse, row.toVerseEnd)
+            val quoted = repository.quotations.quotedPart(ref.book, ref.chapter, ref.verse, row.toBook, row.toChapter, row.toVerse, row.toVerseEnd)
+            val quote = quoted != null
             if (row.votes < MIN_SUGGESTED_VOTES && !quote) continue
-            val first = VerseRef(row.toBook, row.toChapter, row.toVerse)
+            val first = VerseRef(row.toBook, row.toChapter, quoted?.first ?: row.toVerse)
             if (first == ref || !seen.add(first.key)) continue
-            val span = row.toVerseEnd - row.toVerse + 1
+            val span = (quoted?.last ?: row.toVerseEnd) - first.verse + 1
             val found = verseTexts(first.book, first.chapter, first.verse, first.verse + (span - 1).coerceIn(0, MAX_PASSAGE - 1))
             if (found[first.verse] == null) continue
             val passage = (0 until span).map { found[first.verse + it] }

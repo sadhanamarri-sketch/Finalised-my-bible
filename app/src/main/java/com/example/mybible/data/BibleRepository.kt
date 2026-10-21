@@ -1450,18 +1450,20 @@ class BibleRepository(private val context: Context) {
     suspend fun getCrossReferences(book: String, chapter: Int, verse: Int): List<CrossReferenceItem> = withContext(Dispatchers.IO) {
         val rows = bibleDao.getCrossReferences(book, chapter, verse)
         if (rows.isNotEmpty()) {
-            // The quotations first, however few votes they have; then the strongest 20 of the rest.
-            val (quotes, rest) = rows.partition { quotations.isQuote(book, chapter, verse, it.toBook, it.toChapter, it.toVerse, it.toVerseEnd) }
-            return@withContext (quotes.map { it to true } + rest.take(20).map { it to false }).map { (row, quote) ->
-                val preview = bibleDao.getVerseText(row.toBook, row.toChapter, row.toVerse) ?: ""
+            // The quotations first, however few votes they have, each from the verse holding it (of a longer
+            // passage); then the strongest 20 of the rest.
+            val parts = rows.associateWith { quotations.quotedPart(book, chapter, verse, it.toBook, it.toChapter, it.toVerse, it.toVerseEnd) }
+            val (quotes, rest) = rows.partition { parts[it] != null }
+            return@withContext (quotes.map { it to parts[it]!!.first } + rest.take(20).map { it to null }).map { (row, quoted) ->
+                val target = quoted ?: row.toVerse
                 CrossReferenceItem(
                     targetBook = row.toBook,
                     targetChapter = row.toChapter,
-                    targetVerse = row.toVerse,
-                    previewText = preview,
-                    quote = quote
+                    targetVerse = target,
+                    previewText = bibleDao.getVerseText(row.toBook, row.toChapter, target) ?: "",
+                    quote = quoted != null
                 )
-            }
+            }.distinctBy { Triple(it.targetBook, it.targetChapter, it.targetVerse) }
         }
         fallbackCrossReferences(book, chapter, verse)
     }

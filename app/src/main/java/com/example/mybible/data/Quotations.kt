@@ -27,10 +27,28 @@ class Quotations(private val pairs: List<Pair<Passage, Passage>>) {
 
     /** Whether the cross reference from [book] [chapter]:[verse] to [toBook] [toChapter]:[toFirst]–[toLast] is a quotation, either way round. */
     fun isQuote(book: String, chapter: Int, verse: Int, toBook: String, toChapter: Int, toFirst: Int, toLast: Int): Boolean =
-        pairs.any { (nt, ot) ->
-            (nt.has(book, chapter, verse) && ot.meets(toBook, toChapter, toFirst, toLast)) ||
-                (ot.has(book, chapter, verse) && nt.meets(toBook, toChapter, toFirst, toLast))
+        quotedPart(book, chapter, verse, toBook, toChapter, toFirst, toLast) != null
+
+    /**
+     * When the cross reference from [book] [chapter]:[verse] to [toBook] [toChapter]:[toFirst]–[toLast] is a
+     * quotation (either way round), the verses of its passage that quote or are quoted: of a link to Matthew
+     * 22:42-46 from Psalm 110:1, 22:44. Null when it isn't one.
+     */
+    fun quotedPart(book: String, chapter: Int, verse: Int, toBook: String, toChapter: Int, toFirst: Int, toLast: Int): IntRange? {
+        var from = Int.MAX_VALUE
+        var to = Int.MIN_VALUE
+        for ((nt, ot) in pairs) {
+            val other = when {
+                nt.has(book, chapter, verse) -> ot
+                ot.has(book, chapter, verse) -> nt
+                else -> continue
+            }
+            if (!other.meets(toBook, toChapter, toFirst, toLast)) continue
+            from = minOf(from, maxOf(other.first, toFirst))
+            to = maxOf(to, minOf(other.last, toLast))
         }
+        return if (from <= to) from..to else null
+    }
 
     companion object {
         val None = Quotations(emptyList())

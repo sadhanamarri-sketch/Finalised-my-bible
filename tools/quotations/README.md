@@ -26,7 +26,10 @@ python3 make_quotations.py eng-kjv.osis.xml cross_references.txt quotations.txt 
   Old Testament verses it quotes (`Matt 2:15 = Hos 11:1`). A quotation counts when the verse
   reproduces a particular passage's words as a citation: introduced as one ("it is written", "that
   it might be fulfilled which was spoken by the prophet"), or close to word for word without that.
-  Each verse holding quoted words counts, the formula's verse alone doesn't.
+  Each verse holding quoted words counts, the formula's verse alone doesn't, and each side names just
+  the verses holding the quoted words, whatever passage the cross reference names. Every candidate was
+  read, and the quotations the candidates missed were added by hand (Matthew 19:5 and Genesis 2:24, for
+  one, share no five words in a row).
 - `make_quotations.py` checks every reference against the KJV and every pair against the cross
   references, and writes the app's list with the app's book names.
 
