@@ -33,8 +33,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -143,15 +145,19 @@ private val BurstEasing = CubicBezierEasing(0f, 0f, 0.58f, 1f)
 
 private data class Burst(val id: Long, val at: Offset, val color: Color)
 
+/** A color just picked for a card from the color box its double-tap opened: [id] new each time. */
+internal data class CardBurst(val id: Long, val hex: String)
+
 /**
  * One verse card: the background photo (or the plain theme background), and the verse, at the same size
- * as every other (cut short with "…" if it runs out of room). Double-tap highlights, long-press opens
+ * as every other (cut short with "…" if it runs out of room). Double-tap opens the color box, long-press
  * the full verse sheet.
  *
  * @param teluguSize the Telugu under the verse's size, in sp (when [showTelugu]).
  * @param words for a search's verses, what found this one ("loveth", "charity", "Greek agapē").
  * @param highlightHexes a verse's highlight colors (up to three), in the order they were put on.
- * @param onDoubleTap highlights the card; returns the color for the burst under the finger.
+ * @param onDoubleTap opens the color box for the card.
+ * @param burst a color picked in the box a double-tap opened: a ring pops in it where the finger was.
  */
 @Composable
 internal fun VerseCardPage(
@@ -169,9 +175,10 @@ internal fun VerseCardPage(
     colorLabel: (String) -> String,
     notePreview: String?,
     onPress: () -> Unit,
-    onDoubleTap: () -> String?,
+    onDoubleTap: () -> Unit,
     onLongPress: () -> Unit,
-    onLinkedFrom: () -> Unit = {}
+    onLinkedFrom: () -> Unit = {},
+    burst: CardBurst? = null
 ) {
     val content = card.content
     val long = content.wordCount > LONG_VERSE_WORDS
@@ -179,6 +186,12 @@ internal fun VerseCardPage(
     val c = if (onScene) colors.onScene() else colors
     val haptics = LocalHapticFeedback.current
     val bursts = remember { mutableStateListOf<Burst>() }
+    // Where the card was last double-tapped, for the ring once a color's picked.
+    var tappedAt by remember { mutableStateOf<Offset?>(null) }
+    LaunchedEffect(burst) {
+        val at = tappedAt
+        if (burst != null && at != null && !reduceMotion) bursts += Burst(burst.id, at, hexToColor(burst.hex))
+    }
     val currentOnPress by rememberUpdatedState(onPress)
     val currentOnDoubleTap by rememberUpdatedState(onDoubleTap)
     val currentOnLongPress by rememberUpdatedState(onLongPress)
@@ -205,8 +218,8 @@ internal fun VerseCardPage(
                     detectTapGestures(
                         onPress = { currentOnPress() },
                         onDoubleTap = { at ->
-                            val hex = currentOnDoubleTap()
-                            if (hex != null && !reduceMotion) bursts += Burst(System.nanoTime(), at, hexToColor(hex))
+                            tappedAt = at
+                            currentOnDoubleTap()
                         },
                         onLongPress = {
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -621,7 +634,7 @@ private fun normalCdf(z: Float): Float {
     return if (z >= 0) 0.5f * (1f + y) else 0.5f * (1f - y)
 }
 
-/** The ring that pops under the finger on a double-tap, in the highlight's color. */
+/** The ring that pops where the finger double-tapped, in the color then picked for the verse. */
 @Composable
 private fun BurstRing(burst: Burst, onDone: () -> Unit) {
     val progress = remember { Animatable(0f) }

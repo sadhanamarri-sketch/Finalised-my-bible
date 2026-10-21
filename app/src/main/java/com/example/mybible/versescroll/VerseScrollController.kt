@@ -64,10 +64,6 @@ class VerseScrollController(
     var motion by mutableStateOf(prefs.getBoolean(KEY_MOTION, true))
         private set
 
-    /** The color a double-tap highlights with. */
-    var doubleTapColor by mutableStateOf(prefs.getString(KEY_COLOR, DEFAULT_COLOR) ?: DEFAULT_COLOR)
-        private set
-
     /** The Telugu translation under each verse. */
     var showTelugu by mutableStateOf(prefs.getBoolean(KEY_TELUGU, false))
         private set
@@ -76,7 +72,7 @@ class VerseScrollController(
     var teluguSize by mutableIntStateOf(prefs.getInt(KEY_TELUGU_SIZE, DEFAULT_TELUGU_SIZE).coerceIn(MIN_TELUGU_SIZE, MAX_TELUGU_SIZE))
         private set
 
-    /** Whether the first-time "double-tap a verse" hint has been dismissed. */
+    /** Whether the first-time "double-tap a verse to choose a color" hint has been dismissed. */
     var hintSeen by mutableStateOf(prefs.getBoolean(KEY_HINT_SEEN, false))
         private set
 
@@ -88,11 +84,6 @@ class VerseScrollController(
     fun updateMotion(on: Boolean) {
         motion = on
         prefs.edit().putBoolean(KEY_MOTION, on).apply()
-    }
-
-    fun updateDoubleTapColor(hex: String) {
-        doubleTapColor = hex
-        prefs.edit().putString(KEY_COLOR, hex).apply()
     }
 
     fun updateShowTelugu(on: Boolean) {
@@ -872,7 +863,6 @@ class VerseScrollController(
         // Named for the painted scenes the photos replaced; kept so the setting carries over.
         private const val KEY_SCENES = "painted_scenes"
         private const val KEY_MOTION = "motion"
-        private const val KEY_COLOR = "double_tap_color"
         private const val KEY_TELUGU = "show_telugu"
         private const val KEY_TELUGU_SIZE = "telugu_size"
         private const val KEY_HINT_SEEN = "hint_seen"
@@ -882,9 +872,6 @@ class VerseScrollController(
         private const val KEY_SOURCE = "source"
         private const val KEY_ORDER_SOURCE = "order_source"
         private const val KEY_ORDER_VERSE = "order_verse"
-
-        /** Sunshine, the lightest of the twelve highlight colors. */
-        const val DEFAULT_COLOR = "#F1F1B1"
 
         // The Telugu under a verse: the Reader's own size to start with, against the verse's 26.
         const val DEFAULT_TELUGU_SIZE = 18

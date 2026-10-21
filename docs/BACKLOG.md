@@ -758,7 +758,7 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     there even with Read until set further; Next pressed at the chapter's last verse still goes
     on.
 
-27. **Highlighting in Verse Scroll: just the colour box.** "The default color is not necessary as I
+27. **Done 21 Oct.** **Highlighting in Verse Scroll: just the colour box.** "The default color is not necessary as I
     have unclick the default one always. Exclude that functionality. It just pop up the color
     selection that's all." — "I'm okay with your suggestion"
     *Today:* in Verse Scroll a double-tap, or the bottom bar's Highlight, puts the double-tap
@@ -774,6 +774,11 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     it goes), and the first pick puts the colour on through toggleColor; the doubleTapColor
     preference and its settings row go; a quick note in Verse Scroll's verse sheet goes with a
     highlight, as in the Reader (today it falls back to the double-tap colour).
+    *Built 21 Oct,* just so: a double-tap or Highlight opens the colour box and puts nothing on;
+    the box stays until a colour is picked (then it closes a moment later) or the verse is
+    touched, swiped or Back pressed; picked after a double-tap, the ring pops in that colour
+    where the finger was. The hint reads "Double-tap a verse to choose its color", and Verse
+    Scroll's settings no longer have Double-tap color.
 
 28. **Verse Scroll: the English dictionary.** "Dictionary in verse scroll." — "Only English in
     scroll verse." — "no seperate button required right? can't we just tap the word like in

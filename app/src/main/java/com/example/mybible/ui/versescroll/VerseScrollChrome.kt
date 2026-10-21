@@ -51,7 +51,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,7 +62,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -453,22 +451,21 @@ internal fun BoxScope.VersesTodayCounter(count: Int, colors: VsColors) {
 }
 
 /**
- * The color box: after a double-tap it takes the bottom bar's place for a few seconds, with all twelve
- * colors and their names plus Note and Remove. A color puts it on the verse or takes it off (a verse
- * can be in up to three); Remove takes them all off. It never dims or covers the verse.
+ * The color box: after a double-tap (or the bottom bar's Highlight) it takes the bottom bar's place, with
+ * all twelve colors and their names plus Note and Remove, until a color is picked or the verse touched.
+ * A color puts it on the verse or takes it off (a verse can be in up to three); Remove takes them all
+ * off. It never dims or covers the verse.
  */
 @Composable
 internal fun ColorBox(
     colors: VsColors,
     defs: List<HighlightColorDef>,
     current: List<String>,
-    onTouch: () -> Unit,
     onPick: (String) -> Unit,
     onNote: () -> Unit,
     onRemove: () -> Unit
 ) {
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val touched by rememberUpdatedState(onTouch)
     val items: List<@Composable (Modifier) -> Unit> = defs.map { def ->
         @Composable { m: Modifier ->
             val selected = current.any { it.equals(def.colorHex, ignoreCase = true) }
@@ -498,15 +495,6 @@ internal fun ColorBox(
             .clip(RoundedCornerShape(18.dp))
             .background(colors.surface)
             .border(1.dp, colors.line, RoundedCornerShape(18.dp))
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    // Any touch inside keeps the box up a while longer.
-                    while (true) {
-                        awaitPointerEvent()
-                        touched()
-                    }
-                }
-            }
             .padding(horizontal = 2.dp, vertical = 10.dp)
     ) {
         items.chunked(7).forEach { row ->
@@ -658,14 +646,14 @@ internal fun BoxScope.FirstTimeHint(colors: VsColors, reduceMotion: Boolean, onD
             .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
         Text(
-            text = "Double-tap a verse to highlight it",
+            text = "Double-tap a verse to choose its color",
             color = colors.ink,
             fontFamily = WorkSansFontFamily,
             fontWeight = FontWeight.SemiBold,
             fontSize = 15.sp
         )
         Text(
-            text = "Pick another color from the box that pops up, or long-press for a note. Swipe up for the next verse.",
+            text = "Pick one from the box that pops up, or long-press for a note. Swipe up for the next verse.",
             color = colors.soft,
             fontFamily = WorkSansFontFamily,
             fontSize = 13.sp,
@@ -678,17 +666,14 @@ internal fun BoxScope.FirstTimeHint(colors: VsColors, reduceMotion: Boolean, onD
 
 /**
  * Verse Scroll's own settings, laid out like the app's Settings: the background and its motion, the
- * double-tap color, the Telugu under each verse and its size, and reading aloud.
+ * Telugu under each verse and its size, and reading aloud.
  */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun VerseScrollSettingsSheet(
-    colors: VsColors,
-    defs: List<HighlightColorDef>,
     photos: Boolean,
     motion: Boolean,
     reduceMotion: Boolean,
-    doubleTapColor: String,
     showTelugu: Boolean,
     teluguSize: Int,
     sceneCount: Int,
@@ -696,7 +681,6 @@ internal fun VerseScrollSettingsSheet(
     pauseBetweenCards: Int,
     onPhotos: (Boolean) -> Unit,
     onMotion: (Boolean) -> Unit,
-    onDoubleTapColor: (String) -> Unit,
     onShowTelugu: (Boolean) -> Unit,
     onTeluguSize: (Int) -> Unit,
     onContinueReading: (Boolean) -> Unit,
@@ -745,28 +729,6 @@ internal fun VerseScrollSettingsSheet(
                     enabled = !reduceMotion
                 )
             }
-            DsSectionDivider()
-
-            DsSectionLabel("Double-tap color")
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                defs.forEach { def ->
-                    val selected = def.colorHex.equals(doubleTapColor, ignoreCase = true)
-                    Box(
-                        Modifier
-                            .clip(CircleShape)
-                            .clickable(role = Role.RadioButton) { onDoubleTapColor(def.colorHex) }
-                            .semantics {
-                                contentDescription = def.label
-                                this.selected = selected
-                            }
-                    ) { Swatch(hexToColor(def.colorHex), selected, colors) }
-                }
-            }
-            DsNote(
-                "Double-tapping a verse highlights it in " +
-                    (defs.find { it.colorHex.equals(doubleTapColor, ignoreCase = true) }?.label ?: "this color") + ".",
-                modifier = Modifier.padding(top = 10.dp)
-            )
             DsSectionDivider()
 
             DsSectionLabel("Telugu")

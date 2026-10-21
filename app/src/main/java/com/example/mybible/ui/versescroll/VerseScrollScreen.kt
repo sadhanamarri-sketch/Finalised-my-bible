@@ -145,7 +145,7 @@ private fun noteRefs(note: NoteItem): List<VerseRef> =
 /**
  * Verse Scroll: one verse at a time, full screen, swiping up for the next — a calmer thing to scroll
  * than a social feed. Discover deals widely referenced verses from across the Bible over slowly drifting
- * nature photos; double-tap highlights, long-press opens the full verse sheet, and the bottom
+ * nature photos; double-tap opens the color box, long-press the full verse sheet, and the bottom
  * bar adds a note, reads the verse in context, or shows its links.
  */
 @Composable
@@ -196,7 +196,10 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
     // ---- screen-only state ----
     var pickerIndex by remember { mutableIntStateOf(-1) }
     var pickerArm by remember { mutableIntStateOf(0) }
-    var pickerMillis by remember { mutableLongStateOf(PICKER_MS) }
+    var pickerMillis by remember { mutableLongStateOf(0L) }
+    // A color picked in the box a double-tap opened: the card's ring pops in it.
+    var pickerFromTap by remember { mutableStateOf(false) }
+    var burst by remember { mutableStateOf<Pair<Int, CardBurst>?>(null) }
     var toast by remember { mutableStateOf<VsToast?>(null) }
     var sheetCard by remember { mutableStateOf<VerseFeedCard?>(null) }
     var linksCard by remember { mutableStateOf<Pair<Int, VerseFeedCard>?>(null) }
@@ -210,20 +213,22 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
     fun showToast(message: String, action: String? = null, onAction: (() -> Unit)? = null) {
         toast = VsToast(System.nanoTime(), message, action, onAction)
     }
-    fun armPicker(ms: Long = PICKER_MS) {
+    // The color box closes [ms] from now (0: not by itself).
+    fun armPicker(ms: Long) {
         pickerMillis = ms
         pickerArm++
     }
-    fun showPicker(index: Int) {
+    fun showPicker(index: Int, fromTap: Boolean = false) {
         toast = null
         pickerIndex = index
-        armPicker()
+        pickerFromTap = fromTap
+        armPicker(0)
     }
     fun hidePicker() {
         pickerIndex = -1
     }
     LaunchedEffect(pickerIndex, pickerArm) {
-        if (pickerIndex >= 0) {
+        if (pickerIndex >= 0 && pickerMillis > 0) {
             delay(pickerMillis)
             pickerIndex = -1
         }
@@ -276,19 +281,11 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
             controller.noteHighlighted(keys, on = true)
         }
     }
-    fun doubleTap(index: Int, card: VerseFeedCard): String {
+    // A double-tap: the color box, and nothing on the verse until a color is picked there.
+    fun doubleTap(index: Int) {
         controller.dismissHint()
-        val missing = card.content.refs.filter { hexesOf(it).isEmpty() }
         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-        if (missing.isEmpty()) {
-            // Already highlighted: the color box offers more or a change.
-            showPicker(index)
-            return hexesOf(card.content.refs.first()).firstOrNull() ?: controller.doubleTapColor
-        }
-        val color = controller.doubleTapColor
-        setColor(card, missing, color)
-        showPicker(index)
-        return color
+        showPicker(index, fromTap = true)
     }
     fun asVerse(card: VerseFeedCard): Verse {
         val line = card.content.lines.first()
@@ -390,7 +387,8 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                             colorLabel = ::labelOf,
                             notePreview = firstNote?.let(::notePreview),
                             onPress = { hidePicker() },
-                            onDoubleTap = { doubleTap(page, card) },
+                            onDoubleTap = { doubleTap(page) },
+                            burst = burst?.takeIf { it.first == page }?.second,
                             onLongPress = {
                                 hidePicker()
                                 toast = null
@@ -516,12 +514,8 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                         BarHighlight(hexes, labelOf(hexes.first()) + if (hexes.size > 1) " +${hexes.size - 1}" else "")
                     },
                     linkCount = verseCard.content.linkCount,
-                    onHighlight = {
-                        // Highlights if needed, then opens the color box, where Remove lives.
-                        val missing = verseCard.content.refs.filter { hexesOf(it).isEmpty() }
-                        if (colorsOf(verseCard).isEmpty() && missing.isNotEmpty()) setColor(verseCard, missing, controller.doubleTapColor)
-                        showPicker(pagerState.settledPage)
-                    },
+                    // The color box, where Remove lives too.
+                    onHighlight = { showPicker(pagerState.settledPage) },
                     onNote = { viewModel.openNoteEditor(defaultVerse = asVerse(verseCard)) },
                     onRead = {
                         val ref = verseCard.content.ref
@@ -548,9 +542,10 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                         colors = colors,
                         defs = colorDefs,
                         current = colorsOf(boxCard),
-                        onTouch = { armPicker() },
                         onPick = { hex ->
+                            val adding = colorsOf(boxCard).none { it.equals(hex, ignoreCase = true) }
                             toggleColor(boxCard, hex)
+                            if (adding && pickerFromTap) burst = pagerState.settledPage to CardBurst(System.nanoTime(), hex)
                             armPicker(PICKER_AFTER_PICK_MS)
                         },
                         onNote = {
@@ -638,11 +633,10 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                 sheetCard = null
                 viewModel.openNoteReader(note, originTab = NavTab.VERSE_SCROLL)
             },
+            // Offered only with a color on the verse, as in the Reader.
             onAddQuickNote = { text ->
-                val hex = highlight?.colorHex ?: controller.doubleTapColor
-                viewModel.addHighlightQuickNote(
-                    verse.book, verse.chapter, verse.number, verse.text, hex, labelOf(hex), text
-                )
+                val hex = highlight?.colorHex
+                if (hex != null) viewModel.addHighlightQuickNote(verse.book, verse.chapter, verse.number, verse.text, hex, labelOf(hex), text)
             },
             highlightHasLinkedNote = highlight?.noteId != null
         )
@@ -702,18 +696,14 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
 
     if (settingsOpen) {
         VerseScrollSettingsSheet(
-            colors = colors,
-            defs = colorDefs,
             photos = controller.backgroundPhotos,
             motion = controller.motion,
             reduceMotion = reduceMotion,
-            doubleTapColor = controller.doubleTapColor,
             showTelugu = controller.showTelugu,
             teluguSize = controller.teluguSize,
             sceneCount = controller.sceneCount,
             onPhotos = controller::updateBackgroundPhotos,
             onMotion = controller::updateMotion,
-            onDoubleTapColor = controller::updateDoubleTapColor,
             onShowTelugu = controller::updateShowTelugu,
             onTeluguSize = controller::adjustTeluguSize,
             continueReading = viewModel.readAloudSettings.continueReading,
@@ -738,10 +728,9 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
     }
 }
 
-// The color box stays up this long after a double-tap, and closes this soon after a pick.
-private const val PICKER_MS = 6000L
+// The color box closes this soon after a pick.
+private const val PICKER_AFTER_PICK_MS = 380L
+private const val TOAST_MS = 3800L
 
 // The slide to the next card as reading aloud goes on by itself: slower than a swipe's, and eased.
 private const val GENTLE_SLIDE_MS = 700
-private const val PICKER_AFTER_PICK_MS = 380L
-private const val TOAST_MS = 3800L
