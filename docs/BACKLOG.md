@@ -780,7 +780,7 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     where the finger was. The hint reads "Double-tap a verse to choose its color", and Verse
     Scroll's settings no longer have Double-tap color.
 
-28. **Verse Scroll: the English dictionary.** "Dictionary in verse scroll." — "Only English in
+28. **Done 21 Oct.** **Verse Scroll: the English dictionary.** "Dictionary in verse scroll." — "Only English in
     scroll verse." — "no seperate button required right? can't we just tap the word like in
     reader?"
     *Today:* the Reader looks English words up in Webster's 1828 (about 61,800 words, with Save):
@@ -796,6 +796,12 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     *To build it:* the card's text becomes tappable word by word, as the Reader's verses are
     (VerseComponents), within the card's own tap handling (double-tap, long press); the Reader's
     openEnglishWordLookup already opens the sheet over any tab.
+    *Built 21 Oct,* just so: each English word on a card is marked as the Reader's are, and a
+    single tap on one (on the words themselves, not the space around them, a verse number or
+    "…") opens its Webster's 1828 sheet about a third of a second later. A double-tap on a word
+    still opens the colour box, with no look-up; the Telugu under a verse isn't looked up.
+    Reading aloud, whether a card's or the Reader's, pauses while the sheet is open and plays on
+    when it closes.
 
 29. **Old Testament quotations in the New, in purple.** "Quotes/references in new testament from
     old testament." — "We already have cross references right? why can't we use them? the real

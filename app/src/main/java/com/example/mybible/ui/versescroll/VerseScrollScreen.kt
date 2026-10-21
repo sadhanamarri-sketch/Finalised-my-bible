@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.example.mybible.audio.ReadAloudState
 import com.example.mybible.audio.ReadingPlace
 import com.example.mybible.data.MAX_VERSE_COLORS
 import com.example.mybible.model.HIGHLIGHT_COLOR_DEFS
@@ -291,6 +292,23 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
         val line = card.content.lines.first()
         return Verse(card.content.ref.book, card.content.ref.chapter, line.number, line.text, teluguText = line.telugu)
     }
+    // A word tapped on a card: its Webster's 1828 sheet, over Verse Scroll. Reading aloud pauses while
+    // it's open, and plays on by itself once it's closed.
+    val lookingUp by viewModel.selectedEnglishWord.collectAsState()
+    var pausedForWord by remember { mutableStateOf(false) }
+    fun lookUp(word: String, card: VerseFeedCard) {
+        hidePicker()
+        if (viewModel.readAloudState.value.status == ReadAloudState.Status.PLAYING) {
+            viewModel.pauseReading()
+            pausedForWord = true
+        }
+        viewModel.openEnglishWordLookup(word, baseVerse = asVerse(card))
+    }
+    LaunchedEffect(lookingUp) {
+        if (lookingUp != null || !pausedForWord) return@LaunchedEffect
+        pausedForWord = false
+        if (viewModel.readAloudState.value.status == ReadAloudState.Status.PAUSED) viewModel.resumeReading()
+    }
 
     Box(
         Modifier
@@ -388,6 +406,7 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                             notePreview = firstNote?.let(::notePreview),
                             onPress = { hidePicker() },
                             onDoubleTap = { doubleTap(page) },
+                            onWord = { word -> lookUp(word, card) },
                             burst = burst?.takeIf { it.first == page }?.second,
                             onLongPress = {
                                 hidePicker()

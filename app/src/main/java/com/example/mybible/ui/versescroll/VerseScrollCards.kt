@@ -52,12 +52,15 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
@@ -148,14 +151,50 @@ private data class Burst(val id: Long, val at: Offset, val color: Color)
 /** A color just picked for a card from the color box its double-tap opened: [id] new each time. */
 internal data class CardBurst(val id: Long, val hex: String)
 
+// Where a card's verses are laid out, word by word, to tell which English word a tap on the card is on.
+private class CardWords {
+    var card: LayoutCoordinates? = null
+    private val layouts = HashMap<Int, TextLayoutResult>()
+    private val places = HashMap<Int, LayoutCoordinates>()
+
+    fun laidOut(verse: Int, layout: TextLayoutResult) {
+        layouts[verse] = layout
+    }
+
+    fun placed(verse: Int, at: LayoutCoordinates) {
+        places[verse] = at
+    }
+
+    // The word at [at] on the card: on a verse's text, not the space around it (nor its number or "…").
+    fun at(at: Offset): String? {
+        val card = card?.takeIf { it.isAttached } ?: return null
+        for ((verse, place) in places) {
+            val layout = layouts[verse] ?: continue
+            if (!place.isAttached) continue
+            val local = place.localPositionOf(card, at)
+            if (local.x < 0 || local.y < 0 || local.x > place.size.width || local.y > place.size.height) continue
+            val line = layout.getLineForVerticalPosition(local.y)
+            if (local.x < layout.getLineLeft(line) || local.x > layout.getLineRight(line)) return null
+            val offset = layout.getOffsetForPosition(local)
+            return layout.layoutInput.text.getStringAnnotations(WORD, offset, offset).firstOrNull()?.item
+        }
+        return null
+    }
+}
+
+private const val WORD = "WORD"
+private val WORD_PATTERN = Regex("[A-Za-z]+(?:['\u2019][A-Za-z]+)*")
+
 /**
  * One verse card: the background photo (or the plain theme background), and the verse, at the same size
- * as every other (cut short with "…" if it runs out of room). Double-tap opens the color box, long-press
- * the full verse sheet.
+ * as every other (cut short with "…" if it runs out of room). A tap on one of its English words looks it
+ * up (once it's clear it isn't a double-tap), double-tap opens the color box, long-press the full verse
+ * sheet.
  *
  * @param teluguSize the Telugu under the verse's size, in sp (when [showTelugu]).
  * @param words for a search's verses, what found this one ("loveth", "charity", "Greek agapē").
  * @param highlightHexes a verse's highlight colors (up to three), in the order they were put on.
+ * @param onWord looks up the English word tapped.
  * @param onDoubleTap opens the color box for the card.
  * @param burst a color picked in the box a double-tap opened: a ring pops in it where the finger was.
  */
@@ -178,7 +217,8 @@ internal fun VerseCardPage(
     onDoubleTap: () -> Unit,
     onLongPress: () -> Unit,
     onLinkedFrom: () -> Unit = {},
-    burst: CardBurst? = null
+    burst: CardBurst? = null,
+    onWord: (String) -> Unit = {}
 ) {
     val content = card.content
     val long = content.wordCount > LONG_VERSE_WORDS
@@ -195,6 +235,8 @@ internal fun VerseCardPage(
     val currentOnPress by rememberUpdatedState(onPress)
     val currentOnDoubleTap by rememberUpdatedState(onDoubleTap)
     val currentOnLongPress by rememberUpdatedState(onLongPress)
+    val currentOnWord by rememberUpdatedState(onWord)
+    val cardWords = remember { CardWords() }
 
     Box(
         Modifier
@@ -214,9 +256,11 @@ internal fun VerseCardPage(
         Box(
             Modifier
                 .fillMaxSize()
+                .onGloballyPositioned { cardWords.card = it }
                 .pointerInput(card.uid) {
                     detectTapGestures(
                         onPress = { currentOnPress() },
+                        onTap = { at -> cardWords.at(at)?.let { currentOnWord(it) } },
                         onDoubleTap = { at ->
                             tappedAt = at
                             currentOnDoubleTap()
@@ -249,7 +293,8 @@ internal fun VerseCardPage(
                 words = words,
                 highlightHexes = highlightHexes,
                 colorLabel = colorLabel,
-                notePreview = notePreview
+                notePreview = notePreview,
+                cardWords = cardWords
             )
         }
         bursts.forEach { burst ->
@@ -280,7 +325,8 @@ private fun VerseStack(
     words: List<String>,
     highlightHexes: (VerseRef) -> List<String>,
     colorLabel: (String) -> String,
-    notePreview: String?
+    notePreview: String?,
+    cardWords: CardWords
 ) {
     val telugu = if (showTelugu) lines.mapNotNull { it.telugu }.joinToString(" ") else ""
     val style = verseStyle(colors, onScene)
@@ -298,8 +344,13 @@ private fun VerseStack(
                         text = { i, words -> verseString(lines[i], showNumber = lines.size > 1, colors.soft, words) },
                         words = { i -> wordsOf(lines[i].text).size },
                         style = style
-                    ) { text ->
-                        Text(text = text, style = style)
+                    ) { i, text ->
+                        Text(
+                            text = text,
+                            style = style,
+                            onTextLayout = { cardWords.laidOut(i, it) },
+                            modifier = Modifier.onGloballyPositioned { cardWords.placed(i, it) }
+                        )
                     }
                 },
                 {
@@ -419,7 +470,7 @@ private fun VerseLines(
     text: (index: Int, words: Int?) -> AnnotatedString,
     words: (index: Int) -> Int,
     style: TextStyle,
-    verse: @Composable (text: AnnotatedString) -> Unit
+    verse: @Composable (index: Int, text: AnnotatedString) -> Unit
 ) {
     val measurer = rememberTextMeasurer()
     SubcomposeLayout(Modifier.fillMaxWidth()) { constraints ->
@@ -455,7 +506,7 @@ private fun VerseLines(
             else if (shown.isNotEmpty()) shown[shown.lastIndex] = cut(shown.lastIndex, heights.last())
             break
         }
-        val placed = shown.mapIndexed { i, t -> subcompose(i) { verse(t) }.first().measure(Constraints(maxWidth = width)) }
+        val placed = shown.mapIndexed { i, t -> subcompose(i) { verse(i, t) }.first().measure(Constraints(maxWidth = width)) }
         val height = placed.sumOf { it.height } + gap * (placed.size - 1).coerceAtLeast(0)
         layout(width, height) {
             var y = 0
@@ -471,7 +522,7 @@ private fun wordsOf(text: String): List<String> = text.split(' ').filter { it.is
 
 /**
  * A verse as the card shows it: its number when it's one of a passage's, then its words, or only the first
- * [words] of them and "…" when the card hasn't room for the rest.
+ * [words] of them and "…" when the card hasn't room for the rest; each word marked, to be looked up.
  */
 private fun verseString(line: VerseLine, showNumber: Boolean, numberColor: Color, words: Int? = null): AnnotatedString =
     buildAnnotatedString {
@@ -487,8 +538,16 @@ private fun verseString(line: VerseLine, showNumber: Boolean, numberColor: Color
                 )
             ) { append("${line.number}\u2009") }
         }
-        if (words == null) append(line.text)
-        else append(wordsOf(line.text).take(words).joinToString(" ").trimEnd(',', ';', ':') + "\u2026")
+        val text = if (words == null) line.text else wordsOf(line.text).take(words).joinToString(" ").trimEnd(',', ';', ':') + "\u2026"
+        var at = 0
+        for (word in WORD_PATTERN.findAll(text)) {
+            append(text.substring(at, word.range.first))
+            pushStringAnnotation(WORD, word.value)
+            append(word.value)
+            pop()
+            at = word.range.last + 1
+        }
+        append(text.substring(at))
     }
 
 /** The type every verse is set in: one size, whatever the verse's length. */
