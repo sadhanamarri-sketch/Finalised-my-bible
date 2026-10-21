@@ -188,13 +188,14 @@ private val WORD_PATTERN = Regex("[A-Za-z]+(?:['\u2019][A-Za-z]+)*")
 /**
  * One verse card: the background photo (or the plain theme background), and the verse, at the same size
  * as every other (cut short with "…" if it runs out of room). A tap on one of its English words looks it
- * up (once it's clear it isn't a double-tap), double-tap opens the color box, long-press the full verse
- * sheet.
+ * up, and anywhere else plays or pauses the reading (each once it's clear it isn't a double-tap);
+ * double-tap opens the color box, long-press the full verse sheet.
  *
  * @param teluguSize the Telugu under the verse's size, in sp (when [showTelugu]).
  * @param words for a search's verses, what found this one ("loveth", "charity", "Greek agapē").
  * @param highlightHexes a verse's highlight colors (up to three), in the order they were put on.
  * @param onWord looks up the English word tapped.
+ * @param onTapAround a tap anywhere but on a word: plays or pauses the reading.
  * @param onDoubleTap opens the color box for the card.
  * @param burst a color picked in the box a double-tap opened: a ring pops in it where the finger was.
  */
@@ -218,7 +219,8 @@ internal fun VerseCardPage(
     onLongPress: () -> Unit,
     onLinkedFrom: () -> Unit = {},
     burst: CardBurst? = null,
-    onWord: (String) -> Unit = {}
+    onWord: (String) -> Unit = {},
+    onTapAround: () -> Unit = {}
 ) {
     val content = card.content
     val long = content.wordCount > LONG_VERSE_WORDS
@@ -236,6 +238,7 @@ internal fun VerseCardPage(
     val currentOnDoubleTap by rememberUpdatedState(onDoubleTap)
     val currentOnLongPress by rememberUpdatedState(onLongPress)
     val currentOnWord by rememberUpdatedState(onWord)
+    val currentOnTapAround by rememberUpdatedState(onTapAround)
     val cardWords = remember { CardWords() }
 
     Box(
@@ -260,7 +263,10 @@ internal fun VerseCardPage(
                 .pointerInput(card.uid) {
                     detectTapGestures(
                         onPress = { currentOnPress() },
-                        onTap = { at -> cardWords.at(at)?.let { currentOnWord(it) } },
+                        onTap = { at ->
+                            val word = cardWords.at(at)
+                            if (word != null) currentOnWord(word) else currentOnTapAround()
+                        },
                         onDoubleTap = { at ->
                             tappedAt = at
                             currentOnDoubleTap()

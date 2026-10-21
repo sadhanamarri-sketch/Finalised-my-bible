@@ -828,7 +828,7 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     *To build it:* the list first (tools/, from the cross references, Nave's topics and the KJV,
     reviewed), then the mark's colour, the Cross References order and tag, and the links sheet.
 
-30. **Verse Scroll: a tap to play or pause, and the reading kept through a visit to the Reader.**
+30. **Done 21 Oct.** **Verse Scroll: a tap to play or pause, and the reading kept through a visit to the Reader.**
     "Pause/play in scroll verse by tapping the screen and change the stopping of speech after
     return from reader to scroll verse." — "wait for my tap."
     *Today:* a single tap on a card only closes the colour box, and reading is started and
@@ -845,6 +845,16 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     state becomes the reading's (today a pause turns it off); the tap is the card's onTap, which
     waits out the double-tap. A Reader reading started meanwhile still ends Verse Scroll's, and
     then a tap starts the card over.
+    *Built 21 Oct,* just so: a tap on a card anywhere but a word (the space around the words, a
+    verse number, the photo) plays or pauses the reading about a third of a second later, or starts
+    reading the card when nothing is being read (or what's paused is another card's). A tap that
+    closes the colour box does only that. "Read" pauses the reading instead of stopping it; back in
+    Verse Scroll it waits, paused, for a tap and plays on from where it paused, and the Reader's
+    reading bar doesn't show it meanwhile. A reading started in the Reader ends it, and a tap then
+    starts the card over. Going to any other tab still stops it. The speaker button at the top
+    works as before (a pause still turns it off) until it becomes the language button (31). With
+    nothing to read with (Telugu alone, and no Telugu voice), a tap opens the reading settings,
+    which say why.
 
 31. **A one-tap language button: English, Telugu, Both.** "Easy switch for eng, tel and both for
     scroll verse and reader read aloud." — "replace speaker button (now that we have pause/play

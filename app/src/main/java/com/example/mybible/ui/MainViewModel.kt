@@ -1367,8 +1367,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun selectTab(tab: NavTab) {
         finishReaderRestore()
-        // Verse Scroll's cards read aloud stop once they're off screen (not when the app is: they read on).
-        if (_activeTab.value == NavTab.VERSE_SCROLL && tab != NavTab.VERSE_SCROLL) verseScroll.stopReading()
+        // Verse Scroll's cards read aloud stop once they're off screen (not when the app is: they read on),
+        // but only pause for a look at a verse in the Reader ("Read"), to be played on back there.
+        if (_activeTab.value == NavTab.VERSE_SCROLL && tab != NavTab.VERSE_SCROLL) {
+            if (tab == NavTab.READER && _verseScrollReturnAvailable.value) verseScroll.pauseReading() else verseScroll.stopReading()
+        }
         _activeTab.value = if (tab == NavTab.GREEK_WORD || tab == NavTab.HEBREW_WORD) wordPageTab(tab) else tab
     }
 

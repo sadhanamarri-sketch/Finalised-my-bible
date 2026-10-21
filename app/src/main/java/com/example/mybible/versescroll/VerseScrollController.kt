@@ -479,6 +479,33 @@ class VerseScrollController(
         if (readAloud.prefs.language != ReadLanguage.ENGLISH && !showTelugu) updateShowTelugu(true)
     }
 
+    /**
+     * A tap on a card, away from its words: plays or pauses the cards' reading, or, with nothing being
+     * read (or what's paused another card's), starts reading the card on screen.
+     */
+    fun playOrPause() {
+        val current = reading?.takeIf { readAloud.session === it }
+        val status = readAloud.state.value.status
+        when {
+            current != null && status == ReadAloudState.Status.PLAYING -> readAloud.pause()
+            current != null && status == ReadAloudState.Status.PAUSED && current.uid == cards.getOrNull(currentIndex)?.uid -> {
+                showTeluguForReading()
+                readAloud.resume()
+            }
+            cards.getOrNull(currentIndex) is VerseFeedCard -> {
+                speakerOn = true
+                showTeluguForReading()
+                readCard(currentIndex)
+            }
+        }
+    }
+
+    /** Off to the Reader for a look ("Read"): the cards' reading pauses where it is, to be played on back here. */
+    fun pauseReading() {
+        val current = reading ?: return
+        if (readAloud.session === current && readAloud.state.value.status == ReadAloudState.Status.PLAYING) readAloud.pause()
+    }
+
     /** The speaker off: stops reading the cards aloud. */
     fun stopReading() {
         speakerOn = false

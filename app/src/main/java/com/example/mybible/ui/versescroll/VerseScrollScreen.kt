@@ -200,6 +200,8 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
     var pickerMillis by remember { mutableLongStateOf(0L) }
     // A color picked in the box a double-tap opened: the card's ring pops in it.
     var pickerFromTap by remember { mutableStateOf(false) }
+    // A tap that only closed the color box does nothing more (no look-up, no play or pause).
+    var pressClosedPicker by remember { mutableStateOf(false) }
     var burst by remember { mutableStateOf<Pair<Int, CardBurst>?>(null) }
     var toast by remember { mutableStateOf<VsToast?>(null) }
     var sheetCard by remember { mutableStateOf<VerseFeedCard?>(null) }
@@ -404,9 +406,21 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                             highlightHexes = ::hexesOf,
                             colorLabel = ::labelOf,
                             notePreview = firstNote?.let(::notePreview),
-                            onPress = { hidePicker() },
+                            onPress = {
+                                pressClosedPicker = pickerIndex >= 0
+                                hidePicker()
+                            },
                             onDoubleTap = { doubleTap(page) },
-                            onWord = { word -> lookUp(word, card) },
+                            onWord = { word -> if (!pressClosedPicker) lookUp(word, card) },
+                            onTapAround = {
+                                if (!pressClosedPicker) {
+                                    controller.playOrPause()
+                                    // Nothing to read with (Telugu alone, and no Telugu voice): the settings say why.
+                                    val now = viewModel.readAloudState.value
+                                    if (!now.active && (now.noTeluguVoice || now.noVoice)) readAloudOpen = true
+                                    if (now.active) askForNotifications()
+                                }
+                            },
                             burst = burst?.takeIf { it.first == page }?.second,
                             onLongPress = {
                                 hidePicker()
