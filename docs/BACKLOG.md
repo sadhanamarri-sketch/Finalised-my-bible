@@ -668,7 +668,7 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
 
 ## Noted 20 Oct 2026
 
-24. **Reading aloud stops when the app is swiped away.** "Player continued in background even
+24. **Done 21 Oct.** **Reading aloud stops when the app is swiped away.** "Player continued in background even
     after killing the app."
     *Today:* the reading's service isn't told when the app is swiped away from Recents (nothing
     asks Android to stop it with the app, and it doesn't watch for it), and the reader-aloud lasts
@@ -680,6 +680,8 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     *To build it:* ReadAloudService's onTaskRemoved stops the reader-aloud and takes the
     notification down itself (a stopped reading's own teardown runs in a collector that
     onDestroy cancels, and a paused reading's notification is detached), then stops the service.
+    *Built 21 Oct,* just so: swiped away playing or paused, the reading stops, its notification
+    goes, and the service stops.
 
 25. **Verse Scroll: a pause between cards, and a gentler slide.** "Provide a setting to set
     delay(pause for few secs) the scrolling during continue reading(auto-scroll). Also snoother

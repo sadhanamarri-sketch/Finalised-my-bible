@@ -119,6 +119,18 @@ class ReadAloudService : Service() {
         return START_NOT_STICKY
     }
 
+    // The app swiped away from Recents: whatever is being read stops, in the Reader or Verse Scroll, and
+    // its notification goes with the app. (The screen off, or another app in front, it plays on.) Taken
+    // down here, not left to render: the reading's own teardown runs in the collector onDestroy cancels,
+    // and a paused reading's notification is no longer the service's to take with it.
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        engine.stop()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        notifications.cancel(NOTIFICATION_ID)
+        stopSelf()
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onDestroy() {
         scope.cancel()
         silence.stop()
