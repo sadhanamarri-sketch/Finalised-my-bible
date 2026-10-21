@@ -868,7 +868,7 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     nothing to read with (Telugu alone, and no Telugu voice), a tap opens the reading settings,
     which say why.
 
-31. **A one-tap language button: English, Telugu, Both.** "Easy switch for eng, tel and both for
+31. **Done 21 Oct.** **A one-tap language button: English, Telugu, Both.** "Easy switch for eng, tel and both for
     scroll verse and reader read aloud." — "replace speaker button (now that we have pause/play
     feature) with one tap button that cycles."
     *Today:* the language is chosen only in the reading settings, and with the phone's voice a
@@ -884,6 +884,15 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     whenever a reading is going (today only for recordings); the bar needs the settings passed
     in; restartVerse does nothing while the next verse is being found, so a change then applies
     from that verse.
+    *Built 21 Oct,* just so: a small key shows the language, A, అ, or Aఅ for both, and a tap moves
+    it on. In Verse Scroll it takes the speaker's place at the top, gold while the cards are read,
+    and says "Reading in Telugu" as it changes. On the Reader's reading bar it sits after the verse
+    being read, whose line under it now just says what's heard ("English", "Telugu recording"), to
+    leave the verse its room. Changed while a verse is read, the verse starts again in the new
+    language at once; paused, it waits, and plays on in the new language. The reading settings'
+    "Read in" does the same now. Without a Telugu voice or recording, a tap opens the reading
+    settings, which say why. Verse Scroll's settings and first hint now say a tap on a card reads
+    it aloud.
 
 32. **Verse Scroll: a progress bar on the card, with a dot where the Telugu starts.** "why not a
     progress bar that can be scrolled just like in the doomscrolling apps? With a dot indicating

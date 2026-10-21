@@ -1539,6 +1539,7 @@ fun ReaderScreen(
         val readingBar: @Composable (Modifier) -> Unit = { barModifier ->
             ReadAloudBar(
                 state = readAloudState,
+                language = viewModel.readAloudSettings.language,
                 onPlayPause = {
                     if (readAloudState.status == ReadAloudState.Status.PLAYING) viewModel.pauseReading() else viewModel.resumeReading()
                 },
@@ -1553,6 +1554,8 @@ fun ReaderScreen(
                         viewModel.jumpToVerse(reading.book, reading.chapter, reading.verse, focusVerse = false)
                     }
                 },
+                // No other language to go to (no Telugu voice or recording): the settings say why.
+                onLanguage = { if (!viewModel.nextReadLanguage()) readAloudSheetOpen = true },
                 onSettings = { readAloudSheetOpen = true },
                 onStop = { viewModel.stopReading() },
                 sleepLeft = viewModel.readAloud::sleepLeftMs,

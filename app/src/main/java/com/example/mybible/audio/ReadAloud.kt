@@ -15,6 +15,14 @@ enum class ReadLanguage(val label: String) {
     TELUGU("Telugu"),
     BOTH("Both");
 
+    /** The language button's next: English, Telugu, Both, round again; English alone when Telugu can't be read. */
+    fun next(telugu: Boolean): ReadLanguage = when {
+        !telugu -> ENGLISH
+        this == ENGLISH -> TELUGU
+        this == TELUGU -> BOTH
+        else -> ENGLISH
+    }
+
     companion object {
         fun from(name: String?): ReadLanguage = entries.firstOrNull { it.name == name } ?: ENGLISH
     }
@@ -367,6 +375,9 @@ class ReadAloud(
 
     /** Whether the phone has a Telugu voice (null: not known yet). */
     fun hasTeluguVoice(): Boolean? = if (teluguFailed) false else speaker.hasTelugu()
+
+    /** Whether Telugu can be read: from its recording, or by a Telugu voice (unless the phone surely has none). */
+    fun canReadTelugu(): Boolean = reads(telugu = true) || hasTeluguVoice() != false
 
     /** Whether English's speech engine has started (null: not yet; false: it couldn't). */
     fun englishReady(): Boolean? = speaker.ready

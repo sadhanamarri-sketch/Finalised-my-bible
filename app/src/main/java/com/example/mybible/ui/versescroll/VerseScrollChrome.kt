@@ -79,6 +79,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.example.mybible.audio.ReadAloudState
+import com.example.mybible.audio.ReadLanguage
 import com.example.mybible.model.HighlightColorDef
 import com.example.mybible.model.MatchedWord
 import com.example.mybible.ui.theme.GelasioFontFamily
@@ -93,6 +94,7 @@ import com.example.mybible.ui.components.DsSectionDivider
 import com.example.mybible.ui.components.DsSectionLabel
 import com.example.mybible.ui.components.DsSizeAdjustRow
 import com.example.mybible.ui.components.DsToggleRow
+import com.example.mybible.ui.components.ReadLanguageButton
 import com.example.mybible.ui.components.PauseBetweenCardsRow
 import com.example.mybible.ui.components.QuoteTag
 import com.example.mybible.ui.components.SleepTimerMenu
@@ -119,10 +121,11 @@ private fun bottomScrim(colors: VsColors, scenes: Boolean): Brush =
     else Brush.verticalGradient(0f to Color(0x00FAF7F0), 0.65f to Color(0xCCFAF7F0), 1f to Color(0xCCFAF7F0))
 
 /**
- * Back, the feed's two tabs, the speaker and settings. The first tab is the mode, named for where its
- * verses come from ("Full", "Romans 8", "Highlighted"): tapped while showing, it opens the choice of
- * verses. The speaker reads each card aloud as it comes up. Inside a Rabbit hole, past its first verse,
- * a "Back to …" button underneath returns to the verse it started from.
+ * Back, the feed's two tabs, the reading's language and settings. The first tab is the mode, named for
+ * where its verses come from ("Full", "Romans 8", "Highlighted"): tapped while showing, it opens the
+ * choice of verses. The language button changes what the cards are read aloud in, a tap at a time
+ * (English, Telugu, Both), gold while they're read (a tap on a card plays or pauses). Inside a Rabbit
+ * hole, past its first verse, a "Back to …" button underneath returns to the verse it started from.
  */
 @Composable
 internal fun BoxScope.VerseScrollTopBar(
@@ -131,12 +134,13 @@ internal fun BoxScope.VerseScrollTopBar(
     rabbitHole: Boolean,
     backTo: String?,
     modeLabel: String,
-    speakerOn: Boolean,
+    language: ReadLanguage,
+    reading: Boolean,
     onBack: () -> Unit,
     onDiscover: () -> Unit,
     onRabbitHole: () -> Unit,
     onBackTo: () -> Unit,
-    onSpeaker: () -> Unit,
+    onLanguage: () -> Unit,
     onSettings: () -> Unit,
     sleepChip: (@Composable () -> Unit)? = null
 ) {
@@ -163,12 +167,7 @@ internal fun BoxScope.VerseScrollTopBar(
                 Tab(modeLabel, selected = !rabbitHole, colors = colors, menu = !rabbitHole, onClick = onDiscover)
                 Tab("Rabbit hole", selected = rabbitHole, colors = colors, onClick = onRabbitHole)
             }
-            RoundIconButton(
-                if (speakerOn) VerseScrollIcons.Speaker else VerseScrollIcons.SpeakerOff,
-                if (speakerOn) "Stop reading aloud" else "Read aloud",
-                if (speakerOn) colors.gold else colors.ink,
-                onSpeaker
-            )
+            ReadLanguageButton(language, if (reading) colors.gold else colors.ink, onLanguage, size = 42.dp)
             RoundIconButton(VerseScrollIcons.Settings, "Verse Scroll settings", colors.ink, onSettings)
         }
         if (sleepChip != null) {
@@ -655,7 +654,8 @@ internal fun BoxScope.FirstTimeHint(colors: VsColors, reduceMotion: Boolean, onD
             fontSize = 15.sp
         )
         Text(
-            text = "Pick one from the box that pops up, or long-press for a note. Swipe up for the next verse.",
+            text = "Pick one from the box that pops up, or long-press for a note. Tap a word to look it up, " +
+                "anywhere else to read aloud. Swipe up for the next verse.",
             color = colors.soft,
             fontFamily = WorkSansFontFamily,
             fontSize = 13.sp,
@@ -751,9 +751,9 @@ internal fun VerseScrollSettingsSheet(
             DsSectionLabel("Reading aloud")
             DsToggleRow(
                 label = "Continue reading",
-                subLabel = "With the speaker at the top on, each card is read aloud as it comes up" +
+                subLabel = "A tap on a card reads it aloud" +
                     if (continueReading) ", then Verse Scroll moves on to the next by itself, hands-free, even with the screen off."
-                    else ". On: Verse Scroll moves on to the next by itself, hands-free.",
+                    else ", and each you swipe to after it. On: Verse Scroll moves on to the next by itself, hands-free.",
                 checked = continueReading,
                 onCheckedChange = onContinueReading
             )

@@ -64,6 +64,7 @@ import com.example.mybible.model.Verse
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.components.ReadAloudSheet
+import com.example.mybible.ui.components.readLanguageName
 import com.example.mybible.ui.components.rememberReadAloudNotificationAsk
 import com.example.mybible.ui.components.VerseActionToolbar
 import com.example.mybible.ui.theme.WorkSansFontFamily
@@ -486,7 +487,8 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                 rabbitHole = inRabbitHole,
                 backTo = controller.rabbitHoleRoot(pagerState.settledPage)?.content?.label,
                 modeLabel = controller.source.label,
-                speakerOn = controller.speakerOn,
+                language = viewModel.readAloudSettings.language,
+                reading = controller.speakerOn,
                 sleepChip = if (readAloudState.place == ReadingPlace.VERSE_SCROLL && readAloudState.sleep != null) {
                     {
                         SleepChip(
@@ -524,13 +526,14 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                 onBackTo = {
                     leave(toRoot = true) { root -> if (root != null) "Out of the Rabbit hole \u00b7 back at $root" else "Out of the Rabbit hole" }
                 },
-                onSpeaker = {
+                onLanguage = {
                     hidePicker()
-                    controller.toggleSpeaker()
-                    // Nothing to read with (Telugu alone, and no Telugu voice): the settings say why.
-                    val now = viewModel.readAloudState.value
-                    if (!now.active && (now.noTeluguVoice || now.noVoice)) readAloudOpen = true
-                    if (controller.speakerOn) askForNotifications()
+                    if (viewModel.nextReadLanguage()) {
+                        showToast("Reading in ${readLanguageName(viewModel.readAloudSettings.language)}")
+                    } else {
+                        // No other language to go to (no Telugu voice or recording): the settings say why.
+                        readAloudOpen = true
+                    }
                 },
                 onSettings = {
                     hidePicker()

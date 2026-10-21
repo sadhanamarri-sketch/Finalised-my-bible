@@ -449,27 +449,15 @@ class VerseScrollController(
 
     // ---- reading aloud ----
 
-    /** The speaker button: each card is read aloud as it comes up (and with Continue reading, it moves on). */
+    /**
+     * The cards being read aloud (a tap on one plays it): each card is read as it comes up (and with Continue
+     * reading, it moves on). Off while paused.
+     */
     var speakerOn by mutableStateOf(false)
         private set
 
     // The cards' reading going on (or just finished, the speaker still on), if any.
     private var reading: CardReading? = null
-
-    fun toggleSpeaker() {
-        if (speakerOn) {
-            stopReading()
-            return
-        }
-        speakerOn = true
-        showTeluguForReading()
-        // Paused on the card still on screen: on from where it stopped. Otherwise the card on screen.
-        val paused = reading?.takeIf {
-            readAloud.session === it && readAloud.state.value.status == ReadAloudState.Status.PAUSED &&
-                it.uid == cards.getOrNull(currentIndex)?.uid
-        }
-        if (paused != null) readAloud.resume() else readCard(currentIndex)
-    }
 
     /**
      * Read in Telugu or both, the Telugu shows under each verse, as the Reader's అ comes on for its
@@ -506,7 +494,7 @@ class VerseScrollController(
         if (readAloud.session === current && readAloud.state.value.status == ReadAloudState.Status.PLAYING) readAloud.pause()
     }
 
-    /** The speaker off: stops reading the cards aloud. */
+    /** Off to another tab: stops reading the cards aloud. */
     fun stopReading() {
         speakerOn = false
         val current = reading ?: return

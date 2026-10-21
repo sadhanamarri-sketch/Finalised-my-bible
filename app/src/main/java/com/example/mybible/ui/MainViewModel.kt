@@ -726,6 +726,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** The reading bar's previous, held: the chapter from its first verse. */
     fun readFromChapterStart() = readAloud.skipToStart()
 
+    /**
+     * The language button (Verse Scroll's top bar, the Reader's reading bar): English, Telugu, Both, round
+     * again, leaving out Telugu and Both without a Telugu voice or recording. Being read, the verse starts
+     * again in the new language at once. False when there's no other language to go to.
+     */
+    fun nextReadLanguage(): Boolean {
+        val now = readAloudSettings.language
+        val next = now.next(telugu = readAloud.canReadTelugu())
+        if (next == now) return false
+        readAloudSettings.updateLanguage(next)
+        if (readAloud.state.value.active) readAloud.restartVerse()
+        return true
+    }
+
     override fun onCleared() {
         // Verse Scroll's reading needs its feed, which goes with this; the Reader's chapter can read on.
         if (readAloud.session?.place == ReadingPlace.VERSE_SCROLL) readAloud.stop()

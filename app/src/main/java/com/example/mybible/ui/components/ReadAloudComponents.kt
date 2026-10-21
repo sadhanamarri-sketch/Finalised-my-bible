@@ -27,11 +27,13 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.mybible.audio.VoiceDepths
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -68,16 +70,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -97,18 +107,21 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
  * The Reader's reading-aloud bar, over its bottom pill while a chapter is read aloud: previous (held, back
- * to the chapter's first verse), play or pause, next, the verse being read (tap it to go to it), the sleep
- * timer (the time left while one's set), the settings, and stop.
+ * to the chapter's first verse), play or pause, next, the verse being read (tap it to go to it), the
+ * language it's read in (a tap changes it), the sleep timer (the time left while one's set), the
+ * settings, and stop.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ReadAloudBar(
     state: ReadAloudState,
+    language: ReadLanguage,
     onPlayPause: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onChapterStart: () -> Unit,
     onOpenVerse: () -> Unit,
+    onLanguage: () -> Unit,
     onSettings: () -> Unit,
     onStop: () -> Unit,
     sleepLeft: () -> Long?,
@@ -176,14 +189,15 @@ fun ReadAloudBar(
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurface
                 )
+                // What's heard now: in both languages, the one this part of the verse is in.
                 Text(
                     text = when {
                         !playing -> "Paused"
                         state.recording -> if (state.telugu) "Telugu recording" else "English recording"
-                        state.telugu -> "Reading in Telugu"
+                        state.telugu -> "Telugu"
                         // Both languages, but no Telugu voice on the phone.
-                        state.noTeluguVoice -> "English only: no Telugu voice"
-                        else -> "Reading in English"
+                        state.noTeluguVoice -> "No Telugu voice"
+                        else -> "English"
                     },
                     fontFamily = WorkSansFontFamily,
                     fontSize = 12.sp,
@@ -192,6 +206,7 @@ fun ReadAloudBar(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            ReadLanguageButton(language, MaterialTheme.colorScheme.onSurface, onLanguage)
             SleepTimerButton(state, sleepLeft, onSleepIn, onSleepAtChapterEnd, onCancelSleep)
             IconButton(onClick = onSettings, modifier = Modifier.size(38.dp)) {
                 Icon(Icons.Default.Tune, contentDescription = "Reading aloud settings", tint = MaterialTheme.colorScheme.onSurface)
@@ -201,6 +216,64 @@ fun ReadAloudBar(
             }
         }
     }
+}
+
+/**
+ * The language a reading's in, on a key a tap moves on (English, Telugu, Both, round again): A, అ, or the
+ * two together. [size] is the button's, [tint] the key's.
+ */
+@Composable
+fun ReadLanguageButton(
+    language: ReadLanguage,
+    tint: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: Dp = 38.dp
+) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = "Reading in ${readLanguageName(language)}: tap to change" }
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .heightIn(min = 22.dp)
+                .widthIn(min = 22.dp)
+                .border(1.5.dp, tint, RoundedCornerShape(6.dp))
+                .padding(horizontal = 4.dp)
+        ) {
+            Text(
+                text = buildAnnotatedString {
+                    if (language != ReadLanguage.TELUGU) append("A")
+                    // The Telugu letter a size up, to stand as tall as the A.
+                    if (language != ReadLanguage.ENGLISH) withStyle(SpanStyle(fontSize = 18.sp)) { append("అ") }
+                },
+                color = tint,
+                fontFamily = WorkSansFontFamily,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp,
+                maxLines = 1,
+                softWrap = false,
+                // One height for the key whichever letters it shows.
+                style = TextStyle(
+                    platformStyle = PlatformTextStyle(includeFontPadding = false),
+                    lineHeight = 14.sp,
+                    lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both)
+                )
+            )
+        }
+    }
+}
+
+/** A reading's language, as said: "English", "Telugu", "English and Telugu". */
+fun readLanguageName(language: ReadLanguage): String = when (language) {
+    ReadLanguage.ENGLISH -> "English"
+    ReadLanguage.TELUGU -> "Telugu"
+    ReadLanguage.BOTH -> "English and Telugu"
 }
 
 /**
@@ -492,8 +565,8 @@ fun ReadAloudSheet(
                 label = { it.label },
                 onSelect = { language ->
                     settings.updateLanguage(language)
-                    // A recording would play on in the language it started in to the chapter's end.
-                    if (state.recording) readAloud.restartVerse()
+                    // Being read, the verse starts again in the new language at once.
+                    if (state.active) readAloud.restartVerse()
                 }
             )
             DsNote(
