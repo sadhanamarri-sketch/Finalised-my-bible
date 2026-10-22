@@ -815,20 +815,20 @@ class MainActivity : ComponentActivity() {
                         TourCuratedEndDialog(onDismiss = { viewModel.dismissTourCuratedEndNote() })
                     }
 
-                    // A change to what's studied, with a way to take it back: "Unmarked John 3:16",
-                    // "Marked John 3 studied", "Cleared 1,234 studied verses" (see
-                    // MainViewModel.studiedUndo). Over whichever page is showing; on the Reader,
+                    // A change with a way to take it back: "Unmarked John 3:16", "Marked John 3
+                    // studied", "Cleared 1,234 studied verses", "Deleted “Prayer list”" (see
+                    // MainViewModel.changeUndo). Over whichever page is showing; on the Reader,
                     // above its bar.
-                    val studiedUndo by viewModel.studiedUndo.collectAsState()
-                    val studiedSnackbar = remember { SnackbarHostState() }
-                    LaunchedEffect(studiedUndo?.id) {
-                        val change = studiedUndo ?: return@LaunchedEffect
-                        val result = studiedSnackbar.showSnackbar(change.message, actionLabel = "Undo", duration = SnackbarDuration.Long)
-                        if (result == SnackbarResult.ActionPerformed) viewModel.undoStudiedChange(change.id)
-                        else viewModel.dismissStudiedUndo(change.id)
+                    val changeUndo by viewModel.changeUndo.collectAsState()
+                    val undoSnackbar = remember { SnackbarHostState() }
+                    LaunchedEffect(changeUndo?.id) {
+                        val change = changeUndo ?: return@LaunchedEffect
+                        val result = undoSnackbar.showSnackbar(change.message, actionLabel = "Undo", duration = SnackbarDuration.Long)
+                        if (result == SnackbarResult.ActionPerformed) viewModel.undoChange(change.id)
+                        else viewModel.dismissChangeUndo(change.id)
                     }
                     SnackbarHost(
-                        hostState = studiedSnackbar,
+                        hostState = undoSnackbar,
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .navigationBarsPadding()

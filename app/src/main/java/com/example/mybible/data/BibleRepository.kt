@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.mybible.data.local.AppDatabase
 import com.example.mybible.data.local.BibleDao
 import com.example.mybible.data.local.CrossReferenceEntity
+import com.example.mybible.data.local.NoteEntity
 import com.example.mybible.data.local.StudiedVerseEntity
 import com.example.mybible.data.local.UserDatabase
 import com.example.mybible.data.local.VerseEntity
@@ -98,6 +99,10 @@ class BibleRepository(private val context: Context) {
 
     // The verses marked studied, a row each, in the reader's own database (see UserDatabase).
     private val studiedDao = UserDatabase.getInstance(context).studiedVerseDao()
+
+    // The notes, a row each, in the same database (see NoteEntity), kept in compact JSON.
+    private val noteDao = UserDatabase.getInstance(context).noteDao()
+    private val noteJson = Json { ignoreUnknownKeys = true }
 
     /** Runs the one-time KJV download + Telugu asset import; see [BibleDataInitializer].
      *  A process-wide singleton (BibleDataInitializer.getInstance), not a fresh
@@ -264,8 +269,11 @@ class BibleRepository(private val context: Context) {
         if (prefs.contains("total_study_time_ms")) prefs.edit().remove("total_study_time_ms").apply()
     }
 
-    private val _notesFlow = MutableStateFlow<List<NoteItem>>(loadNotesFromPrefs())
-    val allNotes: Flow<List<NoteItem>> = _notesFlow.asStateFlow()
+    /** Every note, newest first, again each time one is saved or deleted, here or by a sync. */
+    val allNotes: Flow<List<NoteItem>> = flow {
+        moveLegacyNotes()
+        emitAll(noteDao.observeAll().map { rows -> rows.mapNotNull { it.toNoteItem() } })
+    }
 
     private val _tagDefinitionsFlow = MutableStateFlow<List<TagDefinition>>(loadTagDefinitionsFromPrefs())
     val allTagDefinitions: Flow<List<TagDefinition>> = _tagDefinitionsFlow.asStateFlow()
@@ -313,17 +321,19 @@ class BibleRepository(private val context: Context) {
             current.map { if (it.name.equals(oldName, true)) it.copy(name = cleaned, description = description.trim()) else it }
         )
         if (!cleaned.equals(oldName, ignoreCase = true)) {
-            val updatedNotes = _notesFlow.value.map { note ->
-                note.copy(tags = note.tags.map { if (it.equals(oldName, true)) cleaned else it }.distinct())
+            updateNotes { note ->
+                if (note.tags.none { it.equals(oldName, true) }) null
+                else note.copy(tags = note.tags.map { if (it.equals(oldName, true)) cleaned else it }.distinct())
             }
-            saveNotesToPrefs(updatedNotes)
         }
     }
 
     suspend fun deleteTag(name: String) {
         saveTagDefinitionsToPrefs(_tagDefinitionsFlow.value.filterNot { it.name.equals(name, true) })
-        val updatedNotes = _notesFlow.value.map { note -> note.copy(tags = note.tags.filterNot { it.equals(name, true) }) }
-        saveNotesToPrefs(updatedNotes)
+        updateNotes { note ->
+            if (note.tags.none { it.equals(name, true) }) null
+            else note.copy(tags = note.tags.filterNot { it.equals(name, true) })
+        }
         recordTombstone(tagTombstoneKey(name))
     }
 
@@ -363,7 +373,9 @@ class BibleRepository(private val context: Context) {
     private fun recordTombstones(keys: Collection<String>) {
         if (keys.isEmpty()) return
         val now = System.currentTimeMillis()
-        val updated = _tombstonesFlow.value.toMutableMap()
+        // From the preferences each time, not this repository's copy: another (a sync worker's) may
+        // have recorded a deletion since, which a stale copy would write over.
+        val updated = loadTombstonesFromPrefs().toMutableMap()
         for (key in keys) updated[key] = now
         saveTombstonesToPrefs(updated)
     }
@@ -371,7 +383,7 @@ class BibleRepository(private val context: Context) {
     // Something deleted is back (a verse marked studied again, an undo): no longer deleted, so a
     // restore or another device's backup doesn't skip it.
     private fun clearTombstones(keys: Collection<String>) {
-        val current = _tombstonesFlow.value
+        val current = loadTombstonesFromPrefs()
         if (keys.none { it in current }) return
         saveTombstonesToPrefs(current - keys.toSet())
     }
@@ -412,15 +424,6 @@ class BibleRepository(private val context: Context) {
     private fun resolvedHighlightColorDefs(overrides: Map<String, String>): List<HighlightColorDef> =
         HIGHLIGHT_COLOR_DEFS.map { def -> overrides[def.colorHex]?.let { def.copy(label = it) } ?: def }
 
-    private fun loadNotesFromPrefs(): List<NoteItem> {
-        val str = prefs.getString("saved_notes_json", null) ?: return emptyList()
-        return try {
-            json.decodeFromString<List<NoteItem>>(str).map { it.normalized() }
-        } catch (e: Exception) {
-            emptyList()
-        }
-    }
-
     private fun NoteItem.normalized(): NoteItem {
         val normalizedRefs = if (refs.isNotEmpty()) {
             refs
@@ -442,9 +445,40 @@ class BibleRepository(private val context: Context) {
         )
     }
 
-    private fun saveNotesToPrefs(list: List<NoteItem>) {
-        _notesFlow.value = list
-        prefs.edit().putString("saved_notes_json", json.encodeToString(list)).apply()
+    private fun NoteItem.toNoteEntity() = NoteEntity(id, createdAt, updatedAt, noteJson.encodeToString(this))
+
+    private fun NoteEntity.toNoteItem(): NoteItem? =
+        try { noteJson.decodeFromString<NoteItem>(data).normalized() } catch (_: Exception) { null }
+
+    // Notes were once one JSON list in these preferences, rewritten whole on every save. They're
+    // moved into the database the first time they're needed, and the list removed; a list that
+    // can't be read is left where it is rather than lost.
+    private suspend fun moveLegacyNotes() {
+        if (!prefs.contains(LEGACY_NOTES_KEY)) return
+        notesMutex.withLock {
+            val str = prefs.getString(LEGACY_NOTES_KEY, null) ?: return
+            val notes = try {
+                json.decodeFromString<List<NoteItem>>(str).map { it.normalized() }
+            } catch (_: Exception) {
+                return
+            }
+            // Tags were once worked out from the notes when no tag list was kept (see
+            // loadTagDefinitionsFromPrefs): kept now, before the notes leave.
+            if (!prefs.contains("tag_definitions_json")) saveTagDefinitionsToPrefs(_tagDefinitionsFlow.value)
+            withContext(Dispatchers.IO) { noteDao.insertNew(notes.map { it.toNoteEntity() }) }
+            prefs.edit().remove(LEGACY_NOTES_KEY).apply()
+        }
+    }
+
+    // Saves the notes [change] gives a new copy of (null: the note as it is), each its own row.
+    private suspend fun updateNotes(change: (NoteItem) -> NoteItem?) {
+        moveLegacyNotes()
+        notesMutex.withLock {
+            withContext(Dispatchers.IO) {
+                val changed = noteDao.getAll().mapNotNull { row -> row.toNoteItem()?.let(change) }
+                if (changed.isNotEmpty()) noteDao.upsert(changed.map { it.toNoteEntity() })
+            }
+        }
     }
 
     // Studied verses were once one JSON list in these preferences, rewritten whole on every mark.
@@ -964,42 +998,42 @@ class BibleRepository(private val context: Context) {
         refs: List<NoteReference>,
         tags: List<String>,
         richText: String = ""
-    ) {
-        val current = _notesFlow.value.toMutableList()
+    ): Long {
+        moveLegacyNotes()
         val now = System.currentTimeMillis()
-        val noteId = if (id > 0) id else System.currentTimeMillis()
+        val noteId = if (id > 0) id else now
         val normalizedRefs = refs.distinctBy { Triple(it.book, it.chapter, it.verse) }
         val primary = normalizedRefs.firstOrNull()
-        val existingIndex = current.indexOfFirst { it.id == noteId }
+        notesMutex.withLock {
+            val existing = withContext(Dispatchers.IO) { noteDao.find(noteId) }?.toNoteItem()
 
-        val newNote = NoteItem(
-            id = noteId,
-            title = title.trim(),
-            text = text,
-            noteDate = noteDate.ifBlank { SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(now)) },
-            refs = normalizedRefs,
-            // Keep the old fields synchronized for old callers/backups and
-            // for compatibility with data written by previous builds.
-            book = primary?.book ?: "",
-            chapter = primary?.chapter ?: 0,
-            verse = primary?.verse ?: 0,
-            verseText = primary?.verseText ?: "",
-            tags = tags.map { it.trim() }.filter { it.isNotBlank() }.distinct(),
-            createdAt = if (existingIndex >= 0) current[existingIndex].createdAt else now,
-            updatedAt = now,
-            richText = richText
-        )
-        if (existingIndex >= 0) {
-            current[existingIndex] = newNote
-        } else {
-            current.add(0, newNote)
+            val newNote = NoteItem(
+                id = noteId,
+                title = title.trim(),
+                text = text,
+                noteDate = noteDate.ifBlank { SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(now)) },
+                refs = normalizedRefs,
+                // Keep the old fields synchronized for old callers/backups and
+                // for compatibility with data written by previous builds.
+                book = primary?.book ?: "",
+                chapter = primary?.chapter ?: 0,
+                verse = primary?.verse ?: 0,
+                verseText = primary?.verseText ?: "",
+                tags = tags.map { it.trim() }.filter { it.isNotBlank() }.distinct(),
+                createdAt = existing?.createdAt ?: now,
+                updatedAt = now,
+                richText = richText
+            )
+            withContext(Dispatchers.IO) { noteDao.upsert(listOf(newNote.toNoteEntity())) }
         }
-        saveNotesToPrefs(current)
+        // Saved again after a delete (its undo): no longer deleted.
+        clearTombstones(listOf(noteTombstoneKey(noteId)))
         val known = _tagDefinitionsFlow.value.toMutableList()
         tags.map { it.trim() }.filter { it.isNotBlank() }.forEach { tag ->
             if (known.none { it.name.equals(tag, true) }) known.add(TagDefinition(tag))
         }
         saveTagDefinitionsToPrefs(known)
+        return noteId
     }
 
     // Compatibility overload for existing UI/callers while the richer note
@@ -1015,11 +1049,20 @@ class BibleRepository(private val context: Context) {
         )
     }
 
-    suspend fun deleteNote(id: Long) {
-        val current = _notesFlow.value.toMutableList()
-        current.removeAll { it.id == id }
-        saveNotesToPrefs(current)
+    /** Deletes the note, and gives it back as it was, for an undo ([restoreNote]). */
+    suspend fun deleteNote(id: Long): NoteItem? {
+        moveLegacyNotes()
+        val removed = notesMutex.withLock {
+            withContext(Dispatchers.IO) { noteDao.find(id)?.also { noteDao.delete(id) } }
+        }
         recordTombstone(noteTombstoneKey(id))
+        return removed?.toNoteItem()
+    }
+
+    /** A deleted note back as it was (an undo): no longer deleted, so a restore or a sync keeps it. */
+    suspend fun restoreNote(note: NoteItem) {
+        notesMutex.withLock { withContext(Dispatchers.IO) { noteDao.upsert(listOf(note.toNoteEntity())) } }
+        clearTombstones(listOf(noteTombstoneKey(note.id)))
     }
 
     suspend fun resolveNoteReference(ref: NoteReference): NoteReference {
@@ -1557,7 +1600,10 @@ class BibleRepository(private val context: Context) {
     suspend fun exportBackupJson(): String = withContext(Dispatchers.IO) {
         val data = BackupData(
             exportedAt = backupTimestampFormat.format(Date()),
-            notes = _notesFlow.value,
+            notes = run {
+                moveLegacyNotes()
+                noteDao.getAll().mapNotNull { it.toNoteItem() }
+            },
             // `tags` (name-only) is kept for backups read by older builds;
             // `tagDefs` is what this build itself reads back, since it's
             // the only one that carries `description`.
@@ -1571,7 +1617,7 @@ class BibleRepository(private val context: Context) {
             highlightColorDefs = resolvedHighlightColorDefs(_highlightColorLabelOverridesFlow.value),
             savedWords = _savedWordsFlow.value,
             wordLinks = _wordLinksFlow.value,
-            tombstones = SyncTombstones(_tombstonesFlow.value)
+            tombstones = SyncTombstones(loadTombstonesFromPrefs())
         )
         json.encodeToString(data)
     }
@@ -1644,7 +1690,7 @@ class BibleRepository(private val context: Context) {
 
         // Tombstones are merged first so every entity merge below can
         // check against the up-to-date combined set in one pass.
-        val mergedTombstones = _tombstonesFlow.value.toMutableMap()
+        val mergedTombstones = loadTombstonesFromPrefs().toMutableMap()
         for ((key, deletedAt) in data.tombstones.entries) {
             val existingAt = mergedTombstones[key]
             if (existingAt == null || deletedAt > existingAt) {
@@ -1657,25 +1703,27 @@ class BibleRepository(private val context: Context) {
         // Notes: union by id, newest updatedAt wins on collision. A
         // tombstoned id is skipped unless the incoming edit postdates the
         // deletion (see doc comment above).
-        val existingNotes = _notesFlow.value
-        val existingNoteIds = existingNotes.associateBy { it.id }
+        // Read and written in one go under the notes' lock, so a note saved meanwhile isn't lost.
+        moveLegacyNotes()
         var notesAdded = 0
         var notesUpdated = 0
-        val mergedNotes = existingNotes.toMutableList()
-        for (incoming in data.notes) {
-            val deletedAt = tombstones[noteTombstoneKey(incoming.id)]
-            if (deletedAt != null && incoming.updatedAt <= deletedAt) continue
-            val existing = existingNoteIds[incoming.id]
-            if (existing == null) {
-                mergedNotes.add(incoming.normalized())
-                notesAdded++
-            } else if (incoming.updatedAt > existing.updatedAt) {
-                val idx = mergedNotes.indexOfFirst { it.id == incoming.id }
-                if (idx >= 0) mergedNotes[idx] = incoming.normalized()
-                notesUpdated++
+        notesMutex.withLock {
+            val existingNoteIds = noteDao.getAll().mapNotNull { it.toNoteItem() }.associateBy { it.id }
+            val toWrite = LinkedHashMap<Long, NoteItem>()
+            for (incoming in data.notes) {
+                val deletedAt = tombstones[noteTombstoneKey(incoming.id)]
+                if (deletedAt != null && incoming.updatedAt <= deletedAt) continue
+                val existing = toWrite[incoming.id] ?: existingNoteIds[incoming.id]
+                if (existing == null) {
+                    toWrite[incoming.id] = incoming.normalized()
+                    notesAdded++
+                } else if (incoming.updatedAt > existing.updatedAt) {
+                    toWrite[incoming.id] = incoming.normalized()
+                    notesUpdated++
+                }
             }
+            if (toWrite.isNotEmpty()) noteDao.upsert(toWrite.values.map { it.toNoteEntity() })
         }
-        saveNotesToPrefs(mergedNotes.sortedByDescending { it.createdAt })
 
         // Tags: union by name, case-insensitive; new names only. Prefers
         // tagDefs (carries description) over the legacy name-only `tags`
@@ -1808,6 +1856,12 @@ class BibleRepository(private val context: Context) {
     private companion object {
         // Where studied verses were kept before the database (see moveLegacyCompletedVerses).
         const val LEGACY_COMPLETED_KEY = "saved_completed_json"
+
+        // Where notes were kept before the database (see moveLegacyNotes).
+        const val LEGACY_NOTES_KEY = "saved_notes_json"
+
+        // One change to the notes at a time, across every BibleRepository in the process.
+        val notesMutex = Mutex()
 
         // One change to the studied verses at a time, across every BibleRepository in the
         // process (the app's, and a sync worker's): a mark, an undo, a restore's merge.

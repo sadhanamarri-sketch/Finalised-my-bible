@@ -2577,28 +2577,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * A change to what's studied that can be taken back, while its message shows: a verse
-     * unmarked by a long-press, a chapter marked or unmarked, everything cleared. [id] tells one
-     * from the next.
+     * A change that can be taken back, while its message shows: to what's studied (a verse
+     * unmarked by a long-press, a chapter marked or unmarked, everything cleared), or a note
+     * deleted. [id] tells one from the next.
      */
-    class StudiedUndo(val id: Long, val message: String, internal val undo: suspend () -> Unit)
+    class ChangeUndo(val id: Long, val message: String, internal val undo: suspend () -> Unit)
 
-    private val _studiedUndo = MutableStateFlow<StudiedUndo?>(null)
-    val studiedUndo: StateFlow<StudiedUndo?> = _studiedUndo.asStateFlow()
-    private var studiedUndoCount = 0L
+    private val _changeUndo = MutableStateFlow<ChangeUndo?>(null)
+    val changeUndo: StateFlow<ChangeUndo?> = _changeUndo.asStateFlow()
+    private var changeUndoCount = 0L
 
-    private fun offerStudiedUndo(message: String, undo: suspend () -> Unit) {
-        _studiedUndo.value = StudiedUndo(++studiedUndoCount, message, undo)
+    private fun offerChangeUndo(message: String, undo: suspend () -> Unit) {
+        _changeUndo.value = ChangeUndo(++changeUndoCount, message, undo)
     }
 
-    fun undoStudiedChange(id: Long) {
-        val change = _studiedUndo.value?.takeIf { it.id == id } ?: return
-        _studiedUndo.value = null
+    fun undoChange(id: Long) {
+        val change = _changeUndo.value?.takeIf { it.id == id } ?: return
+        _changeUndo.value = null
         viewModelScope.launch { change.undo() }
     }
 
-    fun dismissStudiedUndo(id: Long) {
-        if (_studiedUndo.value?.id == id) _studiedUndo.value = null
+    fun dismissChangeUndo(id: Long) {
+        if (_changeUndo.value?.id == id) _changeUndo.value = null
     }
 
     /** The end of a chapter's "Mark … studied": the verses of it not yet studied, marked. */
@@ -2606,7 +2606,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val verses = (1..repository.getVerseCount(book, chapter)).toList()
             val added = repository.markCompletedVerses(book, chapter, verses)
-            if (added.isNotEmpty()) offerStudiedUndo("Marked $book $chapter studied") { repository.unmarkCompletedVerses(added) }
+            if (added.isNotEmpty()) offerChangeUndo("Marked $book $chapter studied") { repository.unmarkCompletedVerses(added) }
         }
     }
 
@@ -2614,7 +2614,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun unmarkChapterStudied(book: String, chapter: Int) {
         viewModelScope.launch {
             val removed = repository.unmarkCompletedChapter(book, chapter)
-            if (removed.isNotEmpty()) offerStudiedUndo("Unmarked $book $chapter") { repository.restoreCompletedVerses(removed) }
+            if (removed.isNotEmpty()) offerChangeUndo("Unmarked $book $chapter") { repository.restoreCompletedVerses(removed) }
         }
     }
 
@@ -2624,7 +2624,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val removed = repository.clearAllCompletedVerses()
             if (removed.isNotEmpty()) {
                 val count = if (removed.size == 1) "1 studied verse" else "${StudiedProgress.count(removed.size)} studied verses"
-                offerStudiedUndo("Cleared $count") { repository.restoreCompletedVerses(removed) }
+                offerChangeUndo("Cleared $count") { repository.restoreCompletedVerses(removed) }
             }
         }
     }
@@ -2881,7 +2881,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _readerPickMode.value = ReaderPickMode.NONE
             viewModelScope.launch {
                 val removed = repository.toggleCompletedVerse(verse.book, verse.chapter, verse.number) ?: return@launch
-                offerStudiedUndo("Unmarked ${verse.book} ${verse.chapter}:${verse.number}") {
+                offerChangeUndo("Unmarked ${verse.book} ${verse.chapter}:${verse.number}") {
                     repository.restoreCompletedVerses(listOf(removed))
                 }
             }
@@ -3040,9 +3040,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return ref.copy(verseText = text)
     }
 
+    /** Deletes the note, with Undo to bring it back as it was. */
     fun deleteNote(noteId: Long) {
         viewModelScope.launch {
-            repository.deleteNote(noteId)
+            val removed = repository.deleteNote(noteId) ?: return@launch
+            val name = removed.title.ifBlank { "Note" }
+            offerChangeUndo("Deleted \u201c${name.take(40)}\u201d") { repository.restoreNote(removed) }
         }
     }
 

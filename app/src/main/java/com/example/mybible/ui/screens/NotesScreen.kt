@@ -93,10 +93,6 @@ fun NotesScreen(
     var selectedFilterTags by remember { mutableStateOf<List<String>>(emptyList()) }
     var dateFilter by remember { mutableStateOf("") }
     val filtersActive = selectedFilterTags.isNotEmpty() || dateFilter.isNotBlank()
-    // Edit/Delete were also on the Note Reader's top bar before, but that
-    // duplicated what's already one tap away here in the list — Delete now
-    // confirms here since this is the only place it can be triggered from.
-    var noteIdPendingDelete by remember { mutableStateOf<Long?>(null) }
 
     // One-shot handoff from the Tags screen: tapping a tag row there sets
     // this, closes Tags, and lands back here with that tag pre-selected as
@@ -375,7 +371,8 @@ fun NotesScreen(
                                             },
                                             onClick = {
                                                 showMenu = false
-                                                noteIdPendingDelete = note.id
+                                                // At once, with Undo on the bar that comes up (see MainViewModel.deleteNote).
+                                                viewModel.deleteNote(note.id)
                                             }
                                         )
                                     }
@@ -424,27 +421,6 @@ fun NotesScreen(
         )
     }
 
-    val pendingDeleteId = noteIdPendingDelete
-    if (pendingDeleteId != null) {
-        AlertDialog(
-            onDismissRequest = { noteIdPendingDelete = null },
-            title = { Text("Delete note?") },
-            text = { Text("This can't be undone.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.deleteNote(pendingDeleteId)
-                        noteIdPendingDelete = null
-                    }
-                ) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { noteIdPendingDelete = null }) { Text("Cancel") }
-            }
-        )
-    }
 }
 
 // Advanced filters, pulled out of permanent screen space and into a sheet —
