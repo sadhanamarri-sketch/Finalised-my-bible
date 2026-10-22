@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -37,13 +36,13 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mybible.data.findVerseMentions
 import com.example.mybible.model.NoteText
 import com.example.mybible.model.RichBlockStyle
 import com.example.mybible.model.ThemeMode
-import com.example.mybible.ui.theme.NotoSerifFontFamily
 
 // The note page's look of a note, as the editor shows it (see NoteDisplay.kt): a paragraph at a
 // time, so its text can be selected and copied (each line its own, the lines copied with their
@@ -55,7 +54,7 @@ internal fun RichNoteBodyView(
     themeMode: ThemeMode,
     onMentionClick: (book: String, chapter: Int, verse: Int) -> Unit,
     onToggleCheck: ((para: Int) -> Unit)?,
-    baseFontSizeSp: Float = 19f,
+    baseFontSizeSp: Float = NOTE_TEXT_SIZE,
     modifier: Modifier = Modifier
 ) {
     val look = rememberNoteLook(themeMode, baseFontSizeSp)
@@ -69,7 +68,7 @@ internal fun RichNoteBodyView(
                 val text = remember(note, i, look) { paraText(note, i, start, end, look, onMentionClick) }
                 val textSize = paraSize(p, look)
                 val lead = paraLead(p)
-                val markLead = p.indent * 24f
+                val markLead = p.indent * INDENT_STEP
                 val accent = look.accent
                 val line = paraStyle(p, look)
                 Row(
@@ -84,19 +83,20 @@ internal fun RichNoteBodyView(
                             } else Modifier
                         )
                 ) {
-                    // The paragraph's room at the left, with its mark or tick box centred on its first line.
+                    // The paragraph's room at the left, its first line high, with its mark where the
+                    // editor draws it (see drawNoteMarks): a bullet at its start, a number just before
+                    // the text, a tick box that the whole room ticks or unticks when tapped.
                     val density = LocalDensity.current
-                    Box(
-                        Modifier.width(with(density) { lead.sp.toDp() }).height(with(density) { line.lineHeight.toDp() }),
-                        contentAlignment = Alignment.CenterEnd
-                    ) {
+                    val markStart = with(density) { markLead.sp.toDp() } + 2.dp
+                    Box(Modifier.width(with(density) { lead.sp.toDp() }).height(with(density) { line.lineHeight.toDp() })) {
                         when (p.style) {
                             RichBlockStyle.CHECK_ITEM -> TickBox(
                                 checked = p.checked,
-                                size = textSize,
+                                box = with(density) { (textSize * 0.95f).sp.toDp() },
+                                start = markStart,
                                 look = look,
                                 onClick = onToggleCheck?.let { toggle -> { toggle(i) } },
-                                modifier = Modifier.padding(end = 6.dp)
+                                modifier = Modifier.matchParentSize()
                             )
                             RichBlockStyle.BULLET_ITEM, RichBlockStyle.NUMBERED_ITEM -> markText(note, i)?.let { mark ->
                                 Text(
@@ -108,7 +108,11 @@ internal fun RichNoteBodyView(
                                         lineHeight = line.lineHeight,
                                         lineHeightStyle = line.lineHeightStyle
                                     ),
-                                    modifier = Modifier.padding(end = if (p.style == RichBlockStyle.NUMBERED_ITEM) 6.dp else 8.dp)
+                                    modifier = if (p.style == RichBlockStyle.NUMBERED_ITEM) {
+                                        Modifier.align(Alignment.CenterEnd).padding(end = 6.dp)
+                                    } else {
+                                        Modifier.align(Alignment.CenterStart).padding(start = markStart)
+                                    }
                                 )
                             }
                             else -> {}
@@ -164,42 +168,31 @@ private fun paraText(
     }
 }
 
-// A checklist item's box: ticked or not, and ticked or unticked with a tap when [onClick] is given.
+// A checklist item's box, drawn [start] from the left and centred down the room it's given; the
+// whole room ticks or unticks it when tapped, if [onClick] is given.
 @Composable
-private fun TickBox(checked: Boolean, size: Float, look: NoteLook, onClick: (() -> Unit)?, modifier: Modifier = Modifier) {
-    val box = (size * 0.95f).dp
+private fun TickBox(checked: Boolean, box: Dp, start: Dp, look: NoteLook, onClick: (() -> Unit)?, modifier: Modifier = Modifier) {
     Box(
         modifier
-            .size(box + 12.dp)
             .clip(RoundedCornerShape(6.dp))
             .then(if (onClick != null) Modifier.clickable(role = Role.Checkbox, onClick = onClick) else Modifier)
-            .semantics { contentDescription = if (checked) "Ticked" else "Not ticked" },
-        contentAlignment = Alignment.Center
-    ) {
-        Box(
-            Modifier
-                .size(box)
-                .drawBehind {
-                    val radius = CornerRadius(4.dp.toPx())
-                    if (checked) {
-                        drawRoundRect(look.accent, cornerRadius = radius)
-                        val tick = Path().apply {
-                            moveTo(this@drawBehind.size.width * 0.24f, this@drawBehind.size.height * 0.52f)
-                            lineTo(this@drawBehind.size.width * 0.43f, this@drawBehind.size.height * 0.70f)
-                            lineTo(this@drawBehind.size.width * 0.77f, this@drawBehind.size.height * 0.32f)
-                        }
-                        drawPath(tick, look.paper, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
-                    } else {
-                        val w = 1.6.dp.toPx()
-                        drawRoundRect(
-                            look.accent,
-                            topLeft = Offset(w / 2, w / 2),
-                            size = Size(this.size.width - w, this.size.height - w),
-                            cornerRadius = radius,
-                            style = Stroke(w)
-                        )
+            .semantics { contentDescription = if (checked) "Ticked" else "Not ticked" }
+            .drawBehind {
+                val side = box.toPx()
+                val at = Offset(start.toPx(), (size.height - side) / 2f)
+                val radius = CornerRadius(4.dp.toPx())
+                if (checked) {
+                    drawRoundRect(look.accent, at, Size(side, side), radius)
+                    val tick = Path().apply {
+                        moveTo(at.x + side * 0.24f, at.y + side * 0.52f)
+                        lineTo(at.x + side * 0.43f, at.y + side * 0.70f)
+                        lineTo(at.x + side * 0.77f, at.y + side * 0.32f)
                     }
+                    drawPath(tick, look.paper, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+                } else {
+                    val w = 1.6.dp.toPx()
+                    drawRoundRect(look.accent, at + Offset(w / 2, w / 2), Size(side - w, side - w), radius, style = Stroke(w))
                 }
-        )
-    }
+            }
+    )
 }

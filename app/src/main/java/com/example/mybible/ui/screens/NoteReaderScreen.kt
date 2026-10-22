@@ -162,7 +162,7 @@ fun NoteReaderScreen(
                         noteItem.refs.forEach { ref ->
                             Text(
                                 text = "${ref.book} ${ref.chapter}:${ref.verse}",
-                                fontSize = 14.sp,
+                                fontSize = 13.sp,
                                 color = MaterialTheme.colorScheme.tertiary,
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(10.dp))
@@ -199,8 +199,7 @@ fun NoteReaderScreen(
                     note = body,
                     themeMode = themeMode,
                     onMentionClick = { b, c, v -> onOpenVerseMention?.invoke(b, c, v) },
-                    onToggleCheck = onToggleCheck,
-                    baseFontSizeSp = 19f
+                    onToggleCheck = onToggleCheck
                 )
             }
         }

@@ -323,7 +323,7 @@ fun NotesScreen(
                             ) {
                                 Text(
                                     text = note.title.ifBlank { "Untitled note" }.uppercase(),
-                                    fontSize = 15.sp,
+                                    fontSize = 14.sp,
                                     fontFamily = WorkSansFontFamily,
                                     fontWeight = FontWeight.SemiBold,
                                     letterSpacing = 0.sp,
@@ -393,8 +393,10 @@ fun NotesScreen(
                             Text(
                                 text = note.text,
                                 fontFamily = NotoSerifFontFamily,
-                                fontSize = 18.sp,
-                                lineHeight = 32.94.sp, // 18sp * 1.83x, tuned via the Notes Font Lab
+                                // Looks the size of the verse cards' 17sp Source Serif 4 (Noto Serif runs
+                                // large), spaced as they are.
+                                fontSize = 15.sp,
+                                lineHeight = 25.5.sp,
                                 letterSpacing = 0.sp,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 3,

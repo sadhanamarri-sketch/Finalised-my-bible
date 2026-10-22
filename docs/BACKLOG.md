@@ -1065,3 +1065,35 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     *Not yet tried on a phone:* Gboard (its underlined word, swipe typing), the date picker, and
     taps past a line's end. On a 392dp-wide screen the toolbar's 9 buttons are 43dp wide each, to
     fit, not 48dp. Still to do from the list: 5–7, Insert verse (8) and 9–21.
+
+36. **Done 22 Oct.** **Notes: sizes that sit with the rest of the app, and Aa in the keyboard's
+    place.** "how 3 lines of formatting displays handle against the keyboard on the screen? And
+    text sizes of notes list and note editor, note reader seems off" — "i picked the sizes but they
+    look a bit odd compared to rest of the app . They look very big which is not acceptable in UI.
+    what's your recommendation for that?" — "yes build both, no apk".
+    *Found 22 Oct:* Aa stacked two rows over the toolbar while the keyboard was up, about 107dp,
+    and stayed open while typing: about 8 lines left to write in instead of 12, and none with the
+    phone on its side. Notes are in Noto Serif, whose small letters are 13% taller than Source
+    Serif 4's (the verse cards on Search and Highlights, 17sp), so 19sp note text looked about a
+    quarter bigger than a verse card, the list's 18sp a fifth bigger, with lines 1.8× apart (cards
+    1.71×); most of the app's text is 12–17sp. The new editor had also made Title and Heading lines
+    bigger (26 and 22sp, a Title line bigger than the note's own title) and Subheading near text
+    size, and given the writing page's title its own look (24sp dark serif).
+    *Built 22 Oct:*
+    - Text 16sp with lines 1.7× apart on the writing page and the note page; Title 21sp, Heading
+      18sp, Subheading back to a small grey label (13sp); list marks, tick boxes and indents
+      sized to match. The notes list's preview 15sp, 1.7× (it looks the size of a verse card), its
+      title 14sp. Verse, date and tag chips 13sp.
+    - The writing page's title in the note page's look: gold capitals, 17sp, centred under the top
+      bar (kept as typed; shown in capitals). The top bar is just Back, Undo, Redo and ⋮.
+    - On the note page the marks and tick boxes sit where the editor draws them, and a tick box
+      ticks from anywhere in its paragraph's room at the left.
+    - Aa swaps the keyboard for the text styles, as tall as the keyboard was (at most half the
+      screen), so the page doesn't move: they show as the keyboard goes down, and a tap on the text
+      or on Aa brings the keyboard back over them. In them, each a full-size button with its name:
+      Title, Heading, Subheading, Text; Bullets, Numbers, Checklist, Quote; Left, Centre, Right;
+      Underline, Clear formatting. While they're open the right-hand button closes them (and
+      Back does); writing in the title or a tag closes them too.
+    *Not yet tried on a phone:* the swap with the real keyboard (Robolectric has none): that the
+    page holds still as one goes and the other comes, and that a tap on the text brings the
+    keyboard back.

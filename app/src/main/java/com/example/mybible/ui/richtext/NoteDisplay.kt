@@ -59,7 +59,7 @@ data class NoteLook(
 )
 
 @Composable
-fun rememberNoteLook(themeMode: ThemeMode, bodySize: Float = 19f): NoteLook {
+fun rememberNoteLook(themeMode: ThemeMode, bodySize: Float = NOTE_TEXT_SIZE): NoteLook {
     val scheme = MaterialTheme.colorScheme
     val (bg, ink) = highlightColors(themeMode)
     return remember(scheme, themeMode, bodySize) {
@@ -67,22 +67,28 @@ fun rememberNoteLook(themeMode: ThemeMode, bodySize: Float = 19f): NoteLook {
     }
 }
 
-// A paragraph's room on the left, in sp: a step for each level of indent, then room for its mark.
-private const val INDENT_STEP = 24f
-private const val BULLET_ROOM = 24f
-private const val NUMBER_ROOM = 30f
-private const val CHECK_ROOM = 32f
-private const val QUOTE_ROOM = 18f
+/**
+ * A note's text size, in sp. Noto Serif runs large (its small letters 13% taller than Source
+ * Serif 4's), so 16sp sits with the verse cards' 17sp Source Serif 4 elsewhere in the app.
+ */
+const val NOTE_TEXT_SIZE = 16f
 
-// Line height for text, a multiple of its size (the Notes Font Lab's 1.81 for body text).
-private const val BODY_LINE = 1.81f
+// A paragraph's room on the left, in sp: a step for each level of indent, then room for its mark.
+internal const val INDENT_STEP = 22f
+private const val BULLET_ROOM = 20f
+private const val NUMBER_ROOM = 26f
+private const val CHECK_ROOM = 28f
+private const val QUOTE_ROOM = 16f
+
+// Line height, a multiple of the text's size: as the verse cards' for text, closer for headings.
+const val BODY_LINE = 1.7f
 private const val HEADING_LINE = 1.4f
 
-/** Paragraph [p]'s text size, in sp: Title, Heading and Subheading above the body's. */
+/** Paragraph [p]'s text size, in sp: Title and Heading above the text's, Subheading a small label. */
 fun paraSize(p: ParaStyle, look: NoteLook): Float = when (p.style) {
-    RichBlockStyle.HEADING_1 -> look.bodySize + 7f
-    RichBlockStyle.HEADING_2 -> look.bodySize + 3f
-    RichBlockStyle.HEADING_3 -> look.bodySize + 1f
+    RichBlockStyle.HEADING_1 -> look.bodySize + 5f
+    RichBlockStyle.HEADING_2 -> look.bodySize + 2f
+    RichBlockStyle.HEADING_3 -> look.bodySize - 3f
     else -> look.bodySize
 }
 
@@ -99,8 +105,13 @@ fun paraLead(p: ParaStyle): Float = p.indent * INDENT_STEP + when (p.style) {
 fun paraSpan(p: ParaStyle, look: NoteLook): SpanStyle? = when {
     p.style == RichBlockStyle.HEADING_1 || p.style == RichBlockStyle.HEADING_2 ->
         SpanStyle(fontSize = paraSize(p, look).sp, fontWeight = FontWeight.Bold, color = look.accent)
-    p.style == RichBlockStyle.HEADING_3 ->
-        SpanStyle(fontSize = paraSize(p, look).sp, fontWeight = FontWeight.SemiBold, fontFamily = WorkSansFontFamily, color = look.ink)
+    p.style == RichBlockStyle.HEADING_3 -> SpanStyle(
+        fontSize = paraSize(p, look).sp,
+        fontWeight = FontWeight.SemiBold,
+        fontFamily = WorkSansFontFamily,
+        color = look.muted,
+        letterSpacing = 1.sp
+    )
     p.style == RichBlockStyle.BLOCKQUOTE -> SpanStyle(fontStyle = FontStyle.Italic)
     p.style == RichBlockStyle.CHECK_ITEM && p.checked -> SpanStyle(color = look.muted, textDecoration = TextDecoration.LineThrough)
     else -> null
@@ -115,7 +126,12 @@ fun paraStyle(p: ParaStyle, look: NoteLook): ParagraphStyle {
             RichAlign.START -> TextAlign.Start
         },
         textIndent = TextIndent(lead, lead),
-        lineHeight = (paraSize(p, look) * if (p.isHeading) HEADING_LINE else BODY_LINE).sp,
+        // A Subheading (a small label) takes a line of text's height.
+        lineHeight = when (p.style) {
+            RichBlockStyle.HEADING_1, RichBlockStyle.HEADING_2 -> paraSize(p, look) * HEADING_LINE
+            RichBlockStyle.HEADING_3 -> look.bodySize * BODY_LINE
+            else -> paraSize(p, look) * BODY_LINE
+        }.sp,
         // Every line its full height, a paragraph's first and last too.
         lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None)
     )

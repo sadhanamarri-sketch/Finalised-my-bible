@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -22,6 +23,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.FormatAlignLeft
 import androidx.compose.material.icons.automirrored.filled.FormatAlignRight
@@ -35,6 +37,7 @@ import androidx.compose.material.icons.filled.FormatItalic
 import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.FormatUnderlined
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardHide
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.outlined.CheckBox
@@ -48,7 +51,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,6 +61,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
@@ -77,7 +80,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -310,25 +313,23 @@ private fun keys(e: KeyEvent, state: NoteEditorState): Boolean {
 
 /**
  * The toolbar over the keyboard while the note's text is being written, in one row that fits a
- * phone: Aa (the text styles panel), bold, italic, highlight, bullets, checklist, Shift-Tab and
- * Tab, and, kept in view at the right, hide the keyboard. Each lights up for the style at the
- * cursor or over the selection, and tells TalkBack what it is and whether it's on.
+ * phone: Aa, bold, italic, highlight, bullets, checklist, Shift-Tab and Tab, and, kept in view at
+ * the right, put the keyboard away. Aa swaps the keyboard for the text styles (see
+ * NoteStylesPanel) and back; [stylesOpen] is whether they're showing. Each button lights up for the
+ * style at the cursor or over the selection, and tells TalkBack what it is and whether it's on.
  */
 @Composable
 fun NoteFormattingBar(
     state: NoteEditorState,
     look: NoteLook,
-    onHideKeyboard: () -> Unit,
+    stylesOpen: Boolean,
+    onToggleStyles: () -> Unit,
+    onPutAway: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var panel by rememberSaveable { mutableStateOf(false) }
     val line = MaterialTheme.colorScheme.outlineVariant
     Column(modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer)) {
         HorizontalDivider(color = line)
-        if (panel) {
-            TextStylesPanel(state)
-            HorizontalDivider(color = line.copy(alpha = 0.5f))
-        }
         BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp)) {
             // As wide as nine fit, from 40dp to 48dp; on a narrower screen the left part scrolls.
             val slot = (maxWidth / 9).coerceIn(40.dp, 48.dp)
@@ -338,7 +339,7 @@ fun NoteFormattingBar(
                     Modifier.weight(1f).horizontalScroll(rememberScrollState()),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    ToolButton(Icons.Filled.TextFields, "Text styles", panel, slot) { panel = !panel }
+                    ToolButton(Icons.Filled.TextFields, "Text styles", stylesOpen, slot, onClick = onToggleStyles)
                     ToolButton(Icons.Filled.FormatBold, "Bold", state.isOn(CharStyle.BOLD), slot) { state.toggle(CharStyle.BOLD) }
                     ToolButton(Icons.Filled.FormatItalic, "Italic", state.isOn(CharStyle.ITALIC), slot) { state.toggle(CharStyle.ITALIC) }
                     HighlightButton(state.isOn(CharStyle.HIGHLIGHT), look, slot) { state.toggle(CharStyle.HIGHLIGHT) }
@@ -356,64 +357,117 @@ fun NoteFormattingBar(
                     }
                 }
                 Box(Modifier.width(1.dp).height(24.dp).background(line))
-                ToolButton(Icons.Filled.KeyboardHide, "Hide keyboard", null, slot, onClick = onHideKeyboard)
+                if (stylesOpen) {
+                    ToolButton(Icons.Filled.KeyboardArrowDown, "Close text styles", null, slot, onClick = onPutAway)
+                } else {
+                    ToolButton(Icons.Filled.KeyboardHide, "Hide keyboard", null, slot, onClick = onPutAway)
+                }
             }
         }
     }
 }
 
-// Aa: the paragraph's kind (Title, Heading, Subheading, Text), underline, numbered list, quote,
-// alignment and Clear formatting.
+/**
+ * The text styles, in the keyboard's place while Aa is on: the paragraph's kind (Title, Heading,
+ * Subheading, Text), the lists and quote, its alignment, underline and Clear formatting, each a
+ * full-size button with its name, lit when it's what the cursor is in. Scrolls if it's given less
+ * room than it needs.
+ */
 @Composable
-private fun TextStylesPanel(state: NoteEditorState) {
+fun NoteStylesPanel(state: NoteEditorState, modifier: Modifier = Modifier) {
     val p = state.para
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            StyleChip("Title", p.style == RichBlockStyle.HEADING_1, 18.sp, FontWeight.Bold, NotoSerifFontFamily) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TypeButton("Title", p.style == RichBlockStyle.HEADING_1, TextStyle(fontFamily = NotoSerifFontFamily, fontWeight = FontWeight.Bold, fontSize = 18.sp)) {
                 state.setParaStyle(RichBlockStyle.HEADING_1)
             }
-            StyleChip("Heading", p.style == RichBlockStyle.HEADING_2, 16.sp, FontWeight.Bold, NotoSerifFontFamily) {
+            TypeButton("Heading", p.style == RichBlockStyle.HEADING_2, TextStyle(fontFamily = NotoSerifFontFamily, fontWeight = FontWeight.Bold, fontSize = 15.sp)) {
                 state.setParaStyle(RichBlockStyle.HEADING_2)
             }
-            StyleChip("Subheading", p.style == RichBlockStyle.HEADING_3, 15.sp, FontWeight.SemiBold, WorkSansFontFamily) {
+            TypeButton(
+                "Subheading",
+                p.style == RichBlockStyle.HEADING_3,
+                TextStyle(fontFamily = WorkSansFontFamily, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, letterSpacing = 1.sp, color = muted)
+            ) {
                 state.setParaStyle(RichBlockStyle.HEADING_3)
             }
-            StyleChip("Text", p.style == RichBlockStyle.PARAGRAPH, 15.sp, FontWeight.Normal, NotoSerifFontFamily) {
+            TypeButton("Text", p.style == RichBlockStyle.PARAGRAPH, TextStyle(fontFamily = NotoSerifFontFamily, fontSize = 15.sp)) {
                 state.setParaStyle(RichBlockStyle.PARAGRAPH)
             }
         }
-        Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
-            ToolButton(Icons.Filled.FormatUnderlined, "Underline", state.isOn(CharStyle.UNDERLINE)) { state.toggle(CharStyle.UNDERLINE) }
-            ToolButton(Icons.Filled.FormatListNumbered, "Numbered list", p.style == RichBlockStyle.NUMBERED_ITEM) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PanelButton(Icons.AutoMirrored.Filled.FormatListBulleted, "Bullets", p.style == RichBlockStyle.BULLET_ITEM) {
+                state.toggleParaStyle(RichBlockStyle.BULLET_ITEM)
+            }
+            PanelButton(Icons.Filled.FormatListNumbered, "Numbers", p.style == RichBlockStyle.NUMBERED_ITEM) {
                 state.toggleParaStyle(RichBlockStyle.NUMBERED_ITEM)
             }
-            ToolButton(Icons.Filled.FormatQuote, "Quote", p.style == RichBlockStyle.BLOCKQUOTE) {
+            PanelButton(Icons.Outlined.CheckBox, "Checklist", p.style == RichBlockStyle.CHECK_ITEM) {
+                state.toggleParaStyle(RichBlockStyle.CHECK_ITEM)
+            }
+            PanelButton(Icons.Filled.FormatQuote, "Quote", p.style == RichBlockStyle.BLOCKQUOTE) {
                 state.toggleParaStyle(RichBlockStyle.BLOCKQUOTE)
             }
-            ToolButton(Icons.AutoMirrored.Filled.FormatAlignLeft, "Align left", p.align == RichAlign.START) { state.align(RichAlign.START) }
-            ToolButton(Icons.Filled.FormatAlignCenter, "Centre", p.align == RichAlign.CENTER) { state.align(RichAlign.CENTER) }
-            ToolButton(Icons.AutoMirrored.Filled.FormatAlignRight, "Align right", p.align == RichAlign.END) { state.align(RichAlign.END) }
-            ToolButton(Icons.Filled.FormatClear, "Clear formatting", null) { state.clearFormatting() }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PanelButton(Icons.AutoMirrored.Filled.FormatAlignLeft, "Left", p.align == RichAlign.START) { state.align(RichAlign.START) }
+            PanelButton(Icons.Filled.FormatAlignCenter, "Centre", p.align == RichAlign.CENTER) { state.align(RichAlign.CENTER) }
+            PanelButton(Icons.AutoMirrored.Filled.FormatAlignRight, "Right", p.align == RichAlign.END) { state.align(RichAlign.END) }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PanelButton(Icons.Filled.FormatUnderlined, "Underline", state.isOn(CharStyle.UNDERLINE)) { state.toggle(CharStyle.UNDERLINE) }
+            PanelButton(Icons.Filled.FormatClear, "Clear formatting", null) { state.clearFormatting() }
         }
     }
 }
 
+// A paragraph kind in the text styles, its name shown in that kind's own look.
 @Composable
-private fun StyleChip(label: String, selected: Boolean, size: androidx.compose.ui.unit.TextUnit, weight: FontWeight, family: FontFamily, onClick: () -> Unit) {
+private fun RowScope.TypeButton(label: String, selected: Boolean, style: TextStyle, onClick: () -> Unit) {
     val accent = MaterialTheme.colorScheme.primary
     Box(
         Modifier
-            .height(40.dp)
-            .clip(RoundedCornerShape(10.dp))
+            .weight(1f)
+            .height(48.dp)
+            .clip(RoundedCornerShape(12.dp))
             .background(if (selected) accent.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceContainerHighest)
-            .toggleable(value = selected, role = Role.RadioButton, onValueChange = { onClick() })
-            .padding(horizontal = 10.dp),
+            .toggleable(value = selected, role = Role.RadioButton, onValueChange = { onClick() }),
         contentAlignment = Alignment.Center
     ) {
-        Text(label, fontSize = size, fontWeight = weight, fontFamily = family, color = if (selected) accent else MaterialTheme.colorScheme.onSurface)
+        Text(label, style = style, color = if (selected) accent else style.color.takeOrElse { MaterialTheme.colorScheme.onSurface }, maxLines = 1)
+    }
+}
+
+// A button in the text styles: its icon over its name; [on] null for an action, true or false for a style.
+@Composable
+private fun RowScope.PanelButton(icon: ImageVector, label: String, on: Boolean?, onClick: () -> Unit) {
+    val accent = MaterialTheme.colorScheme.primary
+    val tint = if (on == true) accent else MaterialTheme.colorScheme.onSurface
+    val action = if (on != null) {
+        Modifier.toggleable(value = on, role = Role.Checkbox, onValueChange = { onClick() })
+    } else {
+        Modifier.clickable(role = Role.Button, onClick = onClick)
+    }
+    Column(
+        Modifier
+            .weight(1f)
+            .height(52.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (on == true) accent.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceContainerHighest)
+            .then(action),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
+        Text(label, fontFamily = WorkSansFontFamily, fontSize = 12.sp, color = tint, maxLines = 1)
     }
 }
 

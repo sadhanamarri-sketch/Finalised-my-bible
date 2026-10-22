@@ -5,6 +5,7 @@
 
 package com.example.mybible.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -19,8 +20,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -60,23 +64,34 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -84,20 +99,24 @@ import com.example.mybible.model.ThemeMode
 import com.example.mybible.ui.NoteDraft
 import com.example.mybible.ui.richtext.NoteBodyField
 import com.example.mybible.ui.richtext.NoteFormattingBar
+import com.example.mybible.ui.richtext.NoteStylesPanel
 import com.example.mybible.ui.richtext.rememberNoteLook
-import com.example.mybible.ui.theme.NotoSerifFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
-import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * The note's one page to write on: the title and the text together, with the note's verses, date
  * and tags in a strip between them. Saved as it's written (see MainViewModel.saveDraft), so Back
  * ([onClose]) just closes it; the menu has Discard changes (back to how it was opened) and Delete.
- * Over the keyboard while the text is written, the formatting toolbar (see NoteFormattingBar);
+ * Over the keyboard while the text is written, the formatting toolbar (see NoteFormattingBar),
+ * whose Aa swaps the keyboard for the text styles, as tall as the keyboard, so the page stays put;
  * undo and redo in the top bar.
  */
 @Composable
@@ -125,6 +144,49 @@ fun NoteEditorScreen(
     val titleFocus = remember { FocusRequester() }
     val accent = MaterialTheme.colorScheme.primary
 
+    // The keyboard's height above the navigation bar now, and whether it's up or on its way, in px.
+    val density = LocalDensity.current
+    val ime = WindowInsets.ime
+    val imeTarget = WindowInsets.imeAnimationTarget
+    val navBars = WindowInsets.navigationBars
+    fun keyboardNow() = (ime.getBottom(density) - navBars.getBottom(density)).coerceAtLeast(0)
+    fun keyboardComing() = imeTarget.getBottom(density) > navBars.getBottom(density)
+
+    // Aa: the text styles in the keyboard's place, as tall as it was (see NoteStylesPanel).
+    var stylesOpen by rememberSaveable { mutableStateOf(false) }
+    var stylesHeight by rememberSaveable { mutableIntStateOf(0) }
+    // The keyboard on its way back over the styles, their room shrinking as it comes up.
+    var keyboardReturning by remember { mutableStateOf(false) }
+    fun openStyles() {
+        keyboardNow().takeIf { it > 0 }?.let { stylesHeight = it }
+        stylesOpen = true
+        keyboard?.hide()
+    }
+    fun stylesToKeyboard() {
+        stylesOpen = false
+        keyboardReturning = true
+        keyboard?.show()
+    }
+    // A tap on the text brings the keyboard back, in the styles' place.
+    LaunchedEffect(Unit) {
+        snapshotFlow { keyboardComing() }.distinctUntilChanged().collect { coming ->
+            if (coming && stylesOpen) {
+                stylesOpen = false
+                keyboardReturning = true
+            }
+        }
+    }
+    LaunchedEffect(keyboardReturning) {
+        if (!keyboardReturning) return@LaunchedEffect
+        withTimeoutOrNull(1_000) {
+            snapshotFlow { keyboardComing() && keyboardNow() >= imeTarget.getBottom(density) - navBars.getBottom(density) }.first { it }
+        }
+        keyboardReturning = false
+    }
+    // Writing somewhere else (the title, a tag) puts them away; so does Back, as it does the keyboard.
+    LaunchedEffect(bodyFocused) { if (!bodyFocused) stylesOpen = false }
+    BackHandler(enabled = stylesOpen) { stylesOpen = false }
+
     // Ready to write: the cursor at the end of the text, once the page has slid up.
     LaunchedEffect(draft) {
         body.moveCursorToEnd()
@@ -142,13 +204,7 @@ fun NoteEditorScreen(
                 IconButton(onClick = onClose) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                 }
-                Text(
-                    if (draft.isNew) "New note" else "Note",
-                    fontFamily = WorkSansFontFamily,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 17.sp,
-                    modifier = Modifier.weight(1f).padding(start = 4.dp)
-                )
+                Spacer(Modifier.weight(1f))
                 IconButton(onClick = { body.undo() }, enabled = body.canUndo) {
                     Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo")
                 }
@@ -222,14 +278,32 @@ fun NoteEditorScreen(
                 )
             }
 
-            if (bodyFocused && imeVisible) {
+            if (bodyFocused && (imeVisible || stylesOpen || keyboardReturning)) {
                 NoteFormattingBar(
                     state = body,
                     look = look,
-                    onHideKeyboard = {
-                        keyboard?.hide()
+                    stylesOpen = stylesOpen,
+                    onToggleStyles = { if (stylesOpen) stylesToKeyboard() else openStyles() },
+                    onPutAway = {
+                        if (stylesOpen) stylesOpen = false else keyboard?.hide()
                         focusManager.clearFocus()
                     }
+                )
+            }
+            if (bodyFocused && (stylesOpen || keyboardReturning)) {
+                // As tall as the keyboard was (at most half the screen), less what of the keyboard
+                // is still showing: uncovered as the keyboard goes down, covered as it comes back.
+                val most = with(density) { (LocalConfiguration.current.screenHeightDp.dp * 0.5f).roundToPx() }
+                val full = (if (stylesHeight > 0) stylesHeight else with(density) { 260.dp.roundToPx() }).coerceAtMost(most)
+                NoteStylesPanel(
+                    state = body,
+                    modifier = Modifier
+                        .clipToBounds()
+                        .layout { measurable, constraints ->
+                            val shown = (full - keyboardNow()).coerceIn(0, full)
+                            val panel = measurable.measure(constraints.copy(minHeight = full, maxHeight = full))
+                            layout(panel.width, shown) { panel.place(0, 0) }
+                        }
                 )
             }
         }
@@ -285,12 +359,21 @@ fun NoteEditorScreen(
     }
 }
 
+// The note's title, as the note page and the notes list show it: gold capitals, here centred under
+// the top bar as it's centred in the note page's.
 @Composable
 private fun TitleField(value: String, onChange: (String) -> Unit, focus: FocusRequester, onNext: () -> Unit) {
-    val ink = MaterialTheme.colorScheme.onSurface
-    val style = TextStyle(fontFamily = NotoSerifFontFamily, fontWeight = FontWeight.SemiBold, fontSize = 24.sp, lineHeight = 32.sp, color = ink)
+    val gold = MaterialTheme.colorScheme.tertiary
+    val style = TextStyle(
+        fontFamily = WorkSansFontFamily,
+        fontSize = 17.sp,
+        lineHeight = 24.sp,
+        letterSpacing = 0.sp,
+        color = gold,
+        textAlign = TextAlign.Center
+    )
     Box(Modifier.fillMaxWidth()) {
-        if (value.isEmpty()) Text("Title", style = style.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+        if (value.isEmpty()) Text("TITLE", style = style.copy(color = gold.copy(alpha = 0.5f)), modifier = Modifier.fillMaxWidth())
         BasicTextField(
             value = value,
             // A title is one line: Enter goes on to the text.
@@ -298,12 +381,18 @@ private fun TitleField(value: String, onChange: (String) -> Unit, focus: FocusRe
                 if ('\n' in v) onNext() else onChange(v)
             },
             textStyle = style,
+            visualTransformation = Capitals,
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next),
             keyboardActions = KeyboardActions(onNext = { onNext() }),
             modifier = Modifier.fillMaxWidth().focusRequester(focus)
         )
     }
+}
+
+// Shows what's typed in capitals, a letter for a letter, so the cursor stays where it is.
+private val Capitals = VisualTransformation { text ->
+    TransformedText(AnnotatedString(buildString { text.text.forEach { append(it.uppercaseChar()) } }), OffsetMapping.Identity)
 }
 
 // The note's verses (a tap shows one, × takes it off), + Verse, its date, its tags, + Tag.
@@ -370,7 +459,7 @@ private fun DetailChip(
         Text(
             text,
             fontFamily = WorkSansFontFamily,
-            fontSize = 13.5.sp,
+            fontSize = 13.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             color = if (quiet) accent else MaterialTheme.colorScheme.onSurface
