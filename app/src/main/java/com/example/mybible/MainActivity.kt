@@ -282,7 +282,8 @@ class MainActivity : ComponentActivity() {
             val showTagsScreen by viewModel.showTagsScreen.collectAsState()
             val showSavedWordsScreen by viewModel.showSavedWordsScreen.collectAsState()
             val savedWords by viewModel.savedWords.collectAsState(initial = emptyList())
-            val noteToEdit by viewModel.noteToEdit.collectAsState()
+            val noteDraft by viewModel.noteDraft.collectAsState()
+            val allNotes by viewModel.notes.collectAsState(initial = emptyList())
             val noteToRead by viewModel.noteToRead.collectAsState()
             val readerPickMode by viewModel.readerPickMode.collectAsState()
             val tagDefinitions by viewModel.tagDefinitions.collectAsState(initial = emptyList())
@@ -669,7 +670,9 @@ class MainActivity : ComponentActivity() {
                         ),
                         exit = pageExit(300)
                     ) {
-                        val note = lastReadNote
+                        val opened = lastReadNote
+                        // As it's saved now (a tick box ticked on it), not as it was opened.
+                        val note = opened?.let { o -> allNotes.firstOrNull { it.id == o.id } ?: o }
                         if (note != null) {
                             NoteReaderScreen(
                                 noteItem = note,
@@ -687,31 +690,21 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onOpenVerseMention = { book, chapter, verse ->
                                     viewModel.openVerseMentionPreview(book, chapter, verse, noteReturnItem = note)
-                                }
+                                },
+                                onToggleCheck = { para -> viewModel.toggleNoteCheck(note, para) }
                             )
                         }
                     }
 
-                    // Note Editor — full page for both "Add new note" and
-                    // editing an existing one, instead of a bottom modal.
-                    // Same last-value trick as the reader above, keyed off
-                    // showNoteEditor rather than the note itself so a brand
-                    // new note (id == 0) still counts as "has content".
-                    // Synchronous update during composition, not a
-                    // LaunchedEffect — see the identical fix/comment on
-                    // lastReadNote above. With the effect-based version,
-                    // NoteEditorScreen's onAddNote -> openNoteEditor(verse)
-                    // could compose once with the previous note still in
-                    // lastEditingNote (LaunchedEffect hadn't run yet), and
-                    // since NoteEditorScreen seeds its title/text/refs from
-                    // noteItem via unkeyed remember{}, that stale first frame
-                    // got baked in permanently instead of self-correcting.
-                    var lastEditingNote by remember { mutableStateOf(noteToEdit) }
-                    if (showNoteEditor && noteToEdit != null) {
-                        lastEditingNote = noteToEdit
+                    // Note Editor — the one page a note is written on, new or opened to edit. The
+                    // draft it shows is kept through the exit animation (it's cleared the moment the
+                    // page closes), updated during composition so the page never shows an old one.
+                    var lastDraft by remember { mutableStateOf(noteDraft) }
+                    if (showNoteEditor && noteDraft != null) {
+                        lastDraft = noteDraft
                     }
                     AnimatedVisibility(
-                        visible = showNoteEditor && noteToEdit != null,
+                        visible = showNoteEditor && noteDraft != null,
                         enter = slideInVertically(
                             animationSpec = tween(300),
                             initialOffsetY = { fullHeight -> fullHeight }
@@ -721,31 +714,19 @@ class MainActivity : ComponentActivity() {
                             targetOffsetY = { fullHeight -> fullHeight }
                         )
                     ) {
-                        val editing = lastEditingNote
-                        if (editing != null) {
+                        val draft = lastDraft
+                        if (draft != null) {
                             NoteEditorScreen(
-                                noteItem = editing,
+                                draft = draft,
                                 themeMode = themeMode,
-                                onSave = { title, text, noteDate, refs, tags, richText ->
-                                    viewModel.saveNote(title, text, noteDate, refs, tags, richText)
-                                },
-                                onCancel = { viewModel.closeNoteEditor() },
-                                onDelete = {
-                                    if (editing.id > 0) {
-                                        viewModel.deleteNote(editing.id)
-                                    }
-                                    viewModel.closeNoteEditor()
-                                },
-                                onResolveVerseText = { ref ->
-                                    viewModel.resolveNoteReferenceText(ref)
-                                },
-                                onAddAnotherVerse = { draft ->
-                                    viewModel.addAnotherVerseToDraft(draft)
-                                },
+                                knownTags = tagDefinitions.map { it.name },
+                                onClose = { viewModel.closeNoteEditor() },
+                                onDiscard = { viewModel.discardNoteDraft() },
+                                onDelete = { viewModel.deleteNoteDraft() },
+                                onAddVerse = { viewModel.addVerseToDraft() },
                                 onPreviewReference = { book, chapter, verse ->
                                     viewModel.openVerseMentionPreview(book, chapter, verse)
-                                },
-                                knownTags = tagDefinitions.map { it.name }
+                                }
                             )
                         }
                     }

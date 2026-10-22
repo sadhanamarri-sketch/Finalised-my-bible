@@ -19,7 +19,8 @@ import kotlinx.serialization.json.Json
 // just a set of character ranges; the actual highlight/accent colors come
 // from whichever of the app's five themes is active when it's rendered, the
 // same as every other themed surface in the app.
-enum class RichBlockStyle { PARAGRAPH, HEADING_1, HEADING_2, HEADING_3, BLOCKQUOTE, BULLET_ITEM, NUMBERED_ITEM }
+// CHECK_ITEM is a checklist line, ticked or not ([RichBlock.checked]).
+enum class RichBlockStyle { PARAGRAPH, HEADING_1, HEADING_2, HEADING_3, BLOCKQUOTE, BULLET_ITEM, NUMBERED_ITEM, CHECK_ITEM }
 
 enum class RichAlign { START, CENTER, END }
 
@@ -34,15 +35,16 @@ data class RichBlock(
     val text: String = "",
     val style: RichBlockStyle = RichBlockStyle.PARAGRAPH,
     val align: RichAlign = RichAlign.START,
-    // Tab-indent level, 0 = none. Only meaningful for PARAGRAPH/HEADING/
-    // BLOCKQUOTE blocks — list items get their indent from nesting instead
-    // (not yet supported: lists are single-level for now).
+    // Tab-indent level, 0 = none: how far a paragraph is indented, or how deep
+    // a list or checklist item is nested (◦ under •, a. under 1.).
     val indent: Int = 0,
     val bold: List<StyleRange> = emptyList(),
     val italic: List<StyleRange> = emptyList(),
     val underline: List<StyleRange> = emptyList(),
     val highlight: List<StyleRange> = emptyList(),
-    val fontScale: List<ScaleRange> = emptyList()
+    val fontScale: List<ScaleRange> = emptyList(),
+    // A checklist item's tick (CHECK_ITEM only).
+    val checked: Boolean = false
 )
 
 @Serializable

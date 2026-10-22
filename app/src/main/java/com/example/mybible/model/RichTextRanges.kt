@@ -78,7 +78,7 @@ internal fun mergeScaleRanges(ranges: List<ScaleRange>): List<ScaleRange> {
 }
 
 // Font size isn't a toggle — it's a step through a fixed scale (see
-// RichTextEditor's FONT_SCALE_STEPS) — so this always sets the given scale
+// sizes of older notes) — so this always sets the given scale
 // explicitly over [start,end), replacing whatever was there. A scale of 1f
 // (the default/no-op size) is never stored: setting back to 1f just clears
 // that region instead of leaving a redundant explicit entry.

@@ -23,14 +23,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import com.example.mybible.ui.theme.NotoSerifFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.mybible.model.NoteDocument
 import com.example.mybible.model.NoteItem
 import com.example.mybible.model.ThemeMode
-import com.example.mybible.ui.components.LinkifiedNoteText
+import com.example.mybible.ui.NoteDraft
 import com.example.mybible.ui.richtext.RichNoteBodyView
 
 /**
@@ -61,7 +59,7 @@ import com.example.mybible.ui.richtext.RichNoteBodyView
  *    straight port.
  *  - Body text: no separate title block — the title only appears once, in
  *    the header. Verse mentions inside the body (e.g. "See John 3:16") are
- *    still tappable via LinkifiedNoteText, opening the small verse-preview
+ *    still tappable (see RichNoteBodyView), opening the small verse-preview
  *    sheet — matches Capacitor's linkifyXrefs applied to #noteReaderText.
  *
  * Capacitor's note reader doesn't show tags at all, so this doesn't
@@ -75,13 +73,15 @@ fun NoteReaderScreen(
     onBack: () -> Unit,
     onEdit: (() -> Unit)? = null,
     // Tapping a reference in the ref line — or a verse mention inside the
-    // body text (see LinkifiedNoteText below) — opens the small
+    // body text (see RichNoteBodyView below) — opens the small
     // verse-preview sheet (verse text + "Open in Reader"), same as tapping
     // a reference chip anywhere else in the Notes tab. Capacitor's own
     // #noteReaderRef has no click handler at all, so making the ref line
     // tappable here is a deliberate deviation kept from the pre-Capacitor
     // version rather than a straight port.
     onOpenVerseMention: ((book: String, chapter: Int, verse: Int) -> Unit)? = null,
+    // A checklist item's box tapped: [para] is its paragraph.
+    onToggleCheck: ((para: Int) -> Unit)? = null,
     // Defaults to filling the screen — this is pushed inside an
     // AnimatedVisibility in MainActivity, which (unlike Scaffold on its
     // own) doesn't impose full-screen sizing on its content.
@@ -192,31 +192,16 @@ fun NoteReaderScreen(
                     )
                 }
 
-                // A note only carries richText once it's been opened in the
-                // rich text editor at least once (see model/RichText.kt) —
-                // every note saved before that existed, and any note never
-                // reopened there since, falls straight back to the original
-                // plain LinkifiedNoteText path with no behavior change.
-                val richDocument = remember(noteItem.richText) { NoteDocument.fromJsonOrNull(noteItem.richText) }
-                if (richDocument != null) {
-                    RichNoteBodyView(
-                        document = richDocument,
-                        themeMode = themeMode,
-                        onMentionClick = { b, c, v -> onOpenVerseMention?.invoke(b, c, v) },
-                        baseFontSizeSp = 19f
-                    )
-                } else {
-                    LinkifiedNoteText(
-                        text = noteItem.text,
-                        onMentionClick = { b, c, v -> onOpenVerseMention?.invoke(b, c, v) },
-                        style = androidx.compose.ui.text.TextStyle(
-                            fontFamily = NotoSerifFontFamily,
-                            fontSize = 19.sp,
-                            lineHeight = 34.39.sp, // 19sp * 1.81x, tuned via the Notes Font Lab
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    )
-                }
+                // As the editor shows it, formatted or (written before formatting) a line a
+                // paragraph: selectable, its tick boxes ticked with a tap, its links followed.
+                val body = remember(noteItem.richText, noteItem.text) { NoteDraft.bodyOf(noteItem) }
+                RichNoteBodyView(
+                    note = body,
+                    themeMode = themeMode,
+                    onMentionClick = { b, c, v -> onOpenVerseMention?.invoke(b, c, v) },
+                    onToggleCheck = onToggleCheck,
+                    baseFontSizeSp = 19f
+                )
             }
         }
     }

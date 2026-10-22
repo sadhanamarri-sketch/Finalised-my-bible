@@ -171,7 +171,7 @@ fun ReaderScreen(
     val readerPickMode by viewModel.readerPickMode.collectAsState()
     val pickBannerMessage by viewModel.pickBannerMessage.collectAsState()
     val pickedNoteRefs by viewModel.pickedNoteRefs.collectAsState()
-    val noteToEdit by viewModel.noteToEdit.collectAsState()
+    val noteDraft by viewModel.noteDraft.collectAsState()
 
     // Reading aloud: a chapter being read in the Reader, the verse being read, and the settings sheet.
     val readAloudState by viewModel.readAloudState.collectAsState()
@@ -1509,7 +1509,7 @@ fun ReaderScreen(
                         // before falling through to openVerseSheet().
                         val isPicked = when (readerPickMode) {
                             ReaderPickMode.NOTE_PICK -> {
-                                val onDraft = noteToEdit?.refs?.any {
+                                val onDraft = noteDraft?.refs?.any {
                                     it.book == verse.book && it.chapter == verse.chapter && it.verse == verse.number
                                 } == true
                                 val onPickedList = pickedNoteRefs.any {

@@ -47,11 +47,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -1106,8 +1109,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _showNoteEditor = MutableStateFlow(false)
     val showNoteEditor: StateFlow<Boolean> = _showNoteEditor.asStateFlow()
 
-    private val _noteToEdit = MutableStateFlow<NoteItem?>(null)
-    val noteToEdit: StateFlow<NoteItem?> = _noteToEdit.asStateFlow()
+    // The note being written (see NoteDraft): here rather than on its page, so turning the phone or
+    // going to the Reader to add a verse keeps it, undo and all. Null while no note is being written.
+    private val _noteDraft = MutableStateFlow<NoteDraft?>(null)
+    val noteDraft: StateFlow<NoteDraft?> = _noteDraft.asStateFlow()
 
     private val _noteToRead = MutableStateFlow<NoteItem?>(null)
     val noteToRead: StateFlow<NoteItem?> = _noteToRead.asStateFlow()
@@ -2742,26 +2747,117 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // goes through startNotePicking() below, matching Capacitor's
     // startNewNoteFromScratch().
     fun openNoteEditor(note: NoteItem? = null, defaultVerse: Verse? = null) {
-        if (note != null) {
-            _noteToEdit.value = note
-        } else if (defaultVerse != null) {
-            _noteToEdit.value = NoteItem(
+        val item = note ?: defaultVerse?.let { v ->
+            NoteItem(
                 id = 0,
-                book = defaultVerse.book,
-                chapter = defaultVerse.chapter,
-                verse = defaultVerse.number,
-                verseText = defaultVerse.text,
                 text = "",
-                refs = listOf(NoteReference(defaultVerse.book, defaultVerse.chapter, defaultVerse.number, defaultVerse.text)),
+                noteDate = todayDateString(),
+                refs = listOf(NoteReference(v.book, v.chapter, v.number, v.text)),
                 tags = emptyList()
             )
-        }
+        } ?: return
+        startDraft(item)
         _showNoteEditor.value = true
     }
 
+    // How long after a change stops a note being written is saved.
+    private val noteAutosaveMs = 800L
+    private val draftSaving = Mutex()
+    private var draftWatch: Job? = null
+
+    // A note opened to write in, saved a moment after each change to it stops.
+    private fun startDraft(item: NoteItem) {
+        val draft = NoteDraft(item)
+        _noteDraft.value = draft
+        draftWatch?.cancel()
+        draftWatch = viewModelScope.launch {
+            snapshotFlow { draft.key() }.drop(1).collectLatest {
+                delay(noteAutosaveMs)
+                saveDraft(draft)
+            }
+        }
+    }
+
+    // Saves what's written, unless it's nothing or nothing's changed since the last save. A new note
+    // gets its id the first time, kept for every save after.
+    private suspend fun saveDraft(draft: NoteDraft) = draftSaving.withLock {
+        if (draft.isEmpty()) return@withLock
+        val key = draft.key()
+        if (key == draft.savedKey) return@withLock
+        val body = draft.body.note
+        val refs = draft.refs.map { repository.resolveNoteReference(it) }
+        draft.id = repository.saveNote(
+            id = draft.id,
+            title = draft.title,
+            text = body.plainText(),
+            noteDate = draft.date,
+            refs = refs,
+            tags = draft.tags,
+            richText = body.toDocument().toJson()
+        )
+        draft.savedKey = key
+    }
+
+    /**
+     * Back from the note being written: it's saved and the page closes. Emptied, a note there before
+     * goes (with Undo), and one started now just isn't kept.
+     */
     fun closeNoteEditor() {
         _showNoteEditor.value = false
-        _noteToEdit.value = null
+        val draft = _noteDraft.value ?: return
+        endDraft()
+        viewModelScope.launch {
+            if (!draft.isEmpty()) {
+                saveDraft(draft)
+                return@launch
+            }
+            val removed = draftSaving.withLock { if (draft.id > 0) repository.deleteNote(draft.id) else null } ?: return@launch
+            if (!draft.isNew) offerChangeUndo("Empty note deleted") { repository.restoreNote(removed) }
+        }
+    }
+
+    private fun endDraft() {
+        draftWatch?.cancel()
+        draftWatch = null
+        _noteDraft.value = null
+        _selectedVerse.value = null
+    }
+
+    /** The menu's Discard changes: the note back as it was opened; one started now, not kept. */
+    fun discardNoteDraft() {
+        _showNoteEditor.value = false
+        val draft = _noteDraft.value ?: return
+        endDraft()
+        viewModelScope.launch {
+            draftSaving.withLock {
+                if (draft.isNew) {
+                    if (draft.id > 0) repository.deleteNote(draft.id)
+                } else {
+                    repository.restoreNote(draft.original)
+                }
+            }
+        }
+    }
+
+    /** The menu's Delete note: saved as it stands first, so Undo brings back the latest. */
+    fun deleteNoteDraft() {
+        _showNoteEditor.value = false
+        val draft = _noteDraft.value ?: return
+        endDraft()
+        viewModelScope.launch {
+            if (!draft.isEmpty()) saveDraft(draft)
+            val removed = draftSaving.withLock { if (draft.id > 0) repository.deleteNote(draft.id) else null } ?: return@launch
+            val name = removed.title.ifBlank { "Note" }
+            offerChangeUndo("Deleted \u201c${name.take(40)}\u201d") { repository.restoreNote(removed) }
+        }
+    }
+
+    /** A tick box on the note page ticked or unticked: the note saved with it. */
+    fun toggleNoteCheck(note: NoteItem, para: Int) {
+        viewModelScope.launch {
+            val body = NoteEditing.toggleChecked(NoteDraft.bodyOf(note), para)
+            repository.saveNote(note.id, note.title, body.plainText(), note.noteDate, note.refs, note.tags, body.toDocument().toJson())
+        }
     }
 
     // ---- Reader "picking mode" — the banner overlay that lets the user tap
@@ -2777,7 +2873,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val pickBannerMessage: StateFlow<String> = _pickBannerMessage.asStateFlow()
 
     // Verses tapped so far in the current note-picking session. Held
-    // separately from _noteToEdit so Cancel can discard them without
+    // separately from the note being written so Cancel can discard them without
     // touching a draft that's being resumed (see pickModeResumesEditor).
     private val _pickedNoteRefs = MutableStateFlow<List<NoteReference>>(emptyList())
     val pickedNoteRefs: StateFlow<List<NoteReference>> = _pickedNoteRefs.asStateFlow()
@@ -2814,12 +2910,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Notes tab "+" — brand-new note, nothing picked yet, editor not shown
     // until Done. Matches startNewNoteFromScratch().
     fun startNotePicking() {
+        // A note left while verses were being picked for it, kept as it was.
+        _noteDraft.value?.let { left ->
+            endDraft()
+            viewModelScope.launch { if (!left.isEmpty()) saveDraft(left) }
+        }
         pickBannerResetJob?.cancel()
         pickModeResumesEditor = false
         _pickedNoteRefs.value = emptyList()
         _showNoteEditor.value = false
-        _noteToEdit.value = null
-        _pickBannerMessage.value = "Tap verses to add — or tap Done to write without one"
+        _pickBannerMessage.value = "Tap verses to add \u2014 or tap Done to write without one"
         _readerPickMode.value = ReaderPickMode.NOTE_PICK
         // Picking requires reading verse text to know what you're tapping —
         // blur mode would make that impossible.
@@ -2828,16 +2928,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         selectTab(NavTab.READER)
     }
 
-    // "+ Add another verse" inside an in-progress draft. `draft` is the
-    // editor's current unsaved state (title/text/date/tags/refs as typed so
-    // far) — held onto so it can be restored once picking finishes. Matches
-    // the neAddRef click handler, which hides the editor without clearing
-    // draftNote.
-    fun addAnotherVerseToDraft(draft: NoteItem) {
+    // "+ Verse" on the note being written: the page steps aside for the Reader to pick verses in,
+    // the note kept as it is (and saved now, in case the app's closed meanwhile), and comes back
+    // with them added.
+    fun addVerseToDraft() {
+        val draft = _noteDraft.value ?: return
+        viewModelScope.launch { saveDraft(draft) }
         pickBannerResetJob?.cancel()
         pickModeResumesEditor = true
         _pickedNoteRefs.value = emptyList()
-        _noteToEdit.value = draft
         _showNoteEditor.value = false
         _pickBannerMessage.value = "Adding to note \u2014 tap a verse"
         _readerPickMode.value = ReaderPickMode.NOTE_PICK
@@ -2896,7 +2995,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         when (_readerPickMode.value) {
             ReaderPickMode.NOTE_PICK -> {
                 val alreadyOnDraft = pickModeResumesEditor &&
-                    (_noteToEdit.value?.refs?.any { it.book == verse.book && it.chapter == verse.chapter && it.verse == verse.number } == true)
+                    (_noteDraft.value?.refs?.any { it.book == verse.book && it.chapter == verse.chapter && it.verse == verse.number } == true)
                 val alreadyPicked = _pickedNoteRefs.value.any {
                     it.book == verse.book && it.chapter == verse.chapter && it.verse == verse.number
                 }
@@ -2915,10 +3014,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         // Already part of the draft from before this picking
                         // session (e.g. resumed via "+ Add another verse") —
                         // tapping it again removes it from the draft too.
-                        _noteToEdit.value = _noteToEdit.value?.let { draft ->
-                            draft.copy(refs = draft.refs.filterNot {
+                        _noteDraft.value?.let { draft ->
+                            draft.refs = draft.refs.filterNot {
                                 it.book == verse.book && it.chapter == verse.chapter && it.verse == verse.number
-                            })
+                            }
                         }
                         setPickBanner("Removed $label", revertTo)
                     }
@@ -2962,22 +3061,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (mode != ReaderPickMode.NOTE_PICK) return
 
         val picked = _pickedNoteRefs.value
-        if (pickModeResumesEditor) {
-            val current = _noteToEdit.value
-            if (current != null) {
-                val merged = current.refs + picked.filter { p ->
-                    current.refs.none { it.book == p.book && it.chapter == p.chapter && it.verse == p.verse }
-                }
-                _noteToEdit.value = current.copy(refs = merged)
+        val draft = _noteDraft.value
+        if (pickModeResumesEditor && draft != null) {
+            draft.refs = draft.refs + picked.filter { p ->
+                draft.refs.none { it.book == p.book && it.chapter == p.chapter && it.verse == p.verse }
             }
         } else {
-            _noteToEdit.value = NoteItem(
-                id = 0,
-                text = "",
-                title = "",
-                noteDate = todayDateString(),
-                refs = picked,
-                tags = emptyList()
+            startDraft(
+                NoteItem(
+                    id = 0,
+                    text = "",
+                    title = "",
+                    noteDate = todayDateString(),
+                    refs = picked,
+                    tags = emptyList()
+                )
             )
         }
         _showNoteEditor.value = true
@@ -3001,44 +3099,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun todayDateString(): String = studyDateFormat.format(Date())
-
-    fun saveNote(title: String, text: String, noteDate: String, refs: List<NoteReference>, tags: List<String>, richText: String = "") {
-        val note = _noteToEdit.value ?: return
-        viewModelScope.launch {
-            val resolvedRefs = refs.map { ref -> repository.resolveNoteReference(ref) }
-            repository.saveNote(
-                id = note.id,
-                title = title,
-                text = text,
-                noteDate = noteDate,
-                refs = resolvedRefs,
-                tags = tags,
-                richText = richText
-            )
-            closeNoteEditor()
-            _selectedVerse.value = null
-        }
-    }
-
-    fun saveNote(text: String, tags: List<String>) {
-        val note = _noteToEdit.value ?: return
-        saveNote(note.title, text, note.noteDate, note.refs.ifEmpty {
-            listOf(NoteReference(note.book, note.chapter, note.verse, note.verseText))
-        }, tags)
-    }
-
-    fun parseNoteReference(input: String): NoteReference? {
-        val match = Regex("^\\s*(.+?)\\s+(\\d+)\\s*:\\s*(\\d+)\\s*$").matchEntire(input) ?: return null
-        val book = resolveBookName(match.groupValues[1]) ?: return null
-        val chapter = match.groupValues[2].toIntOrNull() ?: return null
-        val verse = match.groupValues[3].toIntOrNull() ?: return null
-        return NoteReference(book, chapter, verse, "")
-    }
-
-    suspend fun resolveNoteReferenceText(ref: NoteReference): NoteReference {
-        val text = repository.getVerseText(ref.book, ref.chapter, ref.verse) ?: ""
-        return ref.copy(verseText = text)
-    }
 
     /** Deletes the note, with Undo to bring it back as it was. */
     fun deleteNote(noteId: Long) {
