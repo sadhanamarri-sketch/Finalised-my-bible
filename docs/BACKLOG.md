@@ -1025,3 +1025,43 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     stays where it's put until the reading plays again. The button is 56dp, 16dp from the right,
     just over the pill; the ring is the verse's place in its chapter (verse 16 of 36, a little under
     half). With a verse's sheet open the bar is the full bar as before.
+
+35. **Done 22 Oct.** **Notes: the writing page, to the best standard.** "bring up all suggestions
+    for notes" — "can you review the formatting tools in note editor as well?" — "Can we add tab
+    and hide keyboard as well? can you review thoroughly tue notes editor and the formatting tools?
+    I want the best standard" — "build all 5 steps you mentioned as best standards".
+    *Agreed 22 Oct* (numbers from `docs/NOTES_SUGGESTIONS.md`), in five steps: never lose a note
+    (1–4, 35); typing that works (33, 34); a better way to write (36, 22, 23, Undo/Redo from 8, 39,
+    30, 31, 32); a toolbar that fits a phone (24, 25, 40, 28); finishing touches (29, 37, 43, 44,
+    42, 41, and the bug 38).
+    *Built 22 Oct:*
+    - Notes are in the app's database, a row each (moved once from the old list). Delete happens at
+      once, with Undo, as on the Studied page.
+    - A note is saved as it's written (0.8 seconds after a change) and kept through turning the
+      phone or going to the Reader for a verse, so Back just closes it. A note left empty is deleted,
+      with Undo. The ⋮ menu has Discard changes (back to the note as it was opened; grey when nothing
+      has changed) and Delete note.
+    - One page: the title, a strip of chips (the verses, each with ×, and + Verse; the date, from a
+      date picker; the tags and + Tag), then the text. Undo and Redo at the top.
+    - The text is one box, so a selection runs across paragraphs, and the keyboard isn't restarted
+      at every letter (swipe typing and word suggestions keep working). Sentences start with a
+      capital.
+    - The toolbar over the keyboard: Aa · B · I · highlight · • · ☐ · Shift-Tab · Tab | hide
+      keyboard, each lit for the style at the cursor and named for TalkBack. Aa opens Title,
+      Heading, Subheading and Text, then underline, numbered list, quote, left/centre/right and
+      Clear formatting. Text size is out of the toolbar; sizes in older notes still show.
+    - B, I, U and highlight with nothing selected apply to what's typed next. New text takes the
+      style of the letter before it, so typing just before bold text isn't bold.
+    - "- " or "* " starts a bullet list, "1. " a numbered one, "[] " a checklist, "> " a quote and
+      "# " a heading. Enter on an empty item ends the list (a sub-item moves out a level first);
+      Backspace at an item's start takes off its mark, then its indent, then joins it to the line
+      above. Tab and Shift-Tab nest an item up to 4 levels (• ◦ ▪; 1. a. i.). On a keyboard: Tab,
+      Shift-Tab, Ctrl+B, I, U, Z and Y.
+    - Checklist boxes tick and untick with a tap, in the editor and on the note page; a ticked item
+      is greyed and struck through.
+    - The note page shows a note as the editor does. Its text can be selected and copied, and web
+      addresses open the browser as verse references open the verse.
+    - An empty page says "Start writing…"; a note opens with the cursor at its end.
+    *Not yet tried on a phone:* Gboard (its underlined word, swipe typing), the date picker, and
+    taps past a line's end. On a 392dp-wide screen the toolbar's 9 buttons are 43dp wide each, to
+    fit, not 48dp. Still to do from the list: 5–7, Insert verse (8) and 9–21.

@@ -158,9 +158,15 @@ fun editorText(note: NoteText, look: NoteLook): AnnotatedString = buildAnnotated
     addParagraphs(note, look)
     addCharStyles(note, look, 0)
     val text = note.text
-    findVerseMentions(text).forEach { m -> addStyle(SpanStyle(color = look.accent), m.range.first, m.range.last + 1) }
-    findWebLinks(text).forEach { r -> addStyle(SpanStyle(color = look.accent, textDecoration = TextDecoration.Underline), r.first, r.last + 1) }
+    findVerseMentions(text).forEach { m -> addStyle(SpanStyle(color = linkColor(note, m.range.first, look)), m.range.first, m.range.last + 1) }
+    findWebLinks(text).forEach { r ->
+        addStyle(SpanStyle(color = linkColor(note, r.first, look), textDecoration = TextDecoration.Underline), r.first, r.last + 1)
+    }
 }
+
+/** A link's colour: the accent, or grey in a ticked checklist item like the rest of its text. */
+internal fun linkColor(note: NoteText, offset: Int, look: NoteLook): Color =
+    note.paras[note.paraAt(offset)].let { if (it.style == RichBlockStyle.CHECK_ITEM && it.checked) look.muted else look.accent }
 
 private fun AnnotatedString.Builder.addParagraphs(note: NoteText, look: NoteLook) {
     note.paras.forEachIndexed { i, p ->

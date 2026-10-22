@@ -371,7 +371,7 @@ private fun TextStylesPanel(state: NoteEditorState) {
         Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             StyleChip("Title", p.style == RichBlockStyle.HEADING_1, 18.sp, FontWeight.Bold, NotoSerifFontFamily) {
                 state.setParaStyle(RichBlockStyle.HEADING_1)
             }
@@ -410,7 +410,7 @@ private fun StyleChip(label: String, selected: Boolean, size: androidx.compose.u
             .clip(RoundedCornerShape(10.dp))
             .background(if (selected) accent.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceContainerHighest)
             .toggleable(value = selected, role = Role.RadioButton, onValueChange = { onClick() })
-            .padding(horizontal = 14.dp),
+            .padding(horizontal = 10.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(label, fontSize = size, fontWeight = weight, fontFamily = family, color = if (selected) accent else MaterialTheme.colorScheme.onSurface)

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -70,6 +71,7 @@ internal fun RichNoteBodyView(
                 val lead = paraLead(p)
                 val markLead = p.indent * 24f
                 val accent = look.accent
+                val line = paraStyle(p, look)
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -82,20 +84,30 @@ internal fun RichNoteBodyView(
                             } else Modifier
                         )
                 ) {
-                    // The paragraph's room at the left, with its mark or tick box.
-                    Box(Modifier.width(with(LocalDensity.current) { lead.sp.toDp() }), contentAlignment = Alignment.TopEnd) {
+                    // The paragraph's room at the left, with its mark or tick box centred on its first line.
+                    val density = LocalDensity.current
+                    Box(
+                        Modifier.width(with(density) { lead.sp.toDp() }).height(with(density) { line.lineHeight.toDp() }),
+                        contentAlignment = Alignment.CenterEnd
+                    ) {
                         when (p.style) {
                             RichBlockStyle.CHECK_ITEM -> TickBox(
                                 checked = p.checked,
                                 size = textSize,
                                 look = look,
                                 onClick = onToggleCheck?.let { toggle -> { toggle(i) } },
-                                modifier = Modifier.padding(top = (textSize * 0.4f).dp, end = 6.dp)
+                                modifier = Modifier.padding(end = 6.dp)
                             )
                             RichBlockStyle.BULLET_ITEM, RichBlockStyle.NUMBERED_ITEM -> markText(note, i)?.let { mark ->
                                 Text(
                                     mark,
-                                    style = noteTextStyle(look).copy(fontSize = textSize.sp, color = accent, fontWeight = FontWeight.SemiBold),
+                                    style = noteTextStyle(look).copy(
+                                        fontSize = textSize.sp,
+                                        color = accent,
+                                        fontWeight = FontWeight.SemiBold,
+                                        lineHeight = line.lineHeight,
+                                        lineHeightStyle = line.lineHeightStyle
+                                    ),
                                     modifier = Modifier.padding(end = if (p.style == RichBlockStyle.NUMBERED_ITEM) 6.dp else 8.dp)
                                 )
                             }
@@ -107,9 +119,9 @@ internal fun RichNoteBodyView(
                         style = noteTextStyle(look).merge(
                             TextStyle(
                                 fontSize = textSize.sp,
-                                lineHeight = paraStyle(p, look).lineHeight,
-                                textAlign = paraStyle(p, look).textAlign,
-                                lineHeightStyle = paraStyle(p, look).lineHeightStyle
+                                lineHeight = line.lineHeight,
+                                textAlign = line.textAlign,
+                                lineHeightStyle = line.lineHeightStyle
                             )
                         ),
                         modifier = Modifier.weight(1f)
@@ -133,7 +145,7 @@ private fun paraText(
     append(line)
     paraSpan(note.paras[i], look)?.let { if (line.isNotEmpty()) addStyle(it, 0, line.length) }
     addCharStyles(note, look, start, end, start)
-    val linkStyle = TextLinkStyles(SpanStyle(color = look.accent, fontWeight = FontWeight.SemiBold))
+    val linkStyle = TextLinkStyles(SpanStyle(color = linkColor(note, start, look), fontWeight = FontWeight.SemiBold))
     findVerseMentions(line).forEach { m ->
         addLink(
             LinkAnnotation.Clickable("verse", linkStyle) { onMentionClick(m.book, m.chapter, m.verse) },
@@ -145,7 +157,7 @@ private fun paraText(
         val address = line.substring(r.first, r.last + 1)
         val url = if (address.startsWith("www.", ignoreCase = true)) "https://$address" else address
         addLink(
-            LinkAnnotation.Url(url, TextLinkStyles(SpanStyle(color = look.accent, textDecoration = TextDecoration.Underline))),
+            LinkAnnotation.Url(url, TextLinkStyles(SpanStyle(color = linkColor(note, start, look), textDecoration = TextDecoration.Underline))),
             r.first,
             r.last + 1
         )
