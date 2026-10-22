@@ -3,7 +3,7 @@
 Written 8 Oct 2026, after going through the Notes feature: the list, editor, writing page,
 note page, tags, and notes in the Reader. Pick by number.
 
-All done by 22 Oct, each marked (BACKLOG.md items 35–37).
+All done by 22 Oct but 16 and 17, which were dropped; each marked (BACKLOG.md items 35–37).
 
 ## Losing what you write
 
@@ -70,10 +70,10 @@ All done by 22 Oct, each marked (BACKLOG.md items 35–37).
 
 ## Notes while reading
 
-16. **Done 22 Oct:** a small note under the verse number; with one note it opens it, with more the verse's sheet listing them. **A clearer note mark you can tap.** The dot after a verse number looks like punctuation
+16. **Dropped 22 Oct** (built, then taken back out: "no, revert 1 and 3"); the dot stays. **A clearer note mark you can tap.** The dot after a verse number looks like punctuation
     and does nothing when tapped. Use a small note icon that opens the note.
 
-17. **Done 22 Oct:** Notes, searched for the chapter. **"Notes in this chapter"** from the Reader menu.
+17. **Dropped 22 Oct** (built, then taken back out). **"Notes in this chapter"** from the Reader menu.
 
 18. **Done 22 Oct.** **Show the missing details:** the note's title in the verse sheet (it shows the first line
     of the text now, see `notePreviewLine`), and the date and tags on the note page. Tags

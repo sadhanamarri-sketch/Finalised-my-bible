@@ -327,14 +327,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _notesQuery.value = query
     }
 
-    /** "Notes in this chapter" from the Reader: Notes, showing the notes on its verses. */
-    fun showChapterNotes(book: String, chapter: Int) {
-        setNotesQuery(NotesQuery(text = "$book $chapter", sort = _notesQuery.value.sort))
-        _notesScrollIndex.value = 0
-        _notesScrollOffset.value = 0
-        selectTab(NavTab.NOTES)
-    }
-
     fun setNotePinned(note: NoteItem, pinned: Boolean) {
         viewModelScope.launch { repository.setNotePinned(note.id, pinned) }
     }

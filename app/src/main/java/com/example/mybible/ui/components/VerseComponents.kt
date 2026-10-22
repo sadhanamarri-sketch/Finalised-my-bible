@@ -24,7 +24,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
@@ -117,8 +116,6 @@ fun VerseCard(
     fontSizeSp: Int,
     hasNotes: Boolean,
     hasXref: Boolean = false,
-    // The note mark under the verse number tapped.
-    onNoteMarkerClick: (() -> Unit)? = null,
     // The verse quotes the Old Testament, or is quoted in the New: its dagger is purple.
     isQuotation: Boolean = false,
     onVerseClick: () -> Unit,
@@ -247,13 +244,13 @@ fun VerseCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top
             ) {
-                // Verse number, and under it the note mark
-                Column(
+                // Verse number
+                Row(
                     modifier = Modifier
                         .width(32.dp)
-                        .padding(top = 4.dp)
+                        .padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "${verse.number}",
                         fontSize = 12.sp,
@@ -279,33 +276,20 @@ fun VerseCard(
                                 .testTag("xref_marker_${verse.number}")
                         )
                     }
-                }
-                // Note mark: a small note under the verse number (a dot after it read as
-                // punctuation), tapped to open the note.
-                if (hasNotes) {
-                    Box(
-                        modifier = Modifier
-                            // Up into the space under the number, so with it the column's no taller
-                            // than a verse's first line at the usual size (a short verse keeps its height).
-                            .layout { measurable, constraints ->
-                                val box = measurable.measure(constraints)
-                                val lift = 8.dp.roundToPx()
-                                layout(box.width, box.height - lift) { box.place(0, -lift) }
-                            }
-                            .size(28.dp, 20.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .then(if (onNoteMarkerClick != null) Modifier.clickable(onClick = onNoteMarkerClick) else Modifier)
-                            .testTag("note_marker_${verse.number}"),
-                        contentAlignment = Alignment.CenterStart
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.StickyNote2,
-                            contentDescription = "Note on this verse",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(14.dp)
+                    // Note marker — a small dot next to the verse number,
+                    // matching Capacitor's inline note indicator, rather
+                    // than a separate icon off at the far end of the row.
+                    if (hasNotes) {
+                        Text(
+                            text = "\u2022",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .padding(start = 2.dp)
+                                .testTag("note_marker_${verse.number}")
                         )
                     }
-                }
                 }
 
                 Column(modifier = Modifier.weight(1f)) {

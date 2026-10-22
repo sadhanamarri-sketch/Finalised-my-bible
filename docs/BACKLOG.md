@@ -1100,7 +1100,7 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
 
 37. **Done 22 Oct.** **Notes: the rest of the suggestions (5–21 in NOTES_SUGGESTIONS.md).** "now
     the rest of items in backlog... do them". (Of the backlog itself only 7's step 2 and 22 are
-    left, both waiting: Bible Brain's key, and a link to the films.)
+    left, both waiting: Bible Brain's key, and a link to the films.) 16 and 17 dropped (see below).
     *Built 22 Oct:*
     - + opens a new note, dated today, ready to write in; verses are added from inside it. A note
       with only a title or only verses is kept.
@@ -1115,9 +1115,10 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
       and dates (this week, this month, from–to); pinned notes stay at the top; the search,
       filters and order are kept when Notes is left and come back to (the order between visits
       too). Each card's ⋮: Edit, Pin to top, Share, Copy, Delete.
-    - The Reader: a small note under a verse's number, that opens its note (with more than one, the
-      verse's sheet listing them); the verse's sheet shows each note's title; Notes in this chapter
-      in the ⋮ menu.
+    - The Reader: the verse's sheet shows each note's title (its first line when it has none).
+      *Taken back out 22 Oct* ("no, revert 1 and 3", after seeing them): a note mark under the verse
+      number that opened its note, and Notes in this chapter in the menu; the dot after the number
+      is as it was.
     - The note page shows the note's date and tags, and has Share. Notes' ⋮ has Save all notes as a
       document: a text file of the notes shown, saved wherever it's put.
     - The Tags page: A to Z, each tag with its count, no "No description" lines. Old note code
