@@ -1952,7 +1952,7 @@ fun ReaderScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Menu,
-                                contentDescription = "Read aloud, Notes, Studied, Search, Highlighted Verses, Verse Scroll",
+                                contentDescription = "Read aloud, Notes, Notes in this chapter, Studied, Search, Highlighted Verses, Verse Scroll",
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
