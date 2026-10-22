@@ -2,6 +2,9 @@ package com.example.mybible.ui.versescroll
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -48,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -106,6 +110,10 @@ private const val TELUGU_LINES = 6
 // The space between the parts of the card (eyebrow, verse, reference, note), and between a passage's verses.
 private val STACK_GAP = 14.dp
 private val VERSE_GAP = (VERSE_SIZE * 0.35f).dp
+
+// A verse coming in after its picture: how long it takes, and how far it rises into place.
+private const val VERSE_IN_MS = 900
+private val VERSE_RISE = 16.dp
 
 /** The part of the Bible a book belongs to, shown above each verse. */
 internal fun genreOf(book: String): String {
@@ -186,11 +194,13 @@ private const val WORD = "WORD"
 private val WORD_PATTERN = Regex("[A-Za-z]+(?:['\u2019][A-Za-z]+)*")
 
 /**
- * One verse card: the background photo (or the plain theme background), and the verse, at the same size
- * as every other (cut short with "…" if it runs out of room). A tap on one of its English words looks it
- * up, and anywhere else plays or pauses the reading (each once it's clear it isn't a double-tap);
+ * One verse card: the background photo or picture (or the plain theme background), and the verse, at the
+ * same size as every other (cut short with "…" if it runs out of room). A tap on one of its English words
+ * looks it up, and anywhere else plays or pauses the reading (each once it's clear it isn't a double-tap);
  * double-tap opens the color box, long-press the full verse sheet.
  *
+ * @param verseHeld the card's own picture is showing alone first: the verse, and the dimming under it,
+ *   come in once this goes false (rising a little into place, unless the phone asks for less motion).
  * @param teluguSize the Telugu under the verse's size, in sp (when [showTelugu]).
  * @param words for a search's verses, what found this one ("loveth", "charity", "Greek agapē").
  * @param highlightHexes a verse's highlight colors (up to three), in the order they were put on.
@@ -220,7 +230,8 @@ internal fun VerseCardPage(
     onLinkedFrom: () -> Unit = {},
     burst: CardBurst? = null,
     onWord: (String) -> Unit = {},
-    onTapAround: () -> Unit = {}
+    onTapAround: () -> Unit = {},
+    verseHeld: Boolean = false
 ) {
     val content = card.content
     val long = content.wordCount > LONG_VERSE_WORDS
@@ -240,6 +251,12 @@ internal fun VerseCardPage(
     val currentOnWord by rememberUpdatedState(onWord)
     val currentOnTapAround by rememberUpdatedState(onTapAround)
     val cardWords = remember { CardWords() }
+    val verseShown by animateFloatAsState(
+        targetValue = if (verseHeld) 0f else 1f,
+        animationSpec = if (verseHeld) snap() else tween(VERSE_IN_MS, easing = FastOutSlowInEasing),
+        label = "verseIn"
+    )
+    val rise = with(LocalDensity.current) { VERSE_RISE.toPx() }
 
     Box(
         Modifier
@@ -253,12 +270,17 @@ internal fun VerseCardPage(
                 image = image,
                 dark = colors.dark,
                 motion = motion,
-                running = isCurrent
+                running = isCurrent,
+                veil = verseShown
             )
         }
         Box(
             Modifier
                 .fillMaxSize()
+                .graphicsLayer {
+                    alpha = verseShown
+                    if (!reduceMotion) translationY = (1f - verseShown) * rise
+                }
                 .onGloballyPositioned { cardWords.card = it }
                 .pointerInput(card.uid) {
                     detectTapGestures(

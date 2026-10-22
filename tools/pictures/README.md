@@ -40,8 +40,9 @@ in the lower half so the verse can sit above them, no words. God is only ever sh
 A picture is found by its file's name, so pictures named by hand work too: `Genesis 1.3-5.png` for
 Genesis 1:3-5 (a dot for the colon, which phones don't allow in names), `Psalms 23.jpg` for a chapter,
 `Genesis 6-9.jpg` for several, `Psalms.jpg` for a book, and `Psalms 23 (2).jpg` for another of the same
-place (they take turns). A card shows the one that fits its verse best; a picture named for no place at
-all shows now and then on any card.
+place (they take turns). A card shows the one that fits its verse best. A picture whose name starts
+with "Any" (`Any sunrise.jpg`) shows now and then on any card; files with other names are left alone, so
+the folder can be one the phone saves other things to.
 
 ## Adding a book
 

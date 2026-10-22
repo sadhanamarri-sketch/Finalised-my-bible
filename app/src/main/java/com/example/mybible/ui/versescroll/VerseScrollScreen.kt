@@ -35,12 +35,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -174,8 +174,7 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
             controller.screenShowing = false
         }
     }
-    val scenes = controller.backgroundPhotos
-    val motion = scenes && controller.motion && !reduceMotion
+    val motion = controller.motion && !reduceMotion
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
 
@@ -208,6 +207,8 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
     var sheetCard by remember { mutableStateOf<VerseFeedCard?>(null) }
     var linksCard by remember { mutableStateOf<Pair<Int, VerseFeedCard>?>(null) }
     var settingsOpen by remember { mutableStateOf(false) }
+    // The Pictures page, kept open through a trip to the phone's picture picker.
+    var picturesOpen by rememberSaveable { mutableStateOf(false) }
     var sourcesOpen by remember { mutableStateOf(false) }
     var readAloudOpen by remember { mutableStateOf(false) }
     val readAloudState by viewModel.readAloudState.collectAsState()
@@ -382,14 +383,18 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
             ) { page ->
                 when (val card = cards.getOrNull(page)) {
                     is VerseFeedCard -> {
-                        val scene = if (scenes) controller.scene(card.sceneId) else null
-                        val image by produceState<ImageBitmap?>(
-                            initialValue = card.sceneId?.let { controller.cachedImage(it) },
-                            card.sceneId, scenes
-                        ) {
-                            if (scenes && value == null) card.sceneId?.let { value = controller.loadImage(it) }
+                        val scene = controller.sceneFor(card)
+                        val sceneId = scene?.id
+                        val image by produceState(initialValue = sceneId?.let { controller.cachedImage(it) }, sceneId) {
+                            value = sceneId?.let { controller.cachedImage(it) ?: controller.loadImage(it) }
                         }
                         val firstNote = card.content.refs.firstNotNullOfOrNull { notesByKey[it.key]?.firstOrNull() }
+                        val isCurrent = pagerState.settledPage == page
+                        // A card with its own picture shows it alone first, once it has come to rest.
+                        val held = controller.holdsVerse(card)
+                        LaunchedEffect(card.uid, isCurrent, held) {
+                            if (isCurrent && held) controller.startReveal(card)
+                        }
                         VerseCardPage(
                             card = card,
                             scene = scene,
@@ -397,7 +402,8 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                             colors = colors,
                             motion = motion,
                             reduceMotion = reduceMotion,
-                            isCurrent = pagerState.settledPage == page,
+                            isCurrent = isCurrent,
+                            verseHeld = held,
                             showTelugu = controller.showTelugu,
                             teluguSize = controller.teluguSize,
                             // A search's verses (not a Rabbit hole's links): what found each.
@@ -411,10 +417,18 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                                 pressClosedPicker = pickerIndex >= 0
                                 hidePicker()
                             },
-                            onDoubleTap = { doubleTap(page) },
-                            onWord = { word -> if (!pressClosedPicker) lookUp(word, card) },
+                            onDoubleTap = {
+                                if (held) controller.showVerse(card)
+                                doubleTap(page)
+                            },
+                            // A tap while the picture shows alone brings the verse, and nothing more.
+                            onWord = { word ->
+                                if (held) controller.showVerse(card) else if (!pressClosedPicker) lookUp(word, card)
+                            },
                             onTapAround = {
-                                if (!pressClosedPicker) {
+                                if (held) {
+                                    controller.showVerse(card)
+                                } else if (!pressClosedPicker) {
                                     controller.playOrPause()
                                     // Nothing to read with (Telugu alone, and no Telugu voice): the settings say why.
                                     val now = viewModel.readAloudState.value
@@ -424,6 +438,7 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                             },
                             burst = burst?.takeIf { it.first == page }?.second,
                             onLongPress = {
+                                if (held) controller.showVerse(card)
                                 hidePicker()
                                 toast = null
                                 sheetCard = card
@@ -467,11 +482,10 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
             }
 
             // Loads the pictures for the cards either side ahead of time, so a swipe never lands on an empty scene.
-            LaunchedEffect(pagerState, scenes) {
-                if (!scenes) return@LaunchedEffect
+            LaunchedEffect(pagerState) {
                 snapshotFlow { pagerState.currentPage to cards.size }.collect { (page, _) ->
                     for (j in (page - 1)..(page + 2)) {
-                        (cards.getOrNull(j) as? VerseFeedCard)?.sceneId?.let { controller.loadImage(it) }
+                        (cards.getOrNull(j) as? VerseFeedCard)?.let { controller.sceneFor(it) }?.let { controller.loadImage(it.id) }
                     }
                 }
             }
@@ -479,11 +493,13 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
             val current = cards.getOrNull(pagerState.settledPage)
             val verseCard = current as? VerseFeedCard
             val picking = pickerIndex >= 0 && pickerIndex == pagerState.settledPage
+            // The card on screen has a photo or picture behind it: the bars are drawn for that.
+            val scenes = verseCard?.let { controller.sceneFor(it) } != null
 
             val inRabbitHole = controller.mode == FeedMode.RABBIT_HOLE
             VerseScrollTopBar(
                 colors = colors,
-                scenes = scenes && verseCard != null,
+                scenes = scenes,
                 rabbitHole = inRabbitHole,
                 backTo = controller.rabbitHoleRoot(pagerState.settledPage)?.content?.label,
                 modeLabel = controller.source.label,
@@ -492,7 +508,7 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                 sleepChip = if (readAloudState.place == ReadingPlace.VERSE_SCROLL && readAloudState.sleep != null) {
                     {
                         SleepChip(
-                            readAloudState, colors, scenes && verseCard != null, viewModel.readAloud::sleepLeftMs,
+                            readAloudState, colors, scenes, viewModel.readAloud::sleepLeftMs,
                             onSleepIn = viewModel::sleepIn, onCancel = viewModel::cancelSleep
                         )
                     }
@@ -653,6 +669,10 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
         if (!controller.hintSeen && controller.cards.isNotEmpty()) {
             FirstTimeHint(colors, reduceMotion, onDismiss = { controller.dismissHint() })
         }
+
+        if (picturesOpen) {
+            PicturesPage(pictures = controller.pictures, onClose = { picturesOpen = false })
+        }
     }
 
     // Back closes the color box before it leaves Verse Scroll.
@@ -748,6 +768,15 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
             showTelugu = controller.showTelugu,
             teluguSize = controller.teluguSize,
             sceneCount = controller.sceneCount,
+            pictures = controller.showPictures,
+            pictureCount = controller.shelf.size,
+            pictureFirst = controller.pictureFirst,
+            onPictures = controller::updateShowPictures,
+            onPictureFirst = controller::updatePictureFirst,
+            onPicturesPage = {
+                settingsOpen = false
+                picturesOpen = true
+            },
             onPhotos = controller::updateBackgroundPhotos,
             onMotion = controller::updateMotion,
             onShowTelugu = controller::updateShowTelugu,

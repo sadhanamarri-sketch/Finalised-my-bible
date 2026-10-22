@@ -51,6 +51,8 @@ private fun alternating(t: Float, period: Float, delay: Float): Float {
  *
  * @param motion motion is on (the drift, and a little extra dimming to cover the brighter patches the
  *   zoom can bring behind the text).
+ * @param veil how much of the picture's own dimming is on, 0 to 1: none while a picture shows alone
+ *   before its verse (the strips under the bars stay).
  */
 @Composable
 internal fun SceneLayer(
@@ -60,7 +62,8 @@ internal fun SceneLayer(
     dark: Boolean,
     motion: Boolean,
     running: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    veil: Float = 1f
 ) {
     val breathe = remember(cardKey) { Breathe.forKey(cardKey) }
     var clock by remember(cardKey) { mutableFloatStateOf(0f) }
@@ -106,7 +109,7 @@ internal fun SceneLayer(
                 )
             }
         }
-        Canvas(Modifier.fillMaxSize()) { drawVeil(scene, dark, motion) }
+        Canvas(Modifier.fillMaxSize()) { drawVeil(scene, dark, motion, veil) }
     }
 }
 
@@ -115,9 +118,9 @@ internal fun SceneLayer(
  * top and bottom bars. With motion on, a small margin covers the brighter patches the zoom can bring
  * behind the text.
  */
-private fun DrawScope.drawVeil(scene: SceneSpec, dark: Boolean, motion: Boolean) {
+private fun DrawScope.drawVeil(scene: SceneSpec, dark: Boolean, motion: Boolean, veil: Float) {
     val color = if (dark) VeilDark else VeilLight
-    val k = if (dark) scene.kd + (if (motion) 0.05f else 0f) else scene.kl + (if (motion) 0.03f else 0f)
+    val k = veil * if (dark) scene.kd + (if (motion) 0.05f else 0f) else scene.kl + (if (motion) 0.03f else 0f)
     val stops = if (dark) listOf(0f to 0.45f, 0.14f to 0.08f, 0.8f to 0.08f, 1f to 0.7f)
     else listOf(0f to 0.6f, 0.14f to 0.12f, 0.8f to 0.12f, 1f to 0.8f)
     drawRect(

@@ -38,7 +38,9 @@ data class VerseFeedCard(
     /** On a Rabbit hole: the verse this one is linked from. */
     val from: LinkedFrom? = null,
     /** The first card of a fresh thread, started because the last one ran out of links to follow. */
-    val newThread: Boolean = false
+    val newThread: Boolean = false,
+    /** Its own picture from the pictures folder (the picture's uri), shown in place of the nature photo. */
+    val picture: String? = null
 ) : FeedCard
 
 /** "Linked from Isaiah 41:10 · 2 of 3". */

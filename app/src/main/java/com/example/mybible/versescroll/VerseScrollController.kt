@@ -8,6 +8,7 @@ import androidx.annotation.VisibleForTesting
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
@@ -20,10 +21,14 @@ import com.example.mybible.audio.ReadingSession
 import com.example.mybible.audio.VerseToRead
 import com.example.mybible.data.BibleRepository
 import com.example.mybible.model.MatchedWord
+import com.example.mybible.pictures.PictureShelf
+import com.example.mybible.pictures.PictureVeil
+import com.example.mybible.pictures.Pictures
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
@@ -42,8 +47,9 @@ import java.util.Locale
 
 /**
  * Everything behind the Verse Scroll screen that should outlive it: the feed itself (so a trip to the
- * Reader via "Read" and back lands on the same card), its settings, today's verse count, and the scene
- * pictures. Owned by MainViewModel; the screen only reads this state and calls back into it.
+ * Reader via "Read" and back lands on the same card), its settings, today's verse count, the nature
+ * photos, and your own pictures (see [pictures]), each shown first, alone, the first time its card comes
+ * up. Owned by MainViewModel; the screen only reads this state and calls back into it.
  */
 class VerseScrollController(
     private val context: Context,
@@ -62,6 +68,14 @@ class VerseScrollController(
 
     /** The photos' slow drift and zoom (never when the phone asks for less motion). */
     var motion by mutableStateOf(prefs.getBoolean(KEY_MOTION, true))
+        private set
+
+    /** Your own pictures (from the pictures folder) on the cards they're for, in place of the nature photos. */
+    var showPictures by mutableStateOf(prefs.getBoolean(KEY_PICTURES, true))
+        private set
+
+    /** A card with its own picture shows the picture alone first, then its verse comes in. */
+    var pictureFirst by mutableStateOf(prefs.getBoolean(KEY_PICTURE_FIRST, true))
         private set
 
     /** The Telugu translation under each verse. */
@@ -84,6 +98,18 @@ class VerseScrollController(
     fun updateMotion(on: Boolean) {
         motion = on
         prefs.edit().putBoolean(KEY_MOTION, on).apply()
+    }
+
+    fun updateShowPictures(on: Boolean) {
+        showPictures = on
+        prefs.edit().putBoolean(KEY_PICTURES, on).apply()
+    }
+
+    fun updatePictureFirst(on: Boolean) {
+        pictureFirst = on
+        prefs.edit().putBoolean(KEY_PICTURE_FIRST, on).apply()
+        // Off: a card waiting to show its verse shows it now.
+        if (!on) revealing?.let { uid -> (cards.firstOrNull { it.uid == uid } as? VerseFeedCard)?.let(::showVerse) }
     }
 
     fun updateShowTelugu(on: Boolean) {
@@ -115,6 +141,9 @@ class VerseScrollController(
     val sceneCount: Int get() = scenes.size
 
     private suspend fun ensureLoaded() = loadLock.withLock {
+        // What was in the pictures folder last time, so the first cards get theirs.
+        pictures.ready()
+        takeShelf()
         if (discover != null) return@withLock
         withContext(Dispatchers.IO) {
             val catalog = context.assets.open("verse_scroll/scenes.json").bufferedReader().use { it.readText() }
@@ -240,7 +269,7 @@ class VerseScrollController(
     }
 
     /** Whether Verse Scroll is on screen (started and not stopped), to slide to the cards a reading moves to. */
-    var screenShowing = false
+    var screenShowing by mutableStateOf(false)
 
     private var thread: Thread? = null
     private var scrollIds = 0L
@@ -260,6 +289,10 @@ class VerseScrollController(
         if ((stale && !source.inOrder) || waitingForBibleText || sourceEmpty) reset()
         leftAtMillis = 0
         versesToday = readTodayCount()
+        // Pictures put in the folder since show up; a place's other pictures take their turn.
+        pictureTurn = prefs.getInt(KEY_PICTURE_TURN, 0) + 1
+        prefs.edit().putInt(KEY_PICTURE_TURN, pictureTurn).apply()
+        pictures.lookAgain()
         if (cards.size - currentIndex < CARDS_AHEAD) generateMore()
     }
 
@@ -279,6 +312,9 @@ class VerseScrollController(
         currentIndex = 0
         sinceCheckIn = 0
         lastSceneType = null
+        lastPicture = null
+        endReveal()
+        revealed.clear()
         viewedUids.clear()
         highlightedKeys.clear()
         highlightedThisVisit = 0
@@ -297,6 +333,8 @@ class VerseScrollController(
     fun onCardShown(index: Int) {
         currentIndex = index
         val card = cards.getOrNull(index)
+        // A picture showing alone, swiped past before its verse came: shown first all the same.
+        if (revealing != null && revealing != card?.uid) endReveal()
         if (card is VerseFeedCard && viewedUids.add(card.uid)) {
             versesToday = bumpTodayCount()
             if (viewedUids.size % 10 == 0) saveRecent()
@@ -349,7 +387,8 @@ class VerseScrollController(
                 sinceCheckIn++
                 return VerseFeedCard(
                     nextUid++, content, pickScene(content), inThread.id, inThread.rootIndex,
-                    LinkedFrom(step.from, labelOf(step.fromRefs), step.nth, step.of)
+                    LinkedFrom(step.from, labelOf(step.fromRefs), step.nth, step.of),
+                    picture = pickPicture(content)
                 )
             }
             // Nothing left anywhere on this thread: a fresh one from the next of the mode's own verses.
@@ -366,7 +405,7 @@ class VerseScrollController(
             val content = loadContent(ref, 1) ?: return@repeat
             sinceCheckIn++
             waitingForBibleText = false
-            return VerseFeedCard(nextUid++, content, pickScene(content), newThread = newThread)
+            return VerseFeedCard(nextUid++, content, pickScene(content), newThread = newThread, picture = pickPicture(content))
         }
         if (cards.none { it is VerseFeedCard }) waitingForBibleText = true
         return null
@@ -540,22 +579,27 @@ class VerseScrollController(
         override suspend fun next(after: VerseToRead?): VerseToRead? {
             val card = cards.getOrNull(index) as? VerseFeedCard
             if (card != null && card.uid == uid && line + 1 < card.content.lines.size) {
+                // The card's first verse, once its picture has been shown alone.
+                if (line < 0) awaitReveal(card)
                 line++
                 return toRead(card, line)
             }
             if (after == null || !readAloud.prefs.continueReading) return null
             val to = nextVerseCard(index) ?: return null
-            pauseBetweenCards()
+            // A picture shown first on the next card counts toward the pause, so it isn't waited for twice.
+            val next = cards.getOrNull(to) as? VerseFeedCard
+            pauseBetweenCards(shorter = if (next != null && screenShowing && holdsVerse(next)) REVEAL_MS else 0)
             return moveTo(to, gentle = true)
         }
 
-        // Going on by itself: a breath before the next card (Off, or a few seconds), cut short by a
-        // headset's next. Paused meanwhile, it stays on this card until it's played again.
-        private suspend fun pauseBetweenCards() {
+        // Going on by itself: a breath before the next card (Off, or a few seconds; [shorter] by so many
+        // milliseconds), cut short by a headset's next. Paused meanwhile, it stays on this card until it's
+        // played again.
+        private suspend fun pauseBetweenCards(shorter: Long = 0) {
             val wait = CompletableDeferred<Unit>().also { pausing = it }
             try {
-                val seconds = readAloud.prefs.pauseBetweenCards
-                if (seconds > 0) withTimeoutOrNull(seconds * 1000L) { wait.await() }
+                val ms = readAloud.prefs.pauseBetweenCards * 1000L - shorter
+                if (ms > 0) withTimeoutOrNull(ms) { wait.await() }
                 if (!wait.isCompleted && readAloud.state.value.status == ReadAloudState.Status.PAUSED) {
                     merge(flow { emit(wait.await()) }, readAloud.state.filter { it.status != ReadAloudState.Status.PAUSED }.map { }).first()
                 }
@@ -606,6 +650,7 @@ class VerseScrollController(
             val request = ScrollRequest(to, ++scrollIds, gentle)
             scrollRequest = request
             if (gentle && screenShowing) withTimeoutOrNull(SETTLE_LIMIT_MS) { settled.first { it >= request.id } }
+            awaitReveal(card)
             return toRead(card, 0)
         }
 
@@ -693,7 +738,8 @@ class VerseScrollController(
                     cards.add(
                         VerseFeedCard(
                             nextUid++, content, pickScene(content), current.id, current.rootIndex,
-                            LinkedFrom(step.from, labelOf(step.fromRefs), step.nth, step.of)
+                            LinkedFrom(step.from, labelOf(step.fromRefs), step.nth, step.of),
+                            picture = pickPicture(content)
                         )
                     )
                     rabbitHole.continueFrom(current, link.ref)
@@ -863,6 +909,143 @@ class VerseScrollController(
         prefs.edit().putString(KEY_RECENT, pool.recentKeys().joinToString("|")).apply()
     }
 
+    // ---- your own pictures ----
+
+    /** The pictures folder: a picture for each scene, made in ChatGPT and added on the Pictures page. */
+    val pictures: Pictures by lazy {
+        Pictures(context, scope).also { folder ->
+            scope.launch { folder.shelf.collect { takeShelf() } }
+            scope.launch { folder.veils.collect { pictureVeils = it } }
+        }
+    }
+
+    /** The pictures found in the folder. */
+    var shelf by mutableStateOf(PictureShelf.Empty)
+        private set
+    private var pictureVeils by mutableStateOf(emptyMap<String, PictureVeil.Veil>())
+
+    // The picture on the card dealt last, so a book's picture isn't on two cards running; and which of a
+    // place's pictures has its turn this visit.
+    private var lastPicture: String? = null
+    private var pictureTurn = prefs.getInt(KEY_PICTURE_TURN, 0)
+
+    /**
+     * What's behind [card]: its own picture (dimmed as it was measured to need), else a nature photo,
+     * else nothing (the plain page).
+     */
+    fun sceneFor(card: VerseFeedCard): SceneSpec? {
+        val picture = card.picture?.takeIf { showPictures }?.let { shelf[it] }
+        if (picture != null) {
+            val veil = pictureVeils[picture.uri] ?: UNMEASURED
+            // Changed (written again under the same name), it's another scene, read afresh.
+            return SceneSpec("$PICTURE${picture.modified}|${picture.uri}", veil.dark, veil.light)
+        }
+        return if (backgroundPhotos) scene(card.sceneId) else null
+    }
+
+    // A card's own picture: the one for its verse that fits best (its scene's), one of a place's
+    // several in turn; a book's not on two cards running; one for any card ("Any…") now and then.
+    private fun pickPicture(content: VerseCardContent): String? {
+        val ref = content.ref
+        val fit = shelf.forVerse(ref.book, ref.chapter, ref.verse)
+        val picture = when {
+            fit.isNotEmpty() -> {
+                val name = fit.first().name!!
+                fit[Math.floorMod(pictureTurn + fnv1a(name.place), fit.size)].takeUnless { name.rank == 2 && it.uri == lastPicture }
+            }
+            shelf.general.isNotEmpty() && Math.floorMod(fnv1a(ref.key), GENERAL_EVERY) == 0 ->
+                shelf.general[Math.floorMod(fnv1a(ref.key) / GENERAL_EVERY, shelf.general.size)].takeUnless { it.uri == lastPicture }
+            else -> null
+        }
+        lastPicture = picture?.uri
+        return picture?.uri
+    }
+
+    // The folder's pictures as they are now, when they've changed (looked over, one added or taken away):
+    // the card on screen and those after it get theirs. The one on screen already shows its verse, so its
+    // picture comes without being shown first.
+    private fun takeShelf() {
+        val now = pictures.shelf.value
+        if (now === shelf) return
+        shelf = now
+        pictureVeils = pictures.veils.value
+        refreshPictures()
+    }
+
+    private fun refreshPictures() {
+        if (cards.isEmpty()) return
+        lastPicture = (cards.getOrNull(currentIndex - 1) as? VerseFeedCard)?.picture
+        for (i in currentIndex until cards.size) {
+            val card = cards[i] as? VerseFeedCard ?: continue
+            val picture = pickPicture(card.content)
+            if (picture == card.picture) continue
+            if (i == currentIndex && picture != null && revealing != card.uid) revealed[picture] = true
+            cards[i] = card.copy(picture = picture)
+        }
+    }
+
+    // ---- a picture first, then its verse ----
+
+    // The pictures shown first already (by uri): each is, once a visit.
+    private val revealed = mutableStateMapOf<String, Boolean>()
+
+    /** The card whose picture is showing alone just now, its verse to come. */
+    var revealing by mutableStateOf<Long?>(null)
+        private set
+    private var revealJob: Job? = null
+
+    // Goes up as each picture's time alone ends, for a reading waiting to read its verse.
+    private val revealsEnded = MutableStateFlow(0)
+
+    /** Whether [card]'s verse waits for its picture to be shown alone first (see [startReveal]). */
+    fun holdsVerse(card: VerseFeedCard): Boolean {
+        val picture = card.picture ?: return false
+        return showPictures && pictureFirst && shelf.has(picture) && revealed[picture] != true
+    }
+
+    /** [card] has come to rest on screen, its picture alone: its verse comes in a few seconds, or at a tap. */
+    fun startReveal(card: VerseFeedCard) {
+        if (!holdsVerse(card) || revealing == card.uid) return
+        // Another card's, swiped past.
+        endReveal()
+        revealing = card.uid
+        revealJob = scope.launch {
+            delay(REVEAL_MS)
+            showVerse(card)
+        }
+    }
+
+    /** [card]'s verse now (a tap on its picture, or its time alone up). */
+    fun showVerse(card: VerseFeedCard) {
+        card.picture?.let { revealed[it] = true }
+        if (revealing == card.uid) endReveal()
+        revealsEnded.value++
+    }
+
+    // The picture showing alone, if any, is done with (shown first, whether or not its verse came).
+    private fun endReveal() {
+        val uid = revealing ?: return
+        (cards.firstOrNull { it.uid == uid } as? VerseFeedCard)?.picture?.let { revealed[it] = true }
+        revealing = null
+        val job = revealJob
+        revealJob = null
+        job?.cancel()
+        revealsEnded.value++
+    }
+
+    // A card showing its picture first: its verse is read once it's there. With the screen off, nothing
+    // is shown first; the verse is read straight away.
+    private suspend fun awaitReveal(card: VerseFeedCard) {
+        if (!holdsVerse(card)) return
+        if (!screenShowing) {
+            card.picture?.let { revealed[it] = true }
+            return
+        }
+        withTimeoutOrNull(REVEAL_MS + REVEAL_SLACK_MS) { revealsEnded.first { !holdsVerse(card) } }
+        // It never came to rest on screen (another card was swiped to): its verse is read all the same.
+        if (holdsVerse(card)) showVerse(card)
+    }
+
     // ---- scene pictures ----
 
     // Decoded pictures for the cards around the one on screen. Hardware bitmaps live in graphics memory,
@@ -875,17 +1058,22 @@ class VerseScrollController(
 
     fun cachedImage(sceneId: String): ImageBitmap? = images.get(sceneId)
 
+    /** A scene's picture: a nature photo, or one of your own (see [sceneFor]). */
     suspend fun loadImage(sceneId: String): ImageBitmap? {
         images.get(sceneId)?.let { return it }
-        val bitmap = withContext(Dispatchers.IO) {
-            try {
-                context.assets.open("verse_scroll/scenes/$sceneId.webp").use { input ->
-                    BitmapFactory.decodeStream(input, null, BitmapFactory.Options().apply {
-                        inPreferredConfig = imageConfig
-                    })
+        val bitmap = if (sceneId.startsWith(PICTURE)) {
+            pictures.image(sceneId.removePrefix(PICTURE).substringAfter('|'), imageConfig)
+        } else {
+            withContext(Dispatchers.IO) {
+                try {
+                    context.assets.open("verse_scroll/scenes/$sceneId.webp").use { input ->
+                        BitmapFactory.decodeStream(input, null, BitmapFactory.Options().apply {
+                            inPreferredConfig = imageConfig
+                        })
+                    }
+                } catch (e: Exception) {
+                    null
                 }
-            } catch (e: Exception) {
-                null
             }
         } ?: return null
         return bitmap.asImageBitmap().also { images.put(sceneId, it) }
@@ -905,6 +1093,24 @@ class VerseScrollController(
         private const val KEY_SOURCE = "source"
         private const val KEY_ORDER_SOURCE = "order_source"
         private const val KEY_ORDER_VERSE = "order_verse"
+        private const val KEY_PICTURES = "pictures"
+        private const val KEY_PICTURE_FIRST = "picture_first"
+        private const val KEY_PICTURE_TURN = "picture_turn"
+
+        // A scene id for one of your own pictures: this, then when it was last changed, "|" and its uri.
+        private const val PICTURE = "picture:"
+
+        // How a picture not yet measured is dimmed meanwhile: as much as the darkest-needing photos.
+        private val UNMEASURED = PictureVeil.Veil(0.55f, 0.65f)
+
+        // A picture for any card ("Any sunrise.jpg") shows on about one card in this many without its own.
+        private const val GENERAL_EVERY = 6
+
+        /** How long a card's own picture shows alone before its verse comes in. */
+        const val REVEAL_MS = 3_000L
+
+        // How much longer a reading waits for a picture's time alone to end before reading anyway.
+        private const val REVEAL_SLACK_MS = 2_000L
 
         // The Telugu under a verse: the Reader's own size to start with, against the verse's 26.
         const val DEFAULT_TELUGU_SIZE = 18

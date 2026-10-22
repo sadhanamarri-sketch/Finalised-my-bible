@@ -667,8 +667,9 @@ internal fun BoxScope.FirstTimeHint(colors: VsColors, reduceMotion: Boolean, onD
 }
 
 /**
- * Verse Scroll's own settings, laid out like the app's Settings: the background and its motion, the
- * Telugu under each verse and its size, and reading aloud.
+ * Verse Scroll's own settings, laid out like the app's Settings: your pictures (and the way to the
+ * Pictures page), the background and its motion, the Telugu under each verse and its size, and reading
+ * aloud.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -679,6 +680,12 @@ internal fun VerseScrollSettingsSheet(
     showTelugu: Boolean,
     teluguSize: Int,
     sceneCount: Int,
+    pictures: Boolean,
+    pictureCount: Int,
+    pictureFirst: Boolean,
+    onPictures: (Boolean) -> Unit,
+    onPictureFirst: (Boolean) -> Unit,
+    onPicturesPage: () -> Unit,
     continueReading: Boolean,
     pauseBetweenCards: Int,
     onPhotos: (Boolean) -> Unit,
@@ -712,20 +719,44 @@ internal fun VerseScrollSettingsSheet(
                 modifier = Modifier.padding(bottom = 18.dp)
             )
 
-            DsSectionLabel("Background", isFirst = true)
+            DsSectionLabel("Your pictures", isFirst = true)
+            DsToggleRow(
+                label = "Show your pictures",
+                subLabel = if (pictureCount > 0) "${if (pictureCount == 1) "1 picture" else "$pictureCount pictures"} in your folder, " +
+                    "each on the cards of its verses in place of a nature photo."
+                else "Pictures you make of the Bible's scenes, on the cards of their verses. Add them on the Pictures page.",
+                checked = pictures,
+                onCheckedChange = onPictures
+            )
+            if (pictures) {
+                Spacer(Modifier.height(8.dp))
+                DsToggleRow(
+                    label = "Picture first",
+                    subLabel = "A card with its own picture shows it alone for 3 seconds, then the verse comes in. " +
+                        "A tap brings the verse at once.",
+                    checked = pictureFirst,
+                    onCheckedChange = onPictureFirst
+                )
+            }
+            Spacer(Modifier.height(14.dp))
+            DsOutlineAccentButton(text = "Pictures page", onClick = onPicturesPage)
+            DsSectionDivider()
+
+            DsSectionLabel("Background")
             DsToggleRow(
                 label = "Nature photos",
                 subLabel = (if (sceneCount > 0) "$sceneCount photos" else "Photos") + " from Unsplash, matched to the verse " +
-                    "(the sea, the night, snow, harvest, mountains) and dimmed so it stays easy to read. Off: the plain page.",
+                    "(the sea, the night, snow, harvest, mountains) and dimmed so it stays easy to read. Off: the plain page " +
+                    "(your pictures still show).",
                 checked = photos,
                 onCheckedChange = onPhotos
             )
-            if (photos) {
+            if (photos || pictures) {
                 Spacer(Modifier.height(8.dp))
                 DsToggleRow(
                     label = "Gentle motion",
-                    subLabel = if (reduceMotion) "Your phone is set to reduce motion, so photos stay still."
-                    else "Photos drift and zoom very slowly. Only the one on screen moves.",
+                    subLabel = if (reduceMotion) "Your phone is set to reduce motion, so photos and pictures stay still."
+                    else "Photos and pictures drift and zoom very slowly. Only the one on screen moves.",
                     checked = motion && !reduceMotion,
                     onCheckedChange = onMotion,
                     enabled = !reduceMotion

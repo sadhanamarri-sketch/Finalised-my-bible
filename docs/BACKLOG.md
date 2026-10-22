@@ -927,3 +927,64 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
 
     *Set aside 20 Oct:* AI-made pictures or videos for the cards, for surprise ("let's scrap AI
     generated content... I don't have the budget right now"): they'd need a paid image service.
+    (Taken up again 22 Oct, made by hand in ChatGPT Go instead: 33.)
+
+## Noted 22 Oct 2026
+
+33. **Done 22 Oct.** **Verse Scroll: your own pictures, one for every scene, each shown first.** "i
+    think chatgpt go is better... Let's discuss to get prompts for prominent verses." — "when this
+    picture is picked, I want it display first without verse and verse fades in later." — "picture
+    cards only, 3 seconds. photo real, full people, and I want zoomed out version like capturing the
+    essence of the situation like peter walking on water - the sea should be shown too. Not just 60
+    verses... I want to do this for every verse possible. Let's start with book wise." — "go with
+    sample picture style exactly and other features we talked about. Can you also provide document
+    as well for prompts separately?"
+    *Agreed 22 Oct:*
+    - Pictures made by hand in ChatGPT from prompts written here, a book at a time from Genesis,
+      one to a scene (a run of verses showing one moment), so every verse has one. In the look of the
+      first one made: warm and cinematic, photo-real, with the people in it, wide enough to show the
+      whole situation; tall (9:16), everyone's heads in the lower half (the verse sits over the
+      middle), no words. God only ever as light. The same people described the same way in every
+      prompt, to keep their looks.
+    - Kept in a folder on the phone, chosen once. A picture is found by its name ("Genesis 1.3-5": a
+      dot for the colon), so ones named by hand work too, as do a chapter's ("Psalms 23"), several
+      chapters' ("Genesis 6-9"), a book's ("Psalms"), more for one place ("(2)", taking turns) and
+      ones named for no place (now and then on any card).
+    - A Pictures page from Verse Scroll's settings, book by book: each scene with its verses and
+      title, Copy prompt, Add (then Change and Remove), a look at it, and how many are done; "Add
+      several in order" fills the empty scenes with pictures picked one after another, then shows
+      where each went. A picture added there is shrunk to a card's size, named and put in the folder.
+      No adding from a card.
+    - A card with its own picture shows it alone for 3 seconds, then the verse fades in: once a
+      scene; a tap brings the verse at once; a reading waits for it, the wait counting toward the
+      pause between cards; none with the screen off; a plain fade with less motion; a setting to
+      turn it off.
+    - The prompts in a page of their own too, with copy buttons, and as a document.
+    *Built 22 Oct,* just so. Genesis is 370 scenes covering its 1,533 verses, with a cast of 37
+    (tools/pictures has the scenes, the cast and the scripts; docs/pictures/Genesis.md has every
+    prompt, with the name to save it under). Verse Scroll's settings have "Your pictures": Show your
+    pictures, Picture first, and the Pictures page; the nature photos can be off while your pictures
+    still show. On the Pictures page a folder is chosen first (a new empty one is best), then each
+    scene has Copy prompt and Add (Change once it has one); its menu has Copy name, Add several from
+    here and Remove; a tap on a picture shows it whole, with Change and Remove. "Add several in
+    order" starts at the first empty scene after the last one done and fills the empty scenes after
+    it, in the order the pictures were picked, then lists where each went, with Undo for any that
+    landed wrong. A picture added is made at most 1080 by 1920 and saved as WebP (150 to 250 KB),
+    the new one written before the old one is taken away. How much each picture is dimmed under the
+    verse is measured once, the way the photos' was (fit_veils.py, now in the app), and kept. A
+    card shows the picture that fits its verse best (its scene's, then a chapter's, then a book's,
+    a book's not on two cards running); several for one place take turns visit by visit. Of pictures
+    named for no place, only ones named "Any…" ("Any sunrise.jpg") go on any card, about one in six
+    without its own: the folder may be Download, where ChatGPT's pictures land, and the phone's other
+    pictures there are left alone. The
+    picture shows alone for 3 seconds once it has come to rest on screen, then the verse and the
+    dimming come in over most of a second, the verse rising a little into place (not with less
+    motion). The next card of the same scene shows its verse at once; one swiped past before its
+    verse came counts as shown. A tap on the picture brings the verse and nothing else; a reading
+    of the card starts once the verse is there, and going on by itself, its pause between cards is
+    3 seconds shorter for a card shown first (none with the screen off, where the verse is read at
+    once). Pictures put in the folder show up the next time Verse Scroll opens; one added on the
+    page shows at once (on the card on screen, without being shown first). The prompts page:
+    https://claude.ai/artifact/3BmZ5PyWLcdHkrcpVdsPQU (private until shared).
+    Not tried on a phone: choosing the folder, saving into it and the phone's photo picker (the
+    checks here can't open Android's folder access), so the first pictures added are the real test.
