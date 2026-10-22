@@ -10,15 +10,28 @@ Every prompt asks for the same kind of picture, in the look of the first one mad
 photo-real with a warm, painterly glow, wide enough to show the whole situation, tall (9:16), the people
 in the lower half so the verse can sit above them, no words. God is only ever shown as light.
 
+The pictures have to be true to the text (the King James Version): nothing that goes against the verses
+(who is there and how many, ages, the order of events, the state of things, like how high the water is),
+nothing added to the story (no extra people, events or signs), fill-ins only where a picture needs them
+(light, weather, landscape, clothes), and where the text is silent, nothing that settles it either way.
+Each prompt says the counts outright ("Exactly eight people and no one else: ..."), since ChatGPT adds
+people unless it's told not to.
+
 ## The files
 
 - `cast.tsv`: the people who come up again and again, each with one description (`Abraham`, `Isaac
   (old)`) put in every prompt they're in, so ChatGPT keeps them looking alike. The key's bracket says
-  which age; the prompt calls them by their name alone.
+  which age, by Genesis's own numbers; the prompt calls them by their name alone.
+- `things.tsv`: things that come up in more than one scene, described as the text describes them (the
+  ark, a box of 300 by 50 by 30 cubits, not a ship).
 - `<book>.tsv` (`genesis.tsv`): the book's scenes, a line each: chapter, first verse, last verse, title,
-  cast (keys of `cast.tsv`, comma-separated), `y` where God appears, and what the picture shows. Every
-  verse is in exactly one scene. Violent or intimate moments are pictured just before or after, so the
-  prompt is one ChatGPT will make.
+  cast (keys of `cast.tsv` and `things.tsv`, comma-separated), god (`y` where God is present), people (`y`
+  if anyone is in the picture, `n` if no one is), limits (the firm limits: counts, who is there, what
+  isn't), and what the picture shows. Every verse is in exactly one scene. Violent or intimate moments
+  are pictured just before or after, so the prompt is one ChatGPT will make. A picture with no one in it
+  gets an ending that doesn't mention people at all.
+- `genesis_fixes.tsv`: what the accuracy check changed in each scene, with the verses, shown on the
+  prompts page.
 - `make_prompts.py` checks every book's scenes cover every verse of the KJV once, in order, and writes
   the app's list (`app/src/main/assets/pictures/scenes.tsv`) and a document of the prompts for each book
   (`docs/pictures/<Book>.md`):
@@ -28,11 +41,12 @@ in the lower half so the verse can sit above them, no words. God is only ever sh
   ```
 
   `kjv.tsv` is the KJV a verse a line (book, chapter, verse, text), with the app's book names.
-- `make_page.py` makes the prompts page, with Copy prompt and Copy name buttons and a Made tick for
-  each scene (kept in the phone's browser):
+- `make_page.py` makes the prompts page, with Copy prompt and Copy name buttons, the scene's verses to
+  check the picture against, what the check fixed, and a Made tick for each scene (kept in the phone's
+  browser):
 
   ```sh
-  python3 make_page.py ../../app/src/main/assets prompts.html
+  python3 make_page.py ../../app/src/main/assets kjv.tsv prompts.html genesis_fixes.tsv
   ```
 
 ## Names

@@ -1,10 +1,12 @@
-"""Makes the picture prompts page: every scene's prompt with Copy prompt and Copy name buttons, and a mark
-for each picture made (kept in the phone's browser), from the app's list of scenes.
+"""Makes the picture prompts page: every scene's prompt with Copy prompt and Copy name buttons, its verses
+to check a picture against, what the accuracy check changed in it, and a mark for each picture made (kept
+in the phone's browser), from the app's list of scenes.
 
-    python3 make_page.py APP_ASSETS_DIR OUT_HTML
+    python3 make_page.py APP_ASSETS_DIR KJV_TSV OUT_HTML [FIXES_TSV]
 
-Reads APP_ASSETS_DIR/pictures/scenes.tsv (made by make_prompts.py). The style and framing every prompt
-ends with are stored once and put back on as a prompt is copied.
+Reads APP_ASSETS_DIR/pictures/scenes.tsv (made by make_prompts.py) and the KJV (book, chapter, verse,
+text). FIXES_TSV (book, chapter, first, last, what was fixed) is optional. The two endings every prompt
+has one of are stored once and put back on as a prompt is copied.
 """
 import html
 import json
@@ -13,30 +15,37 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-assets_dir, out_path = sys.argv[1:3]
+from make_prompts import ENDING_EMPTY, ENDING_PEOPLE, read_kjv  # noqa: E402
 
-# The ending every prompt shares (see make_prompts.py).
-with open(os.path.join(HERE, "make_prompts.py"), encoding="utf-8") as f:
-    source = f.read()
-namespace = {}
-for name in ("STYLE", "FRAMING"):
-    start = source.index(f"{name} = (")
-    end = source.index(")\n", start) + 1
-    exec(source[start:end], namespace)
-ending = namespace["STYLE"] + " " + namespace["FRAMING"]
+assets_dir, kjv_path, out_path = sys.argv[1:4]
+fixes_path = sys.argv[4] if len(sys.argv) > 4 else None
+endings = [ENDING_PEOPLE, ENDING_EMPTY]
+verses = read_kjv(kjv_path)
+
+fixes = {}
+if fixes_path:
+    for line in open(fixes_path, encoding="utf-8"):
+        if line.startswith("#") or not line.strip():
+            continue
+        book, chapter, first, last, note = line.rstrip("\n").split("\t")
+        fixes[(book, int(chapter), int(first), int(last))] = note
 
 scenes = []
 for line in open(os.path.join(assets_dir, "pictures", "scenes.tsv"), encoding="utf-8"):
     if line.startswith("#") or not line.strip():
         continue
     book, chapter, first, last, title, prompt = line.rstrip("\n").split("\t")
-    if not prompt.endswith(" " + ending):
-        sys.exit(f"{book} {chapter}:{first}: the prompt doesn't end with the usual style and framing")
-    scenes.append([book, int(chapter), int(first), int(last), title, prompt[: -len(ending) - 1]])
+    chapter, first, last = int(chapter), int(first), int(last)
+    ending = next((i for i, e in enumerate(endings) if prompt.endswith(" " + e)), None)
+    if ending is None:
+        sys.exit(f"{book} {chapter}:{first}: the prompt doesn't end with either ending")
+    text = " ".join(f"{v} {verses[(book, chapter, v)]}" for v in range(first, last + 1))
+    scenes.append([book, chapter, first, last, title, prompt[: -len(endings[ending]) - 1], ending, text,
+                   fixes.get((book, chapter, first, last), "")])
 
 books = list(dict.fromkeys(s[0] for s in scenes))
 title = f"{books[0]} Picture Prompts" if len(books) == 1 else "Bible Picture Prompts"
-data = json.dumps({"ending": ending, "scenes": scenes}, ensure_ascii=False, separators=(",", ":"))
+data = json.dumps({"endings": endings, "scenes": scenes}, ensure_ascii=False, separators=(",", ":"))
 # Safe inside a script tag.
 data = data.replace("</", "<\\/")
 
@@ -115,6 +124,9 @@ h2 { font-family: var(--display); font-weight: 600; font-size: 22px; margin: 28p
 input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--gold); }
 button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .name { font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size: 12.5px; color: var(--soft); }
+.verses-text { margin: 10px 0 0; padding: 10px 12px; border-left: 3px solid var(--gold); background: var(--bg); border-radius: 0 8px 8px 0; font-family: var(--verse); font-size: 15px; line-height: 1.6; color: var(--ink); }
+.fix { margin: 8px 0 0; font-size: 13px; color: var(--soft); }
+.fix b { color: var(--gold); font-weight: 600; letter-spacing: 0.04em; }
 .fallback { width: 100%; margin-top: 8px; font: inherit; font-size: 13px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
 .toast {
   position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px));
@@ -130,7 +142,7 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
     <h1>__TITLE__</h1>
     <ol class="how">
       <li><strong>Copy a prompt</strong> and paste it into ChatGPT. Make a book's pictures in one chat, so each person keeps the same face.</li>
-      <li><strong>Save the picture</strong> it makes, then tick Made here.</li>
+      <li><strong>Check the picture against the verses</strong> (Show verses), then save it and tick Made here.</li>
       <li><strong>Add it in the app:</strong> Verse Scroll, Settings, Pictures page, then Add on its scene, or Add several in order for a batch. Or save it in your pictures folder under its name (Copy name).</li>
     </ol>
   </header>
@@ -150,8 +162,8 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 <script>
 (function () {
   var data = JSON.parse(document.getElementById("data").textContent);
-  var ending = data.ending;
   var scenes = data.scenes;
+  function promptOf(s) { return s[5] + " " + data.endings[s[6]]; }
   var list = document.getElementById("list");
   var KEY = "picture-prompts-made";
 
@@ -221,9 +233,12 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
           '<button type="button" class="copy">Copy prompt</button>' +
           '<button type="button" class="copyname">Copy name</button>' +
           '<button type="button" class="more" aria-expanded="false">Show all</button>' +
+          '<button type="button" class="more showverses" aria-expanded="false">Show verses</button>' +
           '<label><input type="checkbox" class="madebox"' + (made.has(name) ? " checked" : "") + '> Made</label>' +
         "</div>" +
         '<div class="name"></div>' +
+        '<blockquote class="verses-text" hidden></blockquote>' +
+        (s[8] ? '<p class="fix"><b>FIXED</b> <span></span></p>' : "") +
       "</article>"
     );
   });
@@ -232,8 +247,10 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
   list.querySelectorAll(".scene").forEach(function (card) {
     var s = scenes[+card.dataset.i];
     card.querySelector(".title").textContent = s[4];
-    card.querySelector(".prompt").textContent = s[5] + " " + ending;
+    card.querySelector(".prompt").textContent = promptOf(s);
     card.querySelector(".name").textContent = nameOf(s);
+    card.querySelector(".verses-text").textContent = s[7];
+    if (s[8]) card.querySelector(".fix span").textContent = s[8];
   });
   chapters.forEach(function (c, i) {
     var o = document.createElement("option");
@@ -252,8 +269,14 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
     var card = e.target.closest(".scene");
     if (!card) return;
     var s = scenes[+card.dataset.i];
-    if (e.target.classList.contains("copy")) copy(s[5] + " " + ending, "Prompt", card);
+    if (e.target.classList.contains("copy")) copy(promptOf(s), "Prompt", card);
     else if (e.target.classList.contains("copyname")) copy(nameOf(s), "Name", card);
+    else if (e.target.classList.contains("showverses")) {
+      var box = card.querySelector(".verses-text");
+      box.hidden = !box.hidden;
+      e.target.textContent = box.hidden ? "Show verses" : "Hide verses";
+      e.target.setAttribute("aria-expanded", String(!box.hidden));
+    }
     else if (e.target.classList.contains("more")) {
       var p = card.querySelector(".prompt");
       var open = p.classList.toggle("short") === false;
