@@ -93,3 +93,46 @@ Items 1–4 matter most: today a note being written can be lost without any warn
     (`ui/components/NoteReaderDialog.kt`), `MainViewModel.parseNoteReference`,
     `MainViewModel.saveNote(text, tags)` and the older `BibleRepository.saveNote` overload.
     Nothing visible changes.
+
+## Formatting tools in the writing page
+
+Added 22 Oct 2026, after going through the toolbar over the keyboard (`FormattingToolbar` in
+`ui/richtext/RichTextEditor.kt`). Today it has, in a row that scrolls sideways: B, I, U, the
+text size (− 19 +), H (heading), ⇥ (indent), Ctr (centre), “ (quote), highlight, • (bullets)
+and 1. (numbers). The note page shows each of them as the editor does.
+
+22. **Bold, italic, underline, highlight and size work only on selected text.** With just the
+    cursor they're greyed out, so you can't tap B and then type in bold: you type, select, then
+    tap. And with the cursor in bold text, B doesn't light up. Make them, with nothing
+    selected, apply to what's typed next, and light up for the style at the cursor.
+
+23. **Selecting stops at the end of a paragraph.** Each paragraph is its own text box, so two
+    paragraphs can't be made bold or highlighted together, or copied or cut in one go. One text
+    box for the whole note would fix it (a bigger change to the editor; saved notes keep their
+    format).
+
+24. **Half the buttons are off the screen.** The row is about 555dp wide on a 392dp phone, so
+    quote, highlight, bullets and numbers sit past the edge with nothing to say there's more.
+    Put the most used first (B, I, highlight, bullets, numbers, heading), use icons instead of
+    "Ctr", "⇥" and "“", and fit one row, with the rest behind a "more" button.
+
+25. **Headings by guesswork.** H goes round big → medium → small → normal text, a tap at a time,
+    without showing the choices; the "small" one is smaller than the text, in grey. A tap on H
+    could open a short list instead: Title, Heading, Subheading, Normal text.
+
+26. **Indent only goes in.** The only way back out is Backspace at the start of the line. Add an
+    outdent button. (Ctr only centres; the notes can also hold right-aligned lines, but nothing
+    makes them.)
+
+27. **Text size overlaps headings.** − and + change the size of selected words in six steps,
+    beside headings that already make text bigger, and the number shown is wrong in a heading
+    (19 where the heading is 24). Drop it, or offer Small, Normal and Large in one place.
+
+28. **No "Clear formatting"** to take every style off selected text at once.
+
+29. **The cursor starts at the end of the first paragraph** when a note opens, not at the end of
+    the note, where you'd go on writing.
+
+30. **A checklist** (a list with tick boxes) for things like verses to memorise or prayers.
+
+(Undo and Redo in the writing page are in 8.)
