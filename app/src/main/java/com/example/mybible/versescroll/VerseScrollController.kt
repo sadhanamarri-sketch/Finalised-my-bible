@@ -488,6 +488,9 @@ class VerseScrollController(
         }
     }
 
+    /** Whether [card] is the one being read aloud (playing or paused): its progress bar shows. */
+    fun reads(card: VerseFeedCard): Boolean = reading?.let { readAloud.session === it && it.uid == card.uid } == true
+
     /** Off to the Reader for a look ("Read"): the cards' reading pauses where it is, to be played on back here. */
     fun pauseReading() {
         val current = reading ?: return
@@ -574,6 +577,15 @@ class VerseScrollController(
         override suspend fun back(current: VerseToRead): VerseToRead? {
             val before = (index - 1 downTo 0).firstOrNull { cards.getOrNull(it) is VerseFeedCard } ?: return null
             return moveTo(before)
+        }
+
+        // One of the card's verses (a passage's), for the progress bar's move to it.
+        override suspend fun verse(book: String, chapter: Int, verse: Int): VerseToRead? {
+            val card = cards.getOrNull(index) as? VerseFeedCard ?: return null
+            if (card.uid != uid || card.content.ref.book != book || card.content.ref.chapter != chapter) return null
+            val at = card.content.lines.indexOfFirst { it.number == verse }.takeIf { it >= 0 } ?: return null
+            line = at
+            return toRead(card, at)
         }
 
         // The rest of the card's verses (a passage's), which a recording plays on through.

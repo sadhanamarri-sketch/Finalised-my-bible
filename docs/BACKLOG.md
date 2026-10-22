@@ -894,7 +894,7 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     settings, which say why. Verse Scroll's settings and first hint now say a tap on a card reads
     it aloud.
 
-32. **Verse Scroll: a progress bar on the card, with a dot where the Telugu starts.** "why not a
+32. **Done 22 Oct.** **Verse Scroll: a progress bar on the card, with a dot where the Telugu starts.** "why not a
     progress bar that can be scrolled just like in the doomscrolling apps? With a dot indicating
     the switch between english and telugu." — "Verse Scroll only for the progress bar(only if
     it's a small change)."
@@ -914,6 +914,16 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     for a recording, the part again from that second, as a paused one resumes; for the voice,
     from that character, as a pause picks up at a word. The bar's lengths come from the timings,
     or the text's length for the voice.
+    *Built 22 Oct,* just so: while a card is read, a thin bar above "N verses today" fills as it
+    goes, with a dot where its English gives way to its Telugu (Both). A tap moves the reading
+    there, the voice from the word there, a recording from that moment; a tap by the dot goes to
+    the Telugu's start. Held, the bar thickens, a thumb follows the finger, and the reading goes
+    where it's let go. Paused, a move waits there, and a tap on the card plays on from it. On a
+    card of a few verses each has its stretch, and a tap in another reads it from its start. The
+    bar takes its own touches, apart from the card's taps and the swipes. A recording's lengths are
+    its own; the voice's are guessed from the text (about 15 characters a second in English, 13 in
+    Telugu, at the speed set), so there the dot's place is near enough rather than exact. A voice
+    that doesn't say which word it's on fills the bar at that pace.
 
     *Set aside 20 Oct:* AI-made pictures or videos for the cards, for surprise ("let's scrap AI
     generated content... I don't have the budget right now"): they'd need a paid image service.

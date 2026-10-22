@@ -659,6 +659,44 @@ class ReadAloudTest {
     }
 
     @Test
+    fun theProgressBarShowsHowFarTheVerseHasGotAndMovesIt() {
+        val speaker = FakeSpeaker()
+        var now = 0L
+        val reader = reader(speaker, FakePrefs(ReadLanguage.BOTH), clock = { now })
+        assertFalse(reader.seek(part = 0, at = 0.5f))
+        reader.start(Chapter(john3, from = 16))
+        // Its English, then its Telugu, each as long as its text takes; at the start.
+        val start = reader.progress()!!
+        assertEquals("John 3:16", start.verse.label)
+        assertEquals(listOf(false, true), start.parts.map { it.telugu })
+        assertEquals(0 to 0f, start.part to start.at)
+        // A word said: that far into the verse's English.
+        val english = speaker.said.last().text
+        assertEquals("For God so loved the world", english)
+        speaker.reachWord(english.indexOf("the"))
+        assertEquals(english.indexOf("the").toFloat() / english.length, reader.progress()!!.at, 1e-6f)
+        // Moved halfway: on from the word there.
+        assertTrue(reader.seek(part = 0, at = 0.5f))
+        assertEquals("loved the world", speaker.said.last().text)
+        // To the dot: its Telugu, from the start.
+        reader.seek(part = 1, at = 0f)
+        assertEquals(true to "దేవుడు లోకమును ఎంతో ప్రేమించెను.", speaker.said.last().let { it.telugu to it.text })
+        assertTrue(reader.state.value.telugu)
+        assertEquals(1, reader.progress()!!.part)
+        // Paused, a move waits there, and it plays on from it.
+        reader.pause()
+        val said = speaker.said.size
+        reader.seek(part = 0, at = 0f)
+        assertEquals(said, speaker.said.size)
+        assertEquals(0 to 0f, reader.progress()!!.let { it.part to it.at })
+        reader.resume()
+        assertEquals("For God so loved the world", speaker.said.last().text)
+        // A voice that never says which word it's on: as far as it would have got at its pace (15 a second).
+        now += 1_000
+        assertEquals(15f / english.length, reader.progress()!!.at, 1e-6f)
+    }
+
+    @Test
     fun versesAreSaidAsWordsNotMarks() {
         assertEquals("And the Lord said unto Moses", SpeechText.english("¶ And the LORD said unto  Moses"))
         assertEquals("I Am That I Am", SpeechText.english("I AM THAT I AM"))

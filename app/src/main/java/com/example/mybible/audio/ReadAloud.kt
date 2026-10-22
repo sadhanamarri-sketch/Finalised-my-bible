@@ -220,6 +220,15 @@ data class SleepTimer(val at: Long?, val minutes: Int? = null, val minutesLeft: 
 }
 
 /**
+ * How far the verse being read has got, for a progress bar: its [parts] in order (a language each), the
+ * one being read ([part]), and how far into it ([at], 0 to 1).
+ */
+data class VerseProgress(val verse: VerseToRead, val parts: List<PartLength>, val part: Int, val at: Float)
+
+/** A verse's part in a language, and how long it takes in seconds: a recording's own, the voice's guessed from its text. */
+data class PartLength(val telugu: Boolean, val seconds: Float)
+
+/**
  * Reads verses aloud, one at a time: each in English, in Telugu, or in English and then Telugu, as the
  * settings say, in the phone's own voice or played from a narrated recording on the phone. One reading
  * at a time — starting another stops the first. A pause stops the voice mid-verse and picks up again at
@@ -264,6 +273,11 @@ class ReadAloud(
 
     // Where in the part the text last given to the speaker starts, to place the words it reports.
     private var spokenFrom = 0
+
+    // When the voice was last given the text, and whether it has said which word it's on since (some
+    // voices never do: how far they've got is then guessed from the time).
+    private var spokenAt = 0L
+    private var wordHeard = false
 
     // When the verse being read came up, or was last said from its beginning (see skipToPrevious).
     private var verseStartedAt = 0L
@@ -532,6 +546,68 @@ class ReadAloud(
     fun restartVerse() {
         val verse = skippableVerse() ?: return
         readFrom(verse)
+    }
+
+    /**
+     * How far the verse being read has got, for Verse Scroll's progress bar; null with none being read,
+     * or while the next is being found.
+     */
+    fun progress(): VerseProgress? {
+        val verse = _state.value.verse ?: return null
+        if (session == null || advancing?.isActive == true || parts.isEmpty()) return null
+        val at = when (val part = parts.getOrNull(partIndex)) {
+            is Spoken -> {
+                // A voice that doesn't say which word it's on: as far as it would have got at its pace.
+                val reached = if (wordHeard || _state.value.status != ReadAloudState.Status.PLAYING) resumeAt
+                else spokenFrom + ((clock() - spokenAt) / 1000f * charsPerSecond(part.telugu)).toInt()
+                reached.toFloat() / part.text.length.coerceAtLeast(1)
+            }
+            is Recorded -> {
+                val seconds = recordedResume ?: recorder.position ?: part.at.start
+                ((seconds - part.at.start) / (part.at.end - part.at.start).coerceAtLeast(MIN_PART_SECONDS)).toFloat()
+            }
+            null -> 0f
+        }
+        return VerseProgress(verse, parts.map { PartLength(it.telugu, secondsOf(it)) }, partIndex, at.coerceIn(0f, 1f))
+    }
+
+    /**
+     * The progress bar moved: the verse being read goes on from [at] (0 to 1) of its part [part], a
+     * recording from that moment, the phone's voice from the word there. Paused, it waits there. False
+     * when there's nothing to move (no verse being read, or the next being found).
+     */
+    fun seek(part: Int, at: Float): Boolean {
+        if (session == null || advancing?.isActive == true) return false
+        val target = parts.getOrNull(part) ?: return false
+        utterances++
+        speaker.stop()
+        stopRecording()
+        partIndex = part
+        resumeAt = 0
+        when (target) {
+            is Spoken -> resumeAt = wordStart(target.text, (at * target.text.length).toInt())
+            is Recorded -> recordedResume = target.at.start + at.coerceIn(0f, 1f) * (target.at.end - target.at.start)
+        }
+        _state.update { it.copy(telugu = target.telugu, recording = target is Recorded) }
+        if (_state.value.status == ReadAloudState.Status.PLAYING) speakPart()
+        return true
+    }
+
+    // How long a part takes, in seconds: a recording's own; the voice's guessed from its text, at its speed.
+    private fun secondsOf(part: Part): Float = when (part) {
+        is Recorded -> (part.at.end - part.at.start).coerceAtLeast(MIN_PART_SECONDS).toFloat()
+        is Spoken -> part.text.length / charsPerSecond(part.telugu)
+    }
+
+    // The phone's voice's pace, roughly, in characters a second at the language's speed.
+    private fun charsPerSecond(telugu: Boolean): Float =
+        (if (telugu) TELUGU_CHARS_PER_SECOND else ENGLISH_CHARS_PER_SECOND) * prefs.speed(telugu)
+
+    // Where the word [at] falls in starts.
+    private fun wordStart(text: String, at: Int): Int {
+        var i = at.coerceIn(0, text.length)
+        while (i > 0 && !text[i - 1].isWhitespace()) i--
+        return i
     }
 
     /**
@@ -851,6 +927,8 @@ class ReadAloud(
                 val from = resumeAt.coerceIn(0, part.text.length)
                 if (partIndex == 0 && from == 0) verseStartedAt = clock()
                 spokenFrom = from
+                spokenAt = clock()
+                wordHeard = false
                 utterances++
                 _state.update { it.copy(telugu = part.telugu, recording = false) }
                 speaker.speak(currentId, part.text.substring(from), part.telugu, prefs.speed(part.telugu), voiceFor(part.telugu), prefs.pitch(part.telugu))
@@ -939,7 +1017,9 @@ class ReadAloud(
     }
 
     override fun onRange(id: String, start: Int) {
-        if (id == currentId) resumeAt = spokenFrom + start
+        if (id != currentId) return
+        resumeAt = spokenFrom + start
+        wordHeard = true
     }
 
     override fun onDone(id: String) {
@@ -995,6 +1075,13 @@ class ReadAloud(
 
         // A mark reached counts for a verse starting this close after it (seconds), however it's rounded.
         const val MARK_SLACK = 0.01
+
+        // The phone's voice's pace, roughly, in characters a second at speed 1: how long it takes is guessed from it.
+        const val ENGLISH_CHARS_PER_SECOND = 15f
+        const val TELUGU_CHARS_PER_SECOND = 13f
+
+        // A recorded part is taken to last at least this long (seconds), however its timings came out.
+        const val MIN_PART_SECONDS = 0.1
 
         // The verse a recording is heard by in the settings.
         val SAMPLE_VERSE = VerseToRead("John", 3, 16, "", null)

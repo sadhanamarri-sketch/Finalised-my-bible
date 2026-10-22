@@ -543,6 +543,16 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
 
             if (verseCard != null && !picking) {
                 VersesTodayCounter(controller.versesToday, if (scenes) colors.onScene() else colors)
+                if (readAloudState.active && readAloudState.place == ReadingPlace.VERSE_SCROLL && controller.reads(verseCard)) {
+                    CardProgress(
+                        card = verseCard,
+                        language = viewModel.readAloudSettings.language,
+                        progress = viewModel.readAloud::progress,
+                        colors = if (scenes) colors.onScene() else colors,
+                        onSeek = { part, at -> viewModel.readAloud.seek(part, at) },
+                        onVerse = { verse -> verseCard.content.ref.let { viewModel.readAloud.moveTo(it.book, it.chapter, verse) } }
+                    )
+                }
                 VerseScrollBottomBar(
                     colors = colors,
                     scenes = scenes,

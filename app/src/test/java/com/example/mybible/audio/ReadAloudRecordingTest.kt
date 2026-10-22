@@ -156,6 +156,33 @@ class ReadAloudRecordingTest {
     }
 
     @Test
+    fun theProgressBarMovesARecordingWithinItsVerse() {
+        val recorder = FakeRecorder()
+        val reader = reader(FakeSpeaker(), FakePrefs(), FakeRecordings(), recorder)
+        reader.start(Chapter(john3, from = 16))
+        // 3:16 runs from 160 to 168 seconds into its file: a recording's own length, and how far it's got.
+        recorder.at = 162.0
+        val progress = reader.progress()!!
+        assertEquals(8f, progress.parts.single().seconds, 1e-4f)
+        assertEquals(0.25f, progress.at, 1e-4f)
+        // Moved three quarters in: played from that moment, on to the chapter's end as before.
+        assertTrue(reader.seek(part = 0, at = 0.75f))
+        val again = recorder.played.last()
+        assertEquals(166.0, again.from, 1e-9)
+        assertEquals(188.0, again.to, 1e-9)
+        assertEquals(listOf(170.0, 180.0), again.marks)
+        // Paused, a move waits there, and it plays on from it.
+        reader.pause()
+        val played = recorder.played.size
+        reader.seek(part = 0, at = 0.5f)
+        assertEquals(played, recorder.played.size)
+        assertEquals(0.5f, reader.progress()!!.at, 1e-4f)
+        reader.resume()
+        assertEquals(164.0, recorder.played.last().from, 1e-9)
+        assertEquals(ReadAloudState.Status.PLAYING, reader.state.value.status)
+    }
+
+    @Test
     fun aTapOnAVersePlaysOnFromItsOwnStartInTheRecording() {
         val recorder = FakeRecorder()
         val reader = reader(FakeSpeaker(), FakePrefs(), FakeRecordings(), recorder)
