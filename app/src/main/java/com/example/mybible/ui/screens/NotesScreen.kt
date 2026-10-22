@@ -5,6 +5,9 @@
 
 package com.example.mybible.ui.screens
 
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -17,50 +20,76 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
 import com.example.mybible.ui.theme.NotoSerifFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.mybible.model.NoteDates
+import com.example.mybible.model.NoteItem
+import com.example.mybible.model.NoteSharing
+import com.example.mybible.model.NoteSort
+import com.example.mybible.model.NotesFinder
+import com.example.mybible.model.NotesQuery
+import com.example.mybible.model.NotesRow
+import com.example.mybible.model.groupRefs
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.components.BackTopBar
-import com.example.mybible.ui.components.DateField
 import com.example.mybible.ui.components.NeSectionLabel
+import com.example.mybible.ui.components.bibleBookIndex
+import com.example.mybible.ui.shareText
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
-// Formats an ISO "yyyy-MM-dd" note date as "22nd Aug 2026" — matches the
-// day-ordinal + short-month style requested for the Notes list, falling
-// back to the raw string if it isn't parseable (e.g. a partially-typed
-// date filter).
-private fun formatNoteDate(iso: String): String {
-    return try {
-        val date = java.time.LocalDate.parse(iso)
-        val day = date.dayOfMonth
-        val suffix = if (day in 11..13) "th" else when (day % 10) {
-            1 -> "st"; 2 -> "nd"; 3 -> "rd"; else -> "th"
-        }
-        val month = date.month.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US)
-        "$day$suffix $month ${date.year}"
-    } catch (e: Exception) {
-        iso
+private val SHORT_DATE = DateTimeFormatter.ofPattern("d MMM", Locale.UK)
+private val LONG_DATE = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.UK)
+
+// A note's date on its card: "7 Oct", with the year when it isn't this one.
+private fun cardDate(note: NoteItem, today: LocalDate): String {
+    val day = NotesFinder.dateOf(note)
+    return day.format(if (day.year == today.year) SHORT_DATE else LONG_DATE)
+}
+
+// What the date filter shows as: "This week", "7 Oct – 21 Oct".
+private fun datesLabel(dates: NoteDates, today: LocalDate): String? = when (dates) {
+    NoteDates.Any -> null
+    NoteDates.ThisWeek -> "This week"
+    NoteDates.ThisMonth -> "This month"
+    is NoteDates.Between -> {
+        val f = if (dates.from.year == today.year && dates.to.year == today.year) SHORT_DATE else LONG_DATE
+        if (dates.from == dates.to) dates.from.format(f) else "${dates.from.format(f)} – ${dates.to.format(f)}"
     }
 }
 
@@ -71,6 +100,9 @@ fun NotesScreen(
 ) {
     val notes by viewModel.notes.collectAsState(initial = emptyList())
     val tagDefinitions by viewModel.tagDefinitions.collectAsState(initial = emptyList())
+    // The search, filters and order, kept by the view model while the app is open (left for a
+    // verse and come back to, they're as they were).
+    val query by viewModel.notesQuery.collectAsState()
     val savedScrollIndex by viewModel.notesScrollIndex.collectAsState()
     val savedScrollOffset by viewModel.notesScrollOffset.collectAsState()
     val listState = rememberLazyListState(
@@ -85,24 +117,27 @@ fun NotesScreen(
             )
         }
     }
-    // Advanced filters (tags + date) live in a bottom sheet now, opened via
-    // the compact search bar's Filter chip — search text itself is always
-    // visible and never needs the sheet.
+    val today = remember { LocalDate.now() }
+    val rows = remember(notes, query) { NotesFinder.rows(notes, query, today, ::bibleBookIndex) }
+    val shown = remember(rows) { rows.filterIsInstance<NotesRow.Note>().map { it.note } }
+    // The order and filters live in a sheet, opened from the search bar's Filter icon.
     var showFilterSheet by remember { mutableStateOf(false) }
-    var textQuery by remember { mutableStateOf("") }
-    var selectedFilterTags by remember { mutableStateOf<List<String>>(emptyList()) }
-    var dateFilter by remember { mutableStateOf("") }
-    val filtersActive = selectedFilterTags.isNotEmpty() || dateFilter.isNotBlank()
+    var menuOpen by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
+    val scope = rememberCoroutineScope()
 
-    // One-shot handoff from the Tags screen: tapping a tag row there sets
-    // this, closes Tags, and lands back here with that tag pre-selected as
-    // a filter. Consumed once, then cleared, so it doesn't re-trigger on
-    // later recompositions (e.g. after manually clearing the filter).
-    val pendingTagFilter by viewModel.pendingNoteTagFilter.collectAsState()
-    LaunchedEffect(pendingTagFilter) {
-        val tag = pendingTagFilter ?: return@LaunchedEffect
-        selectedFilterTags = listOf(tag)
-        viewModel.clearPendingNoteTagFilter()
+    // Saved as a document: the notes the list shows, as text to read, wherever it's put.
+    val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val text = NoteSharing.allAsText(shown, today, ::bibleBookIndex)
+        scope.launch {
+            val saved = withContext(Dispatchers.IO) {
+                runCatching { context.contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray()) } != null }.getOrDefault(false)
+            }
+            val count = if (shown.size == 1) "1 note" else "${shown.size} notes"
+            Toast.makeText(context, if (saved) "Saved $count" else "Couldn't save the notes", Toast.LENGTH_SHORT).show()
+        }
     }
 
     Scaffold(
@@ -115,14 +150,34 @@ fun NotesScreen(
                 },
                 actions = {
                     IconButton(onClick = { viewModel.openTagsScreen() }) {
-                        Icon(Icons.Default.Label, contentDescription = "Manage tags")
+                        Icon(Icons.AutoMirrored.Filled.Label, contentDescription = "Manage tags")
+                    }
+                    Box {
+                        IconButton(onClick = { menuOpen = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "More")
+                        }
+                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        if (query.filtering || query.text.isNotBlank()) "Save these notes as a document"
+                                        else "Save all notes as a document"
+                                    )
+                                },
+                                enabled = shown.isNotEmpty(),
+                                onClick = {
+                                    menuOpen = false
+                                    exporter.launch("Notes $today.txt")
+                                }
+                            )
+                        }
                     }
                 }
             )
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { viewModel.startNotePicking() },
+                onClick = { viewModel.startNewNote() },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.testTag("add_note_fab")
@@ -164,8 +219,8 @@ fun NotesScreen(
                 Spacer(modifier = Modifier.width(10.dp))
                 Box(modifier = Modifier.weight(1f)) {
                     BasicTextField(
-                        value = textQuery,
-                        onValueChange = { textQuery = it },
+                        value = query.text,
+                        onValueChange = { viewModel.setNotesQuery(query.copy(text = it)) },
                         singleLine = true,
                         textStyle = TextStyle(
                             fontFamily = WorkSansFontFamily,
@@ -177,24 +232,26 @@ fun NotesScreen(
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         modifier = Modifier.fillMaxWidth()
                     )
-                    if (textQuery.isEmpty()) {
+                    if (query.text.isEmpty()) {
                         Text(
-                            text = "Search notes\u2026",
+                            // Verses ("John 15", "Jn 15:5") and tags are found too.
+                            text = "Search notes, verses, tags…",
                             fontSize = 16.sp,
                             fontFamily = WorkSansFontFamily,
                             letterSpacing = 0.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
                         )
                     }
                 }
-                if (textQuery.isNotEmpty()) {
+                if (query.text.isNotEmpty()) {
                     Icon(
                         Icons.Default.Close,
                         contentDescription = "Clear search",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
                             .size(18.dp)
-                            .clickable { textQuery = "" }
+                            .clickable { viewModel.setNotesQuery(query.copy(text = "")) }
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                 }
@@ -207,10 +264,10 @@ fun NotesScreen(
                 ) {
                     Icon(
                         Icons.Default.FilterList,
-                        contentDescription = "Filter notes",
-                        tint = if (filtersActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        contentDescription = "Sort and filter notes",
+                        tint = if (query.filtering) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    if (filtersActive) {
+                    if (query.filtering) {
                         Box(
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
@@ -225,12 +282,18 @@ fun NotesScreen(
             // ── Active-filter summary — a slim chip row that only appears
             // once a tag or date filter is applied, so you can see (and
             // clear) what's filtering the list without reopening the sheet.
-            if (filtersActive) {
+            if (query.filtering) {
                 val summaryParts = buildList {
-                    if (selectedFilterTags.isNotEmpty()) {
-                        add(if (selectedFilterTags.size == 1) "1 tag" else "${selectedFilterTags.size} tags")
+                    if (query.tags.isNotEmpty()) {
+                        add(
+                            when {
+                                query.tags.size == 1 -> query.tags.first()
+                                query.allTags -> "All of ${query.tags.size} tags"
+                                else -> "${query.tags.size} tags"
+                            }
+                        )
                     }
-                    if (dateFilter.isNotBlank()) add(formatNoteDate(dateFilter))
+                    datesLabel(query.dates, today)?.let(::add)
                 }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -249,7 +312,7 @@ fun NotesScreen(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = summaryParts.joinToString(" \u00b7 "),
+                        text = summaryParts.joinToString(" · "),
                         fontSize = 12.5.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -260,8 +323,7 @@ fun NotesScreen(
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.clickable {
-                            selectedFilterTags = emptyList()
-                            dateFilter = ""
+                            viewModel.setNotesQuery(query.copy(tags = emptyList(), allTags = false, dates = NoteDates.Any))
                         }
                     )
                 }
@@ -269,25 +331,13 @@ fun NotesScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            val filteredNotes = notes.filter { note ->
-                val q = textQuery.trim()
-                val textMatch = q.isBlank() ||
-                    note.title.contains(q, ignoreCase = true) ||
-                    note.text.contains(q, ignoreCase = true)
-                val tagsMatch = selectedFilterTags.isEmpty() || note.tags.any { noteTag ->
-                    selectedFilterTags.any { filterTag -> noteTag.equals(filterTag, ignoreCase = true) }
-                }
-                val dateMatch = dateFilter.isBlank() || note.noteDate == dateFilter
-                textMatch && tagsMatch && dateMatch
-            }
-
-            if (filteredNotes.isEmpty()) {
+            if (rows.isEmpty()) {
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier.fillMaxSize()
                 ) {
                     Text(
-                        text = if (notes.isEmpty()) "No notes created yet. Click + to add one!" else "No notes match the selected filters.",
+                        text = if (notes.isEmpty()) "No notes yet. Tap + to write one." else "No notes match.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 14.sp
                     )
@@ -298,112 +348,34 @@ fun NotesScreen(
                 LazyColumn(
                     state = listState,
                     verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(bottom = 88.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(filteredNotes, key = { it.id }) { note ->
-                        // Stripped down to just what's needed to recognize
-                        // a note at a glance: title, text, "Read more" —
-                        // refs/date/tags used to make each row noisy and
-                        // are already visible inside the note itself.
-                        Card(
-                            onClick = { viewModel.openNoteReader(note) },
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = note.title.ifBlank { "Untitled note" }.uppercase(),
-                                    fontSize = 14.sp,
-                                    fontFamily = WorkSansFontFamily,
-                                    fontWeight = FontWeight.SemiBold,
-                                    letterSpacing = 0.sp,
-                                    color = MaterialTheme.colorScheme.tertiary,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                // ••• menu — kept by request even though
-                                // Capacitor has no per-card menu (there,
-                                // the whole card opens the editor and
-                                // Delete lives inside it).
-                                Box {
-                                    var showMenu by remember { mutableStateOf(false) }
-                                    IconButton(
-                                        onClick = { showMenu = true },
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.MoreVert,
-                                            contentDescription = "Note options",
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                    DropdownMenu(
-                                        expanded = showMenu,
-                                        onDismissRequest = { showMenu = false }
-                                    ) {
-                                        DropdownMenuItem(
-                                            text = { Text("Edit") },
-                                            leadingIcon = {
-                                                Icon(Icons.Default.Edit, contentDescription = null)
-                                            },
-                                            onClick = {
-                                                showMenu = false
-                                                viewModel.openNoteEditor(note)
-                                            }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
-                                            leadingIcon = {
-                                                Icon(
-                                                    Icons.Default.Delete,
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.error
-                                                )
-                                            },
-                                            onClick = {
-                                                showMenu = false
-                                                // At once, with Undo on the bar that comes up (see MainViewModel.deleteNote).
-                                                viewModel.deleteNote(note.id)
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Note body preview — clipped to a few lines;
-                            // "Read more" (below) opens the full note
-                            // reader rather than expanding inline. Plain
-                            // Text, not LinkifiedNoteText: the whole card is
-                            // already tap-to-open-reader (see the Card's own
-                            // onClick above), and a verse mention being
-                            // separately clickable here stole that tap
-                            // instead of opening the reader. Verse mentions
-                            // are only meant to be tappable once you're
-                            // actually inside the reader — see
-                            // NoteReaderScreen's use of LinkifiedNoteText.
-                            Text(
-                                text = note.text,
-                                fontFamily = NotoSerifFontFamily,
-                                // Looks the size of the verse cards' 17sp Source Serif 4 (Noto Serif runs
-                                // large), spaced as they are.
-                                fontSize = 15.sp,
-                                lineHeight = 25.5.sp,
-                                letterSpacing = 0.sp,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 3,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(top = 6.dp)
-                            )
+                    items(rows, key = { row ->
+                        when (row) {
+                            is NotesRow.Book -> "book:${row.name}"
+                            is NotesRow.Note -> row.note.id
                         }
+                    }) { row ->
+                        when (row) {
+                            is NotesRow.Book -> BookHeading(row)
+                            is NotesRow.Note -> {
+                                val note = row.note
+                                NoteCard(
+                                    note = note,
+                                    today = today,
+                                    onOpen = { viewModel.openNoteReader(note) },
+                                    onEdit = { viewModel.openNoteEditor(note) },
+                                    onPin = { viewModel.setNotePinned(note, !note.pinned) },
+                                    onShare = { shareText(context, note.title, NoteSharing.asText(note, ::bibleBookIndex)) },
+                                    onCopy = {
+                                        clipboard.setText(AnnotatedString(NoteSharing.asText(note, ::bibleBookIndex)))
+                                        Toast.makeText(context, "Note copied", Toast.LENGTH_SHORT).show()
+                                    },
+                                    // At once, with Undo on the bar that comes up (see MainViewModel.deleteNote).
+                                    onDelete = { viewModel.deleteNote(note.id) }
+                                )
+                            }
                         }
                     }
                 }
@@ -414,31 +386,202 @@ fun NotesScreen(
 
     if (showFilterSheet) {
         NotesFilterSheet(
-            tagDefinitions = tagDefinitions.map { it.name },
-            selectedTags = selectedFilterTags,
-            onTagsChange = { selectedFilterTags = it },
-            dateFilter = dateFilter,
-            onDateFilterChange = { dateFilter = it },
+            query = query,
+            tagNames = tagDefinitions.map { it.name },
+            today = today,
+            onChange = viewModel::setNotesQuery,
             onDismiss = { showFilterSheet = false }
         )
     }
-
 }
 
-// Advanced filters, pulled out of permanent screen space and into a sheet —
-// opened from the search bar's Filter icon. Reuses the same visual language
-// as the Note editor (NeSectionLabel + chip pills + DateField) so filtering
-// notes feels like the same app as writing them.
+// In Bible order, the book the notes below it are on: "JOHN · 3 notes".
+@Composable
+private fun BookHeading(row: NotesRow.Book) {
+    Row(Modifier.padding(top = 6.dp, start = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            row.name.uppercase(),
+            fontSize = 12.5.sp,
+            fontFamily = WorkSansFontFamily,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 1.sp,
+            color = MaterialTheme.colorScheme.tertiary
+        )
+        Text(
+            " · ${row.count} ${if (row.count == 1) "note" else "notes"}",
+            fontSize = 12.5.sp,
+            fontFamily = WorkSansFontFamily,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+// A note in the list: its title (or, untitled, its first line), a quiet line with its verses and
+// date, and the start of its text; a pin when it's pinned to the top.
+@Composable
+private fun NoteCard(
+    note: NoteItem,
+    today: LocalDate,
+    onOpen: () -> Unit,
+    onEdit: () -> Unit,
+    onPin: () -> Unit,
+    onShare: () -> Unit,
+    onCopy: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val lines = note.text.trim().lines()
+    val untitled = note.title.isBlank()
+    val heading = if (untitled) lines.firstOrNull { it.isNotBlank() }?.trim() ?: "Untitled note" else note.title
+    val preview = if (untitled) lines.dropWhile { it.isBlank() }.drop(1).joinToString("\n").trim() else note.text.trim()
+    val passages = remember(note.refs) { groupRefs(note.refs, ::bibleBookIndex) }
+    val quiet = listOfNotNull(
+        passages.takeIf { it.isNotEmpty() }?.let { p ->
+            p.take(2).joinToString(", ") { it.label } + if (p.size > 2) " +${p.size - 2}" else ""
+        },
+        cardDate(note, today)
+    ).joinToString(" · ")
+    Card(
+        onClick = onOpen,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (note.pinned) {
+                    Icon(
+                        Icons.Filled.PushPin,
+                        contentDescription = "Pinned",
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.padding(end = 6.dp).size(15.dp)
+                    )
+                }
+                Text(
+                    text = heading.uppercase(),
+                    fontSize = 14.sp,
+                    fontFamily = WorkSansFontFamily,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 0.sp,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                Box {
+                    var showMenu by remember { mutableStateOf(false) }
+                    IconButton(
+                        onClick = { showMenu = true },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "Note options",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Edit") },
+                            leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                            onClick = {
+                                showMenu = false
+                                onEdit()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(if (note.pinned) "Unpin" else "Pin to top") },
+                            leadingIcon = { Icon(if (note.pinned) Icons.Outlined.PushPin else Icons.Filled.PushPin, contentDescription = null) },
+                            onClick = {
+                                showMenu = false
+                                onPin()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Share") },
+                            leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
+                            onClick = {
+                                showMenu = false
+                                onShare()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Copy") },
+                            leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
+                            onClick = {
+                                showMenu = false
+                                onCopy()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            },
+                            onClick = {
+                                showMenu = false
+                                onDelete()
+                            }
+                        )
+                    }
+                }
+            }
+            Text(
+                text = quiet,
+                fontSize = 12.5.sp,
+                fontFamily = WorkSansFontFamily,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            // The start of the note's text. Plain: the whole card opens the note, where its verse
+            // references can be tapped.
+            if (preview.isNotEmpty()) {
+                Text(
+                    text = preview,
+                    fontFamily = NotoSerifFontFamily,
+                    // Looks the size of the verse cards' 17sp Source Serif 4 (Noto Serif runs
+                    // large), spaced as they are.
+                    fontSize = 15.sp,
+                    lineHeight = 25.5.sp,
+                    letterSpacing = 0.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
+            }
+        }
+    }
+}
+
+// The list's order and filters, in a sheet opened from the search bar's Filter icon: the order,
+// tags (any or all of them), and dates (this week, this month, or from one day to another).
 @Composable
 private fun NotesFilterSheet(
-    tagDefinitions: List<String>,
-    selectedTags: List<String>,
-    onTagsChange: (List<String>) -> Unit,
-    dateFilter: String,
-    onDateFilterChange: (String) -> Unit,
+    query: NotesQuery,
+    tagNames: List<String>,
+    today: LocalDate,
+    onChange: (NotesQuery) -> Unit,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var choosingDates by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -457,24 +600,35 @@ private fun NotesFilterSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Filter Notes", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                if (selectedTags.isNotEmpty() || dateFilter.isNotBlank()) {
+                Text("Sort and filter", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                if (query.filtering) {
                     Text(
-                        text = "Clear all",
+                        text = "Clear filters",
                         fontSize = 13.5.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.clickable {
-                            onTagsChange(emptyList())
-                            onDateFilterChange("")
+                            onChange(query.copy(tags = emptyList(), allTags = false, dates = NoteDates.Any))
                         }
+                    )
+                }
+            }
+
+            // ── Order ────────────────────────────────────────────────────
+            NeSectionLabel("Sort by")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                NoteSort.entries.forEach { sort ->
+                    FilterChip(
+                        selected = query.sort == sort,
+                        onClick = { onChange(query.copy(sort = sort)) },
+                        label = { Text(sort.label) }
                     )
                 }
             }
 
             // ── Tags ─────────────────────────────────────────────────────
             NeSectionLabel("Tags")
-            if (tagDefinitions.isEmpty()) {
+            if (tagNames.isEmpty()) {
                 Text(
                     text = "No tags yet — add some from Manage Tags.",
                     fontSize = 12.sp,
@@ -486,14 +640,16 @@ private fun NotesFilterSheet(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    tagDefinitions.forEach { tag ->
-                        val selected = selectedTags.any { it.equals(tag, ignoreCase = true) }
+                    tagNames.sortedBy { it.lowercase() }.forEach { tag ->
+                        val selected = query.tags.any { it.equals(tag, ignoreCase = true) }
                         FilterChip(
                             selected = selected,
                             onClick = {
-                                onTagsChange(
-                                    if (selected) selectedTags.filterNot { it.equals(tag, ignoreCase = true) }
-                                    else (selectedTags + tag).distinctBy { it.lowercase() }
+                                onChange(
+                                    query.copy(
+                                        tags = if (selected) query.tags.filterNot { it.equals(tag, ignoreCase = true) }
+                                        else (query.tags + tag).distinctBy { it.lowercase() }
+                                    )
                                 )
                             },
                             label = { Text(tag) },
@@ -503,27 +659,35 @@ private fun NotesFilterSheet(
                         )
                     }
                 }
+                if (query.tags.size > 1) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 6.dp)
+                            .clickable { onChange(query.copy(allTags = !query.allTags)) }
+                    ) {
+                        Text(
+                            "Only notes with all of these tags",
+                            fontSize = 14.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Switch(checked = query.allTags, onCheckedChange = { onChange(query.copy(allTags = it)) })
+                    }
+                }
             }
 
             // ── Date ─────────────────────────────────────────────────────
             NeSectionLabel("Date")
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                DateField(
-                    value = dateFilter,
-                    onValueChange = onDateFilterChange,
-                    placeholder = "YYYY-MM-DD",
-                    modifier = Modifier.weight(1f)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = query.dates == NoteDates.Any, onClick = { onChange(query.copy(dates = NoteDates.Any)) }, label = { Text("Any time") })
+                FilterChip(selected = query.dates == NoteDates.ThisWeek, onClick = { onChange(query.copy(dates = NoteDates.ThisWeek)) }, label = { Text("This week") })
+                FilterChip(selected = query.dates == NoteDates.ThisMonth, onClick = { onChange(query.copy(dates = NoteDates.ThisMonth)) }, label = { Text("This month") })
+                FilterChip(
+                    selected = query.dates is NoteDates.Between,
+                    onClick = { choosingDates = true },
+                    label = { Text(datesLabel(query.dates, today)?.takeIf { query.dates is NoteDates.Between } ?: "Choose dates…") }
                 )
-                if (dateFilter.isNotBlank()) {
-                    Text(
-                        text = "Clear",
-                        fontSize = 14.5.sp,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .clickable { onDateFilterChange("") }
-                            .padding(horizontal = 8.dp, vertical = 6.dp)
-                    )
-                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -534,6 +698,34 @@ private fun NotesFilterSheet(
             ) {
                 Text("Show results")
             }
+        }
+    }
+
+    if (choosingDates) {
+        val between = query.dates as? NoteDates.Between
+        val state = rememberDateRangePickerState(
+            initialSelectedStartDateMillis = between?.from?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli(),
+            initialSelectedEndDateMillis = between?.to?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli()
+        )
+        fun day(millis: Long) = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
+        DatePickerDialog(
+            onDismissRequest = { choosingDates = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val from = state.selectedStartDateMillis
+                        if (from != null) {
+                            val to = state.selectedEndDateMillis ?: from
+                            onChange(query.copy(dates = NoteDates.Between(day(from), day(to))))
+                        }
+                        choosingDates = false
+                    },
+                    enabled = state.selectedStartDateMillis != null
+                ) { Text("OK") }
+            },
+            dismissButton = { TextButton(onClick = { choosingDates = false }) { Text("Cancel") } }
+        ) {
+            DateRangePicker(state = state, modifier = Modifier.weight(1f))
         }
     }
 }

@@ -24,7 +24,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -43,8 +42,8 @@ import com.example.mybible.ui.theme.WorkSansFontFamily
  * dialog, so managing tags feels like its own place instead of a popup
  * bolted onto Notes.
  *
- * Each row: tag name in bold gold (tertiary), its description underneath
- * (or an italic "No description" placeholder), separated by a hairline —
+ * Each row, A to Z: tag name in gold (tertiary) with how many notes have it,
+ * its description underneath when it has one, separated by a hairline —
  * matching the flat divider-separated look of the Notes list rather than
  * elevated cards. A trailing ⋮ menu offers Edit/Delete; tapping the row
  * itself hands off to Notes pre-filtered to that tag.
@@ -100,7 +99,9 @@ fun TagsScreen(
                     .padding(padding)
                     .padding(horizontal = 16.dp)
             ) {
-                items(tagDefinitions, key = { it.name.lowercase() }) { tag ->
+                // A to Z, each with how many notes have it.
+                items(tagDefinitions.sortedBy { it.name.lowercase() }, key = { it.name.lowercase() }) { tag ->
+                    val count = notes.count { n -> n.tags.any { it.equals(tag.name, ignoreCase = true) } }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
@@ -118,24 +119,35 @@ fun TagsScreen(
                             .padding(vertical = 14.dp)
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = tag.name,
-                                fontSize = 16.5.sp,
-                                fontFamily = WorkSansFontFamily,
-                                letterSpacing = 0.sp,
-                                color = MaterialTheme.colorScheme.tertiary
-                            )
-                            Text(
-                                text = tag.description.ifBlank { "No description" },
-                                fontSize = 13.5.sp,
-                                fontFamily = WorkSansFontFamily,
-                                letterSpacing = 0.sp,
-                                fontStyle = if (tag.description.isBlank()) FontStyle.Italic else FontStyle.Normal,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 2,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(top = 3.dp)
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = tag.name,
+                                    fontSize = 16.5.sp,
+                                    fontFamily = WorkSansFontFamily,
+                                    letterSpacing = 0.sp,
+                                    color = MaterialTheme.colorScheme.tertiary
+                                )
+                                Text(
+                                    text = " \u00b7 " + if (count == 1) "1 note" else "$count notes",
+                                    fontSize = 13.5.sp,
+                                    fontFamily = WorkSansFontFamily,
+                                    letterSpacing = 0.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            // Its description, when it has one.
+                            if (tag.description.isNotBlank()) {
+                                Text(
+                                    text = tag.description,
+                                    fontSize = 13.5.sp,
+                                    fontFamily = WorkSansFontFamily,
+                                    letterSpacing = 0.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 2,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(top = 3.dp)
+                                )
+                            }
                         }
                         Box {
                             var showMenu by remember { mutableStateOf(false) }

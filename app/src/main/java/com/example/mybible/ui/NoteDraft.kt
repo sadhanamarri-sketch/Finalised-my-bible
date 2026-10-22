@@ -36,8 +36,8 @@ class NoteDraft(val original: NoteItem) {
     /** As it was opened, to tell whether there's anything to discard. */
     val openedKey: List<Any> = savedKey
 
-    /** Nothing written: no title and no text. */
-    fun isEmpty(): Boolean = title.isBlank() && body.note.isEmpty()
+    /** Nothing in it: no title, no text and no verses (a list of verses is a note). */
+    fun isEmpty(): Boolean = title.isBlank() && body.note.isEmpty() && refs.isEmpty()
 
     companion object {
         /** A note's text as the editor holds it: its formatting, or for a note written before that, its lines. */

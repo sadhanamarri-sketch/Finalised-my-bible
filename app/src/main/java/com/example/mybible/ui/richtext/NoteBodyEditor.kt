@@ -186,6 +186,18 @@ class NoteEditorState(initial: NoteText) {
         format { n, s, e -> NoteEditing.clearFormatting(n, s, e) }
     }
 
+    /** [quote] put in as a quote line after the cursor's line (see NoteEditing.insertQuote). */
+    fun insertQuote(quote: String) {
+        val e = NoteEditing.insertQuote(note, selection.max, quote)
+        history.record(EditHistory.State(note, selection.start, selection.end), EditHistory.Kind.OTHER, SystemClock.uptimeMillis())
+        note = e.note
+        selection = TextRange(e.selStart, e.selEnd)
+        composition = null
+        typing = null
+        version++
+        refreshHistory()
+    }
+
     /** Backspace with the cursor at the very start of the note: a list item there becomes plain. */
     fun backspaceAtStart(): Boolean {
         if (!selection.collapsed || selection.start != 0) return false

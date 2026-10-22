@@ -30,6 +30,13 @@ import com.example.mybible.model.NoteItem
 import com.example.mybible.model.ThemeMode
 import com.example.mybible.ui.NoteDraft
 import com.example.mybible.ui.richtext.RichNoteBodyView
+import com.example.mybible.model.NoteSharing
+import com.example.mybible.ui.shareText
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.filled.Share
+import com.example.mybible.model.RefRange
+import com.example.mybible.model.groupRefs
+import com.example.mybible.ui.components.bibleBookIndex
 
 /**
  * Full-page note reader — ported to match Capacitor's #noteReaderSheet
@@ -66,6 +73,11 @@ import com.example.mybible.ui.richtext.RichNoteBodyView
  * either — they're still visible on the note's row in the list and in
  * the editor.
  */
+// "18 Oct 2026", from the note's "2026-10-18".
+private fun noteDateLabel(iso: String): String? = runCatching {
+    java.time.LocalDate.parse(iso).format(java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy", java.util.Locale.UK))
+}.getOrNull()
+
 @Composable
 fun NoteReaderScreen(
     noteItem: NoteItem,
@@ -82,12 +94,13 @@ fun NoteReaderScreen(
     onOpenVerseMention: ((book: String, chapter: Int, verse: Int) -> Unit)? = null,
     // A checklist item's box tapped: [para] is its paragraph.
     onToggleCheck: ((para: Int) -> Unit)? = null,
+    // One of the note's verses (or passages, "John 15:1–8") tapped at the top.
+    onOpenRefs: ((RefRange) -> Unit)? = null,
     // Defaults to filling the screen — this is pushed inside an
     // AnimatedVisibility in MainActivity, which (unlike Scaffold on its
     // own) doesn't impose full-screen sizing on its content.
     modifier: Modifier = Modifier.fillMaxSize()
 ) {
-    val refFallback = if (noteItem.noteDate.isNotBlank()) noteItem.noteDate else "Note"
 
     Surface(
         modifier = modifier,
@@ -113,6 +126,8 @@ fun NoteReaderScreen(
                     tint = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.clickable(onClick = onBack)
                 )
+                // As wide as Share on the right, so the title stays centred.
+                Spacer(Modifier.width(36.dp))
                 Text(
                     text = noteItem.title.ifBlank { "Untitled note" }.uppercase(),
                     fontSize = 17.sp,
@@ -126,6 +141,16 @@ fun NoteReaderScreen(
                         .weight(1f)
                         .padding(horizontal = 8.dp)
                 )
+                // Share: the note as text, with its verses' words (see NoteSharing).
+                val context = LocalContext.current
+                Icon(
+                    imageVector = Icons.Default.Share,
+                    contentDescription = "Share",
+                    tint = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier
+                        .clickable { shareText(context, noteItem.title, NoteSharing.asText(noteItem, ::bibleBookIndex)) }
+                )
+                Spacer(Modifier.width(12.dp))
                 if (onEdit != null) {
                     Icon(
                         imageVector = Icons.Default.Edit,
@@ -159,9 +184,9 @@ fun NoteReaderScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.padding(bottom = 12.dp)
                     ) {
-                        noteItem.refs.forEach { ref ->
+                        groupRefs(noteItem.refs, ::bibleBookIndex).forEach { range ->
                             Text(
-                                text = "${ref.book} ${ref.chapter}:${ref.verse}",
+                                text = range.label,
                                 fontSize = 13.sp,
                                 color = MaterialTheme.colorScheme.tertiary,
                                 modifier = Modifier
@@ -172,23 +197,28 @@ fun NoteReaderScreen(
                                         shape = RoundedCornerShape(10.dp)
                                     )
                                     .then(
-                                        if (onOpenVerseMention != null) {
-                                            Modifier.clickable {
-                                                onOpenVerseMention(ref.book, ref.chapter, ref.verse)
+                                        when {
+                                            onOpenRefs != null -> Modifier.clickable { onOpenRefs(range) }
+                                            onOpenVerseMention != null -> Modifier.clickable {
+                                                onOpenVerseMention(range.book, range.chapter, range.from)
                                             }
-                                        } else Modifier
+                                            else -> Modifier
+                                        }
                                     )
                                     .padding(horizontal = 14.dp, vertical = 8.dp)
                             )
                         }
                     }
-                } else {
+                }
+                // Its date and tags.
+                val details = listOfNotNull(noteDateLabel(noteItem.noteDate)) + noteItem.tags.map { "#$it" }
+                if (details.isNotEmpty()) {
                     Text(
-                        text = refFallback.uppercase(),
+                        text = details.joinToString("  \u00b7  ").uppercase(),
                         fontSize = 12.5.sp,
-                        letterSpacing = 1.5.sp,
+                        letterSpacing = 1.sp,
                         color = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier.padding(bottom = 8.dp)
+                        modifier = Modifier.padding(bottom = 10.dp)
                     )
                 }
 

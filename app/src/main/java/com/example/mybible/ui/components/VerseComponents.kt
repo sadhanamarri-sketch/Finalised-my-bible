@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
@@ -116,6 +117,8 @@ fun VerseCard(
     fontSizeSp: Int,
     hasNotes: Boolean,
     hasXref: Boolean = false,
+    // The note mark under the verse number tapped.
+    onNoteMarkerClick: (() -> Unit)? = null,
     // The verse quotes the Old Testament, or is quoted in the New: its dagger is purple.
     isQuotation: Boolean = false,
     onVerseClick: () -> Unit,
@@ -244,13 +247,13 @@ fun VerseCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top
             ) {
-                // Verse number
-                Row(
+                // Verse number, and under it the note mark
+                Column(
                     modifier = Modifier
                         .width(32.dp)
-                        .padding(top = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(top = 4.dp)
                 ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "${verse.number}",
                         fontSize = 12.sp,
@@ -276,20 +279,33 @@ fun VerseCard(
                                 .testTag("xref_marker_${verse.number}")
                         )
                     }
-                    // Note marker — a small dot next to the verse number,
-                    // matching Capacitor's inline note indicator, rather
-                    // than a separate icon off at the far end of the row.
-                    if (hasNotes) {
-                        Text(
-                            text = "\u2022",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier
-                                .padding(start = 2.dp)
-                                .testTag("note_marker_${verse.number}")
+                }
+                // Note mark: a small note under the verse number (a dot after it read as
+                // punctuation), tapped to open the note.
+                if (hasNotes) {
+                    Box(
+                        modifier = Modifier
+                            // Up into the space under the number, so with it the column's no taller
+                            // than a verse's first line at the usual size (a short verse keeps its height).
+                            .layout { measurable, constraints ->
+                                val box = measurable.measure(constraints)
+                                val lift = 8.dp.roundToPx()
+                                layout(box.width, box.height - lift) { box.place(0, -lift) }
+                            }
+                            .size(28.dp, 20.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .then(if (onNoteMarkerClick != null) Modifier.clickable(onClick = onNoteMarkerClick) else Modifier)
+                            .testTag("note_marker_${verse.number}"),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.StickyNote2,
+                            contentDescription = "Note on this verse",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(14.dp)
                         )
                     }
+                }
                 }
 
                 Column(modifier = Modifier.weight(1f)) {
@@ -879,10 +895,10 @@ fun VerseActionToolbar(
     }
 }
 
-/** First non-blank line of a note's body, trimmed and truncated — what
- *  each row in the note-preview section shows instead of the full text. */
+/** The note's title, or with none, the first non-blank line of its text, trimmed and truncated —
+ *  what each row in the note-preview section shows instead of the full text. */
 private fun notePreviewLine(note: NoteItem, maxChars: Int = 90): String {
-    val firstLine = note.text.lineSequence().firstOrNull { it.isNotBlank() }?.trim().orEmpty()
+    val firstLine = note.title.trim().ifEmpty { note.text.lineSequence().firstOrNull { it.isNotBlank() }?.trim().orEmpty() }
     if (firstLine.isEmpty()) return "(empty note)"
     return if (firstLine.length > maxChars) firstLine.take(maxChars - 1) + "…" else firstLine
 }
@@ -965,61 +981,3 @@ internal fun parseHexColorOrNull(hex: String): Color? {
     }
 }
 
-/**
- * Renders note body text with Bible-reference mentions (e.g. "John 3:16")
- * turned into tappable links, matching Capacitor's linkifyXrefs() applied
- * in the notes list card and the note reader. [onMentionClick] receives the
- * resolved book/chapter/verse; the caller opens the verse-preview sheet
- * (see ui/components/DialogComponents.kt's VerseMentionPreviewSheet) rather
- * than navigating straight to the Reader — same two-step behavior as
- * Capacitor's openVerseTextSheet.
- */
-@Composable
-fun LinkifiedNoteText(
-    text: String,
-    onMentionClick: (book: String, chapter: Int, verse: Int) -> Unit,
-    modifier: Modifier = Modifier,
-    // TextStyle.Default has an unspecified color, and ClickableText (unlike
-    // Material3's Text) does not fall back to LocalContentColor for that —
-    // it renders literal black regardless of theme. Defaulting to
-    // onSurface here means a call site that forgets to set a color still
-    // gets a legible, theme-correct result instead of invisible text on a
-    // dark background.
-    style: TextStyle = TextStyle.Default,
-    maxLines: Int = Int.MAX_VALUE,
-    overflow: androidx.compose.ui.text.style.TextOverflow = androidx.compose.ui.text.style.TextOverflow.Clip
-) {
-    val annotated = remember(text) { com.example.mybible.data.buildLinkifiedNoteText(text) }
-    val linkColor = MaterialTheme.colorScheme.primary
-    val resolvedStyle = if (style.color.isSpecified) style
-        else style.copy(color = MaterialTheme.colorScheme.onSurface)
-    val styledAnnotated = remember(annotated, linkColor) {
-        androidx.compose.ui.text.buildAnnotatedString {
-            append(annotated)
-            annotated.getStringAnnotations(com.example.mybible.data.VERSE_MENTION_TAG, 0, annotated.length)
-                .forEach { addStyle(SpanStyle(color = linkColor, fontWeight = FontWeight.SemiBold), it.start, it.end) }
-        }
-    }
-    ClickableText(
-        text = styledAnnotated,
-        style = resolvedStyle,
-        modifier = modifier,
-        maxLines = maxLines,
-        overflow = overflow,
-        onClick = { offset ->
-            val hit = styledAnnotated.getStringAnnotations(
-                com.example.mybible.data.VERSE_MENTION_TAG, offset, offset
-            ).firstOrNull()
-            if (hit != null) {
-                val parts = hit.item.split("|")
-                if (parts.size == 3) {
-                    val chapter = parts[1].toIntOrNull()
-                    val verse = parts[2].toIntOrNull()
-                    if (chapter != null && verse != null) {
-                        onMentionClick(parts[0], chapter, verse)
-                    }
-                }
-            }
-        }
-    )
-}

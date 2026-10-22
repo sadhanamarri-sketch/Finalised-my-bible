@@ -1,7 +1,7 @@
 package com.example.mybible.model
 
-// Pure range-manipulation helpers behind the rich text editor (see
-// ui/richtext/RichTextEditor.kt for where these get called from). Kept
+// Pure range-manipulation helpers behind the note editor (see
+// model/NoteText.kt for where these get called from). Kept
 // Compose-free and separate from RichText.kt's data classes so the actual
 // editing logic — toggling a style over a selection, reindexing existing
 // styled ranges after a keystroke, splitting a block's styling in half on

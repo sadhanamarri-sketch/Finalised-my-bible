@@ -1530,6 +1530,17 @@ fun ReaderScreen(
                             showInterlinear = showInterlinear,
                             fontSizeSp = fontSizeSp,
                             hasNotes = hasNote,
+                            // One note opens; more than one, the verse's sheet with each of them.
+                            onNoteMarkerClick = {
+                                runUnlessBlurred {
+                                    val here = notes.filter { it.matchesVerse(verse.book, verse.chapter, verse.number) }
+                                    when {
+                                        readerPickMode != ReaderPickMode.NONE -> viewModel.onPickModeVerseTap(verse)
+                                        here.size == 1 -> viewModel.openNoteReader(here.first(), NavTab.READER)
+                                        else -> viewModel.setSelectedVerse(verse)
+                                    }
+                                }
+                            },
                             hasXref = verse.number in verseNumbersWithXrefs,
                             isQuotation = verse.number in quotedVerseNumbers,
                             isBlurModeEnabled = effectiveBlurEnabled,
@@ -1976,6 +1987,20 @@ fun ReaderScreen(
                                 onClick = {
                                     showReaderMenu = false
                                     viewModel.selectTab(NavTab.NOTES)
+                                }
+                            )
+                            // The notes on this chapter's verses: Notes, searched for the chapter.
+                            val chapterHasNotes = notes.any { n ->
+                                n.refs.any { it.book == currentBook && it.chapter == currentChapter } ||
+                                    (n.refs.isEmpty() && n.book == currentBook && n.chapter == currentChapter)
+                            }
+                            DropdownMenuItem(
+                                text = { Text("Notes in this chapter") },
+                                leadingIcon = { Icon(Icons.Default.StickyNote2, contentDescription = null) },
+                                enabled = chapterHasNotes,
+                                onClick = {
+                                    showReaderMenu = false
+                                    viewModel.showChapterNotes(currentBook, currentChapter)
                                 }
                             )
                             DropdownMenuItem(

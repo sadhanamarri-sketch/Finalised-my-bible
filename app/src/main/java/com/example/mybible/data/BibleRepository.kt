@@ -1022,7 +1022,8 @@ class BibleRepository(private val context: Context) {
                 tags = tags.map { it.trim() }.filter { it.isNotBlank() }.distinct(),
                 createdAt = existing?.createdAt ?: now,
                 updatedAt = now,
-                richText = richText
+                richText = richText,
+                pinned = existing?.pinned ?: false
             )
             withContext(Dispatchers.IO) { noteDao.upsert(listOf(newNote.toNoteEntity())) }
         }
@@ -1038,16 +1039,19 @@ class BibleRepository(private val context: Context) {
 
     // Compatibility overload for existing UI/callers while the richer note
     // editor is rolled out.
-    suspend fun saveNote(id: Long, book: String, chapter: Int, verse: Int, verseText: String, text: String, tags: List<String>) {
-        saveNote(
-            id = id,
-            title = "",
-            text = text,
-            noteDate = "",
-            refs = listOf(NoteReference(book, chapter, verse, verseText)),
-            tags = tags
-        )
+    /** Pins the note to the top of the notes list, or unpins it; not an edit, so it keeps its edited time. */
+    suspend fun setNotePinned(id: Long, pinned: Boolean) {
+        moveLegacyNotes()
+        notesMutex.withLock {
+            withContext(Dispatchers.IO) {
+                val note = noteDao.find(id)?.toNoteItem() ?: return@withContext
+                if (note.pinned != pinned) noteDao.upsert(listOf(note.copy(pinned = pinned).toNoteEntity()))
+            }
+        }
     }
+
+    fun getNotesSort(): String = prefs.getString("notes_sort", "") ?: ""
+    fun saveNotesSort(sort: String) = prefs.edit().putString("notes_sort", sort).apply()
 
     /** Deletes the note, and gives it back as it was, for an undo ([restoreNote]). */
     suspend fun deleteNote(id: Long): NoteItem? {

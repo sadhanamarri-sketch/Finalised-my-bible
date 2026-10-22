@@ -95,8 +95,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.mybible.model.RefRange
 import com.example.mybible.model.ThemeMode
+import com.example.mybible.model.groupRefs
 import com.example.mybible.ui.NoteDraft
+import com.example.mybible.ui.components.bibleBookIndex
 import com.example.mybible.ui.richtext.NoteBodyField
 import com.example.mybible.ui.richtext.NoteFormattingBar
 import com.example.mybible.ui.richtext.NoteStylesPanel
@@ -128,7 +131,7 @@ fun NoteEditorScreen(
     onDiscard: () -> Unit,
     onDelete: () -> Unit,
     onAddVerse: () -> Unit,
-    onPreviewReference: (book: String, chapter: Int, verse: Int) -> Unit,
+    onPreviewReference: (RefRange) -> Unit,
     modifier: Modifier = Modifier.fillMaxSize()
 ) {
     val look = rememberNoteLook(themeMode)
@@ -400,18 +403,19 @@ private val Capitals = VisualTransformation { text ->
 private fun NoteDetails(
     draft: NoteDraft,
     onAddVerse: () -> Unit,
-    onPreviewReference: (String, Int, Int) -> Unit,
+    onPreviewReference: (RefRange) -> Unit,
     onPickDate: () -> Unit,
     onAddTag: () -> Unit
 ) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        draft.refs.forEach { ref ->
+        // Verses side by side as one passage: "John 15:1–8"; × takes off all of it.
+        groupRefs(draft.refs, ::bibleBookIndex).forEach { range ->
             DetailChip(
                 icon = Icons.AutoMirrored.Filled.MenuBook,
-                text = "${ref.book} ${ref.chapter}:${ref.verse}",
-                onClick = { onPreviewReference(ref.book, ref.chapter, ref.verse) },
-                removeLabel = "Remove ${ref.book} ${ref.chapter}:${ref.verse}",
-                onRemove = { draft.refs = draft.refs.filterNot { it.book == ref.book && it.chapter == ref.chapter && it.verse == ref.verse } }
+                text = range.label,
+                onClick = { onPreviewReference(range) },
+                removeLabel = "Remove ${range.label}",
+                onRemove = { draft.refs = draft.refs.filterNot { range.covers(it) } }
             )
         }
         DetailChip(icon = Icons.Default.Add, text = "Verse", onClick = onAddVerse, quiet = true)

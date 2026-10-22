@@ -284,12 +284,9 @@ fun EnglishDictionarySheet(
     }
 }
 
-// NOTE: note editing moved off this file — see NoteEditorScreen (full page)
-// in ui/screens/NoteEditorScreen.kt. Note reading moved similarly to
-// ui/screens/NoteReaderScreen.kt. Both used to be ModalBottomSheet dialogs
-// here/in NoteReaderDialog.kt; they're now pushed as full pages from
-// MainActivity so "Add note" and tapping a note each open their own screen
-// instead of a sheet layered over the notes list.
+// NOTE: notes are written in ui/screens/NoteEditorScreen.kt and read in
+// ui/screens/NoteReaderScreen.kt, full pages pushed from MainActivity (they
+// were once sheets here).
 
 // OnboardingTourDialog (a static 4-slide AlertDialog) has been replaced by
 // the real guided tour — see ui/components/GuidedTourComponents.kt
@@ -311,7 +308,11 @@ fun VerseMentionPreviewSheet(
     verse: Int,
     verseText: String?,
     onOpenInReader: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    // The last verse of a passage ("John 15:1–8").
+    toVerse: Int = verse,
+    // Shown from the note being written: puts the verse in it as a quote.
+    onInsert: (() -> Unit)? = null
 ) {
     // See EnglishDictionarySheet's identical doc above — same fix for the
     // same "stuck halfway" bug.
@@ -323,7 +324,7 @@ fun VerseMentionPreviewSheet(
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Text(
-                text = "$book $chapter:$verse".uppercase(),
+                text = (if (toVerse > verse) "$book $chapter:$verse\u2013$toVerse" else "$book $chapter:$verse").uppercase(),
                 fontSize = 13.sp,
                 fontFamily = WorkSansFontFamily,
                 letterSpacing = 0.5.sp,
@@ -339,11 +340,28 @@ fun VerseMentionPreviewSheet(
                 color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(18.dp))
-            Button(
-                onClick = onOpenInReader,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Open in Reader", fontFamily = WorkSansFontFamily, letterSpacing = 0.sp)
+            if (onInsert != null) {
+                Button(
+                    onClick = onInsert,
+                    enabled = verseText != null,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Insert in note", fontFamily = WorkSansFontFamily, letterSpacing = 0.sp)
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = onOpenInReader,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Open in Reader", fontFamily = WorkSansFontFamily, letterSpacing = 0.sp)
+                }
+            } else {
+                Button(
+                    onClick = onOpenInReader,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Open in Reader", fontFamily = WorkSansFontFamily, letterSpacing = 0.sp)
+                }
             }
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedButton(

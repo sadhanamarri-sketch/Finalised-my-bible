@@ -627,6 +627,10 @@ class MainActivity : ComponentActivity() {
                             chapter = preview.chapter,
                             verse = preview.verse,
                             verseText = preview.text,
+                            toVerse = preview.toVerse,
+                            onInsert = if (preview.quotable) {
+                                { viewModel.insertPreviewInNote() }
+                            } else null,
                             onOpenInReader = {
                                 val lexiconOriginTab = preview.lexiconOriginTab
                                 val mentionNoteReturnItem = preview.noteReturnItem
@@ -691,6 +695,9 @@ class MainActivity : ComponentActivity() {
                                 onOpenVerseMention = { book, chapter, verse ->
                                     viewModel.openVerseMentionPreview(book, chapter, verse, noteReturnItem = note)
                                 },
+                                onOpenRefs = { range ->
+                                    viewModel.openVerseMentionPreview(range.book, range.chapter, range.from, noteReturnItem = note, toVerse = range.to)
+                                },
                                 onToggleCheck = { para -> viewModel.toggleNoteCheck(note, para) }
                             )
                         }
@@ -724,8 +731,8 @@ class MainActivity : ComponentActivity() {
                                 onDiscard = { viewModel.discardNoteDraft() },
                                 onDelete = { viewModel.deleteNoteDraft() },
                                 onAddVerse = { viewModel.addVerseToDraft() },
-                                onPreviewReference = { book, chapter, verse ->
-                                    viewModel.openVerseMentionPreview(book, chapter, verse)
+                                onPreviewReference = { range ->
+                                    viewModel.openVerseMentionPreview(range.book, range.chapter, range.from, toVerse = range.to, quotable = true)
                                 }
                             )
                         }

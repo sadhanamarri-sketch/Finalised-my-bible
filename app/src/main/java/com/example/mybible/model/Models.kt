@@ -362,7 +362,9 @@ data class NoteItem(
     // in it since; `text` above stays the plain-text rendition either way
     // (kept in sync on every save) so old code paths — list previews,
     // search, backup — never need to know richText exists.
-    val richText: String = ""
+    val richText: String = "",
+    // Kept at the top of the notes list.
+    val pinned: Boolean = false
 )
 
 @Serializable

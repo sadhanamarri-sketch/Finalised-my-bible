@@ -281,6 +281,23 @@ object NoteEditing {
     }
 
     /**
+     * [quote] (a verse, say) put in as a quote line of its own after the cursor's line, or in it if
+     * it's empty, with an empty line after it to go on writing in, where the cursor goes.
+     */
+    fun insertQuote(note: NoteText, at: Int, quote: String): Edited {
+        val p = note.paraAt(at)
+        val empty = note.paraStart(p) == note.paraEnd(p)
+        val end = note.paraEnd(p)
+        val insert = (if (empty) "" else "\n") + quote.replace('\n', ' ') + "\n"
+        val quoted = if (empty) p else p + 1
+        val n = apply(note, TextDiff(end, end, insert), emptySet())
+            .withPara(quoted, ParaStyle(RichBlockStyle.BLOCKQUOTE))
+            .withPara(quoted + 1, ParaStyle())
+        val cursor = end + insert.length
+        return Edited(n, cursor, cursor, typing = null, rewritten = true)
+    }
+
+    /**
      * Backspace at the very start of the note (nothing before it to take away): a list item,
      * checklist item or quote line becomes plain, an indented one moves back. Null: nothing to do.
      */

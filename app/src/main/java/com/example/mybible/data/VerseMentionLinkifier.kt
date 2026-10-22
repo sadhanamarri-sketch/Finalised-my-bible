@@ -1,9 +1,5 @@
 package com.example.mybible.data
 
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 
 /**
  * A single Bible-reference mention found in free text, e.g. "John 3:16" or
@@ -52,39 +48,3 @@ fun findVerseMentions(text: String): List<VerseMention> {
     return results
 }
 
-/**
- * Builds a Compose [AnnotatedString] with each recognized verse mention
- * styled as a link (primary color, underlined) and tagged with a clickable
- * annotation carrying "book|chapter|verse" — the Compose equivalent of
- * Capacitor's linkifyXrefs wrapping matches in
- * `<span class="xref-link" data-book=... data-chapter=... data-verse=...>`.
- * Callers pair this with ClickableText/pointerInput to read the annotation
- * and open the verse-preview sheet.
- */
-const val VERSE_MENTION_TAG = "verse_mention"
-
-fun buildLinkifiedNoteText(text: String): AnnotatedString {
-    val mentions = findVerseMentions(text)
-    if (mentions.isEmpty()) return AnnotatedString(text)
-    return buildAnnotatedString {
-        var lastIndex = 0
-        for (mention in mentions) {
-            append(text.substring(lastIndex, mention.range.first))
-            val start = length
-            append(text.substring(mention.range.first, mention.range.last + 1))
-            addStyle(
-                SpanStyle(fontWeight = FontWeight.SemiBold),
-                start,
-                length
-            )
-            addStringAnnotation(
-                tag = VERSE_MENTION_TAG,
-                annotation = "${mention.book}|${mention.chapter}|${mention.verse}",
-                start = start,
-                end = length
-            )
-            lastIndex = mention.range.last + 1
-        }
-        append(text.substring(lastIndex))
-    }
-}

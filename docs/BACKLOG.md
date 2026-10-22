@@ -1097,3 +1097,30 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     *Not yet tried on a phone:* the swap with the real keyboard (Robolectric has none): that the
     page holds still as one goes and the other comes, and that a tap on the text brings the
     keyboard back.
+
+37. **Done 22 Oct.** **Notes: the rest of the suggestions (5–21 in NOTES_SUGGESTIONS.md).** "now
+    the rest of items in backlog... do them". (Of the backlog itself only 7's step 2 and 22 are
+    left, both waiting: Bible Brain's key, and a link to the films.)
+    *Built 22 Oct:*
+    - + opens a new note, dated today, ready to write in; verses are added from inside it. A note
+      with only a title or only verses is kept.
+    - Verses side by side show as one passage, "John 15:1–8", in Bible order, in the writing page,
+      on the note page and on the cards (each verse still kept on its own, so the Reader marks
+      each). Tapping one shows its words (each verse numbered); from the writing page, Insert in
+      note puts them in as a quote line with the reference after them, and a line to go on in.
+    - The notes list: search finds verses ("John 15", "Jn 15:5") and tags as well as words; each
+      card has a quiet line of its passages and date, and an untitled note shows its first line as
+      its title; Sort and filter (the Filter icon) orders by Newest, Recently edited or Bible order
+      (a heading over each book's notes, "JOHN · 3 notes"), filters by tags (any, or all of them)
+      and dates (this week, this month, from–to); pinned notes stay at the top; the search,
+      filters and order are kept when Notes is left and come back to (the order between visits
+      too). Each card's ⋮: Edit, Pin to top, Share, Copy, Delete.
+    - The Reader: a small note under a verse's number, that opens its note (with more than one, the
+      verse's sheet listing them); the verse's sheet shows each note's title; Notes in this chapter
+      in the ⋮ menu.
+    - The note page shows the note's date and tags, and has Share. Notes' ⋮ has Save all notes as a
+      document: a text file of the notes shown, saved wherever it's put.
+    - The Tags page: A to Z, each tag with its count, no "No description" lines. Old note code
+      nothing used is gone. Mt, Mk, Lk and Jn are known as Gospel names (in search and in verse
+      references written in notes).
+    *Not yet tried on a phone:* the share sheet, saving the document, and the date range picker.

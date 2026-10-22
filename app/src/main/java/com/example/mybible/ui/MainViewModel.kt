@@ -315,6 +315,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _notesScrollOffset.value = offset
     }
 
+    // The notes list's search, filters and order, kept here so they're as they were when Notes is
+    // left (for a verse, say) and come back to; the order is kept between visits to the app too.
+    private val _notesQuery = MutableStateFlow(
+        NotesQuery(sort = NoteSort.entries.firstOrNull { it.name == repository.getNotesSort() } ?: NoteSort.NEWEST)
+    )
+    val notesQuery: StateFlow<NotesQuery> = _notesQuery.asStateFlow()
+
+    fun setNotesQuery(query: NotesQuery) {
+        if (query.sort != _notesQuery.value.sort) repository.saveNotesSort(query.sort.name)
+        _notesQuery.value = query
+    }
+
+    /** "Notes in this chapter" from the Reader: Notes, showing the notes on its verses. */
+    fun showChapterNotes(book: String, chapter: Int) {
+        setNotesQuery(NotesQuery(text = "$book $chapter", sort = _notesQuery.value.sort))
+        _notesScrollIndex.value = 0
+        _notesScrollOffset.value = 0
+        selectTab(NavTab.NOTES)
+    }
+
+    fun setNotePinned(note: NoteItem, pinned: Boolean) {
+        viewModelScope.launch { repository.setNotePinned(note.id, pinned) }
+    }
+
     // Feeds HighlightedVersesScreen (the "Highlighted Verses" browser tab):
     // joins the two flows above against each verse's text. Recomputes
     // whenever either the highlight set or the color labels change; verse
@@ -975,8 +999,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val verse: Int,
         val text: String?,
         val lexiconOriginTab: NavTab? = null,
-        val noteReturnItem: NoteItem? = null
-    )
+        val noteReturnItem: NoteItem? = null,
+        // The last verse, for a passage ("John 15:1–8"); its text with each verse's number.
+        val toVerse: Int = verse,
+        // Opened from the note being written: it can be put in it as a quote ([quote], the words alone).
+        val quotable: Boolean = false,
+        val quote: String? = null
+    ) {
+        val label: String get() = RefRange(book, chapter, verse, toVerse).label
+    }
 
     private val _verseMentionPreview = MutableStateFlow<VerseMentionPreview?>(null)
     val verseMentionPreview: StateFlow<VerseMentionPreview?> = _verseMentionPreview.asStateFlow()
@@ -986,20 +1017,42 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         chapter: Int,
         verse: Int,
         lexiconOriginTab: NavTab? = null,
-        noteReturnItem: NoteItem? = null
+        noteReturnItem: NoteItem? = null,
+        toVerse: Int = verse,
+        quotable: Boolean = false
     ) {
-        _verseMentionPreview.value = VerseMentionPreview(book, chapter, verse, null, lexiconOriginTab, noteReturnItem)
+        val last = maxOf(verse, toVerse)
+        _verseMentionPreview.value = VerseMentionPreview(book, chapter, verse, null, lexiconOriginTab, noteReturnItem, last, quotable)
         viewModelScope.launch {
-            val text = repository.getVerseText(book, chapter, verse)
+            val texts = (verse..last).map { v -> v to repository.getVerseText(book, chapter, v) }.filter { it.second != null }
+            val text = when {
+                texts.isEmpty() -> null
+                last == verse -> texts.first().second
+                // A passage: each verse with its number, as the Reader shows them.
+                else -> texts.joinToString(" ") { (v, t) -> superscriptNumber(v) + "\u2009" + t }
+            }
             // bail if the sheet moved on to a different reference while
             // this was loading, or was dismissed — same guard as
             // Capacitor's guard against a stale ref completing after the
             // sheet has already moved on or been dismissed.
             val current = _verseMentionPreview.value
-            if (current != null && current.book == book && current.chapter == chapter && current.verse == verse) {
-                _verseMentionPreview.value = current.copy(text = text ?: "This verse's text isn't available offline right now.")
+            if (current != null && current.book == book && current.chapter == chapter && current.verse == verse && current.toVerse == last) {
+                _verseMentionPreview.value = current.copy(
+                    text = text ?: "This verse's text isn't available offline right now.",
+                    quote = texts.takeIf { it.isNotEmpty() }?.joinToString(" ") { it.second!! }
+                )
             }
         }
+    }
+
+    private fun superscriptNumber(n: Int): String = n.toString().map { "\u2070\u00b9\u00b2\u00b3\u2074\u2075\u2076\u2077\u2078\u2079"[it - '0'] }.joinToString("")
+
+    /** "Insert in note" on a verse's preview: its words put in the note being written, as a quote with the reference after. */
+    fun insertPreviewInNote() {
+        val preview = _verseMentionPreview.value ?: return
+        val words = preview.quote ?: return
+        _noteDraft.value?.body?.insertQuote("\u201c$words\u201d \u2014 ${preview.label}")
+        _verseMentionPreview.value = null
     }
 
     fun closeVerseMentionPreview() {
@@ -2907,25 +2960,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Notes tab "+" — brand-new note, nothing picked yet, editor not shown
-    // until Done. Matches startNewNoteFromScratch().
-    fun startNotePicking() {
-        // A note left while verses were being picked for it, kept as it was.
-        _noteDraft.value?.let { left ->
-            endDraft()
-            viewModelScope.launch { if (!left.isEmpty()) saveDraft(left) }
-        }
-        pickBannerResetJob?.cancel()
-        pickModeResumesEditor = false
-        _pickedNoteRefs.value = emptyList()
-        _showNoteEditor.value = false
-        _pickBannerMessage.value = "Tap verses to add \u2014 or tap Done to write without one"
-        _readerPickMode.value = ReaderPickMode.NOTE_PICK
-        // Picking requires reading verse text to know what you're tapping —
-        // blur mode would make that impossible.
-        _isBlurModeEnabled.value = false
-        clearVerseFocus()
-        selectTab(NavTab.READER)
+    /** Notes tab "+": a new note, open to write in, dated today; verses are added from inside it (+ Verse). */
+    fun startNewNote() {
+        openNoteEditor(NoteItem(id = 0, noteDate = todayDateString()))
     }
 
     // "+ Verse" on the note being written: the page steps aside for the Reader to pick verses in,
@@ -3061,24 +3098,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (mode != ReaderPickMode.NOTE_PICK) return
 
         val picked = _pickedNoteRefs.value
-        val draft = _noteDraft.value
-        if (pickModeResumesEditor && draft != null) {
+        _noteDraft.value?.let { draft ->
             draft.refs = draft.refs + picked.filter { p ->
                 draft.refs.none { it.book == p.book && it.chapter == p.chapter && it.verse == p.verse }
             }
-        } else {
-            startDraft(
-                NoteItem(
-                    id = 0,
-                    text = "",
-                    title = "",
-                    noteDate = todayDateString(),
-                    refs = picked,
-                    tags = emptyList()
-                )
-            )
+            _showNoteEditor.value = true
         }
-        _showNoteEditor.value = true
         pickModeResumesEditor = false
         _pickedNoteRefs.value = emptyList()
     }
@@ -3126,18 +3151,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun openTagsScreen() { _showTagsScreen.value = true }
     fun closeTagsScreen() { _showTagsScreen.value = false }
 
-    // Set when a tag row on the Tags screen is tapped; Notes reads this
-    // once (via LaunchedEffect) to preset its tag filter, then clears it —
-    // a one-shot handoff rather than persistent shared filter state.
-    private val _pendingNoteTagFilter = MutableStateFlow<String?>(null)
-    val pendingNoteTagFilter: StateFlow<String?> = _pendingNoteTagFilter.asStateFlow()
-
+    // A tag row on the Tags screen tapped: back to Notes, showing the notes with that tag.
     fun openNotesFilteredByTag(tagName: String) {
-        _pendingNoteTagFilter.value = tagName
+        setNotesQuery(_notesQuery.value.copy(tags = listOf(tagName), allTags = false))
         _showTagsScreen.value = false
     }
-
-    fun clearPendingNoteTagFilter() { _pendingNoteTagFilter.value = null }
 
     // ── Saved Words screen ──────────────────────────────────────────────
     // Full page pushed over Search (opened from its top-bar bookmark icon),

@@ -3,8 +3,7 @@
 Written 8 Oct 2026, after going through the Notes feature: the list, editor, writing page,
 note page, tags, and notes in the Reader. Pick by number.
 
-Done 22 Oct (each marked, and BACKLOG.md item 35): 1–4, Undo/Redo from 8, and 22–44. Still to
-do: 5–7, Insert verse (8) and 9–21.
+All done by 22 Oct, each marked (BACKLOG.md items 35–37).
 
 ## Losing what you write
 
@@ -32,65 +31,65 @@ do: 5–7, Insert verse (8) and 9–21.
 
 ## Writing
 
-5. **Fewer steps.** A new note today: + → Reader → pick verses → Done → editor → tap Note →
+5. **Done 22 Oct:** + opens a new note, dated today, ready to write in; verses are added from inside it (+ Verse). **Fewer steps.** A new note today: + → Reader → pick verses → Done → editor → tap Note →
    writing page → Done → Save. Instead, + would open the note with the cursor ready, and one
    Save. Verses can still be added from inside the note ("Add verse" is already there).
 
-6. **Allow saving a note with only a title or only verses.** Save stays greyed out until the
+6. **Done 22 Oct:** a note with only a title, or only verses, is kept; one with nothing in it is deleted when it's closed. **Allow saving a note with only a title or only verses.** Save stays greyed out until the
    note has body text (`enabled = text.isNotBlank()`), so a "Verses to memorise" list can't
    be saved.
 
-7. **Show verse ranges as one chip:** "John 15:1–8" instead of eight chips, in the editor and
+7. **Done 22 Oct**, in Bible order, in the writing page, on the note page and on the cards; × takes off the whole passage. **Show verse ranges as one chip:** "John 15:1–8" instead of eight chips, in the editor and
    on the note page. (Each verse can stay stored on its own, so the Reader still marks each.)
 
-8. **Undo/Redo done 22 Oct; Insert verse still to do.** **In the writing page:** an "Insert verse" button that quotes the verse text, plus
+8. **Done 22 Oct:** tap a verse (or passage) at the top of the writing page, then Insert in note: its words go in as a quote line, with the reference after them. **In the writing page:** an "Insert verse" button that quotes the verse text, plus
    Undo/Redo.
 
 ## Finding notes
 
-9. **Search finds verses and tags too.** Typing "John 15" or "Prayer" would find notes on
+9. **Done 22 Oct**, abbreviations too ("Jn 15:5"). **Search finds verses and tags too.** Typing "John 15" or "Prayer" would find notes on
    that passage or with that tag. Today search only looks at the title and text.
 
-10. **A quiet line on each card, like "John 15:1–8 · 7 Oct".** Also show an untitled note's
+10. **Done 22 Oct.** **A quiet line on each card, like "John 15:1–8 · 7 Oct".** Also show an untitled note's
     first words instead of the heading "UNTITLED NOTE". (The cards were trimmed down to title
     and text on purpose earlier, so this one is optional.)
 
-11. **Sort options:** newest, recently edited, or Bible order (Genesis to Revelation). Today
+11. **Done 22 Oct**, the order kept between visits. **Sort options:** newest, recently edited, or Bible order (Genesis to Revelation). Today
     it's by date created only, so editing a note doesn't bring it to the top.
 
-12. **Browse by book**, like the Studied page: "John · 3 notes".
+12. **Done 22 Oct** as Bible order, with a heading over each book's notes ("JOHN · 3 notes"). **Browse by book**, like the Studied page: "John · 3 notes".
 
-13. **Better filters:** a date range (this week, this month, from–to) instead of typing one
+13. **Done 22 Oct:** This week, This month or Choose dates (from–to), and "Only notes with all of these tags". **Better filters:** a date range (this week, this month, from–to) instead of typing one
     exact day, and an option to require all chosen tags (today any one of them matches).
 
-14. **Keep the search and filters** when you leave Notes and come back. Today they reset, for
+14. **Done 22 Oct.** **Keep the search and filters** when you leave Notes and come back. Today they reset, for
     example after opening a verse from a note and returning (they're `remember` state in
     `NotesScreen`, which is disposed with the tab).
 
-15. **Pin** important notes to the top.
+15. **Done 22 Oct**, from a card's ⋮. **Pin** important notes to the top.
 
 ## Notes while reading
 
-16. **A clearer note mark you can tap.** The dot after a verse number looks like punctuation
+16. **Done 22 Oct:** a small note under the verse number; with one note it opens it, with more the verse's sheet listing them. **A clearer note mark you can tap.** The dot after a verse number looks like punctuation
     and does nothing when tapped. Use a small note icon that opens the note.
 
-17. **"Notes in this chapter"** from the Reader menu.
+17. **Done 22 Oct:** Notes, searched for the chapter. **"Notes in this chapter"** from the Reader menu.
 
-18. **Show the missing details:** the note's title in the verse sheet (it shows the first line
+18. **Done 22 Oct.** **Show the missing details:** the note's title in the verse sheet (it shows the first line
     of the text now, see `notePreviewLine`), and the date and tags on the note page. Tags
     never show there, and the date only shows on notes without verses.
 
 ## Sharing and tags
 
-19. **Share or copy a note** as text with its verses, and export all notes as a readable
+19. **Done 22 Oct:** Share and Copy on each card's ⋮, Share at the top of the note page; "Save all notes as a document" in Notes' ⋮ saves a text file wherever it's put (the notes shown, so a tag's or a search's notes can be saved alone). **Share or copy a note** as text with its verses, and export all notes as a readable
     document, for example for a study group. The Drive backup can't be read as a document.
 
-20. **Tags page:** a count per tag ("Prayer · 4 notes"), A–Z order, and no "No description"
+20. **Done 22 Oct.** **Tags page:** a count per tag ("Prayer · 4 notes"), A–Z order, and no "No description"
     lines.
 
 ## Tidy-up
 
-21. **Remove unused note code**, such as an old note pop-up that nothing opens anymore
+21. **Done 22 Oct**, with the old linkified note text and the start-by-picking-verses path that + used. **Remove unused note code**, such as an old note pop-up that nothing opens anymore
     (`ui/components/NoteReaderDialog.kt`), `MainViewModel.parseNoteReference`,
     `MainViewModel.saveNote(text, tags)` and the older `BibleRepository.saveNote` overload.
     Nothing visible changes.

@@ -32,6 +32,9 @@ import com.example.mybible.model.ThemeMode
 import com.example.mybible.ui.theme.FrauncesFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
 
+/** [book]'s place in the Bible, Genesis first; a name it doesn't know goes after Revelation. */
+fun bibleBookIndex(book: String): Int = BIBLE_BOOKS.indexOf(book).let { if (it < 0) BIBLE_BOOKS.size else it }
+
 val BIBLE_BOOKS = listOf(
     "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy", "Joshua", "Judges", "Ruth",
     "1 Samuel", "2 Samuel", "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles", "Ezra", "Nehemiah",
