@@ -40,6 +40,13 @@ class ChapterReading(
     // Each chapter it went on into, and the one it came from.
     private val cameFrom = HashMap<Pair<String, Int>, Pair<String, Int>>()
 
+    /** Where [verse] is in its chapter, while that's one it has loaded: its place (from 1), and the chapter's verses. */
+    fun placeOf(verse: VerseToRead): Pair<Int, Int>? {
+        val all = loaded[verse.book to verse.chapter] ?: return null
+        val i = all.indexOfFirst { it.verse == verse.verse }
+        return if (i < 0) null else i + 1 to all.size
+    }
+
     private suspend fun versesOf(book: String, chapter: Int): List<VerseToRead> =
         loaded[book to chapter] ?: load(book, chapter).also { loaded[book to chapter] = it }
 

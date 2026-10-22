@@ -11,6 +11,7 @@ import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -43,12 +44,14 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.example.mybible.audio.ChapterReading
 import com.example.mybible.audio.ReadAloudState
 import com.example.mybible.audio.ReadingPlace
 import com.example.mybible.data.onVerse
@@ -101,6 +104,12 @@ private val VerseScrollBannerColor = Color(0xFF9C5878) // muted plum
 
 // How long the Reader's one-time "Tap a verse to hear it" line stays over the reading bar.
 private const val TAP_HINT_MS = 8_000L
+
+// Reading aloud, how long after the page is let go (looked around by hand) it goes back to the verse being read.
+private const val LOOK_AROUND_MS = 5_000L
+
+// How long the reading bar shows in full as a reading starts, before it draws in to its round button.
+private const val BAR_INTRO_MS = 3_000L
 
 /** Same "subtle container + matching solid button" recipe for all seven
  *  detour banners. */
@@ -180,11 +189,16 @@ fun ReaderScreen(
     val teluguForReading by viewModel.teluguForReading.collectAsState()
     var readAloudSheetOpen by remember { mutableStateOf(false) }
     var readAloudBarHeightPx by remember { mutableStateOf(0) }
+    // The page moved by hand while a verse is being read, to look around (see LOOK_AROUND_MS), and the
+    // times it was let go (a fling coming to rest).
+    var lookingAround by remember { mutableStateOf(false) }
+    var letGo by remember { mutableIntStateOf(0) }
     val readerScope = rememberCoroutineScope()
     val askForNotifications = rememberReadAloudNotificationAsk()
     // Reads the chapter on screen aloud from [verse]; with nothing to read with (Telugu alone, and no
     // Telugu voice), the settings say why.
     fun readAloudFrom(verse: Int) {
+        lookingAround = false
         viewModel.readChapterAloud(currentBook, currentChapter, verse)
         val now = viewModel.readAloudState.value
         if (!now.active && (now.noTeluguVoice || now.noVoice)) readAloudSheetOpen = true
@@ -369,7 +383,10 @@ fun ReaderScreen(
                 xrefFocusLandedIndex = listState.firstVisibleItemIndex
                 xrefFocusLandedOffset = listState.firstVisibleItemScrollOffset
                 xrefFocusLandedRequest = focusRequest
-                xrefFocusActive = focusedVerseBlurEnabled
+                // No spotlight while the Reader reads aloud: the verse being read is the one to see.
+                val reading = viewModel.readAloudState.value
+                xrefFocusActive = focusedVerseBlurEnabled &&
+                    !(reading.status == ReadAloudState.Status.PLAYING && reading.place == ReadingPlace.READER)
             } else {
                 listState.scrollToItem(0)
                 xrefFocusActive = false
@@ -607,12 +624,21 @@ fun ReaderScreen(
     val nestedScrollConnection = remember(canHideBars) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                // Dragged: Blur Mode's sharp verse is the one in the middle again.
-                if (source == NestedScrollSource.UserInput && available.y != 0f) blurPicked = null
+                // Dragged: Blur Mode's sharp verse is the one in the middle again, and the page is being
+                // looked around.
+                if (source == NestedScrollSource.UserInput && available.y != 0f) {
+                    blurPicked = null
+                    lookingAround = true
+                }
                 if (!canHideBars) return Offset.Zero
                 if (available.y < -hideShowThresholdPx) barsHidden = true
                 else if (available.y > hideShowThresholdPx) barsHidden = false
                 return Offset.Zero
+            }
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                letGo++
+                return Velocity.Zero
             }
         }
     }
@@ -640,20 +666,25 @@ fun ReaderScreen(
     // the middle) — while it's being followed (the verse before it was in view), so scrolling off to look
     // at something else isn't undone with every verse; the bar offers Follow to go back to it.
     var lastReadVerse by remember { mutableStateOf<Int?>(null) }
+    // Whether list item [index] (a verse's index + 1) is wholly on screen, above the pill and the bar.
+    fun wholeInView(index: Int): Boolean {
+        val layout = listState.layoutInfo
+        val bottomEdge = layout.viewportEndOffset - with(density) { bottomOverlayPaddingDp.roundToPx() }
+        val item = layout.visibleItemsInfo.firstOrNull { it.index == index }
+        return item != null && item.offset >= layout.viewportStartOffset && item.offset + item.size <= bottomEdge
+    }
     LaunchedEffect(verseBeingRead) {
         val number = verseBeingRead
         val previous = lastReadVerse
         lastReadVerse = number
-        if (number == null) return@LaunchedEffect
+        // Looked around by hand, the page stays where it's been put for now (see LOOK_AROUND_MS).
+        if (number == null || lookingAround) return@LaunchedEffect
         val index = verses.indexOfFirst { it.number == number }.takeIf { it >= 0 }?.plus(1) ?: return@LaunchedEffect
         val layout = listState.layoutInfo
-        val bottomEdge = layout.viewportEndOffset - with(density) { bottomOverlayPaddingDp.roundToPx() }
-        val item = layout.visibleItemsInfo.firstOrNull { it.index == index }
-        val inView = item != null && item.offset >= layout.viewportStartOffset && item.offset + item.size <= bottomEdge
         val following = previous == null ||
             verses.indexOfFirst { it.number == previous }.let { p -> p >= 0 && layout.visibleItemsInfo.any { it.index == p + 1 } }
         if (!following) return@LaunchedEffect
-        if (isBlurModeEnabled) centre(index) else if (!inView) listState.animateScrollToItem(index, -(layout.viewportSize.height / 6))
+        if (isBlurModeEnabled) centre(index) else if (!wholeInView(index)) listState.animateScrollToItem(index, -(layout.viewportSize.height / 6))
     }
     // The verse being read scrolled out of view (behind the pill and bar counts as out of view).
     val overlayPx by rememberUpdatedState(with(density) { bottomOverlayPaddingDp.roundToPx() })
@@ -674,18 +705,42 @@ fun ReaderScreen(
     }
     val readingChapter = readAloudState.verse?.takeIf { readingInReader }?.let { it.book to it.chapter }
     var lastReadingChapter by remember { mutableStateOf<Pair<String, Int>?>(null) }
+    // The chapter on screen, when the reading went on from it into the next while the page was looked around.
+    var readingLeftFrom by remember { mutableStateOf<Pair<String, Int>?>(null) }
     LaunchedEffect(readingChapter) {
         val before = lastReadingChapter
         lastReadingChapter = readingChapter
+        readingLeftFrom = null
         if (readingChapter == null || before == null || before == readingChapter) return@LaunchedEffect
-        if (followingAlong && before == currentBook to currentChapter) viewModel.turnToReading()
-    }
-    // Follow: back to the verse being read, which is then kept in view again.
-    fun followReading() {
-        val index = verses.indexOfFirst { it.number == verseBeingRead }.takeIf { verseBeingRead != null && it >= 0 }?.plus(1) ?: return
-        readerScope.launch {
-            if (isBlurModeEnabled) centre(index) else listState.animateScrollToItem(index, -(listState.layoutInfo.viewportSize.height / 6))
+        if (before == currentBook to currentChapter) {
+            if (followingAlong && !lookingAround) viewModel.turnToReading() else readingLeftFrom = before
         }
+    }
+    // Follow (and the bar's verse): back to the verse being read, which is then kept in view again; from the
+    // chapter it went on from while the page was looked around, on to it. Not [always] (the page let go a
+    // while): only as far as it takes, to the middle in Blur Mode, and otherwise only if it's out of view.
+    fun followReading(always: Boolean = true) {
+        lookingAround = false
+        val index = verses.indexOfFirst { it.number == verseBeingRead }.takeIf { verseBeingRead != null && it >= 0 }?.plus(1)
+        if (index == null) {
+            if (readingLeftFrom == currentBook to currentChapter) {
+                readingLeftFrom = null
+                viewModel.turnToReading()
+            }
+            return
+        }
+        readerScope.launch {
+            if (isBlurModeEnabled) centre(index)
+            else if (always || !wholeInView(index)) listState.animateScrollToItem(index, -(listState.layoutInfo.viewportSize.height / 6))
+        }
+    }
+    // Reading aloud, the page looked around by hand goes back to the verse being read once it's been let go a
+    // while, as a song's words do in a music player. Paused, it stays until the reading plays again.
+    val dragged by listState.interactionSource.collectIsDraggedAsState()
+    LaunchedEffect(listening, lookingAround, dragged, letGo) {
+        if (!listening || !lookingAround || dragged) return@LaunchedEffect
+        delay(LOOK_AROUND_MS)
+        followReading(always = false)
     }
 
     // A reading in Telugu or both started (or switched to either while it reads): the Telugu lines come
@@ -703,10 +758,31 @@ fun ReaderScreen(
         viewModel.toggleTeluguInline(anchor, keepFocus = false, blur = false, offsetPx = item?.offset ?: 0)
     }
 
-    // Played again (the bar's Play, the earbuds) with a verse's sheet open: the sheet closes.
+    // Played again (the bar's Play, the earbuds) with a verse's sheet open: the sheet closes. Playing, Blur
+    // Mode's sharp verse is the one being read again (not one tapped into focus while paused), and a verse
+    // jumped to loses its spotlight, the reading's own shading showing where it is.
     LaunchedEffect(listening) {
-        if (listening && viewModel.selectedVerse.value != null) viewModel.setSelectedVerse(null)
+        if (!listening) return@LaunchedEffect
+        if (viewModel.selectedVerse.value != null) viewModel.setSelectedVerse(null)
+        blurPicked = null
+        xrefFocusActive = false
     }
+
+    // The reading bar: in full for a moment as a reading starts, then, while it plays, drawn in to its round
+    // button; in full again while it's paused. The button's ring: how far through its chapter the reading is.
+    var barIntroDone by remember { mutableStateOf(false) }
+    LaunchedEffect(readingInReader) {
+        barIntroDone = false
+        if (!readingInReader) return@LaunchedEffect
+        delay(BAR_INTRO_MS)
+        barIntroDone = true
+    }
+    val compactBar = listening && barIntroDone
+    var barWasCompact by remember { mutableStateOf(false) }
+    SideEffect { if (readingInReader) barWasCompact = compactBar }
+    val readingProgress = readAloudState.verse?.takeIf { readingInReader }
+        ?.let { (viewModel.readAloud.session as? ChapterReading)?.placeOf(it) }
+        ?.let { (at, of) -> at.toFloat() / of } ?: 0f
 
     // The first reading after a tap on a verse came to read it: one line over the bar, once.
     val tapHintDue = listening && !viewModel.readAloudSettings.tapHintShown
@@ -1365,10 +1441,12 @@ fun ReaderScreen(
                         // reflow/jerk on that verse as you scrolled past it.
                         //
                         // Reading aloud in Blur Mode, the verse being read is the sharp one (kept in the
-                        // middle as the reading moves on); otherwise a verse tapped into focus, else the
-                        // one in the middle.
+                        // middle as the reading moves on), paused too until another's tapped into focus;
+                        // but while the page is looked around, the one in the middle. Otherwise a verse
+                        // tapped into focus, else the one in the middle.
                         val isFocused = when {
-                            isBlurModeEnabled && listening && verseBeingRead != null -> verse.number == verseBeingRead
+                            isBlurModeEnabled && verseBeingRead != null && !lookingAround && (listening || blurPicked == null) ->
+                                verse.number == verseBeingRead
                             focusedVerseNumber != null -> verse.number == focusedVerseNumber
                             isBlurModeEnabled -> verse.number == (blurPicked ?: verses.getOrNull(centerItemIndex - 1)?.number)
                             else -> false
@@ -1405,6 +1483,9 @@ fun ReaderScreen(
                                     xrefFocusActive = false
                                     viewModel.clearVerseFocus()
                                 }
+                                // Followed from the verse tapped (in Blur Mode, brought to the middle).
+                                lookingAround = false
+                                lastReadVerse = null
                                 viewModel.readAloudSettings.markTapHintShown()
                                 viewModel.readFromTap(verse.book, verse.chapter, verse.number)
                             } else if (effectiveBlurEnabled && !isFocused) {
@@ -1535,8 +1616,9 @@ fun ReaderScreen(
         var colorToRename by remember { mutableStateOf<HighlightColorDef?>(null) }
 
         // Reading aloud's bar: previous and next (held, the chapter's start), play or pause, the verse being
-        // read (a tap goes to it), its settings, and stop.
-        val readingBar: @Composable (Modifier) -> Unit = { barModifier ->
+        // read (a tap goes to it), its settings, and stop. Over the pill, it can be drawn in to its button
+        // ([compact], see compactBar); with a verse's sheet, it's always the bar.
+        val readingBar: @Composable (Modifier, Boolean?) -> Unit = { barModifier, compact ->
             ReadAloudBar(
                 state = readAloudState,
                 language = viewModel.readAloudSettings.language,
@@ -1562,7 +1644,9 @@ fun ReaderScreen(
                 onSleepIn = viewModel::sleepIn,
                 onSleepAtChapterEnd = viewModel::sleepAtChapterEnd,
                 onCancelSleep = viewModel::cancelSleep,
-                modifier = barModifier
+                modifier = barModifier,
+                compact = compact,
+                progress = readingProgress
             )
         }
 
@@ -1658,63 +1742,79 @@ fun ReaderScreen(
                     viewModel.setSelectedVerse(null)
                     // Paused on another verse of this chapter: on from this one in the same reading.
                     if (readingInReader && verseBeingRead != null) {
+                        lookingAround = false
+                        lastReadVerse = null
                         viewModel.readFromTap(verse.book, verse.chapter, verse.number)
                     } else {
                         readAloudFrom(verse.number)
                     }
                 },
                 // Paused, the reading bar stays with the sheet: its Play goes on (and closes the sheet).
-                readingBar = if (readingInReader) ({ readingBar(Modifier) }) else null
+                readingBar = if (readingInReader) ({ readingBar(Modifier, null) }) else null
             )
         } else {
             // Reading aloud: its bar just over the pill — staying on screen while the pill hides, down where
-            // the pill was — and over it, what the bar offers for now: the one-time hint, Next chapter once
-            // a chapter's been read through, Back and Read here while another chapter is on screen, Follow
-            // when the verse being read is scrolled out of view, and Undo after a tap moved the reading.
+            // the pill was, and drawn in to a round button at the right while it plays — and over it, what
+            // the bar offers for now: the one-time hint, Next chapter once a chapter's been read through, Back
+            // and Read here while another chapter is on screen, Follow when the verse being read is scrolled
+            // out of view, and Undo after a tap moved the reading.
             val nextChapterOffer = chapterReadThrough?.takeIf { !readingInReader }
-            if (readingInReader || nextChapterOffer != null) {
-                val pillHeight = with(density) { bottomOverlayHeightPx.toDp() }
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .navigationBarsPadding()
-                        .padding(bottom = 16.dp + pillHeight + 10.dp)
-                        .graphicsLayer { translationY = barsHiddenProgress * (pillHeight + 10.dp).toPx() }
+            val pillHeight = with(density) { bottomOverlayHeightPx.toDp() }
+            // While the bar's drawn in to its button, what it offers lines up with the button's right edge.
+            val offerPlace = if (compactBar) Modifier.padding(end = 16.dp) else Modifier
+            Column(
+                horizontalAlignment = if (compactBar) Alignment.End else Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(bottom = 16.dp + pillHeight + 10.dp)
+                    .graphicsLayer { translationY = barsHiddenProgress * (pillHeight + 10.dp).toPx() }
+            ) {
+                if (tapHintDue) {
+                    ReadAloudHint(
+                        "Tap a verse to hear it \u00b7 Pause for highlights and notes",
+                        Modifier.align(Alignment.CenterHorizontally).padding(horizontal = 32.dp)
+                    )
+                }
+                val reading = readAloudState.verse
+                when {
+                    nextChapterOffer != null -> ReadAloudOffer(
+                        text = "End of ${nextChapterOffer.first} ${nextChapterOffer.second}",
+                        actions = listOf("Next chapter" to { viewModel.readNextChapter() }),
+                        modifier = offerPlace
+                    )
+                    readingElsewhere && reading != null -> ReadAloudOffer(
+                        text = "Reading ${reading.label}",
+                        actions = listOf(
+                            "Back" to { viewModel.jumpToVerse(reading.book, reading.chapter, reading.verse, focusVerse = false) },
+                            "Read here" to { readAloudFrom(startingVerse()) }
+                        ),
+                        modifier = offerPlace
+                    )
+                    beingReadOutOfView -> ReadAloudOffer(text = null, actions = listOf("Follow" to { followReading() }), modifier = offerPlace)
+                }
+                readingMovedFrom?.let { from ->
+                    val here = reading != null && from.book == reading.book && from.chapter == reading.chapter
+                    ReadAloudOffer(
+                        text = "From " + if (here) "${from.chapter}:${from.verse}" else from.label,
+                        actions = listOf("Undo" to { viewModel.undoReadingMove() }),
+                        modifier = offerPlace
+                    )
+                }
+                // Coming as a reading starts, and, as it stops, fading and dropping away as it was.
+                AnimatedVisibility(
+                    visible = readingInReader,
+                    enter = fadeIn(tween(200)) + slideInVertically(tween(200)) { it / 2 },
+                    exit = fadeOut(tween(200)) + slideOutVertically(tween(200)) { it / 2 }
                 ) {
-                    if (tapHintDue) {
-                        ReadAloudHint("Tap a verse to hear it \u00b7 Pause for highlights and notes", Modifier.padding(horizontal = 32.dp))
-                    }
-                    val reading = readAloudState.verse
-                    when {
-                        nextChapterOffer != null -> ReadAloudOffer(
-                            text = "End of ${nextChapterOffer.first} ${nextChapterOffer.second}",
-                            actions = listOf("Next chapter" to { viewModel.readNextChapter() })
-                        )
-                        readingElsewhere && reading != null -> ReadAloudOffer(
-                            text = "Reading ${reading.label}",
-                            actions = listOf(
-                                "Back" to { viewModel.jumpToVerse(reading.book, reading.chapter, reading.verse, focusVerse = false) },
-                                "Read here" to { readAloudFrom(startingVerse()) }
-                            )
-                        )
-                        beingReadOutOfView -> ReadAloudOffer(text = null, actions = listOf("Follow" to { followReading() }))
-                    }
-                    readingMovedFrom?.let { from ->
-                        val here = reading != null && from.book == reading.book && from.chapter == reading.chapter
-                        ReadAloudOffer(
-                            text = "From " + if (here) "${from.chapter}:${from.verse}" else from.label,
-                            actions = listOf("Undo" to { viewModel.undoReadingMove() })
-                        )
-                    }
-                    if (readingInReader) {
-                        readingBar(
-                            Modifier
-                                .onGloballyPositioned { readAloudBarHeightPx = it.size.height }
-                                .testTag("read_aloud_bar")
-                        )
-                    }
+                    readingBar(
+                        Modifier
+                            .onGloballyPositioned { readAloudBarHeightPx = it.size.height }
+                            .testTag("read_aloud_bar"),
+                        if (readingInReader) compactBar else barWasCompact
+                    )
                 }
             }
 

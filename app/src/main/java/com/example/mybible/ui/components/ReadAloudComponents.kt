@@ -7,8 +7,28 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.speech.tts.TextToSpeech
 import android.provider.Settings
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.util.lerp
+import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.material3.Slider
@@ -110,6 +130,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * to the chapter's first verse), play or pause, next, the verse being read (tap it to go to it), the
  * language it's read in (a tap changes it), the sleep timer (the time left while one's set), the
  * settings, and stop.
+ *
+ * Given [compact] (over the pill; not with a verse's sheet), it's drawn in to a small round button at its
+ * right while that's true, the reading playing: pause or play, in a ring that fills, gold, as the chapter's
+ * read ([progress], 0 to 1), the bar laid across the whole width ([modifier]'s) for it.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -128,16 +152,14 @@ fun ReadAloudBar(
     onSleepIn: (Int) -> Unit,
     onSleepAtChapterEnd: () -> Unit,
     onCancelSleep: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    compact: Boolean? = null,
+    progress: Float = 0f
 ) {
     val playing = state.status == ReadAloudState.Status.PLAYING
     val haptics = LocalHapticFeedback.current
-    Surface(
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f),
-        shadowElevation = 8.dp,
-        modifier = modifier
-    ) {
+    val color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f)
+    val controls: @Composable () -> Unit = {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
@@ -215,6 +237,142 @@ fun ReadAloudBar(
                 Icon(Icons.Default.Close, contentDescription = "Stop reading aloud", tint = MaterialTheme.colorScheme.onSurface)
             }
         }
+    }
+    if (compact == null) {
+        Surface(shape = CircleShape, color = color, shadowElevation = 8.dp, modifier = modifier) { controls() }
+    } else {
+        BarOrButton(compact, playing, progress, onPlayPause, color, controls, modifier)
+    }
+}
+
+/** How long the bar takes to draw in to its round button, or out again: as long as the pill's slide. */
+private const val BAR_MORPH_MS = 280
+
+/** The round button the bar draws in to, and its room from the right edge. */
+private val READ_BUTTON_SIZE = 56.dp
+private val READ_BUTTON_MARGIN = 16.dp
+
+/**
+ * The bar across the width given, centred, or drawn in to a round button near the right ([compact]): its body
+ * narrowing in from the left and growing to the button's height, the controls in it fading first (cut to
+ * it as it narrows), the button's sign and ring fading in as it lands. Back out, the button shows play for
+ * a moment first. Only what shows takes a tap.
+ */
+@Composable
+private fun BarOrButton(
+    compact: Boolean,
+    playing: Boolean,
+    progress: Float,
+    onPlayPause: () -> Unit,
+    color: Color,
+    controls: @Composable () -> Unit,
+    modifier: Modifier
+) {
+    // Time through the change, evenly: 0 the bar, 1 the button. The body moves along it eased.
+    val time by animateFloatAsState(
+        targetValue = if (compact) 1f else 0f,
+        animationSpec = tween(BAR_MORPH_MS, delayMillis = if (compact) 0 else 120, easing = LinearEasing),
+        label = "barToButton"
+    )
+    val ring by animateFloatAsState(progress.coerceIn(0f, 1f), tween(600), label = "readingRing")
+    val shape = remember { BarShape() }
+    Layout(
+        content = {
+            Surface(shape = CircleShape, color = color, shadowElevation = 8.dp) {}
+            Box(
+                Modifier
+                    .graphicsLayer { alpha = (1f - time / 0.3f).coerceIn(0f, 1f) }
+                    .drawWithContent {
+                        val body = shape.body(FastOutSlowInEasing.transform(time)).translate(-shape.barLeft, -shape.barTop)
+                        val path = Path().apply { addRoundRect(RoundRect(body, CornerRadius(body.height / 2f))) }
+                        clipPath(path) { this@drawWithContent.drawContent() }
+                    }
+            ) { controls() }
+            ReadAloudButton(
+                playing = playing,
+                progress = { ring },
+                onClick = onPlayPause,
+                modifier = Modifier.graphicsLayer { alpha = ((time - 0.6f) / 0.4f).coerceIn(0f, 1f) }
+            )
+        },
+        modifier = modifier.fillMaxWidth()
+    ) { measurables, constraints ->
+        val bar = measurables[1].measure(constraints.copy(minWidth = 0, minHeight = 0))
+        val size = READ_BUTTON_SIZE.roundToPx()
+        val button = measurables[2].measure(Constraints.fixed(size, size))
+        val width = constraints.maxWidth
+        val height = maxOf(bar.height, size)
+        shape.width = width
+        shape.height = height
+        shape.barWidth = bar.width
+        shape.barHeight = bar.height
+        shape.button = size
+        shape.margin = READ_BUTTON_MARGIN.roundToPx()
+        val body = shape.body(FastOutSlowInEasing.transform(time))
+        val outline = measurables[0].measure(
+            Constraints.fixed(body.width.roundToInt().coerceAtLeast(0), body.height.roundToInt().coerceAtLeast(0))
+        )
+        layout(width, height) {
+            outline.place(body.left.roundToInt(), body.top.roundToInt())
+            if (time < 0.3f) bar.place(shape.barLeft.roundToInt(), shape.barTop.roundToInt())
+            if (time > 0.6f) button.place(width - shape.margin - size, height - size)
+        }
+    }
+}
+
+/** Where the bar and its button go, as last laid out, and the body between them (see [body]). */
+private class BarShape {
+    var width = 0
+    var height = 0
+    var barWidth = 0
+    var barHeight = 0
+    var button = 0
+    var margin = 0
+
+    val barLeft: Float get() = (width - barWidth) / 2f
+    val barTop: Float get() = (height - barHeight).toFloat()
+
+    /** The body [s] of the way from the bar (0, centred) to the button (1, at the right), on the same bottom. */
+    fun body(s: Float) = Rect(
+        left = lerp(barLeft, (width - margin - button).toFloat(), s),
+        top = lerp(barTop, (height - button).toFloat(), s),
+        right = lerp(barLeft + barWidth, (width - margin).toFloat(), s),
+        bottom = height.toFloat()
+    )
+}
+
+/**
+ * The bar drawn in to a button: pause while it reads, play while it's paused, in a ring the gold of which
+ * goes round as far as the chapter's been read ([progress], read as it's drawn).
+ */
+@Composable
+private fun ReadAloudButton(playing: Boolean, progress: () -> Float, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val track = MaterialTheme.colorScheme.outline.copy(alpha = 0.27f)
+    val gold = MaterialTheme.colorScheme.tertiary
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .size(READ_BUTTON_SIZE)
+            .clip(CircleShape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .drawBehind {
+                val stroke = 3.dp.toPx()
+                val inset = 5.dp.toPx() + stroke / 2f
+                val ring = Size(size.width - 2 * inset, size.height - 2 * inset)
+                drawArc(track, 0f, 360f, useCenter = false, topLeft = Offset(inset, inset), size = ring, style = Stroke(stroke))
+                drawArc(
+                    gold, -90f, 360f * progress(), useCenter = false, topLeft = Offset(inset, inset), size = ring,
+                    style = Stroke(stroke, cap = StrokeCap.Round)
+                )
+            }
+            .testTag("read_aloud_button")
+    ) {
+        Icon(
+            imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+            contentDescription = if (playing) "Pause reading aloud" else "Go on reading aloud",
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(30.dp)
+        )
     }
 }
 

@@ -988,3 +988,40 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
     https://claude.ai/artifact/3BmZ5PyWLcdHkrcpVdsPQU (private until shared).
     Not tried on a phone: choosing the folder, saving into it and the phone's photo picker (the
     checks here can't open Android's folder access), so the first pictures added are the real test.
+    *Dropped 22 Oct:* the prompts ("drop the idea of prompts... you are way too much usage"), after
+    the owner found them wrong in places ("only a pair of animals when first created, Noah's family
+    are only 8 in total, the olive leaf is when water is not completely gone"; "genesis 1:3-5...
+    there are no people yet"). A redo of Genesis true to the text was begun and stopped:
+    tools/pictures/redo has what was written (chapters 1-11, 23-30 and 40-50). The app's Copy prompt
+    buttons, the document and the page still have the first prompts.
+
+34. **Done 22 Oct.** **Reader: reading aloud, the page and the bar.** "the read aloud pill is
+    occupying... ideas on how to hide it like we hide the pill in reader" — "let's analyse how it
+    behaves and what's the best way to handle... I am thinking what's the point of scrolling during
+    read aloud when playing... and how it behaves in blur mode. .when a verse is highlighted from
+    jump to" — "i like these as it is along with the pause/play button... what's the transition of
+    button when hide and unhide?" — "got it.. built these".
+    *Found 22 Oct:* scrolled away while it read, the page stopped following until Follow; in Blur
+    Mode everything on screen was then blurred (the sharp verse being the one read, off screen), and
+    paused, the sharp verse went to the one in the middle; read aloud from a verse jumped to, the
+    verses after it were read blurred, the jumped-to one sharp, until the page moved.
+    *Agreed 22 Oct:*
+    - Scrolling while it plays is for looking around: like a song's words in a music player, 5
+      seconds after the page is let go it goes back to the verse being read (Follow still there).
+    - Blur Mode, looked around: the verse in the middle is the sharp one; back at the reading, the
+      one being read. Paused: the one being read stays sharp until the page is dragged or another
+      verse tapped.
+    - A reading playing ends a jump's spotlight, as scrolling away does.
+    - While it plays, the bar is drawn in to a round pause button at the right, its ring filling,
+      gold, as the chapter's read; paused, the full bar. It draws in from the left (the controls
+      fading first, the sign and ring fading in as it lands) and back out (play shown for a moment
+      first), as quickly as the pill slides; it goes down into the corner with the pill and up
+      again; a reading starts with the full bar for 3 seconds; stopped, it fades and drops away;
+      what the bar offers (Follow, Undo, Back and Read here) sits over the button, at its right.
+    *Built 22 Oct,* just so. The 5 seconds count from the finger leaving the page, or a fling coming
+    to rest; while looking around the page isn't moved by the reading, and a reading that goes on into
+    the next chapter meanwhile turns the page to it when it goes back. A tap on a verse while it
+    plays (or Read aloud on a paused verse's sheet) is followed from that verse. Paused, the page
+    stays where it's put until the reading plays again. The button is 56dp, 16dp from the right,
+    just over the pill; the ring is the verse's place in its chapter (verse 16 of 36, a little under
+    half). With a verse's sheet open the bar is the full bar as before.
