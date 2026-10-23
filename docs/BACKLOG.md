@@ -7,6 +7,9 @@ needs asking.
 Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGESTIONS.md)
 (8 Oct 2026).
 
+**On the phone: build #108 (14 Oct 2026, commit 6b9fb64).** Nothing built after that is on it yet,
+so a bug seen on the phone is looked for in that build's code first.
+
 ## Noted 9 Oct 2026
 
 1. **Done 12 Oct.** **More than one colour on a highlighted verse.** "Multi highlighted
@@ -1126,16 +1129,19 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
       references written in notes).
     *Not yet tried on a phone:* the share sheet, saving the document, and the date range picker.
 
-38. **Fixed 23 Oct (not yet tried on a phone).** **Bug — Verse Scroll: verses repeated with the screen
-    locked.** "i selected entire psalms in verse scroll and locked the screen and it repeats the verses".
-    *Found 23 Oct:* not reproduced here: all of Psalms read with the screen locked (a stand-in voice,
-    149 verses, through the check-in cards, then unlocked) had no verse twice, and the Psalms timings
-    of all three recordings have no overlaps. Three ways a verse could be read again, closed: a voice
-    saying a verse is done twice, while the reading waited to go on to the next card, had it go on
-    twice (the next card read twice); a moment's interruption (a notification's sound, which pauses
-    the reading) in a voice that doesn't say which word it's on read the whole verse again; and one
-    coming just as a stretch of a recording ended played the stretch again.
-    *Built 23 Oct:* the reading goes on once however many times it's told; a voice that doesn't say
-    its words picks up about where it had got to (a second and a half before); a stretch that has just
-    ended isn't played over. If it still happens: which voice (the phone's or a recording), which
-    language, and whether one verse came twice or several went round again.
+38. **Fixed 21 Oct, found 23 Oct; not on the phone yet.** **Bug — Verse Scroll: verses repeated with
+    the screen locked.** "i selected entire psalms in verse scroll and locked the screen and it
+    repeats the verses" — "I am still on old version remember that too".
+    *Found 23 Oct:* in the build on the phone (#108, 14 Oct), each time Verse Scroll dealt more
+    cards (every few verses as it read on), the screen said the card it showed had come up again;
+    locked, that was still the card it was locked on, so the reading went back to it and read on
+    from there, over and over. Fixed on 21 Oct with the pause between cards (item 25, 4b21d07): while
+    the reading goes on to a card, the one being left isn't counted as come up again. Here, all of
+    Psalms read with the screen locked (a stand-in voice, 149 verses, then unlocked) had no verse
+    twice, and the Psalms timings of all three recordings have no overlaps.
+    *Also closed 23 Oct,* three more ways a verse could be read again: a voice saying a verse is done
+    twice, while the reading waited to go on to the next card, had it go on twice (the next card read
+    twice) — it now goes on once; a moment's interruption (a notification's sound, which pauses the
+    reading) in a voice that doesn't say which word it's on read the whole verse again — it now picks
+    up about where it had got to (a second and a half before); and one coming just as a stretch of a
+    recording ended played the stretch again — no longer.
