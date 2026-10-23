@@ -341,15 +341,55 @@ class ReadAloudTest {
         assertEquals("He that believeth on him is not condemned", speaker.said.last().text)
     }
 
+    @Test
+    fun aVerseSaidToBeDoneTwiceMovesTheReadingOnOnce() {
+        val speaker = FakeSpeaker()
+        val reader = reader(speaker)
+        val cards = Pausing(john3)
+        reader.start(cards)
+        val first = speaker.said.last().id
+        speaker.listener!!.onDone(first)
+        // The voice saying so again, while the reading waits to go on to the next card: nothing more.
+        speaker.listener!!.onDone(first)
+        assertEquals(1, cards.waits)
+        cards.hurry()
+        assertEquals(listOf("For God so loved the world", "For God sent not his Son"), speaker.said.map { it.text })
+        assertEquals("John 3:17", reader.state.value.verse?.label)
+    }
+
+    @Test
+    fun aPauseInAVoiceThatDoesntSayItsWordsPicksUpAboutWhereItGotTo() {
+        var now = 0L
+        val speaker = FakeSpeaker()
+        val reader = reader(speaker, clock = { now })
+        val verse = VerseToRead("John", 1, 1, "In the beginning was the Word, and the Word was with God, and the Word was God.", null)
+        reader.start(Chapter(listOf(verse), from = 1))
+        val whole = speaker.said.last().text
+        // Four seconds in, at about 15 letters a second: some 60 letters said, none of them told.
+        now = 4_000
+        reader.pause()
+        reader.resume()
+        val again = speaker.said.last().text
+        assertTrue(again.length < whole.length)
+        assertTrue(whole.endsWith(again))
+        // From a word a moment before where it had got to.
+        val from = whole.length - again.length
+        assertTrue("picked up at $from", from in 30..40)
+        assertTrue(from == 0 || whole[from - 1] == ' ')
+    }
+
     // Waits before each verse after its first, as Verse Scroll's pause between cards, until hurried.
     private class Pausing(val verses: List<VerseToRead>) : ReadingSession {
         override val place = ReadingPlace.VERSE_SCROLL
         override val title = "Verse Scroll"
         private var wait: CompletableDeferred<Unit>? = null
         override val waiting: Boolean get() = wait != null
+        // How many times it's waited to go on.
+        var waits = 0
 
         override suspend fun next(after: VerseToRead?): VerseToRead? {
             if (after == null) return verses.first()
+            waits++
             try {
                 CompletableDeferred<Unit>().also { wait = it }.await()
             } finally {

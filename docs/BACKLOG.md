@@ -1125,3 +1125,17 @@ Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGE
       nothing used is gone. Mt, Mk, Lk and Jn are known as Gospel names (in search and in verse
       references written in notes).
     *Not yet tried on a phone:* the share sheet, saving the document, and the date range picker.
+
+38. **Fixed 23 Oct (not yet tried on a phone).** **Bug — Verse Scroll: verses repeated with the screen
+    locked.** "i selected entire psalms in verse scroll and locked the screen and it repeats the verses".
+    *Found 23 Oct:* not reproduced here: all of Psalms read with the screen locked (a stand-in voice,
+    149 verses, through the check-in cards, then unlocked) had no verse twice, and the Psalms timings
+    of all three recordings have no overlaps. Three ways a verse could be read again, closed: a voice
+    saying a verse is done twice, while the reading waited to go on to the next card, had it go on
+    twice (the next card read twice); a moment's interruption (a notification's sound, which pauses
+    the reading) in a voice that doesn't say which word it's on read the whole verse again; and one
+    coming just as a stretch of a recording ended played the stretch again.
+    *Built 23 Oct:* the reading goes on once however many times it's told; a voice that doesn't say
+    its words picks up about where it had got to (a second and a half before); a stretch that has just
+    ended isn't played over. If it still happens: which voice (the phone's or a recording), which
+    language, and whether one verse came twice or several went round again.

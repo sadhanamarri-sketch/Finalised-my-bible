@@ -475,6 +475,15 @@ class ReadAloud(
     fun pause() {
         val current = session ?: return
         if (_state.value.status != ReadAloudState.Status.PLAYING) return
+        // A voice that doesn't say which word it's on picks up about where it would have got to at its
+        // pace (a little before, so nothing's missed), not from the start of the verse: a moment's
+        // interruption (a notification's sound) doesn't read the whole verse again.
+        val spoken = parts.getOrNull(partIndex) as? Spoken
+        if (spoken != null && !wordHeard && advancing?.isActive != true) {
+            val pace = charsPerSecond(spoken.telugu)
+            val got = spokenFrom + ((clock() - spokenAt) / 1000f * pace - pace * RESUME_BACK_SECONDS).toInt()
+            resumeAt = wordStart(spoken.text, got.coerceIn(spokenFrom, spoken.text.length))
+        }
         utterances++
         speaker.stop()
         if (parts.getOrNull(partIndex) is Recorded) {
@@ -495,6 +504,8 @@ class ReadAloud(
         when {
             // Still finding the next verse: it's read as soon as it's found.
             advancing?.isActive == true -> Unit
+            // A stretch of a recording just played to its end: the reading is moving on from it.
+            reached == Double.POSITIVE_INFINITY && crossing?.isActive == true -> Unit
             // A recording paused: on from where it was, at the speed now set.
             part is Recorded -> {
                 recorder.speed(prefs.speed(part.telugu))
@@ -804,6 +815,8 @@ class ReadAloud(
         step: (suspend (ReadingSession, VerseToRead?) -> VerseToRead?)? = null
     ) {
         val current = session ?: return
+        // Already going on by itself to the next verse: once is enough.
+        if (step == null && after != null && advancing?.isActive == true) return
         parts = emptyList()
         partIndex = 0
         resumeAt = 0
@@ -1029,6 +1042,9 @@ class ReadAloud(
             partIndex++
             speakPart()
         } else {
+            // Done with, so a voice that says so twice doesn't move the reading on twice (in Verse
+            // Scroll, the next card read twice, or one skipped).
+            utterances++
             advance(after = _state.value.verse)
         }
     }
@@ -1062,6 +1078,10 @@ class ReadAloud(
         // A headset's "previous" this soon after a verse began goes back to the one before; later, it
         // starts the verse again.
         const val BACK_WITHIN_MS = 3_000L
+
+        // A pause in a voice that doesn't say which word it's on picks up this much before where it
+        // would have got to (seconds).
+        const val RESUME_BACK_SECONDS = 1.5f
 
         // Verses in a row with nothing to read before giving up (a list of verses with no Telugu at all).
         const val MAX_SKIPPED = 50
