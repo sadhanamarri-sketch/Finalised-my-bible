@@ -238,7 +238,8 @@ class NoteEditorState(initial: NoteText) {
  * The note's text in one text box, so a selection can cross paragraphs: list marks, tick boxes
  * and quote bars drawn in each paragraph's room on the left, a tap on a tick box ticking it,
  * capitals at the start of sentences, and on a physical keyboard Ctrl+B, I, U, Z, Y, Tab and
- * Shift+Tab. [placeholder] shows while it's empty.
+ * Shift+Tab. [placeholder] shows while the page is bare: no letters, the first line with no look of
+ * its own (a list, a tick box, a heading, an indent, centring), and no style set to type with.
  */
 @Composable
 fun NoteBodyField(
@@ -256,7 +257,7 @@ fun NoteBodyField(
     val tapAt = remember { longArrayOf(0L) }
     val visual = remember(state.note, look) { NoteVisual(state.note, look) }
     Box(modifier) {
-        if (state.note.text.isEmpty()) {
+        if (state.note.text.isEmpty() && state.note.paras[0] == ParaStyle() && state.typing.isNullOrEmpty()) {
             Text(placeholder, style = noteTextStyle(look).copy(color = look.muted))
         }
         BasicTextField(

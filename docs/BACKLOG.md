@@ -1246,13 +1246,15 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     card, shows its stretch full. Tried here: the fill rose a little every 48 ms through the words; just
     before the English was done it was at 0.425 of the bar, and its Telugu started at 0.426, no jump.
 
-44. **Notes: "Start writing…" goes as soon as anything is put on the page.** ""start writing" text in
+44. **Done 29 Oct.** **Notes: "Start writing…" goes as soon as anything is put on the page.** ""start writing" text in
     notes editor should disappear even when checkbox, tab or anything in toolbar is pressed not just
     first typing of letters."
     *Today:* it shows while the note has no letters at all; a checklist box, a bullet, a heading, a Tab
     or centring on the empty first line doesn't count, so the hint sits beside the box.
     *To do:* it goes once the first line has a look of its own or a style is set to type with (Bold and
     the like), and comes back only when that's all taken off again.
+    *Built 29 Oct,* just so. Tried here on an empty note, each on and then off again: the checklist,
+    bullets, Tab, Bold, a heading, a quote and centring; the hint went with each and came back after.
 
 45. **Cross references: every quotation listed, both ways.** "check if cross references have quotes
     matching. If not add them explicitly."
