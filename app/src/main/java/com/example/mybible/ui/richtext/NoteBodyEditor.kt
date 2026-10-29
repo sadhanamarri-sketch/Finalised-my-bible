@@ -100,6 +100,10 @@ import com.example.mybible.model.RichBlockStyle
 import com.example.mybible.ui.theme.NotoSerifFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
 
+// A deletion coming this soon after the last is Backspace held down, repeating (milliseconds): a
+// keyboard repeats every 50 or so, and a second press takes longer.
+private const val HELD_KEY_MS = 250L
+
 /**
  * A note's text while it's written: the note, the cursor or selection, the word the keyboard is
  * still making (its composition, given back with every change so suggestions, autocorrection and
@@ -127,6 +131,7 @@ class NoteEditorState(initial: NoteText) {
         private set
 
     private val history = EditHistory()
+    private var lastDeletedAt = Long.MIN_VALUE / 2
     val focusRequester = FocusRequester()
 
     val value: TextFieldValue get() = TextFieldValue(note.text, selection, composition)
@@ -138,7 +143,12 @@ class NoteEditorState(initial: NoteText) {
     internal fun change(v: TextFieldValue, fixTap: ((Int) -> Int)?) {
         var sel = v.selection
         if (v.text == note.text && sel.collapsed && fixTap != null) sel = TextRange(fixTap(sel.start))
-        val e = NoteEditing.edit(note, selection.start, selection.end, v.text, sel.start, sel.end, typing)
+        // A deletion straight after the last: Backspace held down, repeating (see NoteEditing.edit).
+        val now = SystemClock.uptimeMillis()
+        val deleting = v.text.length < note.text.length
+        val held = deleting && now - lastDeletedAt < HELD_KEY_MS
+        if (deleting) lastDeletedAt = now
+        val e = NoteEditing.edit(note, selection.start, selection.end, v.text, sel.start, sel.end, typing, held)
         if (e.note != note) {
             val kind = if (e.note.text == note.text) EditHistory.Kind.OTHER else EditHistory.kindOf(note.text, e.note.text)
             history.record(EditHistory.State(note, selection.start, selection.end), kind, SystemClock.uptimeMillis())

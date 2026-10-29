@@ -1279,7 +1279,7 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     references: Isaiah 6:10 lists John 12:40, Acts 2:27 Psalm 16:10, Isaiah 53:12 Mark 15:28, and
     Matthew 2:15 still lists Hosea 11:1 once.
 
-46. **Read aloud: English and Telugu each at its own volume.** "absolute volume/adjust the volume of
+46. **Saved for later 29 Oct.** **Read aloud: English and Telugu each at its own volume.** "absolute volume/adjust the volume of
     telugu and english separately."
     *Today:* both play at the phone's media volume, so one can sound louder than the other (a recording
     against the phone's voice, or one narrator against the other).
@@ -1291,7 +1291,7 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     each phone voice's once (a sample spoken to a file), then each played at the level that brings it
     to the same loudness, the quieter ones raised with Android's loudness enhancer.
 
-47. **Notes: holding Backspace stops at a checklist.** "back button long press in the keyboard is
+47. **Done 29 Oct.** **Notes: holding Backspace stops at a checklist.** "back button long press in the keyboard is
     stopping in the middle after clearing checkmarks."
     *Found 29 Oct:* Backspace at the start of a checklist item (or a list item or quote) first only takes
     its mark off (35), putting back the line break the keyboard took away; the text then isn't what the
@@ -1300,6 +1300,13 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     takes the mark off first. That needs the mark taken off without putting text back behind the
     keyboard's back (say, the mark's place kept as an invisible character the keyboard deletes like any
     other).
+    *Built 29 Oct,* more simply: a deletion coming within a quarter of a second of the one before is the
+    key held down (a keyboard repeats every 50 milliseconds or so), and then a line's start is gone
+    through as the keyboard did it, the lines joined and the mark going with them, so nothing's put back
+    and the keyboard isn't restarted. A single press still takes the mark off first. Held from the very
+    start of a checklist item, the first press is a single one (it takes the mark off, and the keyboard
+    restarts); held again, it goes on. Tested in the editor's rules; the keyboard's repeat itself only on
+    the phone.
 
 48. **Notes list: special notes in purple.** "special notes in purple in notes list."
     *Decided 29 Oct,* as suggested: a mark of its own, Special, put on or taken off from the note's menu

@@ -74,6 +74,22 @@ class NoteTextTest {
     }
 
     @Test
+    fun backspaceHeldDownGoesThroughALinesStartAsTheKeyboardDidIt() {
+        // Held, a checklist item's start is gone through at once, the lines joined: no line break put
+        // back (which would restart the keyboard and end the key's repeat).
+        val n = note("Milk" to plain, "Eggs" to ParaStyle(RichBlockStyle.CHECK_ITEM))
+        val held = NoteEditing.edit(n, 5, 5, n.text.removeRange(4, 5), 4, 4, null, held = true)
+        assertEquals("MilkEggs", held.note.text)
+        assertEquals(listOf(plain), held.note.paras)
+        assertFalse(held.rewritten)
+        // A single press still makes the item plain first.
+        val pressed = backspace(n, 5)
+        assertEquals("Milk\nEggs", pressed.note.text)
+        assertEquals(plain, pressed.note.paras[1])
+        assertTrue(pressed.rewritten)
+    }
+
+    @Test
     fun backspaceAtTheVeryStartMakesTheFirstItemPlain() {
         val n = note("Milk" to bullet)
         assertEquals(ParaStyle(), NoteEditing.backspaceAtStart(n)!!.paras[0])

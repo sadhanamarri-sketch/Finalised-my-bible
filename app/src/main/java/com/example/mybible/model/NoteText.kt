@@ -207,6 +207,10 @@ object NoteEditing {
      * of the text before it in the line (at a line's start, of the text after it), a replacement
      * (an autocorrection) that of what it replaces. A new line after a list item is an item, after a
      * heading plain text; a line opened above another takes its look.
+     *
+     * [held]: Backspace held down (this deletion following the last at once, the key repeating). Then a
+     * line's start is gone through as the keyboard did it, the lines joined: putting the line break
+     * back to make the line plain first would restart the keyboard, which ends the key's repeat.
      */
     fun edit(
         old: NoteText,
@@ -215,7 +219,8 @@ object NoteEditing {
         newText: String,
         newSelStart: Int,
         newSelEnd: Int,
-        typing: Set<CharStyle>?
+        typing: Set<CharStyle>?,
+        held: Boolean = false
     ): Edited {
         if (newText == old.text) {
             // Only the cursor or selection moved: typing styles last while it stays put.
@@ -237,8 +242,8 @@ object NoteEditing {
 
         // Backspace at the start of a line (the line break before it taken away, the cursor having
         // been just after it): a list item, checklist item or quote line first becomes plain, an
-        // indented line moves back; only then do the lines join.
-        if (d.insertText.isEmpty() && d.deleteEnd - d.deleteStart == 1 && old.text[d.deleteStart] == '\n' &&
+        // indented line moves back; only then do the lines join. Held down, they join at once.
+        if (!held && d.insertText.isEmpty() && d.deleteEnd - d.deleteStart == 1 && old.text[d.deleteStart] == '\n' &&
             cursor == d.deleteEnd
         ) {
             val p = old.paraAt(d.deleteEnd)
