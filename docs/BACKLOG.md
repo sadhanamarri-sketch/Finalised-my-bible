@@ -1256,7 +1256,7 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     *Built 29 Oct,* just so. Tried here on an empty note, each on and then off again: the checklist,
     bullets, Tab, Bold, a heading, a quote and centring; the hint went with each and came back after.
 
-45. **Done 29 Oct.** **Cross references: every quotation listed, both ways.** "check if cross references have quotes
+45. **Done 29 Oct; a change agreed, not built yet.** **Cross references: every quotation listed, both ways.** "check if cross references have quotes
     matching. If not add them explicitly."
     *Checked 29 Oct:* the 474 quotations reviewed on 21 Oct (29), against the cross references as the app
     reads them (a verse's Cross References list only the links from it). 411 are linked both ways; 31
@@ -1278,6 +1278,11 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     carry no votes, so a rabbit hole doesn't wander into one by itself. Checked here with the real cross
     references: Isaiah 6:10 lists John 12:40, Acts 2:27 Psalm 16:10, Isaiah 53:12 Mark 15:28, and
     Matthew 2:15 still lists Hosea 11:1 once.
+    *Agreed 29 Oct* (not built yet), asked "quotes should be from verse which is referenced but not other
+    way around?", then "both ways but different wording and diff colors": each side its own. On the verse
+    that quotes (the New Testament's), the verse it quotes is tagged "Quotes", in purple, and its † is
+    purple; on the verse quoted (the Old Testament's), the verse quoting it is tagged "Quoted in", in
+    teal, and its † is teal. In Cross References and Verse Scroll's links sheet alike.
 
 46. **Saved for later 29 Oct.** **Read aloud: English and Telugu each at its own volume.** "absolute volume/adjust the volume of
     telugu and english separately."
