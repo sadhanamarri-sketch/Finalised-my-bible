@@ -1152,15 +1152,19 @@ phone is looked for first in the code of the build it was seen on.
 
 Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
 
-39. **Reader: Follow takes two taps while reading aloud.** "the follow button has to be pressed
+39. **Done 29 Oct.** **Reader: Follow takes two taps while reading aloud.** "the follow button has to be pressed
     twice in reading tab when read aloud is active(paused or playing).I think because of main pill
     pop up."
     *Found 29 Oct, paused:* with the pill hidden (the page scrolled down), the Reader takes the first
     tap anywhere to bring the pill back, a tap on the reading bar and what it offers included (Follow,
     Play, Undo), so only the second tap reaches Follow. Playing, taps are let through (a tap reads the
     verse tapped), so there the cause is still to find on the phone.
-    *To do:* a tap on the reading bar or its offers does what it says at once, pill hidden or not; only
-    a tap on the page brings the pill back.
+    *Built 29 Oct:* only a tap on the page brings the pill back now; the reading bar and what it offers
+    take a tap at once, pill hidden or not. Tried here with the pill hidden: paused, one tap on Follow
+    goes back to the verse being read, and one on the bar's play button plays (each took two before);
+    playing, Follow took one tap before and still does. A tap on the page still only brings the pill
+    back when paused, and still reads the verse tapped while it plays. If Follow still takes two taps
+    while it plays, on the phone, what was on screen will tell where to look.
 
 40. **Reader: the pill out of the way while reading aloud plays.** "Is there a need of main pill if
     once read aloud is being played? doesn't it make sense to hide as soon as it goes to next verse to

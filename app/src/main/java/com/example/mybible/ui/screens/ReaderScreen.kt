@@ -795,6 +795,69 @@ fun ReaderScreen(
     // For the tap-to-reveal below, which outlives any one composition.
     val listeningNow by rememberUpdatedState(listening)
 
+    // Tap-to-reveal: with the pill hidden, a tap on the page brings it back (and does nothing else).
+    // On the page only (see the AnimatedContent below), not the whole screen, so the reading bar and
+    // what it offers over the page (Follow, its play button, Undo) take a tap at once instead of the
+    // first only bringing the pill back. In the page's own modifier chain rather than a separate
+    // full-screen sibling Box drawn over the LazyColumn: a sibling overlay depends on Compose's sibling
+    // hit-test order to "win" against LazyColumn's own gesture detectors — that order isn't part of
+    // the documented contract, so it can (and did) regress into either swallowing every tap or doing
+    // nothing at all. Running in PointerEventPass.Initial makes it deterministic: it always sees the
+    // pointer BEFORE any descendant (VerseCard, LazyColumn drag) does, because it's an ancestor in the
+    // same chain, not a competing sibling.
+    val tapToReveal = Modifier.pointerInput(Unit) {
+        val touchSlop = viewConfiguration.touchSlop
+        while (true) {
+            awaitPointerEventScope {
+                // Never consume the down itself — LazyColumn's own
+                // scrollable needs an untouched down to start a drag
+                // from on the very first touch. If we ate the down
+                // here, any scroll attempt while bars are hidden
+                // would be swallowed whole, forcing a second swipe —
+                // the exact bug this is meant to avoid.
+                val down = awaitFirstDown(
+                    requireUnconsumed = false,
+                    pass = PointerEventPass.Initial
+                )
+                // Reading aloud, a tap reads the verse tapped, pill hidden or not.
+                if (!barsHidden || listeningNow) return@awaitPointerEventScope
+
+                val pointerId = down.id
+                var totalMovement = 0f
+                while (true) {
+                    val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                    val change = event.changes.firstOrNull { it.id == pointerId } ?: break
+                    if (!change.pressed) {
+                        // Genuine release. Only now — and only if the
+                        // gesture never moved beyond touch slop (so
+                        // it was a tap, not a scroll that LazyColumn
+                        // already claimed) — consume it in Initial
+                        // pass, pre-empting VerseCard's own Main-pass
+                        // click detector so tapping while hidden
+                        // reveals the pill instead of also selecting
+                        // a verse.
+                        if (totalMovement < touchSlop) {
+                            change.consume()
+                            barsHidden = false
+                        }
+                        break
+                    }
+                    totalMovement += (change.position - change.previousPosition).getDistance()
+                    if (totalMovement >= touchSlop) {
+                        // This is becoming a drag/scroll, not a tap —
+                        // back off completely and let LazyColumn's
+                        // scrollable (Main pass) own it from here.
+                        break
+                    }
+                }
+                // When bars are already visible, nothing above ever
+                // runs, so the event falls through untouched to the
+                // LazyColumn/VerseCard exactly as if this modifier
+                // didn't exist.
+            }
+        }
+    }
+
     // Reader owns the whole screen edge-to-edge now (no Scaffold bars to
     // reserve space) — statusBarsPadding here replaces what the old
     // Scaffold topBar used to provide, so the chapter title/first verse
@@ -804,68 +867,6 @@ fun ReaderScreen(
             .fillMaxSize()
             .statusBarsPadding()
             .nestedScroll(nestedScrollConnection)
-            // Tap-to-reveal, folded into this same modifier chain instead of
-            // a separate full-screen sibling Box drawn over the LazyColumn.
-            // A sibling overlay depends on Compose's sibling hit-test order
-            // to "win" against LazyColumn's own gesture detectors — that
-            // order isn't part of the documented contract, so it can (and
-            // did) regress into either swallowing every tap or doing
-            // nothing at all. Running in PointerEventPass.Initial here makes
-            // it deterministic: this always sees the pointer BEFORE any
-            // descendant (VerseCard, LazyColumn drag) does, because it's an
-            // ancestor in the same chain, not a competing sibling.
-            .pointerInput(Unit) {
-                val touchSlop = viewConfiguration.touchSlop
-                while (true) {
-                    awaitPointerEventScope {
-                        // Never consume the down itself — LazyColumn's own
-                        // scrollable needs an untouched down to start a drag
-                        // from on the very first touch. If we ate the down
-                        // here, any scroll attempt while bars are hidden
-                        // would be swallowed whole, forcing a second swipe —
-                        // the exact bug this is meant to avoid.
-                        val down = awaitFirstDown(
-                            requireUnconsumed = false,
-                            pass = PointerEventPass.Initial
-                        )
-                        // Reading aloud, a tap reads the verse tapped, pill hidden or not.
-                        if (!barsHidden || listeningNow) return@awaitPointerEventScope
-
-                        val pointerId = down.id
-                        var totalMovement = 0f
-                        while (true) {
-                            val event = awaitPointerEvent(pass = PointerEventPass.Initial)
-                            val change = event.changes.firstOrNull { it.id == pointerId } ?: break
-                            if (!change.pressed) {
-                                // Genuine release. Only now — and only if the
-                                // gesture never moved beyond touch slop (so
-                                // it was a tap, not a scroll that LazyColumn
-                                // already claimed) — consume it in Initial
-                                // pass, pre-empting VerseCard's own Main-pass
-                                // click detector so tapping while hidden
-                                // reveals the pill instead of also selecting
-                                // a verse.
-                                if (totalMovement < touchSlop) {
-                                    change.consume()
-                                    barsHidden = false
-                                }
-                                break
-                            }
-                            totalMovement += (change.position - change.previousPosition).getDistance()
-                            if (totalMovement >= touchSlop) {
-                                // This is becoming a drag/scroll, not a tap —
-                                // back off completely and let LazyColumn's
-                                // scrollable (Main pass) own it from here.
-                                break
-                            }
-                        }
-                        // When bars are already visible, nothing above ever
-                        // runs, so the event falls through untouched to the
-                        // LazyColumn/VerseCard exactly as if this modifier
-                        // didn't exist.
-                    }
-                }
-            }
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Picking-mode banner — shown instead of (takes priority over)
@@ -1373,6 +1374,7 @@ fun ReaderScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .weight(1f)
+                        .then(tapToReveal)
                         // Horizontal swipe-to-change-chapter. Orthogonal to
                         // the LazyColumn's own vertical scroll gesture below
                         // it — detectHorizontalDragGestures only commits once
