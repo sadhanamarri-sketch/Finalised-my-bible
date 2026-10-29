@@ -275,9 +275,10 @@ class ReadAloud(
     private var spokenFrom = 0
 
     // When the voice was last given the text, and whether it has said which word it's on since (some
-    // voices never do: how far they've got is then guessed from the time).
+    // voices never do: how far they've got is then guessed from the time), and when it last did.
     private var spokenAt = 0L
     private var wordHeard = false
+    private var wordAt = 0L
 
     // When the verse being read came up, or was last said from its beginning (see skipToPrevious).
     private var verseStartedAt = 0L
@@ -568,9 +569,17 @@ class ReadAloud(
         if (session == null || advancing?.isActive == true || parts.isEmpty()) return null
         val at = when (val part = parts.getOrNull(partIndex)) {
             is Spoken -> {
-                // A voice that doesn't say which word it's on: as far as it would have got at its pace.
-                val reached = if (wordHeard || _state.value.status != ReadAloudState.Status.PLAYING) resumeAt
-                else spokenFrom + ((clock() - spokenAt) / 1000f * charsPerSecond(part.telugu)).toInt()
+                val reached = when {
+                    _state.value.status != ReadAloudState.Status.PLAYING -> resumeAt
+                    // A voice that says which word it's on: on through that word at its pace, as far as
+                    // the next (the end, after the last), so the bar's there as the voice gets there.
+                    wordHeard -> minOf(
+                        resumeAt + ((clock() - wordAt) / 1000f * charsPerSecond(part.telugu)).toInt(),
+                        nextWord(part.text, resumeAt)
+                    )
+                    // A voice that doesn't: as far as it would have got at its pace.
+                    else -> spokenFrom + ((clock() - spokenAt) / 1000f * charsPerSecond(part.telugu)).toInt()
+                }
                 reached.toFloat() / part.text.length.coerceAtLeast(1)
             }
             is Recorded -> {
@@ -618,6 +627,14 @@ class ReadAloud(
     private fun wordStart(text: String, at: Int): Int {
         var i = at.coerceIn(0, text.length)
         while (i > 0 && !text[i - 1].isWhitespace()) i--
+        return i
+    }
+
+    // Where the word after the one [at] falls in starts; the text's end after its last.
+    private fun nextWord(text: String, at: Int): Int {
+        var i = at.coerceIn(0, text.length)
+        while (i < text.length && !text[i].isWhitespace()) i++
+        while (i < text.length && text[i].isWhitespace()) i++
         return i
     }
 
@@ -1033,6 +1050,7 @@ class ReadAloud(
         if (id != currentId) return
         resumeAt = spokenFrom + start
         wordHeard = true
+        wordAt = clock()
     }
 
     override fun onDone(id: String) {

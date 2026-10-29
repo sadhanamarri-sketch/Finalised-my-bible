@@ -737,6 +737,27 @@ class ReadAloudTest {
     }
 
     @Test
+    fun theProgressBarGoesOnThroughTheWordBeingSaidAtTheVoicesPace() {
+        val speaker = FakeSpeaker()
+        var now = 0L
+        val reader = reader(speaker, FakePrefs(ReadLanguage.ENGLISH), clock = { now })
+        reader.start(Chapter(john3, from = 16))
+        val english = speaker.said.last().text
+        val the = english.indexOf("the")
+        speaker.reachWord(the)
+        // A fifth of a second on: three letters further (15 a second)...
+        now += 200
+        assertEquals((the + 3).toFloat() / english.length, reader.progress()!!.at, 1e-6f)
+        // ...but no further than the next word, which the voice says when it gets there.
+        now += 2_000
+        assertEquals(english.indexOf("world").toFloat() / english.length, reader.progress()!!.at, 1e-6f)
+        // Its last word: on to the verse's end.
+        speaker.reachWord(english.indexOf("world"))
+        now += 2_000
+        assertEquals(1f, reader.progress()!!.at, 1e-6f)
+    }
+
+    @Test
     fun versesAreSaidAsWordsNotMarks() {
         assertEquals("And the Lord said unto Moses", SpeechText.english("¶ And the LORD said unto  Moses"))
         assertEquals("I Am That I Am", SpeechText.english("I AM THAT I AM"))

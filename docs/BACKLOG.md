@@ -1206,7 +1206,7 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     Tried here, each as described: opened and drawn in again (still there at 3.4 seconds, gone at 4.8);
     Next tapped 3 seconds in kept it 4 seconds more; the sleep timer's choices open 6 seconds, still there.
 
-42. **Reader, Blur Mode: a verse tapped while it plays isn't brought into focus.** "When in blur mode,
+42. **Set aside 29 Oct.** **Reader, Blur Mode: a verse tapped while it plays isn't brought into focus.** "When in blur mode,
     while in play mode, when pressed another verse to play, it doesn't change focus automatically but it
     changes only when there's an automatic swift(like moving from english to telugu verse during play)"
     *Today:* a tap on a verse while it plays reads from it (34), and in Blur Mode the sharp verse is meant
@@ -1220,9 +1220,9 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     reading went on from that verse, and it was sharp and in the middle within a third of a second; nothing
     waited for the reading's next part. Nothing in the code holds it back either, so nothing's changed yet.
     *To ask:* whether the voice went to the verse tapped at once (only the page lagged), or went on with
-    the old verse until its part was done.
+    the old verse until its part was done. Left for now ("leave this and move on", 29 Oct).
 
-43. **Verse Scroll: the progress bar, quieter, or a replay button instead.** "progress bar is
+43. **Done 29 Oct.** **Verse Scroll: the progress bar, quieter, or a replay button instead.** "progress bar is
     distracting. make it greyish just like youtube shorts and no round thing when playing. It only
     appears when trying to adjust. stuttering of progress and gap at the end. let's analyse if we need
     it or not.or it can be replaced with a simple replay button."
@@ -1237,6 +1237,14 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     (no gold), and no dot while it plays; touched, it thickens and the dot and the thumb show. The fill
     glides between words at the voice's pace, and runs to the end of each part as it ends.
     *Decided 29 Oct:* the quieter bar, as suggested.
+    *Built 29 Oct,* just so: a 2dp grey line (the ink's colour, faint, filled a shade darker), no gold, and
+    no dot or thumb while it plays; held, it thickens to 6dp and shows the thumb and the dot. The fill
+    glides to each new place (over 0.3 seconds, about a word's time) instead of jumping. The gap: the
+    voice says where each word starts, so through the last word the fill stood at its start until the card
+    moved on; now it goes on through the word being said at the voice's pace, as far as the next word (to
+    the end, after the last). A verse read to its end, the next being found or the pause before the next
+    card, shows its stretch full. Tried here: the fill rose a little every 48 ms through the words; just
+    before the English was done it was at 0.425 of the bar, and its Telugu started at 0.426, no jump.
 
 44. **Notes: "Start writing…" goes as soon as anything is put on the page.** ""start writing" text in
     notes editor should disappear even when checkbox, tab or anything in toolbar is pressed not just

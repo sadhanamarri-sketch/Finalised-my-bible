@@ -1,5 +1,8 @@
 package com.example.mybible.ui.versescroll
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -48,8 +51,9 @@ private sealed interface BarTarget {
 /**
  * A card's bar laid out, 0 to 1 along it: each of its verses' stretch (a passage's), by how long it
  * takes (guessed from its text), and within the one being read ([now]), its parts, a language each.
+ * [ended]: that verse read to its end (the next being found, or the pause before the next card).
  */
-private class BarLayout(card: VerseFeedCard, language: ReadLanguage, now: VerseProgress?) {
+private class BarLayout(card: VerseFeedCard, language: ReadLanguage, now: VerseProgress?, ended: Boolean) {
     private val lines = card.content.lines
     private val estimates = lines.map { line ->
         val english = if (language != ReadLanguage.TELUGU) line.text.length / ENGLISH_CHARS_PER_SECOND else 0f
@@ -82,6 +86,7 @@ private class BarLayout(card: VerseFeedCard, language: ReadLanguage, now: VerseP
 
     /** How far along the bar the reading is; null before it's known. */
     val reached: Float? = now?.takeIf { current >= 0 }?.let { p ->
+        if (ended) return@let ends[current]
         val from = partStarts.getOrNull(p.part) ?: return@let null
         val to = partStarts.getOrNull(p.part + 1) ?: 1f
         along(current, from + (to - from) * p.at)
@@ -111,12 +116,13 @@ private class BarLayout(card: VerseFeedCard, language: ReadLanguage, now: VerseP
 }
 
 /**
- * The card's progress bar while it's read aloud, at its foot: it fills as the verse is read, with a dot
- * where its English gives way to its Telugu (read in both). A tap or a drag moves the reading there, a
- * recording from that moment, the phone's voice from the word there; a tap on a dot, to that
- * language's start. On a card of a few verses each has its stretch, and one dragged into is read from
- * its beginning. Held, the bar thickens, as a reel's does; it takes its own touches, apart from the
- * card's taps and the swipes between cards.
+ * The card's progress bar while it's read aloud, at its foot: a thin grey line, as a short video's, that
+ * fills as the verse is read, gliding between what the reading says of how far it's got, and to the end
+ * of a verse's stretch as it's done. A tap or a drag moves the reading there, a recording from that
+ * moment, the phone's voice from the word there. Held, it thickens, as a reel's does, and shows a thumb
+ * and a dot where the verse's English gives way to its Telugu (read in both): a tap by the dot goes to
+ * that language's start. On a card of a few verses each has its stretch, and one dragged into is read
+ * from its beginning. It takes its own touches, apart from the card's taps and the swipes between cards.
  */
 @Composable
 internal fun BoxScope.CardProgress(
@@ -131,14 +137,28 @@ internal fun BoxScope.CardProgress(
     // Kept up to date a few times a second while the card is shown and read (with the screen off, not
     // at all); between its verses, as it last was.
     var now by remember(card.uid) { mutableStateOf<VerseProgress?>(null) }
+    var ended by remember(card.uid) { mutableStateOf(false) }
     LaunchedEffect(card.uid) {
         while (true) {
             withFrameMillis { }
-            progress()?.let { now = it }
+            val p = progress()
+            if (p != null) {
+                now = p
+                ended = false
+            } else if (now != null) {
+                ended = true
+            }
             delay(POLL_MS)
         }
     }
-    val layout = BarLayout(card, language, now)
+    val layout = BarLayout(card, language, now, ended)
+    // The fill shown: gliding to where the reading's got (the phone's voice says so a word at a time),
+    // straight back when it's gone back.
+    val shown = remember(card.uid) { Animatable(0f) }
+    LaunchedEffect(card.uid, layout.reached) {
+        val to = layout.reached ?: return@LaunchedEffect
+        if (to < shown.value) shown.snapTo(to) else shown.animateTo(to, tween(GLIDE_MS, easing = LinearEasing))
+    }
     val currentLayout by rememberUpdatedState(layout)
     val currentOnSeek by rememberUpdatedState(onSeek)
     val currentOnVerse by rememberUpdatedState(onVerse)
@@ -195,8 +215,9 @@ internal fun BoxScope.CardProgress(
         val thick = (if (held) HELD_THICKNESS else THICKNESS).toPx()
         val y = size.height / 2
         val gap = VERSE_GAP.toPx()
-        val track = colors.ink.copy(alpha = 0.24f)
-        val fill = if (held) heldAt else layout.reached
+        val track = colors.ink.copy(alpha = 0.18f)
+        val filledColor = colors.ink.copy(alpha = if (held) 0.75f else 0.5f)
+        val fill = if (held) heldAt else layout.reached?.let { shown.value }
         for (i in layout.ends.indices) {
             val x0 = layout.start(i) * size.width + if (i > 0) gap / 2 else 0f
             val x1 = layout.ends[i] * size.width - if (i < layout.ends.lastIndex) gap / 2 else 0f
@@ -204,11 +225,13 @@ internal fun BoxScope.CardProgress(
             val corner = CornerRadius(thick / 2)
             drawRoundRect(track, Offset(x0, y - thick / 2), Size(x1 - x0, thick), corner)
             val filled = (fill ?: 0f) * size.width
-            if (filled > x0) drawRoundRect(colors.gold, Offset(x0, y - thick / 2), Size(minOf(filled, x1) - x0, thick), corner)
+            if (filled > x0) drawRoundRect(filledColor, Offset(x0, y - thick / 2), Size(minOf(filled, x1) - x0, thick), corner)
         }
-        val dot = (if (held) HELD_DOT else DOT).toPx()
-        for ((at, _) in layout.dots) drawCircle(colors.ink, radius = dot, center = Offset(at * size.width, y))
-        if (held) drawCircle(colors.gold, radius = THUMB.toPx(), center = Offset(heldAt * size.width, y))
+        // Only while it's held: where the Telugu begins, and the thumb.
+        if (held) {
+            for ((at, _) in layout.dots) drawCircle(colors.ink, radius = DOT.toPx(), center = Offset(at * size.width, y))
+            drawCircle(colors.ink, radius = THUMB.toPx(), center = Offset(heldAt * size.width, y))
+        }
     }
 }
 
@@ -217,11 +240,10 @@ private const val ENGLISH_CHARS_PER_SECOND = 15f
 private const val TELUGU_CHARS_PER_SECOND = 13f
 private const val TELUGU_PER_ENGLISH = 1.1f
 
-private val THICKNESS = 3.dp
-private val HELD_THICKNESS = 8.dp
-private val DOT = 3.5.dp
-private val HELD_DOT = 5.dp
-private val THUMB = 9.dp
+private val THICKNESS = 2.dp
+private val HELD_THICKNESS = 6.dp
+private val DOT = 4.5.dp
+private val THUMB = 8.dp
 private val VERSE_GAP = 3.dp
 
 // A tap this close to a dot goes to that language's start.
@@ -229,3 +251,7 @@ private val DOT_SNAP = 14.dp
 
 // How often the bar catches up with the reading, at most (milliseconds).
 private const val POLL_MS = 80L
+
+// How long the fill takes to glide to where the reading's got, each time it's told (milliseconds): about
+// a word's time, so the phone's voice's word by word moves it on smoothly.
+private const val GLIDE_MS = 300
