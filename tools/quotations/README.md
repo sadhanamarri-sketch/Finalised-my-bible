@@ -4,7 +4,8 @@
 allusions or echoes. The app marks a verse's cross-reference dagger in purple when it quotes the Old
 Testament or is quoted in the New, and lists those links first, tagged "Quote", in Cross References
 and in Verse Scroll's links sheet (however few votes they have). The cross references themselves are
-left as they are; the list only labels links among them.
+left as they are: the list labels the links among them that are quotations, and the app adds those
+they miss as links of their own, so each quotation is listed from both its verses.
 
 It's made in two steps, Python 3, no extra packages:
 
@@ -31,7 +32,8 @@ python3 make_quotations.py eng-kjv.osis.xml cross_references.txt quotations.txt 
   read, and the quotations the candidates missed were added by hand (Matthew 19:5 and Genesis 2:24, for
   one, share no five words in a row).
 - `make_quotations.py` checks every reference against the KJV and every pair against the cross
-  references, and writes the app's list with the app's book names.
+  references (reporting those they don't link, 13 of them), and writes the app's list with the app's
+  book names.
 
 ## Sources and licenses
 

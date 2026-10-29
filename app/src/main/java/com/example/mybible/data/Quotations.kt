@@ -3,7 +3,8 @@ package com.example.mybible.data
 /**
  * The New Testament's quotations of the Old, read and checked by hand (see tools/quotations): each a
  * New Testament verse, or a few, and the Old Testament verses it quotes. They mark the verses that quote
- * or are quoted, and which of the cross references are quotations.
+ * or are quoted, which of the cross references are quotations, and the quotations the cross references
+ * miss (to be links of their own, so each is listed from both its sides).
  */
 class Quotations(private val pairs: List<Pair<Passage, Passage>>) {
 
@@ -24,6 +25,23 @@ class Quotations(private val pairs: List<Pair<Passage, Passage>>) {
     /** The verses of [book] [chapter] that quote the Old Testament or are quoted in the New. */
     fun versesIn(book: String, chapter: Int): Set<Int> =
         byChapter[book to chapter].orEmpty().flatMapTo(HashSet()) { it.first..it.last }
+
+    /** Whether [book] [chapter]:[verse] quotes the Old Testament or is quoted in the New. */
+    fun quotes(book: String, chapter: Int, verse: Int): Boolean =
+        byChapter[book to chapter].orEmpty().any { it.has(book, chapter, verse) }
+
+    /**
+     * The passages [book] [chapter]:[verse] quotes, or is quoted in, that none of [linked] (the passages its
+     * cross references go to) takes in: the quotations its cross references miss, to be links of their own.
+     */
+    fun unlinked(book: String, chapter: Int, verse: Int, linked: List<Passage>): List<Passage> =
+        pairs.mapNotNull { (nt, ot) ->
+            when {
+                nt.has(book, chapter, verse) -> ot
+                ot.has(book, chapter, verse) -> nt
+                else -> null
+            }
+        }.distinct().filter { p -> linked.none { p.meets(it.book, it.chapter, it.first, it.last) } }
 
     /** Whether the cross reference from [book] [chapter]:[verse] to [toBook] [toChapter]:[toFirst]–[toLast] is a quotation, either way round. */
     fun isQuote(book: String, chapter: Int, verse: Int, toBook: String, toChapter: Int, toFirst: Int, toLast: Int): Boolean =

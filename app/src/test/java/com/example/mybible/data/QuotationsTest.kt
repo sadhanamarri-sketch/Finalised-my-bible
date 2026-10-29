@@ -46,6 +46,21 @@ class QuotationsTest {
     }
 
     @Test
+    fun theQuotationsAVersesCrossReferencesMissAreLinksOfTheirOwn() {
+        assertTrue(quotations.quotes("Psalms", 22, 2))
+        assertFalse(quotations.quotes("Psalms", 22, 3))
+        // Linked to neither side: both, each from the verse on the other.
+        assertEquals(listOf(Quotations.Passage("Hosea", 11, 1, 1)), quotations.unlinked("Matthew", 2, 15, emptyList()))
+        assertEquals(listOf(Quotations.Passage("Matthew", 27, 46, 46)), quotations.unlinked("Psalms", 22, 2, emptyList()))
+        // A cross reference to the passage, or a longer one taking it in: none missed.
+        assertTrue(quotations.unlinked("Matthew", 2, 15, listOf(Quotations.Passage("Hosea", 11, 1, 3))).isEmpty())
+        assertTrue(quotations.unlinked("Isaiah", 25, 8, listOf(Quotations.Passage("1 Corinthians", 15, 55, 58))).isEmpty())
+        // Cross references elsewhere don't count, and a verse quoting nothing misses nothing.
+        assertEquals(1, quotations.unlinked("Matthew", 2, 15, listOf(Quotations.Passage("Hosea", 11, 2, 4))).size)
+        assertTrue(quotations.unlinked("Matthew", 2, 14, emptyList()).isEmpty())
+    }
+
+    @Test
     fun aLinkToALongerPassageShowsTheVersesHoldingTheQuotation() {
         assertEquals(15..15, quotations.quotedPart("Hosea", 11, 1, "Matthew", 2, 13, 18))
         assertEquals(1..2, quotations.quotedPart("Matthew", 27, 46, "Psalms", 22, 1, 8))

@@ -757,15 +757,31 @@ class BibleRepository(private val context: Context) {
 
     // Every cross-reference row from a verse, strongest first — Verse Scroll's
     // Links sheet and Rabbit hole pick from these.
+    // A verse's cross references, strongest first, and after them the quotations they miss (see
+    // unlinkedQuotations).
     suspend fun getCrossReferenceRows(bookName: String, chapter: Int, verse: Int): List<CrossReferenceEntity> =
         withContext(Dispatchers.IO) {
-            bibleDao.getCrossReferences(bookName, chapter, verse)
+            val rows = bibleDao.getCrossReferences(bookName, chapter, verse)
+            rows + unlinkedQuotations(bookName, chapter, verse, rows)
         }
 
     suspend fun countCrossReferencesFrom(bookName: String, chapter: Int, verse: Int): Int =
         withContext(Dispatchers.IO) {
-            bibleDao.countCrossReferencesFrom(bookName, chapter, verse)
+            val missed = if (quotations.quotes(bookName, chapter, verse)) {
+                unlinkedQuotations(bookName, chapter, verse, bibleDao.getCrossReferences(bookName, chapter, verse)).size
+            } else {
+                0
+            }
+            bibleDao.countCrossReferencesFrom(bookName, chapter, verse) + missed
         }
+
+    // The quotations of [book] [chapter]:[verse] (either way round) that none of its cross references [rows]
+    // go to, as links of their own, so each quotation is listed from both its verses: with no votes, so they
+    // come after the rest (and aren't picked for a rabbit hole by themselves), listed first all the same as
+    // the quotations they are.
+    private fun unlinkedQuotations(book: String, chapter: Int, verse: Int, rows: List<CrossReferenceEntity>): List<CrossReferenceEntity> =
+        quotations.unlinked(book, chapter, verse, rows.map { Quotations.Passage(it.toBook, it.toChapter, it.toVerse, it.toVerseEnd) })
+            .map { CrossReferenceEntity(book, chapter, verse, it.book, it.chapter, it.first, it.last) }
 
     // Real interlinear Greek (STEPBible TAGNT), imported by GreekImporter.
     // Returns null for OT books (Hebrew, not Greek) and for any verse not
@@ -1495,7 +1511,7 @@ class BibleRepository(private val context: Context) {
     // if Room has no cross-reference data at all yet (import still running
     // or failed for lack of connectivity).
     suspend fun getCrossReferences(book: String, chapter: Int, verse: Int): List<CrossReferenceItem> = withContext(Dispatchers.IO) {
-        val rows = bibleDao.getCrossReferences(book, chapter, verse)
+        val rows = getCrossReferenceRows(book, chapter, verse)
         if (rows.isNotEmpty()) {
             // The quotations first, however few votes they have, each from the verse holding it (of a longer
             // passage); then the strongest 20 of the rest.
@@ -1533,7 +1549,8 @@ class BibleRepository(private val context: Context) {
     // fallback book) if the real dataset hasn't imported yet — the fallback
     // stays reserved for the tap-through sheet itself, not the marker.
     suspend fun getCrossReferenceVerseNumbers(book: String, chapter: Int): Set<Int> = withContext(Dispatchers.IO) {
-        bibleDao.getCrossReferenceVerseNumbers(book, chapter).toSet()
+        // A verse quoting or quoted has a link however its cross references miss it.
+        bibleDao.getCrossReferenceVerseNumbers(book, chapter).toSet() + quotations.versesIn(book, chapter)
     }
 
     private fun fallbackCrossReferences(book: String, chapter: Int, verse: Int): List<CrossReferenceItem> {

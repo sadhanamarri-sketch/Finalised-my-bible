@@ -10,7 +10,8 @@ quotations.txt is the reviewed list (see find_quotations.py), a quotation a line
 
 the New Testament verse (or verses, "Rom 3:10-12"), then the Old Testament verses it quotes, more than
 one separated by ";". Every reference is checked against the KJV, and each pair against the cross
-references, as the app labels links among them (a pair none of them link is reported and left out).
+references: the app labels the links among them that are quotations, and links a pair they don't link
+itself (such pairs are reported).
 
 APP_ASSETS_DIR/quotations.tsv, one pair a line: the New Testament verses, a tab, the Old Testament
 ones, as the app names its books ("Matthew 2:15", "Psalms 22:1-2").
@@ -103,9 +104,8 @@ for no, line in enumerate(open(list_path, encoding="utf-8"), 1):
         ot = ref(ot_part, no)
         if ot[0] >= NT:
             sys.exit(f"line {no}: {ot_part.strip()} isn't in the Old Testament")
-        if any(meets(nt, n) and meets(ot, o) for n, o in links):
-            pairs.append((nt, ot))
-        else:
+        pairs.append((nt, ot))
+        if not any(meets(nt, n) and meets(ot, o) for n, o in links):
             unlinked.append(f"{nt_text.strip()} = {ot_part.strip()}")
 
 pairs = sorted(set(pairs))
@@ -117,6 +117,6 @@ with open(os.path.join(out_dir, "quotations.tsv"), "w", encoding="utf-8") as out
 print(f"{len(pairs)} quotations ({len({p[0] for p in pairs})} New Testament verses, "
       f"{len({p[1] for p in pairs})} Old Testament passages)")
 if unlinked:
-    print(f"left out, as no cross reference links them ({len(unlinked)}):")
+    print(f"not linked by the cross references, so linked by the app ({len(unlinked)}):")
     for u in unlinked:
         print("  " + u)

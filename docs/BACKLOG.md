@@ -1256,7 +1256,7 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     *Built 29 Oct,* just so. Tried here on an empty note, each on and then off again: the checklist,
     bullets, Tab, Bold, a heading, a quote and centring; the hint went with each and came back after.
 
-45. **Cross references: every quotation listed, both ways.** "check if cross references have quotes
+45. **Done 29 Oct.** **Cross references: every quotation listed, both ways.** "check if cross references have quotes
     matching. If not add them explicitly."
     *Checked 29 Oct:* the 474 quotations reviewed on 21 Oct (29), against the cross references as the app
     reads them (a verse's Cross References list only the links from it). 411 are linked both ways; 31
@@ -1269,6 +1269,15 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     *To do:* the quotations become cross references of their own where they're missing, both ways (77
     links), listed first in purple with the "Quote" tag like the rest; the 13 left out go back in the
     app's list (tools/quotations).
+    *Built 29 Oct,* just so. The app's list has all 474 quotations again (the 13 no cross reference
+    links, reported by tools/quotations). Where a verse's cross references don't reach one of its
+    quotations, that quotation is a link of its own, from each verse holding it: 126 links from 102
+    verses (77 counted by quotation). Cross References and Verse Scroll's links sheet list them first,
+    purple and tagged "Quote", with the rest; Verse Scroll's "links" counts them; and a verse quoting or
+    quoted has its † though it has no other cross reference (Mark 15:28 now lists Isaiah 53:12). They
+    carry no votes, so a rabbit hole doesn't wander into one by itself. Checked here with the real cross
+    references: Isaiah 6:10 lists John 12:40, Acts 2:27 Psalm 16:10, Isaiah 53:12 Mark 15:28, and
+    Matthew 2:15 still lists Hosea 11:1 once.
 
 46. **Read aloud: English and Telugu each at its own volume.** "absolute volume/adjust the volume of
     telugu and english separately."
