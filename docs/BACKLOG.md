@@ -1132,8 +1132,8 @@ phone is looked for first in the code of the build it was seen on.
     *Not yet tried on a phone:* the share sheet, saving the document, and the date range picker.
 
 38. **Fixed 21 Oct, found 23 Oct; on the phone in My Bible (Dev), 23 Oct.** **Bug — Verse Scroll:
-    verses repeated with the screen locked.** "i selected entire psalms in verse scroll and locked the screen and it
-    repeats the verses" — "I am still on old version remember that too".
+    verses repeated with the screen locked.** "i selected entire psalms in verse scroll and locked the
+    screen and it repeats the verses" — "I am still on old version remember that too".
     *Found 23 Oct:* in the build on the phone (#108, 14 Oct), each time Verse Scroll dealt more
     cards (every few verses as it read on), the screen said the card it showed had come up again;
     locked, that was still the card it was locked on, so the reading went back to it and read on
