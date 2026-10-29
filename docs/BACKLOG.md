@@ -7,8 +7,10 @@ needs asking.
 Also saved: 21 suggested changes to Notes, in [NOTES_SUGGESTIONS.md](NOTES_SUGGESTIONS.md)
 (8 Oct 2026).
 
-**On the phone: build #108 (14 Oct 2026, commit 6b9fb64).** Nothing built after that is on it yet,
-so a bug seen on the phone is looked for in that build's code first.
+**On the phone:** build #108 (14 Oct 2026, commit 6b9fb64), and beside it **My Bible (Dev)**, a debug
+build of 23 Oct (commit 4f803a1). The notes of 29 Oct were made on the Dev build (they speak of the round
+reading button, Verse Scroll's progress bar and the new notes page, which only it has). A bug seen on the
+phone is looked for first in the code of the build it was seen on.
 
 ## Noted 9 Oct 2026
 
@@ -1129,8 +1131,8 @@ so a bug seen on the phone is looked for in that build's code first.
       references written in notes).
     *Not yet tried on a phone:* the share sheet, saving the document, and the date range picker.
 
-38. **Fixed 21 Oct, found 23 Oct; not on the phone yet.** **Bug — Verse Scroll: verses repeated with
-    the screen locked.** "i selected entire psalms in verse scroll and locked the screen and it
+38. **Fixed 21 Oct, found 23 Oct; on the phone in My Bible (Dev), 23 Oct.** **Bug — Verse Scroll:
+    verses repeated with the screen locked.** "i selected entire psalms in verse scroll and locked the screen and it
     repeats the verses" — "I am still on old version remember that too".
     *Found 23 Oct:* in the build on the phone (#108, 14 Oct), each time Verse Scroll dealt more
     cards (every few verses as it read on), the screen said the card it showed had come up again;
@@ -1145,3 +1147,157 @@ so a bug seen on the phone is looked for in that build's code first.
     reading) in a voice that doesn't say which word it's on read the whole verse again — it now picks
     up about where it had got to (a second and a half before); and one coming just as a stretch of a
     recording ended played the stretch again — no longer.
+
+## Noted 29 Oct 2026
+
+Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
+
+39. **Reader: Follow takes two taps while reading aloud.** "the follow button has to be pressed
+    twice in reading tab when read aloud is active(paused or playing).I think because of main pill
+    pop up."
+    *Found 29 Oct, paused:* with the pill hidden (the page scrolled down), the Reader takes the first
+    tap anywhere to bring the pill back, a tap on the reading bar and what it offers included (Follow,
+    Play, Undo), so only the second tap reaches Follow. Playing, taps are let through (a tap reads the
+    verse tapped), so there the cause is still to find on the phone.
+    *To do:* a tap on the reading bar or its offers does what it says at once, pill hidden or not; only
+    a tap on the page brings the pill back.
+
+40. **Reader: the pill out of the way while reading aloud plays.** "Is there a need of main pill if
+    once read aloud is being played? doesn't it make sense to hide as soon as it goes to next verse to
+    make space? or may after certain time like 3sec."
+    *Today:* the pill hides only when the page is scrolled down, and comes back on a scroll up or a tap;
+    hidden, the reading bar goes down to where it was (34).
+    *Suggested:* while it plays, the pill drops away 3 seconds after the reading starts or plays on (with
+    the bar's own 3 seconds, 34), and the bar takes its place; paused or stopped, it comes back. A scroll
+    up still brings it back meanwhile, to change chapter, and it goes again 3 seconds after the page is
+    let go. 3 seconds rather than the next verse, as a long verse takes half a minute.
+    *To confirm:* 3 seconds, or the next verse.
+
+41. **Reader: the reading bar's controls without pausing.** "I don't like that it has to be paised to
+    see controls. How about we just minimize it with button and maximize when pressed. or any better
+    way you can come up with."
+    *Today (34):* while it plays, the bar draws in to the round button by itself, and a tap on the button
+    pauses, which brings the full bar back; so the full bar's controls (previous, next, the verse being
+    read, settings, stop) are only there paused.
+    *Suggested, as asked:* the bar no longer draws in by itself. The full bar gets a draw-in button (a
+    small chevron at its left end), and a tap on the round button opens the full bar again instead of
+    pausing (so the button shows a small "reading" mark in its gold ring, not a pause sign). The bar is
+    kept the way it's left, for the next reading too. Pausing is then on the full bar, the earbuds or the
+    notification.
+    *The other way,* as a video player's controls: a tap on the round button shows the full bar for about
+    4 seconds (longer while it's being used), then it draws in again; no extra button, but it goes away
+    by itself.
+    *To pick:* which. Recommended: as asked, kept the way it's left.
+
+42. **Reader, Blur Mode: a verse tapped while it plays isn't brought into focus.** "When in blur mode,
+    while in play mode, when pressed another verse to play, it doesn't change focus automatically but it
+    changes only when there's an automatic swift(like moving from english to telugu verse during play)"
+    *Today:* a tap on a verse while it plays reads from it (34), and in Blur Mode the sharp verse is meant
+    to be the one being read, brought to the middle at once. On the phone it stays on the old verse until
+    the reading's next part starts by itself (the verse's English giving way to its Telugu).
+    *To do:* find what holds it back (tried with Both and Blur Mode), so the verse tapped is sharp and
+    in the middle as soon as it's tapped.
+
+43. **Verse Scroll: the progress bar, quieter, or a replay button instead.** "progress bar is
+    distracting. make it greyish just like youtube shorts and no round thing when playing. It only
+    appears when trying to adjust. stuttering of progress and gap at the end. let's analyse if we need
+    it or not.or it can be replaced with a simple replay button."
+    *Today (32):* a gold fill on a dark track, with a dot where the English gives way to the Telugu,
+    there all the while a card is read; held, it thickens and a thumb follows the finger.
+    *Most likely:* the stutter is the fill moving a word at a time, as the voice says which word it's on
+    (or at a guessed pace when it doesn't); the gap is the voice's stretch, guessed from the text's
+    length, ending before the fill gets to its end, just before the card moves on.
+    *What it's for:* how far the card has got, going to the Telugu's start, and hearing a part again from
+    a point. A replay button would do only the last, from the start.
+    *Suggested:* keep it, quieter: a hairline grey track with a lighter grey fill, as YouTube Shorts'
+    (no gold), and no dot while it plays; touched, it thickens and the dot and the thumb show. The fill
+    glides between words at the voice's pace, and runs to the end of each part as it ends.
+    *To pick:* the quieter bar, or a replay button in its place (a curved arrow by "N verses today" that
+    reads the card again from its start).
+
+44. **Notes: "Start writing…" goes as soon as anything is put on the page.** ""start writing" text in
+    notes editor should disappear even when checkbox, tab or anything in toolbar is pressed not just
+    first typing of letters."
+    *Today:* it shows while the note has no letters at all; a checklist box, a bullet, a heading, a Tab
+    or centring on the empty first line doesn't count, so the hint sits beside the box.
+    *To do:* it goes once the first line has a look of its own or a style is set to type with (Bold and
+    the like), and comes back only when that's all taken off again.
+
+45. **Cross references: every quotation listed, both ways.** "check if cross references have quotes
+    matching. If not add them explicitly."
+    *Checked 29 Oct:* the 474 quotations reviewed on 21 Oct (29), against the cross references as the app
+    reads them (a verse's Cross References list only the links from it). 411 are linked both ways; 31
+    only from the New Testament verse, so the Old Testament verse's list lacks the verse quoting it
+    (Isaiah 6:10 lacks John 12:40); 18 only from the Old Testament verse (Acts 2:27 lacks Psalm 16:10);
+    and 14 not at all (Mark 15:28 and Isaiah 53:12, Mark 1:2 and Exodus 23:20, Hebrews 3:9 and Psalm
+    95:9 among them; 13 of these were left out of the app's list on 21 Oct for that reason). The Reader's
+    † is purple on both verses of a quotation, so on those verses it promises a quotation the list
+    doesn't show.
+    *To do:* the quotations become cross references of their own where they're missing, both ways (77
+    links), listed first in purple with the "Quote" tag like the rest; the 13 left out go back in the
+    app's list (tools/quotations).
+
+46. **Read aloud: English and Telugu each at its own volume.** "absolute volume/adjust the volume of
+    telugu and english separately."
+    *Today:* both play at the phone's media volume, so one can sound louder than the other (a recording
+    against the phone's voice, or one narrator against the other).
+    *Suggested:* a Volume slider for each language in Read aloud's settings, by its speed and pitch (76):
+    below 100% it's turned down, above it boosted up to about 150% (Android's loudness enhancer), for
+    the phone's voice and the recordings alike.
+    *To ask:* which sounds too loud or too soft (English or Telugu, the voice or the recordings), and
+    whether "absolute volume" means the app evening the two out by itself rather than sliders.
+
+47. **Notes: holding Backspace stops at a checklist.** "back button long press in the keyboard is
+    stopping in the middle after clearing checkmarks."
+    *Found 29 Oct:* Backspace at the start of a checklist item (or a list item or quote) first only takes
+    its mark off (35), putting back the line break the keyboard took away; the text then isn't what the
+    keyboard made it, so the editor restarts the keyboard's input, which ends the held key's repeat.
+    *To do:* holding Backspace goes on through checklist items as through any text; a single press still
+    takes the mark off first. That needs the mark taken off without putting text back behind the
+    keyboard's back (say, the mark's place kept as an invisible character the keyboard deletes like any
+    other).
+
+48. **Notes list: special notes in purple.** "special notes in purple in notes list."
+    *To ask:* which notes are special: the pinned ones (37), a new mark of their own, or notes on the Old
+    Testament's quotations (29's purple)? And purple how: the title, an edge down the card's left, or the
+    whole card tinted?
+    *Suggested:* a mark of its own, Special, from the note's menu as Pin is; a special note's card has a
+    thin purple edge on its left and its title in purple, and the filter has Special.
+
+49. **Notes: verses named in a note count as its verses, and a whole chapter can be added.** "bible
+    verses mentioned in the note should automatically count into add verse. Add provision to add entire
+    chapter too."
+    *Today:* a note's verses are the ones added with + Verse; a verse named in its text (John 3:16, linked
+    as it's written) isn't one of them, so the note isn't at that verse in the Reader, under its book in
+    the list, or found by that reference.
+    *To do:* verses named in the text are the note's verses too, in its details strip as soon as they're
+    written, and gone again when taken out of the text (unless also added with + Verse). + Verse can pick
+    a whole chapter ("John 3"), kept as one passage.
+    *To ask:* a note on a whole chapter: marked at the chapter's first verse in the Reader, or at each of
+    its verses?
+
+50. **Reader: the page turns with the reading into the next chapter.** "turn chapter along with read
+    loud as the read aloud move to next chapter."
+    *Today (34):* followed along, the page turns with the reading (the reading set to go on past the
+    chapter, 26); looked around, it turns when it goes back to the reading; otherwise the bar offers
+    Back. On the phone, some case misses it.
+    *To find:* which. Likely ones: the chapter's last verses read while behind the bar or the pill
+    (counted as not followed), the Reader left for another page meanwhile (back on it, it no longer
+    knows the reading moved on), or Blur Mode.
+    *To ask:* when it happened: the page left alone, scrolled, in Blur Mode, with the screen off, or after
+    another page.
+    *To do:* the page goes with the reading unless it's being looked around.
+
+51. **A Telugu-only lite app.** "telugu only lite version - reader,cross reference, highlight,verse
+    scroll,read aloud... entire app should be in telugu."
+    *Meant, most likely:* a smaller app for Telugu readers: the Telugu Bible only, with the Reader, Cross
+    References, highlights, Verse Scroll and read aloud, and every word of the app (menus, buttons,
+    settings, messages, book names) in Telugu.
+    *Today:* the app's words are written into its code in English, several hundred of them (only 3 are in
+    strings.xml).
+    *To build it:* first the app's words moved into strings, with a Telugu set (a "Telugu only" switch in
+    this app would need that too); then a Telugu version built from the same code, with its own name and
+    icon and installed beside My Bible, leaving out the English text and the parts not listed (Greek and
+    Hebrew, Notes, Search, Studied, …) and their data, so it's much smaller. A big job.
+    *To ask:* a separate app, or a Telugu only switch in this one; which parts besides those five
+    (Search, Notes, the widgets?); any English at all (the KJV beside the Telugu?); its name.
