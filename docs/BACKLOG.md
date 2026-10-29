@@ -1171,7 +1171,7 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     the bar's own 3 seconds, 34), and the bar takes its place; paused or stopped, it comes back. A scroll
     up still brings it back meanwhile, to change chapter, and it goes again 3 seconds after the page is
     let go. 3 seconds rather than the next verse, as a long verse takes half a minute.
-    *To confirm:* 3 seconds, or the next verse.
+    *Decided 29 Oct:* 3 seconds, as suggested.
 
 41. **Reader: the reading bar's controls without pausing.** "I don't like that it has to be paised to
     see controls. How about we just minimize it with button and maximize when pressed. or any better
@@ -1187,7 +1187,9 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     *The other way,* as a video player's controls: a tap on the round button shows the full bar for about
     4 seconds (longer while it's being used), then it draws in again; no extra button, but it goes away
     by itself.
-    *To pick:* which. Recommended: as asked, kept the way it's left.
+    *Decided 29 Oct:* the video player's way. A tap on the round button shows the full bar for about 4
+    seconds (longer while it's being used), then it draws in again; the button no longer pauses, so it
+    shows no pause sign, and pausing is on the full bar.
 
 42. **Reader, Blur Mode: a verse tapped while it plays isn't brought into focus.** "When in blur mode,
     while in play mode, when pressed another verse to play, it doesn't change focus automatically but it
@@ -1212,8 +1214,7 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     *Suggested:* keep it, quieter: a hairline grey track with a lighter grey fill, as YouTube Shorts'
     (no gold), and no dot while it plays; touched, it thickens and the dot and the thumb show. The fill
     glides between words at the voice's pace, and runs to the end of each part as it ends.
-    *To pick:* the quieter bar, or a replay button in its place (a curved arrow by "N verses today" that
-    reads the card again from its start).
+    *Decided 29 Oct:* the quieter bar, as suggested.
 
 44. **Notes: "Start writing…" goes as soon as anything is put on the page.** ""start writing" text in
     notes editor should disappear even when checkbox, tab or anything in toolbar is pressed not just
@@ -1244,8 +1245,10 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     *Suggested:* a Volume slider for each language in Read aloud's settings, by its speed and pitch (76):
     below 100% it's turned down, above it boosted up to about 150% (Android's loudness enhancer), for
     the phone's voice and the recordings alike.
-    *To ask:* which sounds too loud or too soft (English or Telugu, the voice or the recordings), and
-    whether "absolute volume" means the app evening the two out by itself rather than sliders.
+    *Decided 29 Oct:* the app evens the two out by itself, with nothing to set (rather than sliders).
+    To work out while building: each recording's loudness measured once (as its folder is added) and
+    each phone voice's once (a sample spoken to a file), then each played at the level that brings it
+    to the same loudness, the quieter ones raised with Android's loudness enhancer.
 
 47. **Notes: holding Backspace stops at a checklist.** "back button long press in the keyboard is
     stopping in the middle after clearing checkmarks."
@@ -1258,11 +1261,9 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     other).
 
 48. **Notes list: special notes in purple.** "special notes in purple in notes list."
-    *To ask:* which notes are special: the pinned ones (37), a new mark of their own, or notes on the Old
-    Testament's quotations (29's purple)? And purple how: the title, an edge down the card's left, or the
-    whole card tinted?
-    *Suggested:* a mark of its own, Special, from the note's menu as Pin is; a special note's card has a
-    thin purple edge on its left and its title in purple, and the filter has Special.
+    *Decided 29 Oct,* as suggested: a mark of its own, Special, put on or taken off from the note's menu
+    as Pin is; a special note's card has a thin purple edge down its left and its title in purple, and
+    the list's filter has Special.
 
 49. **Notes: verses named in a note count as its verses, and a whole chapter can be added.** "bible
     verses mentioned in the note should automatically count into add verse. Add provision to add entire
@@ -1273,20 +1274,20 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     *To do:* verses named in the text are the note's verses too, in its details strip as soon as they're
     written, and gone again when taken out of the text (unless also added with + Verse). + Verse can pick
     a whole chapter ("John 3"), kept as one passage.
-    *To ask:* a note on a whole chapter: marked at the chapter's first verse in the Reader, or at each of
-    its verses?
+    *Decided 29 Oct:* a note on a whole chapter has its dot at the chapter's first verse in the Reader.
 
 50. **Reader: the page turns with the reading into the next chapter.** "turn chapter along with read
     loud as the read aloud move to next chapter."
     *Today (34):* followed along, the page turns with the reading (the reading set to go on past the
     chapter, 26); looked around, it turns when it goes back to the reading; otherwise the bar offers
     Back. On the phone, some case misses it.
-    *To find:* which. Likely ones: the chapter's last verses read while behind the bar or the pill
-    (counted as not followed), the Reader left for another page meanwhile (back on it, it no longer
-    knows the reading moved on), or Blur Mode.
-    *To ask:* when it happened: the page left alone, scrolled, in Blur Mode, with the screen off, or after
-    another page.
-    *To do:* the page goes with the reading unless it's being looked around.
+    *Answered 29 Oct:* it happened with the screen off, or after another page (Notes, Search…).
+    *Most likely:* the Reader keeps the chapter the reading was in only while its page is showing; back
+    on it from another page, or after Android rebuilt the page while the screen was off a while, it has
+    forgotten, so it doesn't see that the reading moved on and stays on the old chapter.
+    *To do:* the app turns the Reader's chapter itself, seen or not: when the reading goes on by itself
+    from the chapter the Reader is on, and the Reader was following it, the Reader goes with it, so it's
+    on the chapter being read when it's next seen. Looked around, it stays put as now.
 
 51. **A Telugu-only lite app.** "telugu only lite version - reader,cross reference, highlight,verse
     scroll,read aloud... entire app should be in telugu."
@@ -1299,5 +1300,7 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     this app would need that too); then a Telugu version built from the same code, with its own name and
     icon and installed beside My Bible, leaving out the English text and the parts not listed (Greek and
     Hebrew, Notes, Search, Studied, …) and their data, so it's much smaller. A big job.
-    *To ask:* a separate app, or a Telugu only switch in this one; which parts besides those five
-    (Search, Notes, the widgets?); any English at all (the KJV beside the Telugu?); its name.
+    *Decided 29 Oct:* a separate app, named నా బైబిల్ ("My Bible"), installed beside My Bible. Its parts:
+    the Reader, Cross References, highlights, Verse Scroll, read aloud and the home screen widgets; no
+    Search, Notes or Studied. No English at all: the Telugu Bible only, and every word of the app in
+    Telugu.
