@@ -64,6 +64,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
@@ -87,11 +88,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
@@ -132,8 +137,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * settings, and stop.
  *
  * Given [compact] (over the pill; not with a verse's sheet), it's drawn in to a small round button at its
- * right while that's true, the reading playing: pause or play, in a ring that fills, gold, as the chapter's
- * read ([progress], 0 to 1), the bar laid across the whole width ([modifier]'s) for it.
+ * right while that's true, the reading playing: a sign of reading, in a ring that fills, gold, as the
+ * chapter's read ([progress], 0 to 1), the bar laid across the whole width ([modifier]'s) for it. A tap on
+ * the button asks for the full bar ([onOpen]), as a video player's controls; [onUsed] is told of each touch
+ * on the full bar, and [onMenu] whether the sleep timer's menu is open, so it's kept while it's in use.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -154,7 +161,10 @@ fun ReadAloudBar(
     onCancelSleep: () -> Unit,
     modifier: Modifier = Modifier,
     compact: Boolean? = null,
-    progress: Float = 0f
+    progress: Float = 0f,
+    onOpen: () -> Unit = {},
+    onUsed: () -> Unit = {},
+    onMenu: (Boolean) -> Unit = {}
 ) {
     val playing = state.status == ReadAloudState.Status.PLAYING
     val haptics = LocalHapticFeedback.current
@@ -229,7 +239,7 @@ fun ReadAloudBar(
                 )
             }
             ReadLanguageButton(language, MaterialTheme.colorScheme.onSurface, onLanguage)
-            SleepTimerButton(state, sleepLeft, onSleepIn, onSleepAtChapterEnd, onCancelSleep)
+            SleepTimerButton(state, sleepLeft, onSleepIn, onSleepAtChapterEnd, onCancelSleep, onMenu = onMenu)
             IconButton(onClick = onSettings, modifier = Modifier.size(38.dp)) {
                 Icon(Icons.Default.Tune, contentDescription = "Reading aloud settings", tint = MaterialTheme.colorScheme.onSurface)
             }
@@ -241,7 +251,7 @@ fun ReadAloudBar(
     if (compact == null) {
         Surface(shape = CircleShape, color = color, shadowElevation = 8.dp, modifier = modifier) { controls() }
     } else {
-        BarOrButton(compact, playing, progress, onPlayPause, color, controls, modifier)
+        BarOrButton(compact, progress, onOpen, onUsed, color, controls, modifier)
     }
 }
 
@@ -255,15 +265,15 @@ private val READ_BUTTON_MARGIN = 16.dp
 /**
  * The bar across the width given, centred, or drawn in to a round button near the right ([compact]): its body
  * narrowing in from the left and growing to the button's height, the controls in it fading first (cut to
- * it as it narrows), the button's sign and ring fading in as it lands. Back out, the button shows play for
- * a moment first. Only what shows takes a tap.
+ * it as it narrows), the button's sign and ring fading in as it lands. Only what shows takes a tap: the
+ * button's opens the bar ([onOpen]); each touch on the bar is [onUsed].
  */
 @Composable
 private fun BarOrButton(
     compact: Boolean,
-    playing: Boolean,
     progress: Float,
-    onPlayPause: () -> Unit,
+    onOpen: () -> Unit,
+    onUsed: () -> Unit,
     color: Color,
     controls: @Composable () -> Unit,
     modifier: Modifier
@@ -271,9 +281,10 @@ private fun BarOrButton(
     // Time through the change, evenly: 0 the bar, 1 the button. The body moves along it eased.
     val time by animateFloatAsState(
         targetValue = if (compact) 1f else 0f,
-        animationSpec = tween(BAR_MORPH_MS, delayMillis = if (compact) 0 else 120, easing = LinearEasing),
+        animationSpec = tween(BAR_MORPH_MS, easing = LinearEasing),
         label = "barToButton"
     )
+    val used by rememberUpdatedState(onUsed)
     val ring by animateFloatAsState(progress.coerceIn(0f, 1f), tween(600), label = "readingRing")
     val shape = remember { BarShape() }
     Layout(
@@ -281,6 +292,14 @@ private fun BarOrButton(
             Surface(shape = CircleShape, color = color, shadowElevation = 8.dp) {}
             Box(
                 Modifier
+                    // Each touch on the bar, whatever it lands on, without taking it from what it's for.
+                    .pointerInput(Unit) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                if (awaitPointerEvent(PointerEventPass.Initial).type == PointerEventType.Press) used()
+                            }
+                        }
+                    }
                     .graphicsLayer { alpha = (1f - time / 0.3f).coerceIn(0f, 1f) }
                     .drawWithContent {
                         val body = shape.body(FastOutSlowInEasing.transform(time)).translate(-shape.barLeft, -shape.barTop)
@@ -289,9 +308,8 @@ private fun BarOrButton(
                     }
             ) { controls() }
             ReadAloudButton(
-                playing = playing,
                 progress = { ring },
-                onClick = onPlayPause,
+                onClick = onOpen,
                 modifier = Modifier.graphicsLayer { alpha = ((time - 0.6f) / 0.4f).coerceIn(0f, 1f) }
             )
         },
@@ -342,11 +360,11 @@ private class BarShape {
 }
 
 /**
- * The bar drawn in to a button: pause while it reads, play while it's paused, in a ring the gold of which
- * goes round as far as the chapter's been read ([progress], read as it's drawn).
+ * The bar drawn in to a button: a sign of reading, in a ring the gold of which goes round as far as the
+ * chapter's been read ([progress], read as it's drawn). A tap brings the bar back ([onClick]).
  */
 @Composable
-private fun ReadAloudButton(playing: Boolean, progress: () -> Float, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun ReadAloudButton(progress: () -> Float, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val track = MaterialTheme.colorScheme.outline.copy(alpha = 0.27f)
     val gold = MaterialTheme.colorScheme.tertiary
     Box(
@@ -368,10 +386,10 @@ private fun ReadAloudButton(playing: Boolean, progress: () -> Float, onClick: ()
             .testTag("read_aloud_button")
     ) {
         Icon(
-            imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-            contentDescription = if (playing) "Pause reading aloud" else "Go on reading aloud",
+            imageVector = Icons.Default.GraphicEq,
+            contentDescription = "Reading aloud controls",
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(30.dp)
+            modifier = Modifier.size(28.dp)
         )
     }
 }
@@ -446,11 +464,18 @@ fun SleepTimerButton(
     onSleepIn: (Int) -> Unit,
     onChapterEnd: (() -> Unit)?,
     onCancel: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onMenu: (Boolean) -> Unit = {}
 ) {
     val sleep = state.sleep
     val left = rememberSleepLeft(sleep, sleepLeft)
     var open by remember { mutableStateOf(false) }
+    // Whether its menu is open, told as it opens and closes, and as the button goes with it open.
+    val menuChanged by rememberUpdatedState(onMenu)
+    DisposableEffect(open) {
+        menuChanged(open)
+        onDispose { if (open) menuChanged(false) }
+    }
     Box(modifier) {
         Box(
             contentAlignment = Alignment.Center,

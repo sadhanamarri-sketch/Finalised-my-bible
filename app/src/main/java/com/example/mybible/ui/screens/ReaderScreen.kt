@@ -111,6 +111,10 @@ private const val LOOK_AROUND_MS = 5_000L
 // How long the reading bar shows in full as a reading starts, before it draws in to its round button.
 private const val BAR_INTRO_MS = 3_000L
 
+// While it reads, how long the full bar stays after a tap on its round button brought it back (or after it
+// was last touched), before it draws in again, as a video player's controls do.
+private const val BAR_OPEN_MS = 4_000L
+
 // Reading aloud, how long the pill stays after the reading starts or plays on (or after the page is let go,
 // the pill brought back by a scroll up), before it drops away and the bar goes down into its place.
 private const val PILL_AWAY_MS = 3_000L
@@ -776,14 +780,25 @@ fun ReaderScreen(
 
     // The reading bar: in full for a moment as a reading starts, then, while it plays, drawn in to its round
     // button; in full again while it's paused. The button's ring: how far through its chapter the reading is.
+    // A tap on the button brings the full bar back for a moment (BAR_OPEN_MS), kept while it's being used
+    // (each touch on it starting the moment again), its settings are open or its sleep timer's menu.
     var barIntroDone by remember { mutableStateOf(false) }
+    var barOpen by remember { mutableStateOf(false) }
+    var barTouches by remember { mutableIntStateOf(0) }
+    var barMenuOpen by remember { mutableStateOf(false) }
     LaunchedEffect(readingInReader) {
         barIntroDone = false
+        barOpen = false
         if (!readingInReader) return@LaunchedEffect
         delay(BAR_INTRO_MS)
         barIntroDone = true
     }
-    val compactBar = listening && barIntroDone
+    LaunchedEffect(barOpen, barTouches, readAloudSheetOpen, barMenuOpen) {
+        if (!barOpen || readAloudSheetOpen || barMenuOpen) return@LaunchedEffect
+        delay(BAR_OPEN_MS)
+        barOpen = false
+    }
+    val compactBar = listening && barIntroDone && !barOpen
     var barWasCompact by remember { mutableStateOf(false) }
     SideEffect { if (readingInReader) barWasCompact = compactBar }
 
@@ -1670,6 +1685,9 @@ fun ReaderScreen(
                 onCancelSleep = viewModel::cancelSleep,
                 modifier = barModifier,
                 compact = compact,
+                onOpen = { barOpen = true; barTouches++ },
+                onUsed = { barOpen = true; barTouches++ },
+                onMenu = { barMenuOpen = it },
                 progress = readingProgress
             )
         }

@@ -1182,7 +1182,7 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     2.6 seconds after the page was let go and away by 3.8; back on pause, and staying; away again 3 seconds
     after playing on; still away while the chapter's last verses were read; back on stop.
 
-41. **Reader: the reading bar's controls without pausing.** "I don't like that it has to be paised to
+41. **Done 29 Oct.** **Reader: the reading bar's controls without pausing.** "I don't like that it has to be paised to
     see controls. How about we just minimize it with button and maximize when pressed. or any better
     way you can come up with."
     *Today (34):* while it plays, the bar draws in to the round button by itself, and a tap on the button
@@ -1199,6 +1199,12 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     *Decided 29 Oct:* the video player's way. A tap on the round button shows the full bar for about 4
     seconds (longer while it's being used), then it draws in again; the button no longer pauses, so it
     shows no pause sign, and pausing is on the full bar.
+    *Built 29 Oct,* just so. The round button shows a sound-wave sign in its gold ring; a tap on it brings
+    the full bar, the reading going on, and it draws in again 4 seconds after it was last touched. Kept
+    meanwhile: while its settings are open or the sleep timer's choices. Paused and played on from the bar,
+    it stays 4 seconds too; from the earbuds or the notification it's the button again at once, as before.
+    Tried here, each as described: opened and drawn in again (still there at 3.4 seconds, gone at 4.8);
+    Next tapped 3 seconds in kept it 4 seconds more; the sleep timer's choices open 6 seconds, still there.
 
 42. **Reader, Blur Mode: a verse tapped while it plays isn't brought into focus.** "When in blur mode,
     while in play mode, when pressed another verse to play, it doesn't change focus automatically but it
