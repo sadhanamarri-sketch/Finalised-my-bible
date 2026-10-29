@@ -1214,6 +1214,13 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     the reading's next part starts by itself (the verse's English giving way to its Telugu).
     *To do:* find what holds it back (tried with Both and Blur Mode), so the verse tapped is sharp and
     in the middle as soon as it's tapped.
+    *Tried 29 Oct, not reproduced:* Blur Mode, reading in both languages, by the phone's voice and from the
+    recordings. A tap on another verse while its English or its Telugu was read (on its words, on its Telugu
+    line, straight after scrolling the page, with the Telugu lines off), and the bar's Next: each time the
+    reading went on from that verse, and it was sharp and in the middle within a third of a second; nothing
+    waited for the reading's next part. Nothing in the code holds it back either, so nothing's changed yet.
+    *To ask:* whether the voice went to the verse tapped at once (only the page lagged), or went on with
+    the old verse until its part was done.
 
 43. **Verse Scroll: the progress bar, quieter, or a replay button instead.** "progress bar is
     distracting. make it greyish just like youtube shorts and no round thing when playing. It only
