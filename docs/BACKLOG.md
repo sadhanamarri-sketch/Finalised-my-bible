@@ -1166,7 +1166,7 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     back when paused, and still reads the verse tapped while it plays. If Follow still takes two taps
     while it plays, on the phone, what was on screen will tell where to look.
 
-40. **Reader: the pill out of the way while reading aloud plays.** "Is there a need of main pill if
+40. **Done 29 Oct.** **Reader: the pill out of the way while reading aloud plays.** "Is there a need of main pill if
     once read aloud is being played? doesn't it make sense to hide as soon as it goes to next verse to
     make space? or may after certain time like 3sec."
     *Today:* the pill hides only when the page is scrolled down, and comes back on a scroll up or a tap;
@@ -1176,6 +1176,11 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     up still brings it back meanwhile, to change chapter, and it goes again 3 seconds after the page is
     let go. 3 seconds rather than the next verse, as a long verse takes half a minute.
     *Decided 29 Oct:* 3 seconds, as suggested.
+    *Built 29 Oct,* just so; the page reaching the chapter's top or end as it's read doesn't bring the pill
+    back while it plays. Not reading, the pill hides and comes back as before. Tried here: the pill was
+    still there 2.4 seconds into a reading and away by 3.6; brought back by a scroll up, it was still there
+    2.6 seconds after the page was let go and away by 3.8; back on pause, and staying; away again 3 seconds
+    after playing on; still away while the chapter's last verses were read; back on stop.
 
 41. **Reader: the reading bar's controls without pausing.** "I don't like that it has to be paised to
     see controls. How about we just minimize it with button and maximize when pressed. or any better

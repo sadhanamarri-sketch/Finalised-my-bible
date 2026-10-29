@@ -111,6 +111,10 @@ private const val LOOK_AROUND_MS = 5_000L
 // How long the reading bar shows in full as a reading starts, before it draws in to its round button.
 private const val BAR_INTRO_MS = 3_000L
 
+// Reading aloud, how long the pill stays after the reading starts or plays on (or after the page is let go,
+// the pill brought back by a scroll up), before it drops away and the bar goes down into its place.
+private const val PILL_AWAY_MS = 3_000L
+
 /** Same "subtle container + matching solid button" recipe for all seven
  *  detour banners. */
 @Composable
@@ -613,9 +617,11 @@ fun ReaderScreen(
     }
     // Settle delay before forcing bars back on at a boundary, so a fast
     // fling that briefly overshoots doesn't flicker them in and out —
-    // same reasoning as Capacitor's settleTimer.
-    LaunchedEffect(atScrollBoundary) {
-        if (atScrollBoundary) {
+    // same reasoning as Capacitor's settleTimer. Not while reading aloud
+    // plays: the pill's away then (see PILL_AWAY_MS), and the page
+    // following the reading to the chapter's end mustn't bring it back.
+    LaunchedEffect(atScrollBoundary, listening) {
+        if (atScrollBoundary && !listening) {
             delay(120)
             if (atScrollBoundary) barsHidden = false
         }
@@ -780,6 +786,22 @@ fun ReaderScreen(
     val compactBar = listening && barIntroDone
     var barWasCompact by remember { mutableStateOf(false) }
     SideEffect { if (readingInReader) barWasCompact = compactBar }
+
+    // Reading aloud, the pill drops away a moment after the reading starts or plays on (as the bar draws in to
+    // its button), and the bar goes down into its place. A scroll up brings it back, to change chapter; it goes
+    // again a moment after the page is let go. Paused or stopped, it's back.
+    var pillAwayForReading by remember { mutableStateOf(false) }
+    LaunchedEffect(listening, barsHidden, canHideBars, dragged, letGo) {
+        if (!listening) {
+            if (pillAwayForReading) barsHidden = false
+            pillAwayForReading = false
+            return@LaunchedEffect
+        }
+        pillAwayForReading = true
+        if (barsHidden || !canHideBars || dragged) return@LaunchedEffect
+        delay(PILL_AWAY_MS)
+        barsHidden = true
+    }
     val readingProgress = readAloudState.verse?.takeIf { readingInReader }
         ?.let { (viewModel.readAloud.session as? ChapterReading)?.placeOf(it) }
         ?.let { (at, of) -> at.toFloat() / of } ?: 0f
