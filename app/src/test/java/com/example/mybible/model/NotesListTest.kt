@@ -19,8 +19,20 @@ class NotesListTest {
         date: String = "2026-10-20",
         created: Long = id,
         updated: Long = id,
-        pinned: Boolean = false
-    ) = NoteItem(id = id, title = title, text = text, refs = refs, tags = tags, noteDate = date, createdAt = created, updatedAt = updated, pinned = pinned)
+        pinned: Boolean = false,
+        special: Boolean = false
+    ) = NoteItem(id = id, title = title, text = text, refs = refs, tags = tags, noteDate = date, createdAt = created, updatedAt = updated, pinned = pinned, special = special)
+
+    @Test
+    fun theFilterCanShowTheSpecialNotesAlone() {
+        val notes = listOf(note(1, title = "Abiding", special = true), note(2, title = "Shopping"), note(3, title = "Psalms", special = true, pinned = true))
+        val today = LocalDate.of(2026, 10, 30)
+        fun ids(q: NotesQuery) = NotesFinder.rows(notes, q, today, order).map { (it as NotesRow.Note).note.id }
+        assertEquals(listOf(3L, 2L, 1L), ids(NotesQuery()))
+        assertEquals(listOf(3L, 1L), ids(NotesQuery(special = true)))
+        assertTrue(NotesQuery(special = true).filtering)
+        assertEquals(NotesQuery(text = "a", sort = NoteSort.EDITED), NotesQuery(text = "a", sort = NoteSort.EDITED, special = true, tags = listOf("x")).unfiltered())
+    }
 
     @Test
     fun versesSideBySideShowAsOnePassageInBibleOrder() {

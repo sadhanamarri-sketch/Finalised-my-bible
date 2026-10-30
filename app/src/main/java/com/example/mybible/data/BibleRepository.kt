@@ -1039,7 +1039,8 @@ class BibleRepository(private val context: Context) {
                 createdAt = existing?.createdAt ?: now,
                 updatedAt = now,
                 richText = richText,
-                pinned = existing?.pinned ?: false
+                pinned = existing?.pinned ?: false,
+                special = existing?.special ?: false
             )
             withContext(Dispatchers.IO) { noteDao.upsert(listOf(newNote.toNoteEntity())) }
         }
@@ -1062,6 +1063,17 @@ class BibleRepository(private val context: Context) {
             withContext(Dispatchers.IO) {
                 val note = noteDao.find(id)?.toNoteItem() ?: return@withContext
                 if (note.pinned != pinned) noteDao.upsert(listOf(note.copy(pinned = pinned).toNoteEntity()))
+            }
+        }
+    }
+
+    /** Marks the note special (purple in the notes list), or not; not an edit, so it keeps its edited time. */
+    suspend fun setNoteSpecial(id: Long, special: Boolean) {
+        moveLegacyNotes()
+        notesMutex.withLock {
+            withContext(Dispatchers.IO) {
+                val note = noteDao.find(id)?.toNoteItem() ?: return@withContext
+                if (note.special != special) noteDao.upsert(listOf(note.copy(special = special).toNoteEntity()))
             }
         }
     }

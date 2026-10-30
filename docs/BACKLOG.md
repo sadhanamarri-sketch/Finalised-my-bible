@@ -1315,10 +1315,15 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     restarts); held again, it goes on. Tested in the editor's rules; the keyboard's repeat itself only on
     the phone.
 
-48. **Notes list: special notes in purple.** "special notes in purple in notes list."
+48. **Done 30 Oct.** **Notes list: special notes in purple.** "special notes in purple in notes list."
     *Decided 29 Oct,* as suggested: a mark of its own, Special, put on or taken off from the note's menu
     as Pin is; a special note's card has a thin purple edge down its left and its title in purple, and
     the list's filter has Special.
+    *Built 30 Oct,* just so: "Mark as special" (a star) under Pin in a card's menu, "Not special" to take
+    it off; a special card's edge and title in the app's purple; the filter sheet's Show: All notes or
+    Special, and "Special" in the line under the search while it's on (Clear takes it off with the
+    rest). Marking doesn't count as an edit (the note keeps its edited time), and editing a note keeps
+    its mark. Checked here on the list, the menu, the sheet and Special alone.
 
 49. **Notes: verses named in a note count as its verses, and a whole chapter can be added.** "bible
     verses mentioned in the note should automatically count into add verse. Add provision to add entire

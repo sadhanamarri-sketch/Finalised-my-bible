@@ -18,6 +18,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Label
@@ -32,7 +34,9 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -46,6 +50,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import com.example.mybible.ui.theme.NotoSerifFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
+import com.example.mybible.ui.theme.quoteColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -57,6 +62,7 @@ import com.example.mybible.model.NoteSort
 import com.example.mybible.model.NotesFinder
 import com.example.mybible.model.NotesQuery
 import com.example.mybible.model.NotesRow
+import com.example.mybible.model.QuoteSide
 import com.example.mybible.model.groupRefs
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
@@ -284,6 +290,7 @@ fun NotesScreen(
             // clear) what's filtering the list without reopening the sheet.
             if (query.filtering) {
                 val summaryParts = buildList {
+                    if (query.special) add("Special")
                     if (query.tags.isNotEmpty()) {
                         add(
                             when {
@@ -322,9 +329,7 @@ fun NotesScreen(
                         fontSize = 12.5.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable {
-                            viewModel.setNotesQuery(query.copy(tags = emptyList(), allTags = false, dates = NoteDates.Any))
-                        }
+                        modifier = Modifier.clickable { viewModel.setNotesQuery(query.unfiltered()) }
                     )
                 }
             }
@@ -367,6 +372,7 @@ fun NotesScreen(
                                     onOpen = { viewModel.openNoteReader(note) },
                                     onEdit = { viewModel.openNoteEditor(note) },
                                     onPin = { viewModel.setNotePinned(note, !note.pinned) },
+                                    onSpecial = { viewModel.setNoteSpecial(note, !note.special) },
                                     onShare = { shareText(context, note.title, NoteSharing.asText(note, ::bibleBookIndex)) },
                                     onCopy = {
                                         clipboard.setText(AnnotatedString(NoteSharing.asText(note, ::bibleBookIndex)))
@@ -417,7 +423,8 @@ private fun BookHeading(row: NotesRow.Book) {
 }
 
 // A note in the list: its title (or, untitled, its first line), a quiet line with its verses and
-// date, and the start of its text; a pin when it's pinned to the top.
+// date, and the start of its text; a pin when it's pinned to the top; marked special, a purple edge
+// down its left and its title in purple.
 @Composable
 private fun NoteCard(
     note: NoteItem,
@@ -425,6 +432,7 @@ private fun NoteCard(
     onOpen: () -> Unit,
     onEdit: () -> Unit,
     onPin: () -> Unit,
+    onSpecial: () -> Unit,
     onShare: () -> Unit,
     onCopy: () -> Unit,
     onDelete: () -> Unit
@@ -440,6 +448,8 @@ private fun NoteCard(
         },
         cardDate(note, today)
     ).joinToString(" · ")
+    // The app's purple (the quotations' too).
+    val purple = quoteColor(QuoteSide.QUOTES)
     Card(
         onClick = onOpen,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -449,6 +459,7 @@ private fun NoteCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .then(if (note.special) Modifier.drawBehind { drawRect(purple, size = Size(4.dp.toPx(), size.height)) } else Modifier)
                 .padding(14.dp)
         ) {
             Row(
@@ -470,7 +481,7 @@ private fun NoteCard(
                     fontFamily = WorkSansFontFamily,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 0.sp,
-                    color = MaterialTheme.colorScheme.tertiary,
+                    color = if (note.special) purple else MaterialTheme.colorScheme.tertiary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
@@ -505,6 +516,14 @@ private fun NoteCard(
                             onClick = {
                                 showMenu = false
                                 onPin()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(if (note.special) "Not special" else "Mark as special") },
+                            leadingIcon = { Icon(if (note.special) Icons.Outlined.StarOutline else Icons.Filled.Star, contentDescription = null) },
+                            onClick = {
+                                showMenu = false
+                                onSpecial()
                             }
                         )
                         DropdownMenuItem(
@@ -607,9 +626,7 @@ private fun NotesFilterSheet(
                         fontSize = 13.5.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable {
-                            onChange(query.copy(tags = emptyList(), allTags = false, dates = NoteDates.Any))
-                        }
+                        modifier = Modifier.clickable { onChange(query.unfiltered()) }
                     )
                 }
             }
@@ -624,6 +641,18 @@ private fun NotesFilterSheet(
                         label = { Text(sort.label) }
                     )
                 }
+            }
+
+            // ── Special ──────────────────────────────────────────────────
+            NeSectionLabel("Show")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = !query.special, onClick = { onChange(query.copy(special = false)) }, label = { Text("All notes") })
+                FilterChip(
+                    selected = query.special,
+                    onClick = { onChange(query.copy(special = true)) },
+                    label = { Text("Special") },
+                    leadingIcon = { Icon(Icons.Filled.Star, contentDescription = null, tint = quoteColor(QuoteSide.QUOTES), modifier = Modifier.size(16.dp)) }
+                )
             }
 
             // ── Tags ─────────────────────────────────────────────────────

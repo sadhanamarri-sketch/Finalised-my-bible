@@ -331,6 +331,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { repository.setNotePinned(note.id, pinned) }
     }
 
+    fun setNoteSpecial(note: NoteItem, special: Boolean) {
+        viewModelScope.launch { repository.setNoteSpecial(note.id, special) }
+    }
+
     // Feeds HighlightedVersesScreen (the "Highlighted Verses" browser tab):
     // joins the two flows above against each verse's text. Recomputes
     // whenever either the highlight set or the color labels change; verse

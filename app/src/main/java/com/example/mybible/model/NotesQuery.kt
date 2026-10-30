@@ -29,9 +29,14 @@ data class NotesQuery(
     // All the chosen tags on a note, rather than any one of them.
     val allTags: Boolean = false,
     val dates: NoteDates = NoteDates.Any,
-    val sort: NoteSort = NoteSort.NEWEST
+    val sort: NoteSort = NoteSort.NEWEST,
+    // Only the notes marked special.
+    val special: Boolean = false
 ) {
-    val filtering: Boolean get() = tags.isNotEmpty() || dates != NoteDates.Any
+    val filtering: Boolean get() = tags.isNotEmpty() || dates != NoteDates.Any || special
+
+    /** The same order and search, every filter off. */
+    fun unfiltered(): NotesQuery = copy(tags = emptyList(), allTags = false, dates = NoteDates.Any, special = false)
 }
 
 /** A line of the notes list: a note, or in Bible order the book the notes under it are on. */
@@ -48,7 +53,9 @@ object NotesFinder {
      * verses last. [bookIndex] gives a book's place in the Bible.
      */
     fun rows(notes: List<NoteItem>, q: NotesQuery, today: LocalDate, bookIndex: (String) -> Int): List<NotesRow> {
-        val found = notes.filter { matchesText(it, q.text) && matchesTags(it, q.tags, q.allTags) && matchesDates(it, q.dates, today) }
+        val found = notes.filter {
+            (!q.special || it.special) && matchesText(it, q.text) && matchesTags(it, q.tags, q.allTags) && matchesDates(it, q.dates, today)
+        }
         val (pinned, rest) = found.partition { it.pinned }
         val out = ArrayList<NotesRow>(found.size + 8)
         sorted(pinned, q.sort, bookIndex).mapTo(out) { NotesRow.Note(it) }

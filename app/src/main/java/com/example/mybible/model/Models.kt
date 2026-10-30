@@ -364,7 +364,9 @@ data class NoteItem(
     // search, backup — never need to know richText exists.
     val richText: String = "",
     // Kept at the top of the notes list.
-    val pinned: Boolean = false
+    val pinned: Boolean = false,
+    // Marked special: purple in the notes list, whose filter can show these alone.
+    val special: Boolean = false
 )
 
 @Serializable
