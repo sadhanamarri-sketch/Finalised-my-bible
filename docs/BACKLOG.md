@@ -1468,3 +1468,28 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     first word clear. Each verse now begins a little more after the one before (up to a fifth of a
     second more).
 
+
+53. **Proposed 30 Oct (not built).** **Verse Scroll: a Share button that shares the verse as a picture.** "is
+    it possible to replace quick links with a share button in scroll verse that can share the verse along
+    with the image in 9:16 and more resolutions as possible? how big a build is this?"
+    *Meant:* the bottom bar's "N links" button replaced by Share. Share turns the card into a picture, its
+    photo with the verse on it, in a choice of shapes, and hands it to WhatsApp, Instagram and the rest.
+    *Today:* nothing in the app shares a picture (notes share as text). The scene photos are all 900×1950
+    pixels.
+    *Losing the Links button:* its sheet (the strongest links; tap one to read it next) goes. Following a
+    verse's links stays, in the Rabbit hole tab at the top, and so does Cross References, through Read.
+    *Proposed:* Share opens a sheet with a preview, a choice of shape, and Share and Save to phone
+    (Pictures/My Bible). Each shape is 1080 pixels on its short side, which is what those apps keep; bigger
+    would only sharpen the words, as the photos are 900 wide.
+    - Status and Stories, 9:16 (1080×1920)
+    - The phone's own screen, for a lock-screen wallpaper (for example 1080×2400)
+    - Post, 4:5 (1080×1350)
+    - Square, 1:1 (1080×1080)
+    - Wide, 16:9 (1920×1080): the photo as a tall panel at one side, the verse beside it
+    The picture has the card's photo (or your own picture for that scene), and the verse in the card's
+    language (English, Telugu or Both) and type, with its reference, over the card's soft dark fade. The
+    words are sized to fit, smaller for a long verse.
+    *Size:* medium, about 700 to 900 lines in 5 or 6 files (the picture maker, the sheet, handing the file
+    to other apps, the button, tests): two to three times item 49, smaller than 46.
+    *To ask:* a small "My Bible" mark on the picture or not; the verse sent as text with the picture or
+    not; a larger size too or not.
