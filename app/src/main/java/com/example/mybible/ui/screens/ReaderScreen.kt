@@ -77,10 +77,10 @@ import com.example.mybible.ui.components.BIBLE_BOOKS
 // the legacy single book/chapter/verse fields. A note picked with multiple
 // references (see MainViewModel's picking mode) attaches to *all* of them,
 // so the old refs-blind check was missing markers/previews for every verse
-// past the first one on a multi-ref note.
+// past the first one on a multi-ref note. A note on a whole chapter (verse 0) is at its first verse.
 private fun com.example.mybible.model.NoteItem.matchesVerse(book: String, chapter: Int, verse: Int): Boolean {
     if (refs.isNotEmpty()) {
-        return refs.any { it.book == book && it.chapter == chapter && it.verse == verse }
+        return refs.any { it.book == book && it.chapter == chapter && it.verse.coerceAtLeast(1) == verse }
     }
     return this.book == book && this.chapter == chapter && this.verse == verse
 }
@@ -910,10 +910,18 @@ fun ReaderScreen(
             // the cross-reference back bar, matching Capacitor's #pickBanner
             // / #selectBanner sitting in the same fixed top slot.
             if (readerPickMode != ReaderPickMode.NONE) {
+                // Picking a note's verses, the chapter on the page can be one of them, as a whole.
+                val notePicking = readerPickMode == ReaderPickMode.NOTE_PICK
+                val chapterPicked = notePicking && (pickedNoteRefs + noteDraft?.refs.orEmpty()).any {
+                    it.book == currentBook && it.chapter == currentChapter && it.verse == 0
+                }
                 PickModeBanner(
                     message = pickBannerMessage,
-                    doneLabel = if (readerPickMode == ReaderPickMode.NOTE_PICK) "Done" else "Done",
-                    onDone = { viewModel.finishPicking() }
+                    doneLabel = "Done",
+                    onDone = { viewModel.finishPicking() },
+                    extraLabel = if (notePicking) "Whole chapter" else null,
+                    extraOn = chapterPicked,
+                    onExtra = { viewModel.pickWholeChapter() }
                 )
             }
             // "Return to cross references" banner — shown after tapping a

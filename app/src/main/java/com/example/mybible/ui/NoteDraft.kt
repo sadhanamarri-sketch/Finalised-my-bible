@@ -7,7 +7,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.example.mybible.model.NoteDocument
 import com.example.mybible.model.NoteItem
+import com.example.mybible.model.NoteReference
 import com.example.mybible.model.NoteText
+import com.example.mybible.model.namedRefs
 import com.example.mybible.ui.richtext.NoteEditorState
 
 /**
@@ -20,7 +22,8 @@ import com.example.mybible.ui.richtext.NoteEditorState
 class NoteDraft(val original: NoteItem) {
     var id by mutableLongStateOf(original.id)
     var title by mutableStateOf(original.title)
-    var refs by mutableStateOf(original.refs)
+    // The verses added with + Verse; those named in its title or text are worked out from them (named).
+    var refs by mutableStateOf(original.refs.filterNot { it.named })
     var tags by mutableStateOf(original.tags)
     var date by mutableStateOf(original.noteDate)
     val body = NoteEditorState(bodyOf(original))
@@ -35,6 +38,10 @@ class NoteDraft(val original: NoteItem) {
 
     /** As it was opened, to tell whether there's anything to discard. */
     val openedKey: List<Any> = savedKey
+
+    /** The verses named in its title and text as they're written: its verses too (see namedRefs). */
+    fun named(verses: (book: String, chapter: Int) -> Int?): List<NoteReference> =
+        namedRefs(title, body.note.plainText(), verses)
 
     /** Nothing in it: no title, no text and no verses (a list of verses is a note). */
     fun isEmpty(): Boolean = title.isBlank() && body.note.isEmpty() && refs.isEmpty()

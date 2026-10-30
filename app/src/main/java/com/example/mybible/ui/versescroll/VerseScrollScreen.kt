@@ -140,8 +140,9 @@ private fun notePreview(note: NoteItem): String? {
     return if (line.length > 90) line.take(89) + "…" else line
 }
 
+// A note on a whole chapter (verse 0) is at its first verse.
 private fun noteRefs(note: NoteItem): List<VerseRef> =
-    note.refs.map { VerseRef(it.book, it.chapter, it.verse) }
+    note.refs.map { VerseRef(it.book, it.chapter, it.verse.coerceAtLeast(1)) }.distinct()
         .ifEmpty { if (note.book.isNotEmpty()) listOf(VerseRef(note.book, note.chapter, note.verse)) else emptyList() }
 
 /**

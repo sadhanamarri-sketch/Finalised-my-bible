@@ -5,15 +5,16 @@ package com.example.mybible.data
  * A single Bible-reference mention found in free text, e.g. "John 3:16" or
  * "1 Cor. 13:4-7". Ported verbatim from Capacitor's XREF_RE — same pattern,
  * same capture groups (optional leading book number, book name, chapter,
- * verse). The end-verse range (m[5] in Capacitor) is matched but, like
- * Capacitor's linkifyXrefs, not used for navigation — only the start verse
- * is followed.
+ * verse). The end verse (m[5] in Capacitor) isn't used for navigation, like
+ * Capacitor's linkifyXrefs — only the start verse is followed — but a note
+ * counts the whole passage among its verses (see namedRefs).
  */
 data class VerseMention(
     val book: String,
     val chapter: Int,
     val verse: Int,
-    val range: IntRange // character range in the original text
+    val range: IntRange, // character range in the original text
+    val toVerse: Int = verse // the passage's last verse: 30 for "Rom 8:28-30"
 )
 
 // Matches Capacitor's XREF_RE = /\b([1-3])?\s?([A-Za-z]{2,})\.?\s(\d{1,3}):(\d{1,3})(?:[-–](\d{1,3}))?/g
@@ -43,7 +44,8 @@ fun findVerseMentions(text: String): List<VerseMention> {
         val canonical = resolveBookName(num + name) ?: continue
         val chapter = chStr.toIntOrNull() ?: continue
         val verse = vStr.toIntOrNull() ?: continue
-        results.add(VerseMention(canonical, chapter, verse, match.range))
+        val toVerse = match.groupValues[5].toIntOrNull()?.takeIf { it > verse } ?: verse
+        results.add(VerseMention(canonical, chapter, verse, match.range, toVerse))
     }
     return results
 }

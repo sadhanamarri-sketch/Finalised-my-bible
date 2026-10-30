@@ -105,7 +105,9 @@ object NotesFinder {
         val m = REFERENCE.matchEntire(q) ?: return bookMatches(ref.book, q)
         val (bookPart, chapter, verse, verseTo) = m.destructured
         if (!bookMatches(ref.book, bookPart.trim()) || ref.chapter != chapter.toInt()) return false
+        // A note on the whole chapter is on each of its verses.
         val from = verse.toIntOrNull() ?: return true
+        if (ref.verse == 0) return true
         return ref.verse in from..(verseTo.toIntOrNull() ?: from)
     }
 

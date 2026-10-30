@@ -63,6 +63,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -95,9 +96,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.mybible.model.NoteReference
 import com.example.mybible.model.RefRange
 import com.example.mybible.model.ThemeMode
+import com.example.mybible.model.chapterSizes
 import com.example.mybible.model.groupRefs
+import com.example.mybible.model.withNamed
 import com.example.mybible.ui.NoteDraft
 import com.example.mybible.ui.components.bibleBookIndex
 import com.example.mybible.ui.richtext.NoteBodyField
@@ -132,7 +136,9 @@ fun NoteEditorScreen(
     onDelete: () -> Unit,
     onAddVerse: () -> Unit,
     onPreviewReference: (RefRange) -> Unit,
-    modifier: Modifier = Modifier.fillMaxSize()
+    modifier: Modifier = Modifier.fillMaxSize(),
+    // How many verses each chapter has, by book, to know a verse named in the note is there.
+    verseCounts: Map<String, List<Int>> = emptyMap()
 ) {
     val look = rememberNoteLook(themeMode)
     val body = draft.body
@@ -253,8 +259,10 @@ fun NoteEditorScreen(
                     onNext = { runCatching { body.focusRequester.requestFocus() } }
                 )
                 Spacer(Modifier.height(10.dp))
+                val named by remember(draft, verseCounts) { derivedStateOf { draft.named(chapterSizes(verseCounts)) } }
                 NoteDetails(
                     draft = draft,
+                    named = named,
                     onAddVerse = onAddVerse,
                     onPreviewReference = onPreviewReference,
                     onPickDate = { pickingDate = true },
@@ -402,20 +410,23 @@ private val Capitals = VisualTransformation { text ->
 @Composable
 private fun NoteDetails(
     draft: NoteDraft,
+    named: List<NoteReference>,
     onAddVerse: () -> Unit,
     onPreviewReference: (RefRange) -> Unit,
     onPickDate: () -> Unit,
     onAddTag: () -> Unit
 ) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        // Verses side by side as one passage: "John 15:1–8"; × takes off all of it.
-        groupRefs(draft.refs, ::bibleBookIndex).forEach { range ->
+        // Verses side by side as one passage: "John 15:1–8"; × takes off those added with + Verse.
+        // One named in the text has no ×: it goes when it's taken out of the text.
+        groupRefs(withNamed(draft.refs, named), ::bibleBookIndex).forEach { range ->
+            val added = draft.refs.any { range.covers(it) }
             DetailChip(
                 icon = Icons.AutoMirrored.Filled.MenuBook,
                 text = range.label,
                 onClick = { onPreviewReference(range) },
-                removeLabel = "Remove ${range.label}",
-                onRemove = { draft.refs = draft.refs.filterNot { range.covers(it) } }
+                removeLabel = if (added) "Remove ${range.label}" else null,
+                onRemove = if (added) ({ draft.refs = draft.refs.filterNot { range.covers(it) } }) else null
             )
         }
         DetailChip(icon = Icons.Default.Add, text = "Verse", onClick = onAddVerse, quiet = true)

@@ -21,6 +21,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -126,7 +128,11 @@ fun PickModeBanner(
     message: String,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
-    doneLabel: String = "Done"
+    doneLabel: String = "Done",
+    // A second button before Done ("Whole chapter"), filled while [extraOn].
+    extraLabel: String? = null,
+    extraOn: Boolean = false,
+    onExtra: () -> Unit = {}
 ) {
     Surface(
         color = MaterialTheme.colorScheme.primary,
@@ -146,6 +152,23 @@ fun PickModeBanner(
                 color = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.weight(1f).padding(end = 12.dp)
             )
+            if (extraLabel != null) {
+                val onPrimary = MaterialTheme.colorScheme.onPrimary
+                OutlinedButton(
+                    onClick = onExtra,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, onPrimary.copy(alpha = 0.6f)),
+                    colors = if (extraOn) {
+                        ButtonDefaults.outlinedButtonColors(containerColor = onPrimary, contentColor = MaterialTheme.colorScheme.primary)
+                    } else {
+                        ButtonDefaults.outlinedButtonColors(contentColor = onPrimary)
+                    },
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    modifier = Modifier.height(32.dp).semantics { selected = extraOn }
+                ) {
+                    Text(extraLabel, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                }
+                Spacer(Modifier.width(8.dp))
+            }
             OutlinedButton(
                 onClick = onDone,
                 border = androidx.compose.foundation.BorderStroke(

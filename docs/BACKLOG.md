@@ -1325,9 +1325,9 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     rest). Marking doesn't count as an edit (the note keeps its edited time), and editing a note keeps
     its mark. Checked here on the list, the menu, the sheet and Special alone.
 
-49. **Notes: verses named in a note count as its verses, and a whole chapter can be added.** "bible
-    verses mentioned in the note should automatically count into add verse. Add provision to add entire
-    chapter too."
+49. **Done 30 Oct.** **Notes: verses named in a note count as its verses, and a whole chapter can be
+    added.** "bible verses mentioned in the note should automatically count into add verse. Add provision
+    to add entire chapter too."
     *Today:* a note's verses are the ones added with + Verse; a verse named in its text (John 3:16, linked
     as it's written) isn't one of them, so the note isn't at that verse in the Reader, under its book in
     the list, or found by that reference.
@@ -1335,6 +1335,17 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     written, and gone again when taken out of the text (unless also added with + Verse). + Verse can pick
     a whole chapter ("John 3"), kept as one passage.
     *Decided 29 Oct:* a note on a whole chapter has its dot at the chapter's first verse in the Reader.
+    *Built 30 Oct,* just so: a verse written in the note's title or text ("John 3:16", "Rom 8:28-30" for
+    all three) shows in the details strip as it's typed, without an ×, and goes when it's taken out of
+    the text; one also added with + Verse keeps its × and stays. They count everywhere a note's verses
+    do: the Reader's dot and the verse's notes, Verse Scroll, the list's line and Bible order, search by
+    reference, and Share (each with its words). Verses that aren't there ("John 3:99") are left out.
+    + Verse's banner has Whole chapter, for the chapter on the page: "John 3", a passage of its own (its
+    dot at verse 1; a tap shows the whole chapter, which scrolls; Open in Reader goes to its top); the
+    chapter holds its verses, so "John 3:16" written in the same note adds nothing more. Notes written
+    before have their named verses added once the Bible is in (and notes brought in by a restore too),
+    without counting as an edit. Checked here with the real Bible text: saving, the strip as it's typed,
+    Whole chapter on and off, the chapter's preview, and an older note given its verses.
 
 50. **Reader: the page turns with the reading into the next chapter.** "turn chapter along with read
     loud as the read aloud move to next chapter."

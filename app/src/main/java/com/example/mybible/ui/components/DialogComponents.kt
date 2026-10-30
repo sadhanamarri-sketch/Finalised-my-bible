@@ -10,6 +10,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -36,6 +37,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import com.example.mybible.model.EnglishDictionaryEntry
 import com.example.mybible.model.HighlightColorDef
+import com.example.mybible.model.RefRange
 import com.example.mybible.ui.theme.FrauncesFontFamily
 import com.example.mybible.ui.theme.LiterataFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
@@ -324,7 +326,7 @@ fun VerseMentionPreviewSheet(
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Text(
-                text = (if (toVerse > verse) "$book $chapter:$verse\u2013$toVerse" else "$book $chapter:$verse").uppercase(),
+                text = RefRange(book, chapter, verse, toVerse).label.uppercase(),
                 fontSize = 13.sp,
                 fontFamily = WorkSansFontFamily,
                 letterSpacing = 0.5.sp,
@@ -332,12 +334,14 @@ fun VerseMentionPreviewSheet(
                 color = MaterialTheme.colorScheme.tertiary
             )
             Spacer(modifier = Modifier.height(10.dp))
+            // A long passage or a whole chapter scrolls, its buttons kept below it.
             Text(
                 text = verseText ?: "Loading\u2026",
                 fontSize = 17.sp,
                 fontFamily = com.example.mybible.ui.theme.SourceSerif4FontFamily,
                 lineHeight = 29.07.sp,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())
             )
             Spacer(modifier = Modifier.height(18.dp))
             if (onInsert != null) {

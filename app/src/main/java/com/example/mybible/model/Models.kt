@@ -323,8 +323,12 @@ sealed interface TopicRow {
 data class NoteReference(
     val book: String,
     val chapter: Int,
+    // 0 for a whole chapter ("John 3").
     val verse: Int,
-    val verseText: String = ""
+    val verseText: String = "",
+    // Named in the note's title or text (John 3:16, linked as it's written) rather than added with
+    // + Verse: one of the note's verses for as long as it's named there (see namedRefs).
+    val named: Boolean = false
 )
 
 @Serializable

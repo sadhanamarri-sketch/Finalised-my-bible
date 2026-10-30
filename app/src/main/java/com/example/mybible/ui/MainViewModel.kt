@@ -1020,10 +1020,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val last = maxOf(verse, toVerse)
         _verseMentionPreview.value = VerseMentionPreview(book, chapter, verse, null, lexiconOriginTab, noteReturnItem, last, quotable)
         viewModelScope.launch {
-            val texts = (verse..last).map { v -> v to repository.getVerseText(book, chapter, v) }.filter { it.second != null }
+            // A whole chapter (verse 0): each of its verses.
+            val texts = repository.getVerseRange(book, chapter, maxOf(verse, 1), if (verse == 0) Int.MAX_VALUE else last)
+                .map { it.number to it.text }
             val text = when {
                 texts.isEmpty() -> null
-                last == verse -> texts.first().second
+                verse > 0 && last == verse -> texts.first().second
                 // A passage: each verse with its number, as the Reader shows them.
                 else -> texts.joinToString(" ") { (v, t) -> superscriptNumber(v) + "\u2009" + t }
             }
@@ -1035,7 +1037,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (current != null && current.book == book && current.chapter == chapter && current.verse == verse && current.toVerse == last) {
                 _verseMentionPreview.value = current.copy(
                     text = text ?: "This verse's text isn't available offline right now.",
-                    quote = texts.takeIf { it.isNotEmpty() }?.joinToString(" ") { it.second!! }
+                    quote = texts.takeIf { it.isNotEmpty() }?.joinToString(" ") { it.second }
                 )
             }
         }
@@ -1407,6 +1409,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _otTotalVerses.value = repository.getVerseCountForBooks(otBooks)
             _ntTotalVerses.value = repository.getVerseCountForBooks(ntBooks)
             _chapterVerseCounts.value = repository.getChapterVerseCounts()
+            // Notes saved before the verses named in a note counted as its verses (backlog 49).
+            repository.addNamedVerses()
         }
     }
 
@@ -3033,8 +3037,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     it.book == verse.book && it.chapter == verse.chapter && it.verse == verse.number
                 }
                 val label = "${verse.book} ${verse.chapter}:${verse.number}"
-                val revertTo = if (pickModeResumesEditor) "Adding to note \u2014 tap a verse"
-                    else "Tap verses to add \u2014 or tap Done to write without one"
+                val revertTo = notePickHint()
                 when {
                     alreadyPicked -> {
                         // Tapped again this session — unselect it.
@@ -3081,6 +3084,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
             ReaderPickMode.NONE -> Unit
+        }
+    }
+
+    private fun notePickHint() = if (pickModeResumesEditor) "Adding to note \u2014 tap a verse"
+        else "Tap verses to add \u2014 or tap Done to write without one"
+
+    /** The banner's Whole chapter: the chapter on the page added to the note as one passage ("John 3"), or taken off. */
+    fun pickWholeChapter() {
+        if (_readerPickMode.value != ReaderPickMode.NOTE_PICK) return
+        val book = _currentBook.value
+        val chapter = _currentChapter.value
+        fun isIt(r: NoteReference) = r.book == book && r.chapter == chapter && r.verse == 0
+        val draft = _noteDraft.value
+        when {
+            _pickedNoteRefs.value.any(::isIt) -> {
+                _pickedNoteRefs.value = _pickedNoteRefs.value.filterNot(::isIt)
+                setPickBanner("Removed $book $chapter", notePickHint())
+            }
+            pickModeResumesEditor && draft != null && draft.refs.any(::isIt) -> {
+                draft.refs = draft.refs.filterNot(::isIt)
+                setPickBanner("Removed $book $chapter", notePickHint())
+            }
+            else -> {
+                _pickedNoteRefs.value = _pickedNoteRefs.value + NoteReference(book, chapter, 0)
+                setPickBanner("Added $book $chapter", notePickHint())
+            }
         }
     }
 

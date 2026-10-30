@@ -283,6 +283,7 @@ class MainActivity : ComponentActivity() {
             val showSavedWordsScreen by viewModel.showSavedWordsScreen.collectAsState()
             val savedWords by viewModel.savedWords.collectAsState(initial = emptyList())
             val noteDraft by viewModel.noteDraft.collectAsState()
+            val chapterVerseCounts by viewModel.chapterVerseCounts.collectAsState()
             val allNotes by viewModel.notes.collectAsState(initial = emptyList())
             val noteToRead by viewModel.noteToRead.collectAsState()
             val readerPickMode by viewModel.readerPickMode.collectAsState()
@@ -643,7 +644,9 @@ class MainActivity : ComponentActivity() {
                                     viewModel.closeNoteEditor()
                                 }
                                 viewModel.disableBlurModeForNavigation()
-                                viewModel.jumpToVerse(preview.book, preview.chapter, preview.verse)
+                                // A whole chapter opens at its top.
+                                if (preview.verse == 0) viewModel.jumpToVerse(preview.book, preview.chapter, 1, focusVerse = false)
+                                else viewModel.jumpToVerse(preview.book, preview.chapter, preview.verse)
                                 viewModel.selectTab(NavTab.READER)
                             },
                             onDismiss = { viewModel.closeVerseMentionPreview() }
@@ -733,7 +736,8 @@ class MainActivity : ComponentActivity() {
                                 onAddVerse = { viewModel.addVerseToDraft() },
                                 onPreviewReference = { range ->
                                     viewModel.openVerseMentionPreview(range.book, range.chapter, range.from, toVerse = range.to, quotable = true)
-                                }
+                                },
+                                verseCounts = chapterVerseCounts
                             )
                         }
                     }

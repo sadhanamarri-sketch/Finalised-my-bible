@@ -424,6 +424,18 @@ class BibleRepository(private val context: Context) {
     private fun resolvedHighlightColorDefs(overrides: Map<String, String>): List<HighlightColorDef> =
         HIGHLIGHT_COLOR_DEFS.map { def -> overrides[def.colorHex]?.let { def.copy(label = it) } ?: def }
 
+    // The note with these verses, the first kept in the old one-verse fields too.
+    private fun NoteItem.withRefs(refs: List<NoteReference>): NoteItem {
+        val primary = refs.firstOrNull()
+        return copy(
+            refs = refs,
+            book = primary?.book ?: "",
+            chapter = primary?.chapter ?: 0,
+            verse = primary?.verse ?: 0,
+            verseText = primary?.verseText ?: ""
+        )
+    }
+
     private fun NoteItem.normalized(): NoteItem {
         val normalizedRefs = if (refs.isNotEmpty()) {
             refs
@@ -1018,7 +1030,7 @@ class BibleRepository(private val context: Context) {
         moveLegacyNotes()
         val now = System.currentTimeMillis()
         val noteId = if (id > 0) id else now
-        val normalizedRefs = refs.distinctBy { Triple(it.book, it.chapter, it.verse) }
+        val normalizedRefs = notesVerses(refs, title, text)
         val primary = normalizedRefs.firstOrNull()
         notesMutex.withLock {
             val existing = withContext(Dispatchers.IO) { noteDao.find(noteId) }?.toNoteItem()
@@ -1100,6 +1112,56 @@ class BibleRepository(private val context: Context) {
     suspend fun resolveNoteReference(ref: NoteReference): NoteReference {
         val text = getVerseText(ref.book, ref.chapter, ref.verse) ?: ""
         return ref.copy(verseText = if (ref.verseText.isBlank()) text else ref.verseText)
+    }
+
+    // How many verses each chapter has, read once the Bible is in: for the verses named in notes.
+    @Volatile private var verseCountsRead: Map<String, List<Int>> = emptyMap()
+
+    private suspend fun verseCounts(): Map<String, List<Int>> =
+        verseCountsRead.ifEmpty { getChapterVerseCounts().also { verseCountsRead = it } }
+
+    // A note's verses (backlog 49): those added with + Verse in [refs], then those named in its
+    // title or text, each with its words (kept from [refs] when it was there already).
+    private suspend fun notesVerses(refs: List<NoteReference>, title: String, text: String): List<NoteReference> {
+        val added = refs.filterNot { it.named }.distinctBy { Triple(it.book, it.chapter, it.verse) }
+        val known = refs.associate { Triple(it.book, it.chapter, it.verse) to it.verseText }
+        val named = namedRefs(title, text, chapterSizes(verseCounts())).map { r ->
+            known[Triple(r.book, r.chapter, r.verse)]?.takeIf { it.isNotBlank() }?.let { r.copy(verseText = it) } ?: r
+        }
+        return withNamed(added, withVerseText(named))
+    }
+
+    // Words for the verses without them, read a chapter at a time.
+    private suspend fun withVerseText(refs: List<NoteReference>): List<NoteReference> {
+        val wanted = refs.filter { it.verseText.isBlank() && it.verse > 0 }
+        if (wanted.isEmpty()) return refs
+        val words = HashMap<Triple<String, Int, Int>, String>()
+        withContext(Dispatchers.IO) {
+            wanted.groupBy { it.book to it.chapter }.forEach { (at, verses) ->
+                bibleDao.getVerseRange(at.first, at.second, verses.minOf { it.verse }, verses.maxOf { it.verse })
+                    .forEach { words[Triple(it.book, it.chapter, it.number)] = it.text }
+            }
+        }
+        return refs.map { r -> if (r.verseText.isBlank()) words[Triple(r.book, r.chapter, r.verse)]?.let { r.copy(verseText = it) } ?: r else r }
+    }
+
+    /**
+     * The verses named in each note's title or text (backlog 49), for notes saved before they
+     * counted or brought in by a restore: added to the note, which keeps its edited time. Waits
+     * for the Bible to be in, to know which verses there are.
+     */
+    suspend fun addNamedVerses() {
+        if (verseCounts().isEmpty()) return
+        moveLegacyNotes()
+        notesMutex.withLock {
+            withContext(Dispatchers.IO) {
+                val changed = noteDao.getAll().mapNotNull { it.toNoteItem() }.mapNotNull { note ->
+                    val refs = notesVerses(note.refs, note.title, note.text)
+                    if (refs == note.refs) null else note.withRefs(refs)
+                }
+                if (changed.isNotEmpty()) noteDao.upsert(changed.map { it.toNoteEntity() })
+            }
+        }
     }
 
 
@@ -1758,6 +1820,8 @@ class BibleRepository(private val context: Context) {
             }
             if (toWrite.isNotEmpty()) noteDao.upsert(toWrite.values.map { it.toNoteEntity() })
         }
+        // A note from a backup made before verses named in a note counted: those added now.
+        if (notesAdded + notesUpdated > 0) addNamedVerses()
 
         // Tags: union by name, case-insensitive; new names only. Prefers
         // tagDefs (carries description) over the legacy name-only `tags`
