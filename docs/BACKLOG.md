@@ -1410,7 +1410,7 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
 
 ## Noted 30 Oct 2026
 
-52. **Read aloud: a verse's first word not clearly heard.** "The sentences mostly cut off the first word
+52. **Done 30 Oct.** **Read aloud: a verse's first word not clearly heard.** "The sentences mostly cut off the first word
     (i meant it's not clearly heard)... is it because of bad cutting or there's a fade in while starting
     the sentences? can you check?"
     *Checked 30 Oct (nothing changed yet):*
@@ -1432,4 +1432,16 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     verse before), so a soft first sound is kept and earbuds come on over the pause before the word; and
     the silence between verses made an inaudible hiss, far below anything heard, so earbuds that switch
     off on exact silence stay on (for the phone's voice too, whose words start almost at once).
+    *Built 30 Oct,* just so. A recording's verse is played from a quarter of a second before its timed
+    start, in the pause before it, stopping at the end of the verse before; a chapter's first verse
+    without its spoken heading (Verse Scroll's) from just before it, as before, the heading's last word
+    being close. Checked on the same recordings first: the verses started less than 0.06 s before their
+    first sound went from about one in four to one in twenty, and what the earlier start takes in is a
+    breath or the background (and once, Genesis 9:29 in Telugu, the first word of a verse timed a
+    quarter of a second late, which it had been cutting), not the verse before. The app's silence while
+    it reads is now a hiss about 72 dB under full sound: with the phone as loud as it goes, about as
+    loud as a very quiet room, and nothing under a voice.
+    *To listen for on the phone,* with the earbuds: in Both, and with the phone's voice, each verse's
+    first word clear. Each verse now begins a little more after the one before (up to a fifth of a
+    second more).
 

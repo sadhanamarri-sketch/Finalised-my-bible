@@ -20,11 +20,11 @@ class RecordingTimingsTest {
 
     @Test
     fun aVerseIsPlayedFromAMomentBeforeItNeverIntoTheOneBefore() {
-        // Just before it starts.
-        assertEquals(VerseSpan("ruth.mp3", 9.46, 9.5, 20.0), timings.verse("Ruth", 1, 2)?.rounded())
+        // A quarter of a second before it starts, in the pause before it.
+        assertEquals(VerseSpan("ruth.mp3", 9.25, 9.5, 20.0), timings.verse("Ruth", 1, 2)?.rounded())
         // Not back into the verse before, ending just before it.
         assertEquals(VerseSpan("ruth.mp3", 20.0, 20.02, 39.0), timings.verse("Ruth", 1, 3)?.rounded())
-        // A chapter's first: from its spoken heading, or not.
+        // A chapter's first: from its spoken heading, or not (then only just before it: the heading's close).
         assertEquals(VerseSpan("ruth.mp3", 40.0, 44.0, 60.0), timings.verse("Ruth", 2, 1, heading = true)?.rounded())
         assertEquals(VerseSpan("ruth.mp3", 43.96, 44.0, 60.0), timings.verse("Ruth", 2, 1)?.rounded())
         // Nothing for what the recording hasn't.

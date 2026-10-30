@@ -4,15 +4,19 @@ import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
 import kotlin.concurrent.thread
+import kotlin.random.Random
 
 /**
  * Silence, played in the app's own name while it reads aloud. The voice is the speech engine's sound —
  * another app's — and Android hands a headset's buttons and earbuds' taps to the app whose sound played
  * last: without this they'd go to some other app, or nowhere. It also keeps a Bluetooth headset's sound
  * open between verses, so a verse's first word isn't clipped as it starts up again.
+ *
+ * Not quite silence: a hiss far below hearing ([hiss]). Many earbuds switch their sound off during exact
+ * silence and fade it back in when sound comes again, over the next verse's first word (backlog 52).
  */
 internal class Silence {
-    // The sound being played, and the thread feeding it silence, a chunk at a time.
+    // The sound being played, and the thread feeding it the hiss, a chunk at a time.
     @Volatile
     private var track: AudioTrack? = null
     private var writer: Thread? = null
@@ -44,7 +48,7 @@ internal class Silence {
         }
         track = playing
         writer = thread(name = "ReadAloudSilence", isDaemon = true) {
-            val quiet = ShortArray(CHUNK)
+            val quiet = hiss(CHUNK)
             // Each write waits while the last half second plays.
             while (track === playing) {
                 val written = playing.write(quiet, 0, quiet.size)
@@ -69,11 +73,19 @@ internal class Silence {
         playing.release()
     }
 
-    private companion object {
+    internal companion object {
         const val SAMPLE_RATE = 8_000
-        // Half a second of silence a write.
+        // Half a second of it a write.
         const val CHUNK = SAMPLE_RATE / 2
         const val IDLE_MS = 100L
         const val JOIN_MS = 1_000L
+
+        // The hiss: each sample anywhere within this of nothing (of 32767), about 72 dB under full sound —
+        // with the phone as loud as it goes, about as loud as a very quiet room; under a voice, nothing.
+        const val HISS = 14
+
+        /** [size] samples of the hiss. */
+        fun hiss(size: Int, random: Random = Random(52)): ShortArray =
+            ShortArray(size) { (random.nextInt(2 * HISS + 1) - HISS).toShort() }
     }
 }

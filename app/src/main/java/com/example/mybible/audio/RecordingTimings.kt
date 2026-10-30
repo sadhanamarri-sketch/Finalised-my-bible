@@ -40,23 +40,33 @@ class RecordingTimings(
     }
 
     /**
-     * Where [verse] of [book] [chapter] is: null when the recording hasn't it. It's played from a moment
+     * Where [verse] of [book] [chapter] is: null when the recording hasn't it. It's played from a little
      * before it starts, never back into the verse before; a chapter's first verse, with [heading], from
-     * the chapter's spoken heading ("Genesis chapter 1").
+     * the chapter's spoken heading ("Genesis chapter 1"), and without it, from just before it.
      */
     fun verse(book: String, chapter: Int, verse: Int, heading: Boolean = false): VerseSpan? {
         val timing = chapter(book, chapter) ?: return null
         if (verse < 1 || verse > timing.verses) return null
         val start = timing.start(verse)
-        val before = if (verse == 1) timing.start else timing.end(verse - 1)
-        val from = if (verse == 1 && heading) timing.start else maxOf(before, start - LEAD_SECONDS).coerceAtMost(start)
+        val from = when {
+            verse == 1 && heading -> timing.start
+            verse == 1 -> maxOf(timing.start, start - FIRST_LEAD_SECONDS)
+            else -> maxOf(timing.end(verse - 1), start - LEAD_SECONDS)
+        }.coerceAtMost(start)
         return VerseSpan(timing.file, from, start, timing.end(verse))
     }
 
     companion object {
-        // How long before a verse's first sound it's played from: an MP3's frames are 26 ms each, and
-        // playing starts at the first whole one, so none of the first word is lost.
-        const val LEAD_SECONDS = 0.04
+        // How long before a verse's timed start it's played from: a quarter of a second of the pause before
+        // it (backlog 52). Its first word's first sound is kept where it starts a little before the time it
+        // was given (a soft "th", "h" or "f"), and earbuds that take a moment to come on as sound starts do
+        // so over the pause, not the word. Measured on the recordings: about one verse in four had been
+        // started less than 0.06 s before its first sound; now about one in twenty.
+        const val LEAD_SECONDS = 0.25
+
+        // A chapter's first verse played without its spoken heading: from just before it (an MP3's frames
+        // are 26 ms each, and playing starts at the first whole one), the heading's last word being close.
+        const val FIRST_LEAD_SECONDS = 0.04
 
         private val json = Json { ignoreUnknownKeys = true }
 
