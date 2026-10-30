@@ -10,13 +10,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.mybible.model.QuoteSide
 import com.example.mybible.ui.theme.WorkSansFontFamily
 
-/** The small "Quote" tag on a cross reference that is one of the Old Testament's quotations in the New, in [color]. */
+/**
+ * The small tag on a cross reference that is one of the Old Testament's quotations in the New, in [color]:
+ * "Quotes" on the verse quoting ([side]), "Quoted in" on the verse quoted.
+ */
 @Composable
-fun QuoteTag(color: Color, modifier: Modifier = Modifier) {
+fun QuoteTag(side: QuoteSide, color: Color, modifier: Modifier = Modifier) {
     Text(
-        text = "QUOTE",
+        text = if (side == QuoteSide.QUOTES) "QUOTES" else "QUOTED IN",
         color = color,
         fontFamily = WorkSansFontFamily,
         fontWeight = FontWeight.SemiBold,

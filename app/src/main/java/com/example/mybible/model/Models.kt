@@ -420,9 +420,18 @@ data class CrossReferenceItem(
     val targetChapter: Int,
     val targetVerse: Int,
     val previewText: String,
-    /** One of the Old Testament's quotations in the New (see Quotations). */
-    val quote: Boolean = false
+    /** One of the Old Testament's quotations in the New (see Quotations), seen from this side. */
+    val quote: QuoteSide? = null
 )
+
+/** Which side of one of the Old Testament's quotations in the New a verse is on, and so its links. */
+enum class QuoteSide {
+    /** The New Testament's verse, quoting: its link goes to the verse it quotes ("Quotes", purple). */
+    QUOTES,
+
+    /** The Old Testament's verse, quoted: its link goes to the verse quoting it ("Quoted in", teal). */
+    QUOTED_IN
+}
 
 enum class ThemeMode {
     PAPER,        // Classic warm paper #F6F3EC

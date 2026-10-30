@@ -1,5 +1,7 @@
 package com.example.mybible.versescroll
 
+import com.example.mybible.model.QuoteSide
+
 /** A Rabbit hole only follows a link on its own when at least this many readers voted it helpful. */
 const val MIN_AUTO_VOTES = 5
 
@@ -17,9 +19,9 @@ private const val PER_HUB = 3
 
 /**
  * Where a link points: one verse, or the first of a short passage ([count] verses, 2 or 3), how strong
- * it is, and whether it's one of the Old Testament's quotations in the New ([quote]).
+ * it is, and whether it's one of the Old Testament's quotations in the New ([quote], the side it's seen from).
  */
-data class Link(val ref: VerseRef, val votes: Int, val count: Int = 1, val quote: Boolean = false) {
+data class Link(val ref: VerseRef, val votes: Int, val count: Int = 1, val quote: QuoteSide? = null) {
     val refs: List<VerseRef> get() = (0 until count).map { VerseRef(ref.book, ref.chapter, ref.verse + it) }
 }
 

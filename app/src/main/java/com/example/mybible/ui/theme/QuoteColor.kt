@@ -4,15 +4,22 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import com.example.mybible.model.QuoteSide
 
-// The purple that marks the Old Testament's quotations in the New: the Reader's †, the Cross
-// References' quotations, and Verse Scroll's links. Deeper on paper, lighter on the dark themes.
+// The colours that mark the Old Testament's quotations in the New: the Reader's †, the Cross References'
+// quotations, and Verse Scroll's links. Purple where the New Testament quotes, teal where the Old is
+// quoted. Deeper on paper, lighter on the dark themes.
 private val PaperQuote = Color(0xFF7A4BAA)
 private val DarkQuote = Color(0xFFC3A2EA)
+private val PaperQuoted = Color(0xFF1F7A72)
+private val DarkQuoted = Color(0xFF7FCFC6)
 
-/** The quotations' purple on a [dark] background or a light one. */
-fun quotePurple(dark: Boolean): Color = if (dark) DarkQuote else PaperQuote
+/** A quotation's colour on a [dark] background or a light one: purple quoting, teal quoted. */
+fun quoteColor(side: QuoteSide, dark: Boolean): Color = when (side) {
+    QuoteSide.QUOTES -> if (dark) DarkQuote else PaperQuote
+    QuoteSide.QUOTED_IN -> if (dark) DarkQuoted else PaperQuoted
+}
 
-/** The quotations' purple for the theme on screen. */
+/** A quotation's colour for the theme on screen. */
 @Composable
-fun quotePurple(): Color = quotePurple(MaterialTheme.colorScheme.background.luminance() < 0.5f)
+fun quoteColor(side: QuoteSide): Color = quoteColor(side, MaterialTheme.colorScheme.background.luminance() < 0.5f)

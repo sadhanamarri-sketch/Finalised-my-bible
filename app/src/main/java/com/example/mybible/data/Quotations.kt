@@ -1,5 +1,7 @@
 package com.example.mybible.data
 
+import com.example.mybible.model.QuoteSide
+
 /**
  * The New Testament's quotations of the Old, read and checked by hand (see tools/quotations): each a
  * New Testament verse, or a few, and the Old Testament verses it quotes. They mark the verses that quote
@@ -27,8 +29,25 @@ class Quotations(private val pairs: List<Pair<Passage, Passage>>) {
         byChapter[book to chapter].orEmpty().flatMapTo(HashSet()) { it.first..it.last }
 
     /** Whether [book] [chapter]:[verse] quotes the Old Testament or is quoted in the New. */
-    fun quotes(book: String, chapter: Int, verse: Int): Boolean =
+    fun hasQuotation(book: String, chapter: Int, verse: Int): Boolean =
         byChapter[book to chapter].orEmpty().any { it.has(book, chapter, verse) }
+
+    /** The side [book] [chapter]:[verse] is on: quoting (the New Testament's) or quoted (the Old's); null, neither. */
+    fun sideOf(book: String, chapter: Int, verse: Int): QuoteSide? = when {
+        pairs.any { it.first.has(book, chapter, verse) } -> QuoteSide.QUOTES
+        pairs.any { it.second.has(book, chapter, verse) } -> QuoteSide.QUOTED_IN
+        else -> null
+    }
+
+    /** The verses of [book] [chapter] that quote the Old Testament or are quoted in the New, each with its side. */
+    fun sidesIn(book: String, chapter: Int): Map<Int, QuoteSide> {
+        val sides = HashMap<Int, QuoteSide>()
+        for ((nt, ot) in pairs) {
+            if (nt.book == book && nt.chapter == chapter) for (v in nt.first..nt.last) sides[v] = QuoteSide.QUOTES
+            if (ot.book == book && ot.chapter == chapter) for (v in ot.first..ot.last) sides.putIfAbsent(v, QuoteSide.QUOTED_IN)
+        }
+        return sides
+    }
 
     /**
      * The passages [book] [chapter]:[verse] quotes, or is quoted in, that none of [linked] (the passages its

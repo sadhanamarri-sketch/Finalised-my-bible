@@ -767,7 +767,7 @@ class BibleRepository(private val context: Context) {
 
     suspend fun countCrossReferencesFrom(bookName: String, chapter: Int, verse: Int): Int =
         withContext(Dispatchers.IO) {
-            val missed = if (quotations.quotes(bookName, chapter, verse)) {
+            val missed = if (quotations.hasQuotation(bookName, chapter, verse)) {
                 unlinkedQuotations(bookName, chapter, verse, bibleDao.getCrossReferences(bookName, chapter, verse)).size
             } else {
                 0
@@ -1516,6 +1516,7 @@ class BibleRepository(private val context: Context) {
             // The quotations first, however few votes they have, each from the verse holding it (of a longer
             // passage); then the strongest 20 of the rest.
             val parts = rows.associateWith { quotations.quotedPart(book, chapter, verse, it.toBook, it.toChapter, it.toVerse, it.toVerseEnd) }
+            val side = quotations.sideOf(book, chapter, verse)
             val (quotes, rest) = rows.partition { parts[it] != null }
             return@withContext (quotes.map { it to parts[it]!!.first } + rest.take(20).map { it to null }).map { (row, quoted) ->
                 val target = quoted ?: row.toVerse
@@ -1524,7 +1525,7 @@ class BibleRepository(private val context: Context) {
                     targetChapter = row.toChapter,
                     targetVerse = target,
                     previewText = bibleDao.getVerseText(row.toBook, row.toChapter, target) ?: "",
-                    quote = quoted != null
+                    quote = side.takeIf { quoted != null }
                 )
             }.distinctBy { Triple(it.targetBook, it.targetChapter, it.targetVerse) }
         }
@@ -1540,8 +1541,8 @@ class BibleRepository(private val context: Context) {
         }
     }
 
-    /** The verses of [book] [chapter] that quote the Old Testament or are quoted in the New. */
-    fun quotedVerses(book: String, chapter: Int): Set<Int> = quotations.versesIn(book, chapter)
+    /** The verses of [book] [chapter] that quote the Old Testament or are quoted in the New, each with its side. */
+    fun quotedVerses(book: String, chapter: Int): Map<Int, QuoteSide> = quotations.sidesIn(book, chapter)
 
     // Chapter-scoped: which verse numbers have at least one cross-reference,
     // loaded once per chapter so VerseCard can mark them with a dagger

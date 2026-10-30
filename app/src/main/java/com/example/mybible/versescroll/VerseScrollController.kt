@@ -805,7 +805,7 @@ class VerseScrollController(
             .flatMap { (it as? VerseFeedCard)?.content?.refs.orEmpty() }
             .mapTo(HashSet()) { it.key }
         val links = linkSource.links(card.content.ref)
-        return (links.filter { it.quote } + links.filterNot { it.quote }.take(LINKS_SHOWN)).mapNotNull { link ->
+        return (links.filter { it.quote != null } + links.filter { it.quote == null }.take(LINKS_SHOWN)).mapNotNull { link ->
             loadContent(link.ref, link.count)?.let { LinkPreview(link, it, link.ref.key in seen) }
         }
     }
@@ -850,8 +850,8 @@ class VerseScrollController(
         val seen = HashSet<String>()
         for (row in repository.getCrossReferenceRows(ref.book, ref.chapter, ref.verse)) {
             val quoted = repository.quotations.quotedPart(ref.book, ref.chapter, ref.verse, row.toBook, row.toChapter, row.toVerse, row.toVerseEnd)
-            val quote = quoted != null
-            if (row.votes < MIN_SUGGESTED_VOTES && !quote) continue
+            val quote = if (quoted != null) repository.quotations.sideOf(ref.book, ref.chapter, ref.verse) else null
+            if (row.votes < MIN_SUGGESTED_VOTES && quote == null) continue
             val first = VerseRef(row.toBook, row.toChapter, quoted?.first ?: row.toVerse)
             if (first == ref || !seen.add(first.key)) continue
             val span = (quoted?.last ?: row.toVerseEnd) - first.verse + 1

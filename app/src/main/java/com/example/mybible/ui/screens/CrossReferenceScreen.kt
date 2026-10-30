@@ -23,7 +23,7 @@ import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.components.BackTopBar
 import com.example.mybible.ui.components.QuoteTag
 import com.example.mybible.ui.theme.WorkSansFontFamily
-import com.example.mybible.ui.theme.quotePurple
+import com.example.mybible.ui.theme.quoteColor
 
 /**
  * Full-page cross-reference list, replacing the old CrossReferenceSheet
@@ -216,7 +216,7 @@ fun CrossReferenceScreen(
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            // A quotation (always first): its reference in purple, tagged.
+                                            // A quotation (always first): its reference in its side's colour, tagged.
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Text(
                                                     text = "${item.targetBook} ${item.targetChapter}:${item.targetVerse}".uppercase(),
@@ -224,9 +224,9 @@ fun CrossReferenceScreen(
                                                     fontFamily = WorkSansFontFamily,
                                                     fontWeight = FontWeight.SemiBold,
                                                     letterSpacing = 0.5.sp,
-                                                    color = if (item.quote) quotePurple() else MaterialTheme.colorScheme.tertiary
+                                                    color = item.quote?.let { quoteColor(it) } ?: MaterialTheme.colorScheme.tertiary
                                                 )
-                                                if (item.quote) QuoteTag(quotePurple(), Modifier.padding(start = 8.dp))
+                                                item.quote?.let { QuoteTag(it, quoteColor(it), Modifier.padding(start = 8.dp)) }
                                             }
                                             Icon(
                                                 imageVector = Icons.Default.ArrowForward,

@@ -58,6 +58,7 @@ import com.example.mybible.model.GreekWord
 import com.example.mybible.model.HebrewWord
 import com.example.mybible.model.HighlightColorDef
 import com.example.mybible.model.NoteItem
+import com.example.mybible.model.QuoteSide
 import com.example.mybible.model.Verse
 import androidx.compose.foundation.BorderStroke
 import com.example.mybible.ui.theme.*
@@ -117,7 +118,7 @@ fun VerseCard(
     hasNotes: Boolean,
     hasXref: Boolean = false,
     // The verse quotes the Old Testament, or is quoted in the New: its dagger is purple.
-    isQuotation: Boolean = false,
+    quotation: QuoteSide? = null,
     onVerseClick: () -> Unit,
     onVerseLongClick: () -> Unit,
     onGreekWordClick: (GreekWord) -> Unit,
@@ -264,12 +265,12 @@ fun VerseCard(
                     // Greek word chips below — so it doesn't fall through to
                     // the row's combinedClickable (select/long-press) or
                     // require threading it through the annotated verse text.
-                    // Purple for a quotation (see Quotations).
+                    // A quotation's colour (see Quotations): purple quoting, teal quoted.
                     if (hasXref && onCrossReferenceMarkerClick != null) {
                         Text(
                             text = "\u2020",
                             fontSize = 11.5.sp,
-                            color = if (isQuotation) quotePurple(isDark) else if (isDark) DarkGold else PaperGold,
+                            color = quotation?.let { quoteColor(it, isDark) } ?: if (isDark) DarkGold else PaperGold,
                             modifier = Modifier
                                 .padding(start = 2.dp)
                                 .clickable(onClick = onCrossReferenceMarkerClick)

@@ -1,5 +1,6 @@
 package com.example.mybible.data
 
+import com.example.mybible.model.QuoteSide
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -47,8 +48,8 @@ class QuotationsTest {
 
     @Test
     fun theQuotationsAVersesCrossReferencesMissAreLinksOfTheirOwn() {
-        assertTrue(quotations.quotes("Psalms", 22, 2))
-        assertFalse(quotations.quotes("Psalms", 22, 3))
+        assertTrue(quotations.hasQuotation("Psalms", 22, 2))
+        assertFalse(quotations.hasQuotation("Psalms", 22, 3))
         // Linked to neither side: both, each from the verse on the other.
         assertEquals(listOf(Quotations.Passage("Hosea", 11, 1, 1)), quotations.unlinked("Matthew", 2, 15, emptyList()))
         assertEquals(listOf(Quotations.Passage("Matthew", 27, 46, 46)), quotations.unlinked("Psalms", 22, 2, emptyList()))
@@ -58,6 +59,17 @@ class QuotationsTest {
         // Cross references elsewhere don't count, and a verse quoting nothing misses nothing.
         assertEquals(1, quotations.unlinked("Matthew", 2, 15, listOf(Quotations.Passage("Hosea", 11, 2, 4))).size)
         assertTrue(quotations.unlinked("Matthew", 2, 14, emptyList()).isEmpty())
+    }
+
+    @Test
+    fun eachVerseIsOnItsSideQuotingOrQuoted() {
+        assertEquals(QuoteSide.QUOTES, quotations.sideOf("Matthew", 2, 15))
+        assertEquals(QuoteSide.QUOTED_IN, quotations.sideOf("Hosea", 11, 1))
+        assertEquals(QuoteSide.QUOTED_IN, quotations.sideOf("Psalms", 22, 2))
+        assertNull(quotations.sideOf("Matthew", 2, 14))
+        assertEquals(mapOf(1 to QuoteSide.QUOTED_IN, 2 to QuoteSide.QUOTED_IN), quotations.sidesIn("Psalms", 22))
+        assertEquals(mapOf(54 to QuoteSide.QUOTES, 55 to QuoteSide.QUOTES), quotations.sidesIn("1 Corinthians", 15))
+        assertTrue(quotations.sidesIn("Matthew", 3).isEmpty())
     }
 
     @Test

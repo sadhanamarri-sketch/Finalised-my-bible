@@ -84,7 +84,7 @@ import com.example.mybible.model.HighlightColorDef
 import com.example.mybible.model.MatchedWord
 import com.example.mybible.ui.theme.GelasioFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
-import com.example.mybible.ui.theme.quotePurple
+import com.example.mybible.ui.theme.quoteColor
 import com.example.mybible.ui.components.BIBLE_BOOKS
 import com.example.mybible.ui.components.BookListStep
 import com.example.mybible.ui.components.ChapterGridStep
@@ -1131,7 +1131,7 @@ internal fun LinksSheet(
                 letterSpacing = 0.12.em
             )
             val shown = previews?.size ?: 0
-            val quotes = previews.orEmpty().count { it.link.quote }
+            val quotes = previews.orEmpty().count { it.link.quote != null }
             val sub = when {
                 previews == null -> "Finding the strongest links…"
                 quotes > 0 && shown > quotes -> "Quotations first, then the strongest of its $total links. Tap one to read it next."
@@ -1185,16 +1185,16 @@ private fun LinkItem(
             .padding(start = 13.dp, end = 13.dp, top = 11.dp, bottom = 12.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            // A quotation: its reference in purple, tagged.
+            // A quotation: its reference in its side's colour, tagged.
             Text(
                 text = content.label.uppercase(),
-                color = if (preview.link.quote) quotePurple(colors.dark) else colors.gold,
+                color = preview.link.quote?.let { quoteColor(it, colors.dark) } ?: colors.gold,
                 fontFamily = WorkSansFontFamily,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 11.5.sp,
                 letterSpacing = 0.1.em
             )
-            if (preview.link.quote) QuoteTag(quotePurple(colors.dark))
+            preview.link.quote?.let { QuoteTag(it, quoteColor(it, colors.dark)) }
             highlights.forEach { highlight ->
                 Box(
                     Modifier
