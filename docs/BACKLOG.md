@@ -1535,3 +1535,26 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     *Not covered:* Paul's prayers in his letters (Romans 1:9, Ephesians 1:16 and 3:14, Philippians 1:4,
     Colossians 1:9, 1 Thessalonians 1:2, 2 Thessalonians 1:11, Philemon 4) aren't in Nave's list, so they
     still wouldn't come up. A list of them could be added by hand.
+
+55. **Proposed 30 Oct (not built).** **Search: subjects no word or topic names.** "is there a way to cover
+    those kind of topics?" (after 54: Paul's prayers in his letters, which neither say "Paul" nor are in
+    Nave's list).
+    *Three ways, smallest first:*
+    - **A person and a subject searched in that person's own words.** When no verse has both, the name
+      stands for what the person wrote or said: Paul, his 13 letters (Romans to Philemon); John, his
+      Gospel, letters and Revelation; Peter, James and Jude, their letters; Solomon, Proverbs,
+      Ecclesiastes and the Song; David, the psalms titled his; Jesus, his own words (the red letters the
+      app already marks). The subject is read widely: intercession as prayer for others (pray, prayer,
+      supplication, intreat, "making mention of you"). In Paul's letters that finds 46 verses, his prayers
+      for the churches among them (Romans 1:9 and 10:1, Ephesians 1:16, Philippians 1:4 and 1:9,
+      Colossians 1:3 and 1:9, 1 Thessalonians 1:2 and 3:10, 2 Thessalonians 1:11, 2 Timothy 1:3,
+      Philemon 4), those praying "for you" first; it misses one that names no prayer (Ephesians 3:14,
+      "I bow my knees"). Medium: about 300 to 400 lines; it fits with 54.
+    - **A second topic book: Torrey's Topical Textbook** (1897, public domain): about 600 topics broken
+      into thousands of headings, many of them lists of examples (intercessory prayer, by whom), shown
+      with Nave's in Search. Medium: a tool to read it in, about 300 lines in the app, and a data file of
+      a megabyte or two. It needs a clean copy to read in, and what it covers checked first.
+    - **Search by meaning, on the phone:** a small language model finds verses that mean what's typed,
+      whatever the words ("praying for others", "worried about money"). English only (one for Telugu too
+      is far bigger); the app grows by 30 to 40 MB; a search takes a moment longer on older phones.
+      Large: the biggest of the three by far.
