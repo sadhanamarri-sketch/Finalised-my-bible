@@ -1407,6 +1407,25 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     the Reader, Cross References, highlights, Verse Scroll, read aloud and the home screen widgets; no
     Search, Notes or Studied. No English at all: the Telugu Bible only, and every word of the app in
     Telugu.
+    *Designed 30 Oct* (not built yet), for people who aren't at home with phones: a clickable mock-up
+    of 13 screens and the tab bar, https://claude.ai/artifact/2BhtmUiGYZEigFng9Y9oZt (private to the
+    owner).
+    - Four tabs always at the bottom, each a word under its picture: హోమ్, బైబిల్ (the Reader), ధ్యానం
+      (Verse Scroll) and గుర్తులు (highlights). Settings (అమరికలు) open from Home.
+    - Big letters from the start: the first screen asks how big (మామూలు, పెద్దవి, చాలా పెద్దవి), and
+      the Reader's అ button and Settings change it (five sizes, 18 to 30 px; పెద్దవి, 23 px, is the
+      usual). The Bible in Tiro Telugu, the app's words in Baloo Tammudu 2.
+    - Every button says what it does, in plain Telugu, and nothing is done only by a swipe or a long
+      press. A verse is touched for its choices: ఇక్కడ నుండి వినండి, గుర్తు పెట్టండి (four colours, with
+      రద్దు చేయండి to undo), సంబంధిత వచనాలు (the Cross References) and పంపండి. A tip says so the first
+      time. Verse Scroll has a తరువాతి వచనం button. Every page but the tabs has a వెనుకకు button.
+    - Home: where you stopped (చదవడం కొనసాగించండి), today's verse (వినండి, పంపండి), and the books.
+    - Books: all 66 on one page, two columns, with jumps to పాత నిబంధన and క్రొత్త నిబంధన; then the
+      chapters as big numbers, the one you stopped at filled.
+    - Read aloud: one big ఆపండి / వినండి button between the previous and next verse, the verse being
+      read tinted, and speed and a stop timer as buttons that show their setting.
+    - Widgets: today's verse (చదవండి, వినండి) and continue reading (4×1).
+    - Maroon (#8B2232) on warm paper, so it's told apart from My Bible on the phone.
 
 ## Noted 30 Oct 2026
 
