@@ -1206,7 +1206,7 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     Tried here, each as described: opened and drawn in again (still there at 3.4 seconds, gone at 4.8);
     Next tapped 3 seconds in kept it 4 seconds more; the sleep timer's choices open 6 seconds, still there.
 
-42. **Set aside 29 Oct.** **Reader, Blur Mode: a verse tapped while it plays isn't brought into focus.** "When in blur mode,
+42. **Discarded 30 Oct.** **Reader, Blur Mode: a verse tapped while it plays isn't brought into focus.** "When in blur mode,
     while in play mode, when pressed another verse to play, it doesn't change focus automatically but it
     changes only when there's an automatic swift(like moving from english to telugu verse during play)"
     *Today:* a tap on a verse while it plays reads from it (34), and in Blur Mode the sharp verse is meant
@@ -1392,7 +1392,7 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     read. Checked here: Notes open, rebuilt with the screen off, screen off, looked around then Notes,
     and looked around on the page.
 
-51. **A Telugu-only lite app.** "telugu only lite version - reader,cross reference, highlight,verse
+51. **Saved for later 30 Oct.** **A Telugu-only lite app.** "telugu only lite version - reader,cross reference, highlight,verse
     scroll,read aloud... entire app should be in telugu."
     *Meant, most likely:* a smaller app for Telugu readers: the Telugu Bible only, with the Reader, Cross
     References, highlights, Verse Scroll and read aloud, and every word of the app (menus, buttons,
@@ -1407,3 +1407,29 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     the Reader, Cross References, highlights, Verse Scroll, read aloud and the home screen widgets; no
     Search, Notes or Studied. No English at all: the Telugu Bible only, and every word of the app in
     Telugu.
+
+## Noted 30 Oct 2026
+
+52. **Read aloud: a verse's first word not clearly heard.** "The sentences mostly cut off the first word
+    (i meant it's not clearly heard)... is it because of bad cutting or there's a fade in while starting
+    the sentences? can you check?"
+    *Checked 30 Oct (nothing changed yet):*
+    - No fade-in: the app fades nothing in as a verse starts (its only fade is the sleep timer's, out).
+    - The cutting is right. Measured on the recordings kept here (ten chapters of the narrated KJV, and
+      Genesis, Ruth, Mark, Hebrews and Jude in Telugu, about 2,800 verses): a verse's timed start is
+      usually about 0.05 s before its first sound, and it's played from 0.04 s before that. The verses
+      that looked cut had a breath (or, in the KJV, the background) before them, and the word itself
+      starting right at the cut.
+    - But the margin is thin: half the verses start playing less than 0.1 s before their first sound,
+      one in six less than 0.06 s. A soft first sound ("th", "h", "f", "s") can lose its start there,
+      and so can anything that takes a moment to come on as sound starts.
+    - Earbuds: between verses (and between a verse's English and Telugu) the app plays exact silence, to
+      keep Bluetooth earbuds connected and their buttons coming to it. Many earbuds switch their sound off
+      during exact silence and fade it back in when sound comes again, over about a tenth of a second or
+      two: just the time it takes to reach the first word. "Mostly" fits that. A quick check: the same
+      verses on the phone's own speaker; clear there, it's the earbuds.
+    *Proposed:* each verse played from 0.25 s before its timed start, not 0.04 s (never back into the
+    verse before), so a soft first sound is kept and earbuds come on over the pause before the word; and
+    the silence between verses made an inaudible hiss, far below anything heard, so earbuds that switch
+    off on exact silence stay on (for the phone's voice too, whose words start almost at once).
+
