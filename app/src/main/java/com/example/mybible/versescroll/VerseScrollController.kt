@@ -90,6 +90,15 @@ class VerseScrollController(
     var hintSeen by mutableStateOf(prefs.getBoolean(KEY_HINT_SEEN, false))
         private set
 
+    /** The shape a verse was last shared in as a picture, offered first the next time. */
+    var shareShape by mutableStateOf(ShareShape.named(prefs.getString(KEY_SHARE_SHAPE, null)))
+        private set
+
+    fun chooseShareShape(shape: ShareShape) {
+        shareShape = shape
+        prefs.edit().putString(KEY_SHARE_SHAPE, shape.name).apply()
+    }
+
     fun updateBackgroundPhotos(on: Boolean) {
         backgroundPhotos = on
         prefs.edit().putBoolean(KEY_SCENES, on).apply()
@@ -794,22 +803,6 @@ class VerseScrollController(
     fun verseIndexAtOrBefore(index: Int): Int? =
         (minOf(index, cards.lastIndex) downTo 0).firstOrNull { cards[it] is VerseFeedCard }
 
-    data class LinkPreview(val link: Link, val content: VerseCardContent, val seen: Boolean)
-
-    /**
-     * A verse's links for its Links sheet, its quotations first (all of them) and then its strongest, with
-     * their text and whether they've been shown already.
-     */
-    suspend fun linkPreviews(card: VerseFeedCard): List<LinkPreview> {
-        val seen = cards.take(currentIndex + 1)
-            .flatMap { (it as? VerseFeedCard)?.content?.refs.orEmpty() }
-            .mapTo(HashSet()) { it.key }
-        val links = linkSource.links(card.content.ref)
-        return (links.filter { it.quote != null } + links.filter { it.quote == null }.take(LINKS_SHOWN)).mapNotNull { link ->
-            loadContent(link.ref, link.count)?.let { LinkPreview(link, it, link.ref.key in seen) }
-        }
-    }
-
     // Verse texts, link lists and word sets are looked up over and over while a thread picks its way
     // along, so they're kept for a while.
     private val verseTextCache = LruCache<String, String>(2000)
@@ -1061,23 +1054,33 @@ class VerseScrollController(
     /** A scene's picture: a nature photo, or one of your own (see [sceneFor]). */
     suspend fun loadImage(sceneId: String): ImageBitmap? {
         images.get(sceneId)?.let { return it }
-        val bitmap = if (sceneId.startsWith(PICTURE)) {
-            pictures.image(sceneId.removePrefix(PICTURE).substringAfter('|'), imageConfig)
+        val bitmap = decode(sceneId, imageConfig, own = { uri -> pictures.image(uri, imageConfig) }) ?: return null
+        return bitmap.asImageBitmap().also { images.put(sceneId, it) }
+    }
+
+    /**
+     * A scene's picture to draw a shared picture over (backlog 53): in the app's own memory, which a
+     * picture can be drawn from (the cards' are the screen's), and one of your own as big as a shared one.
+     */
+    suspend fun sharePhoto(sceneId: String): Bitmap? =
+        decode(sceneId, Bitmap.Config.ARGB_8888, own = { uri -> pictures.image(uri, Bitmap.Config.ARGB_8888, SHARE_PICTURE_HEIGHT) })
+
+    private suspend fun decode(sceneId: String, config: Bitmap.Config, own: suspend (String) -> Bitmap?): Bitmap? =
+        if (sceneId.startsWith(PICTURE)) {
+            own(sceneId.removePrefix(PICTURE).substringAfter('|'))
         } else {
             withContext(Dispatchers.IO) {
                 try {
                     context.assets.open("verse_scroll/scenes/$sceneId.webp").use { input ->
                         BitmapFactory.decodeStream(input, null, BitmapFactory.Options().apply {
-                            inPreferredConfig = imageConfig
+                            inPreferredConfig = config
                         })
                     }
                 } catch (e: Exception) {
                     null
                 }
             }
-        } ?: return null
-        return bitmap.asImageBitmap().also { images.put(sceneId, it) }
-    }
+        }
 
     companion object {
         private const val PREFS_NAME = "verse_scroll"
@@ -1096,6 +1099,10 @@ class VerseScrollController(
         private const val KEY_PICTURES = "pictures"
         private const val KEY_PICTURE_FIRST = "picture_first"
         private const val KEY_PICTURE_TURN = "picture_turn"
+        private const val KEY_SHARE_SHAPE = "share_shape"
+
+        // One of your own pictures, read for a shared picture: at least this tall, for its 1920 pixels.
+        private const val SHARE_PICTURE_HEIGHT = 2000
 
         // A scene id for one of your own pictures: this, then when it was last changed, "|" and its uri.
         private const val PICTURE = "picture:"

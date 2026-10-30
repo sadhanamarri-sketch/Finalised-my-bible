@@ -69,7 +69,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.style.Hyphens
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -82,9 +81,7 @@ import com.example.mybible.audio.ReadAloudState
 import com.example.mybible.audio.ReadLanguage
 import com.example.mybible.model.HighlightColorDef
 import com.example.mybible.model.MatchedWord
-import com.example.mybible.ui.theme.GelasioFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
-import com.example.mybible.ui.theme.quoteColor
 import com.example.mybible.ui.components.BIBLE_BOOKS
 import com.example.mybible.ui.components.BookListStep
 import com.example.mybible.ui.components.ChapterGridStep
@@ -96,14 +93,11 @@ import com.example.mybible.ui.components.DsSizeAdjustRow
 import com.example.mybible.ui.components.DsToggleRow
 import com.example.mybible.ui.components.ReadLanguageButton
 import com.example.mybible.ui.components.PauseBetweenCardsRow
-import com.example.mybible.ui.components.QuoteTag
 import com.example.mybible.ui.components.SleepTimerMenu
 import com.example.mybible.ui.components.rememberSleepLeft
 import com.example.mybible.ui.components.sleepLeftLabel
 import com.example.mybible.ui.components.PickerDarkGold
 import com.example.mybible.ui.components.PickerPaperGold
-import com.example.mybible.versescroll.VerseRef
-import com.example.mybible.versescroll.VerseScrollController
 import com.example.mybible.versescroll.VerseSource
 import java.util.Locale
 
@@ -334,11 +328,10 @@ internal fun BoxScope.VerseScrollBottomBar(
     colors: VsColors,
     scenes: Boolean,
     highlight: BarHighlight?,
-    linkCount: Int,
     onHighlight: () -> Unit,
     onNote: () -> Unit,
     onRead: () -> Unit,
-    onLinks: () -> Unit
+    onShare: () -> Unit
 ) {
     Row(
         horizontalArrangement = Arrangement.SpaceAround,
@@ -360,15 +353,7 @@ internal fun BoxScope.VerseScrollBottomBar(
         )
         BarButton(VerseScrollIcons.Note, "Note", "Add a note", emptyList(), colors, scenes, onNote)
         BarButton(VerseScrollIcons.Read, "Read", "Read in context", emptyList(), colors, scenes, onRead)
-        BarButton(
-            icon = VerseScrollIcons.Links,
-            label = if (linkCount == 1) "1 link" else "$linkCount links",
-            description = "See the verses this one links to ($linkCount)",
-            fill = emptyList(),
-            colors = colors,
-            scenes = scenes,
-            onClick = onLinks
-        )
+        BarButton(VerseScrollIcons.Share, "Share", "Share this verse as a picture", emptyList(), colors, scenes, onShare)
     }
 }
 
@@ -1088,148 +1073,5 @@ private fun SourceRow(
             selected -> Icon(Icons.Default.Check, contentDescription = "Showing", tint = colors.primary, modifier = Modifier.padding(start = 12.dp).size(20.dp))
             more -> Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = colors.soft, modifier = Modifier.padding(start = 12.dp).size(20.dp))
         }
-    }
-}
-
-/**
- * A verse's strongest links: tap one to read it next (going down a Rabbit hole from here), follow
- * them all, or see every link in Cross References.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun LinksSheet(
-    colors: VsColors,
-    label: String,
-    total: Int,
-    previews: List<VerseScrollController.LinkPreview>?,
-    highlightHexes: (VerseRef) -> List<String>,
-    colorLabel: (String) -> String,
-    onPick: (VerseScrollController.LinkPreview) -> Unit,
-    onFollow: () -> Unit,
-    onSeeAll: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = colors.surface
-    ) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .navigationBarsPadding()
-                .padding(start = 18.dp, end = 18.dp, bottom = 18.dp)
-        ) {
-            Text(
-                text = "Links from $label".uppercase(),
-                color = colors.gold,
-                fontFamily = WorkSansFontFamily,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 13.sp,
-                letterSpacing = 0.12.em
-            )
-            val shown = previews?.size ?: 0
-            val quotes = previews.orEmpty().count { it.link.quote != null }
-            val sub = when {
-                previews == null -> "Finding the strongest links…"
-                quotes > 0 && shown > quotes -> "Quotations first, then the strongest of its $total links. Tap one to read it next."
-                quotes > 0 -> if (quotes == 1) "A quotation. Tap it to read it next." else "Quotations. Tap one to read it next."
-                shown == 1 && total > 1 -> "The strongest of $total. Tap it to read it next."
-                shown in 2 until total -> "The $shown strongest of $total. Tap one to read it next."
-                shown == 1 -> "Tap it to read it next."
-                shown > 1 -> "Tap one to read it next."
-                total > 0 -> "None of its $total links is strong enough to suggest. Cross References lists them all."
-                else -> "This verse has no links."
-            }
-            Text(
-                text = sub,
-                color = colors.soft,
-                fontFamily = WorkSansFontFamily,
-                fontSize = 13.sp,
-                lineHeight = 1.4.em,
-                modifier = Modifier.padding(bottom = 6.dp)
-            )
-            previews.orEmpty().forEach { preview ->
-                LinkItem(preview, colors, highlightHexes(preview.link.ref), colorLabel) { onPick(preview) }
-            }
-            Spacer(Modifier.height(8.dp))
-            if (shown > 0) {
-                PillButton("Follow this verse’s links", primary = true, colors = colors, onClick = onFollow, modifier = Modifier.fillMaxWidth())
-            }
-            if (total > 0) {
-                PillButton("See all $total in Cross References", primary = false, colors = colors, onClick = onSeeAll, modifier = Modifier.fillMaxWidth())
-            }
-        }
-    }
-}
-
-@Composable
-private fun LinkItem(
-    preview: VerseScrollController.LinkPreview,
-    colors: VsColors,
-    highlights: List<String>,
-    colorLabel: (String) -> String,
-    onClick: () -> Unit
-) {
-    val content = preview.content
-    Column(
-        verticalArrangement = Arrangement.spacedBy(5.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(colors.bg)
-            .border(1.dp, colors.line, RoundedCornerShape(14.dp))
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(start = 13.dp, end = 13.dp, top = 11.dp, bottom = 12.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            // A quotation: its reference in its side's colour, tagged.
-            Text(
-                text = content.label.uppercase(),
-                color = preview.link.quote?.let { quoteColor(it, colors.dark) } ?: colors.gold,
-                fontFamily = WorkSansFontFamily,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 11.5.sp,
-                letterSpacing = 0.1.em
-            )
-            preview.link.quote?.let { QuoteTag(it, quoteColor(it, colors.dark)) }
-            highlights.forEach { highlight ->
-                Box(
-                    Modifier
-                        .size(9.dp)
-                        .clip(CircleShape)
-                        .background(hexToColor(highlight))
-                        .semantics { contentDescription = "Highlighted ${colorLabel(highlight)}" }
-                )
-            }
-            Spacer(Modifier.weight(1f))
-            if (preview.seen) {
-                Text("Seen", color = colors.soft, fontFamily = WorkSansFontFamily, fontWeight = FontWeight.Medium, fontSize = 11.sp)
-            }
-        }
-        val number = SpanStyle(
-            fontFamily = WorkSansFontFamily,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 9.sp,
-            baselineShift = BaselineShift(0.5f),
-            color = colors.soft
-        )
-        Text(
-            text = buildAnnotatedString {
-                content.lines.forEachIndexed { i, line ->
-                    if (i > 0) append(' ')
-                    if (content.lines.size > 1) withStyle(number) { append("${line.number} ") }
-                    append(line.text)
-                }
-            },
-            color = colors.ink,
-            fontFamily = GelasioFontFamily,
-            fontSize = 15.sp,
-            lineHeight = 1.45.em,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis
-        )
     }
 }

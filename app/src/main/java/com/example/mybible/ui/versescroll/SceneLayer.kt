@@ -31,8 +31,8 @@ import kotlin.math.floor
 // CSS's ease-in-out, which the design preview's motion was tuned with.
 private val EaseInOut = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)
 
-private val VeilDark = Color(0xFF0A0808)
-private val VeilLight = Color(0xFFFAF7F0)
+internal val VeilDark = Color(0xFF0A0808)
+internal val VeilLight = Color(0xFFFAF7F0)
 
 /** How far through an animation that plays forward then backward ("alternate") [t] seconds in is, eased. */
 private fun alternating(t: Float, period: Float, delay: Float): Float {

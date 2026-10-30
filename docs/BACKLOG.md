@@ -1469,12 +1469,13 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     second more).
 
 
-53. **Proposed 30 Oct (not built).** **Verse Scroll: a Share button that shares the verse as a picture.** "is
+53. **Done 30 Oct.** **Verse Scroll: a Share button that shares the verse as a picture.** "is
     it possible to replace quick links with a share button in scroll verse that can share the verse along
-    with the image in 9:16 and more resolutions as possible? how big a build is this?"
+    with the image in 9:16 and more resolutions as possible? how big a build is this?" Then: "can you
+    include telugu reference as well along english when telugu is enabled? build 53"
     *Meant:* the bottom bar's "N links" button replaced by Share. Share turns the card into a picture, its
     photo with the verse on it, in a choice of shapes, and hands it to WhatsApp, Instagram and the rest.
-    *Today:* nothing in the app shares a picture (notes share as text). The scene photos are all 900×1950
+    *Before:* nothing in the app shared a picture (notes share as text). The scene photos are all 900×1950
     pixels.
     *Losing the Links button:* its sheet (the strongest links; tap one to read it next) goes. Following a
     verse's links stays, in the Rabbit hole tab at the top, and so does Cross References, through Read.
@@ -1491,5 +1492,22 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     words are sized to fit, smaller for a long verse.
     *Size:* medium, about 700 to 900 lines in 5 or 6 files (the picture maker, the sheet, handing the file
     to other apps, the button, tests): two to three times item 49, smaller than 46.
-    *To ask:* a small "My Bible" mark on the picture or not; the verse sent as text with the picture or
-    not; a larger size too or not.
+    *Built 30 Oct,* with the defaults proposed (no "My Bible" mark, the picture alone, no larger size):
+    - The bottom bar's "N links" button is now Share. Its sheet shows the picture as it will be, the five
+      shapes in a row (9:16 Status, Phone Wallpaper, 4:5 Post, 1:1 Square, 16:9 Wide), Share (the phone's
+      share list: WhatsApp, Instagram and the rest) and Save to phone (in Pictures › My Bible, from
+      Android 10). The shape chosen is kept for next time. The Links sheet is gone, and its code.
+    - The picture: the card's photo, or your own picture for that scene (read big enough for it), dimmed
+      as the card dims it, and the words in the card's type and colors (light or dark, as the app is).
+      They're as large as fits: up to 1.6 times the card's size for a short verse, down to half for a
+      long one, and a verse too long even then is cut short with "…". A long verse over a photo gets the
+      card's soft panel behind it. A wide picture has the photo as a 9:16 panel at its left, and the
+      words beside it over the same photo blurred. With photos off, the plain page.
+    - With the Telugu on: the Telugu under the verse, and the reference in Telugu beside the English one
+      ("JOHN 3:16  యోహాను 3:16"), on the picture and on the card itself. All 66 books' Telugu names are
+      the Bible Society's.
+    - Checked here on pictures drawn from the real photos, type and verses (every shape; English and
+      Telugu; a long verse and a passage; light and dark; no photo), and on the real sheet. Each picture
+      takes well under half a second to draw.
+    *To check on the phone:* sharing to WhatsApp (in a chat, and as Status) and to Instagram; Save to
+    phone, then the picture in the gallery; a lock-screen wallpaper from the Phone shape.

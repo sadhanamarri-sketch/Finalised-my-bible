@@ -189,9 +189,9 @@ class Pictures(context: Context, private val scope: CoroutineScope) {
 
     // ---- showing them ----
 
-    /** [uri]'s picture, big enough for a card (at least [CARD_HEIGHT] tall), in [config]. */
-    suspend fun image(uri: String, config: Bitmap.Config): Bitmap? = withContext(Dispatchers.IO) {
-        decodeSampled(Uri.parse(uri), CARD_HEIGHT, config)
+    /** [uri]'s picture, at least [height] pixels tall (big enough for a card, unless asked for more), in [config]. */
+    suspend fun image(uri: String, config: Bitmap.Config, height: Int = CARD_HEIGHT): Bitmap? = withContext(Dispatchers.IO) {
+        decodeSampled(Uri.parse(uri), height, config)
     }
 
     /** [uri]'s picture, small, for a list ([height] pixels tall at least). */

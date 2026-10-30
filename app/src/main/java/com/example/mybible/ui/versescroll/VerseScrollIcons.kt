@@ -55,6 +55,10 @@ internal object VerseScrollIcons {
         "Links", 1.8f,
         circle(6f, 6.5f, 2.3f), circle(18f, 12f, 2.3f), circle(6f, 17.5f, 2.3f), "M8.2 7.5l7.6 3.4M8.2 16.5l7.6-3.4"
     )
+    val Share = lineIcon(
+        "Share", 1.8f,
+        "M12 14.5v-11", "M8 7.5l4-4 4 4", "M5.5 12v6.5A1.5 1.5 0 0 0 7 20h10a1.5 1.5 0 0 0 1.5-1.5V12"
+    )
     val Spark = lineIcon(
         "Spark", 1.8f,
         "M12 4v4M12 16v4M4 12h4M16 12h4M6.5 6.5l2.5 2.5M15 15l2.5 2.5M17.5 6.5L15 9M9 15l-2.5 2.5"

@@ -206,7 +206,7 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
     var burst by remember { mutableStateOf<Pair<Int, CardBurst>?>(null) }
     var toast by remember { mutableStateOf<VsToast?>(null) }
     var sheetCard by remember { mutableStateOf<VerseFeedCard?>(null) }
-    var linksCard by remember { mutableStateOf<Pair<Int, VerseFeedCard>?>(null) }
+    var shareCard by remember { mutableStateOf<VerseFeedCard?>(null) }
     var settingsOpen by remember { mutableStateOf(false) }
     // The Pictures page, kept open through a trip to the phone's picture picker.
     var picturesOpen by rememberSaveable { mutableStateOf(false) }
@@ -576,7 +576,6 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                     highlight = colorsOf(verseCard).takeIf { it.isNotEmpty() }?.let { hexes ->
                         BarHighlight(hexes, labelOf(hexes.first()) + if (hexes.size > 1) " +${hexes.size - 1}" else "")
                     },
-                    linkCount = verseCard.content.linkCount,
                     // The color box, where Remove lives too.
                     onHighlight = { showPicker(pagerState.settledPage) },
                     onNote = { viewModel.openNoteEditor(defaultVerse = asVerse(verseCard)) },
@@ -584,10 +583,10 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
                         val ref = verseCard.content.ref
                         viewModel.readFromVerseScroll(ref.book, ref.chapter, ref.verse)
                     },
-                    onLinks = {
+                    onShare = {
                         hidePicker()
                         toast = null
-                        linksCard = pagerState.settledPage to verseCard
+                        shareCard = verseCard
                     }
                 )
             }
@@ -709,33 +708,8 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
         )
     }
 
-    linksCard?.let { (index, card) ->
-        val previews by produceState<List<VerseScrollController.LinkPreview>?>(null, card.uid) {
-            value = controller.linkPreviews(card)
-        }
-        LinksSheet(
-            colors = colors,
-            label = card.content.label,
-            total = card.content.linkCount,
-            previews = previews,
-            highlightHexes = ::hexesOf,
-            colorLabel = ::labelOf,
-            onPick = { preview ->
-                linksCard = null
-                controller.followFrom(index, preview.link, advance = true)
-                showToast("Rabbit hole from ${card.content.label}")
-            },
-            onFollow = {
-                linksCard = null
-                controller.followFrom(index, link = null, advance = true)
-                showToast("Rabbit hole \u00b7 following links from ${card.content.label}")
-            },
-            onSeeAll = {
-                linksCard = null
-                viewModel.openCrossReferences(asVerse(card), origin = NavTab.VERSE_SCROLL)
-            },
-            onDismiss = { linksCard = null }
-        )
+    shareCard?.let { card ->
+        ShareSheet(card = card, controller = controller, colors = colors, onDismiss = { shareCard = null })
     }
 
     if (sourcesOpen) {

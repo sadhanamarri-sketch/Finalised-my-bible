@@ -312,6 +312,7 @@ internal fun VerseCardPage(
                 },
                 lines = content.lines,
                 label = content.label,
+                teluguLabel = content.teluguLabel,
                 refs = content.refs,
                 long = long,
                 colors = c,
@@ -344,6 +345,8 @@ private fun VerseStack(
     eyebrow: @Composable () -> Unit,
     lines: List<VerseLine>,
     label: String,
+    // The reference with the book's Telugu name, shown beside it with the Telugu.
+    teluguLabel: String?,
     refs: List<VerseRef>,
     long: Boolean,
     colors: VsColors,
@@ -405,6 +408,17 @@ private fun VerseStack(
                                     .align(Alignment.CenterVertically)
                                     .padding(end = 5.dp)
                             )
+                            if (telugu.isNotEmpty() && teluguLabel != null) {
+                                Text(
+                                    text = teluguLabel,
+                                    color = colors.gold,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 13.5.sp,
+                                    modifier = Modifier
+                                        .align(Alignment.CenterVertically)
+                                        .padding(end = 5.dp)
+                                )
+                            }
                             for (word in words) {
                                 Text(
                                     text = word.uppercase(),

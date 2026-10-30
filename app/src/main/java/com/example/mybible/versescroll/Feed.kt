@@ -1,5 +1,6 @@
 package com.example.mybible.versescroll
 
+import com.example.mybible.model.TeluguBooks
 import kotlin.random.Random
 
 /** A verse as the app's database names it, e.g. Isaiah 41:10. */
@@ -21,6 +22,9 @@ data class VerseCardContent(
 
     /** "Isaiah 41:10", or "Isaiah 40:29–31" for a passage. */
     val label: String get() = labelOf(refs)
+
+    /** [label] with the book's Telugu name, "యెషయా 41:10"; null for a book without one. */
+    val teluguLabel: String? get() = teluguLabelOf(refs)
 }
 
 sealed interface FeedCard {
@@ -66,6 +70,12 @@ data class ScrollRequest(val index: Int, val id: Long, val gentle: Boolean = fal
 /** A label for a verse or short passage: "Isaiah 41:10", "Isaiah 40:29–31". */
 fun labelOf(refs: List<VerseRef>): String =
     if (refs.size > 1) "${refs.first().key}\u2013${refs.last().verse}" else refs.first().key
+
+/** [labelOf] with the book's Telugu name, "\u0c2f\u0c46\u0c37\u0c2f\u0c3e 40:29\u201331"; null for a book it doesn't know. */
+fun teluguLabelOf(refs: List<VerseRef>): String? {
+    val book = refs.first().book
+    return TeluguBooks.nameOf(book)?.let { it + labelOf(refs).removePrefix(book) }
+}
 
 const val CHECK_IN_EVERY = 20
 

@@ -8,9 +8,6 @@ const val MIN_AUTO_VOTES = 5
 /** Word overlap (Jaccard) at which two passages count as the same saying, e.g. Matthew and Luke's parallels. */
 const val NEAR_DUPLICATE = 0.45
 
-/** Links a verse's Links sheet lists. */
-const val LINKS_SHOWN = 6
-
 /** Links weaker than this aren't suggested at all (Cross References still lists them). */
 const val MIN_SUGGESTED_VOTES = 3
 
