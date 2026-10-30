@@ -1512,7 +1512,7 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     *To check on the phone:* sharing to WhatsApp (in a chat, and as Status) and to Instagram; Save to
     phone, then the picture in the gallery; a lock-screen wallpaper from the Phone shape.
 
-54. **Proposed 30 Oct (not built).** **Search: "Paul intercession" finds nothing.** "i just tried seraching
+54. **Saved for later 30 Oct.** **Search: "Paul intercession" finds nothing.** "i just tried seraching
     Paul intercession and it recommended it as well and no search results? us there a way to fix it? how
     big a build is this?"
     *Checked 30 Oct, on the code the Dev build has:* no verse has both words (Paul's own prayers for the
@@ -1536,7 +1536,7 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     Colossians 1:9, 1 Thessalonians 1:2, 2 Thessalonians 1:11, Philemon 4) aren't in Nave's list, so they
     still wouldn't come up. A list of them could be added by hand.
 
-55. **Proposed 30 Oct (not built).** **Search: subjects no word or topic names.** "is there a way to cover
+55. **Saved for later 30 Oct.** **Search: subjects no word or topic names.** "is there a way to cover
     those kind of topics?" (after 54: Paul's prayers in his letters, which neither say "Paul" nor are in
     Nave's list).
     *Three ways, smallest first:*
