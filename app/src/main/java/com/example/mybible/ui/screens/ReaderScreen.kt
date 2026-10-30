@@ -675,7 +675,7 @@ fun ReaderScreen(
     // Reading aloud: the verse being read is kept on screen as the reading moves on (in Blur Mode, in
     // the middle) — while it's being followed (the verse before it was in view), so scrolling off to look
     // at something else isn't undone with every verse; the bar offers Follow to go back to it.
-    var lastReadVerse by remember { mutableStateOf<Int?>(null) }
+    var lastReadVerse by remember(currentBook, currentChapter) { mutableStateOf<Int?>(null) }
     // Whether list item [index] (a verse's index + 1) is wholly on screen, above the pill and the bar.
     fun wholeInView(index: Int): Boolean {
         val layout = listState.layoutInfo
@@ -683,12 +683,16 @@ fun ReaderScreen(
         val item = layout.visibleItemsInfo.firstOrNull { it.index == index }
         return item != null && item.offset >= layout.viewportStartOffset && item.offset + item.size <= bottomEdge
     }
-    LaunchedEffect(verseBeingRead) {
+    LaunchedEffect(verseBeingRead, currentBook, currentChapter) {
         val number = verseBeingRead
         val previous = lastReadVerse
         lastReadVerse = number
         // Looked around by hand, the page stays where it's been put for now (see LOOK_AROUND_MS).
         if (number == null || lookingAround) return@LaunchedEffect
+        // A chapter come to with the reading in it (turned with it, or the page shown again): its verses
+        // laid out first, so what's in view is this chapter's.
+        if (previous == null) withFrameNanos { }
+        if (verses.firstOrNull()?.let { it.book == currentBook && it.chapter == currentChapter } != true) return@LaunchedEffect
         val index = verses.indexOfFirst { it.number == number }.takeIf { it >= 0 }?.plus(1) ?: return@LaunchedEffect
         val layout = listState.layoutInfo
         val following = previous == null ||
@@ -703,28 +707,23 @@ fun ReaderScreen(
             val index = verses.indexOfFirst { it.number == verseBeingRead }.takeIf { verseBeingRead != null && it >= 0 }?.plus(1)
                 ?: return@derivedStateOf false
             val layout = listState.layoutInfo
+            // Not laid out yet (the page just built, the screen still off): not known to be out of view.
+            if (layout.visibleItemsInfo.isEmpty()) return@derivedStateOf false
             layout.visibleItemsInfo.none { it.index == index && it.offset + it.size > 0 && it.offset < layout.viewportEndOffset - overlayPx }
         }
     }
-    // Followed along (the verse being read last seen in view), the reading going on into the next chapter
-    // turns the Reader to it — with the screen off meanwhile, as it comes back on. Looking elsewhere, the
-    // bar offers to go back to it instead.
+    // Followed along (the verse being read last seen in view) and not looked around: the reading going on
+    // into the next chapter turns the Reader to it, seen or not, which the app does (MainViewModel.
+    // readerFollowsReading) so it isn't missed with the screen off or another page open. Looking elsewhere,
+    // the bar offers to go back to it instead.
     var followingAlong by remember { mutableStateOf(true) }
     LaunchedEffect(verseBeingRead, beingReadOutOfView) {
-        if (verseBeingRead != null) followingAlong = !beingReadOutOfView
+        // Judged from this chapter's verses, not the last chapter's still there as it turns.
+        val thisChapter = verses.firstOrNull()?.let { it.book == currentBook && it.chapter == currentChapter } == true
+        if (verseBeingRead != null && thisChapter) followingAlong = !beingReadOutOfView
     }
-    val readingChapter = readAloudState.verse?.takeIf { readingInReader }?.let { it.book to it.chapter }
-    var lastReadingChapter by remember { mutableStateOf<Pair<String, Int>?>(null) }
-    // The chapter on screen, when the reading went on from it into the next while the page was looked around.
-    var readingLeftFrom by remember { mutableStateOf<Pair<String, Int>?>(null) }
-    LaunchedEffect(readingChapter) {
-        val before = lastReadingChapter
-        lastReadingChapter = readingChapter
-        readingLeftFrom = null
-        if (readingChapter == null || before == null || before == readingChapter) return@LaunchedEffect
-        if (before == currentBook to currentChapter) {
-            if (followingAlong && !lookingAround) viewModel.turnToReading() else readingLeftFrom = before
-        }
+    LaunchedEffect(followingAlong, lookingAround) {
+        viewModel.readerFollowsReading = followingAlong && !lookingAround
     }
     // Follow (and the bar's verse): back to the verse being read, which is then kept in view again; from the
     // chapter it went on from while the page was looked around, on to it. Not [always] (the page let go a
@@ -733,10 +732,7 @@ fun ReaderScreen(
         lookingAround = false
         val index = verses.indexOfFirst { it.number == verseBeingRead }.takeIf { verseBeingRead != null && it >= 0 }?.plus(1)
         if (index == null) {
-            if (readingLeftFrom == currentBook to currentChapter) {
-                readingLeftFrom = null
-                viewModel.turnToReading()
-            }
+            if (viewModel.readingLeftFrom == currentBook to currentChapter) viewModel.turnToReading()
             return
         }
         readerScope.launch {

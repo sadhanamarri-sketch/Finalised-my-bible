@@ -1347,8 +1347,8 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     without counting as an edit. Checked here with the real Bible text: saving, the strip as it's typed,
     Whole chapter on and off, the chapter's preview, and an older note given its verses.
 
-50. **Reader: the page turns with the reading into the next chapter.** "turn chapter along with read
-    loud as the read aloud move to next chapter."
+50. **Done 30 Oct.** **Reader: the page turns with the reading into the next chapter.** "turn chapter
+    along with read loud as the read aloud move to next chapter."
     *Today (34):* followed along, the page turns with the reading (the reading set to go on past the
     chapter, 26); looked around, it turns when it goes back to the reading; otherwise the bar offers
     Back. On the phone, some case misses it.
@@ -1359,6 +1359,17 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     *To do:* the app turns the Reader's chapter itself, seen or not: when the reading goes on by itself
     from the chapter the Reader is on, and the Reader was following it, the Reader goes with it, so it's
     on the chapter being read when it's next seen. Looked around, it stays put as now.
+    *Built 30 Oct,* just so. Confirmed first, here in the real app with a silent voice: with Notes open as
+    the reading went from John 3 into John 4, the Reader was still on John 3 when it came back, offering
+    Back; the same when Android rebuilt the page with the screen off. The page only noticed the reading
+    moving on while it was showing, and forgot what it had seen when rebuilt. Now the app watches the
+    reading itself, and the page only tells it whether it's being followed (the verse being read in view,
+    not looked around), so the Reader turns with the screen off, with another page open, and after a
+    rebuild; shown again, it's at the verse being read. A page still being built doesn't count as looked
+    away. Looked around, it stays put, the bar offering Back and Read here, and let go it goes on to the
+    reading as before. The app opened again while the Reader's reading goes on opens on the verse being
+    read. Checked here: Notes open, rebuilt with the screen off, screen off, looked around then Notes,
+    and looked around on the page.
 
 51. **A Telugu-only lite app.** "telugu only lite version - reader,cross reference, highlight,verse
     scroll,read aloud... entire app should be in telugu."

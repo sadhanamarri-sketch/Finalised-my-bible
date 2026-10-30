@@ -622,13 +622,43 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * The Reader's reading gone on into the next chapter while it was followed along: the Reader turns to
-     * that chapter (and keeps up with its verse, as ever).
+     * Whether the Reader is following its reading: the verse being read kept in view and the page not
+     * looked around, as the Reader last showed it (ReaderScreen keeps it up to date). While it is, the
+     * reading going on from the chapter the Reader's on turns the Reader with it, seen or not, so with the
+     * screen off or another page open it's on the chapter being read when it's next seen (backlog 50).
      */
+    var readerFollowsReading = true
+
+    /** The chapter the reading went on from while the Reader, on it, was looked around: Follow turns to the reading. */
+    var readingLeftFrom: Pair<String, Int>? = null
+        private set
+
+    // The Reader's reading going into another chapter (on by itself, the earbuds, previous at a chapter's
+    // first verse): the Reader goes with it while it's followed; looked around, it stays where it is.
+    init {
+        viewModelScope.launch {
+            var last: Pair<String, Int>? = null
+            readAloud.state.collect { state ->
+                val now = state.verse?.takeIf { state.active && state.place == ReadingPlace.READER }?.let { it.book to it.chapter }
+                val before = last
+                last = now
+                if (now == before) return@collect
+                readingLeftFrom = null
+                if (now == null || before == null || before != _currentBook.value to _currentChapter.value) return@collect
+                if (readerFollowsReading) turnToReading() else readingLeftFrom = before
+            }
+        }
+    }
+
+    /** The Reader to the chapter its reading is in, as if it had been followed there. */
     fun turnToReading() {
         val verse = readAloud.state.value.verse?.takeIf { readAloud.state.value.place == ReadingPlace.READER } ?: return
+        readingLeftFrom = null
         clearVerseFocus()
         loadChapter(verse.book, verse.chapter)
+        // Seen or not, the place to come back to is the verse being read.
+        liveTopVerse = verse.verse
+        if (isPositionSettled()) savePositionToDisk(durable = false)
     }
 
     /** A sleep timer for the reading going on: it stops in [minutes] (see ReadAloud.sleepIn). */
@@ -1359,8 +1389,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         val (savedBook, savedChap) = repository.getLastPosition()
-        _currentBook.value = savedBook
-        _currentChapter.value = savedChap
+        // The app opened again while the Reader's reading goes on: the Reader on the verse being read.
+        val reading = readAloud.state.value.let { now -> now.verse?.takeIf { now.active && now.place == ReadingPlace.READER } }
+        _currentBook.value = reading?.book ?: savedBook
+        _currentChapter.value = reading?.chapter ?: savedChap
         // Resume at the exact verse the app was showing when it last went
         // to background (see saveLastReadPosition/the ProcessLifecycleOwner
         // observer below), not just the top of the saved chapter. Unblurred/
@@ -1382,7 +1414,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // after the chapter's verses are actually in _verses makes this
         // cold-start restore look like any other in-app jump to Reader,
         // instead of a special pre-mount case.
-        val restoredVerse = repository.getLastReadVerse()
+        val restoredVerse = reading?.verse ?: repository.getLastReadVerse()
         viewModelScope.launch {
             loadCurrentChapterSuspend()
             restoredVerse?.let { verse -> setJumpTarget(verse, blur = false, pinToTop = true) }
