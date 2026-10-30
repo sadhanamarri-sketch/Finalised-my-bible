@@ -12,6 +12,10 @@ build of 23 Oct (commit 4f803a1). The notes of 29 Oct were made on the Dev build
 reading button, Verse Scroll's progress bar and the new notes page, which only it has). A bug seen on the
 phone is looked for first in the code of the build it was seen on.
 
+**Sent 30 Oct:** a newer My Bible (Dev) at commit ebba364, with everything marked Done up to 52. It
+installs over the 23 Oct Dev build and keeps its data (it's signed with the same checked-in debug key).
+Once it's installed, it's the Dev build on the phone.
+
 ## Noted 9 Oct 2026
 
 1. **Done 12 Oct.** **More than one colour on a highlighted verse.** "Multi highlighted
