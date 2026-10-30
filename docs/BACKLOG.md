@@ -1511,3 +1511,27 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
       takes well under half a second to draw.
     *To check on the phone:* sharing to WhatsApp (in a chat, and as Status) and to Instagram; Save to
     phone, then the picture in the gallery; a lock-screen wallpaper from the Phone shape.
+
+54. **Proposed 30 Oct (not built).** **Search: "Paul intercession" finds nothing.** "i just tried seraching
+    Paul intercession and it recommended it as well and no search results? us there a way to fix it? how
+    big a build is this?"
+    *Checked 30 Oct, on the code the Dev build has:* no verse has both words (Paul's own prayers for the
+    churches never name him), and a two-word search falls back to nothing, so the page only says "No
+    verses found". Nave's has what's wanted, under Intercession: "Paul for Onesimus", "Paul, for God's
+    people", "By Paul, of the congregations" and "For Paul, by the congregations". But a topic is found
+    only by its name and its main headings, and these are a level below. ("Jesus intercession" works:
+    "Intercession of" is a main heading of Jesus, the Christ.) And "Paul intercessory prayer" offers "Did
+    you mean paul intercessor prayer", which finds nothing either.
+    *Proposed:*
+    - A topic's entries at every level count, not only its main headings. "Paul intercession" then gives
+      Intercession › By Paul, of the congregations; Paul for Onesimus; Paul, for God's people; and For
+      Paul, by the congregations, each opening the topic there. So do "Moses intercession", "Abraham
+      intercession" and the like.
+    - A two-word search with no verse having both: "No verse has both words", and a button for each word
+      on its own, with how many verses it finds.
+    - "Did you mean" only when what it offers finds something; and "intercessory" (not a King James word)
+      read as intercession.
+    *Size:* small to medium, about 200 lines in 4 files with tests: about item 49's size.
+    *Not covered:* Paul's prayers in his letters (Romans 1:9, Ephesians 1:16 and 3:14, Philippians 1:4,
+    Colossians 1:9, 1 Thessalonians 1:2, 2 Thessalonians 1:11, Philemon 4) aren't in Nave's list, so they
+    still wouldn't come up. A list of them could be added by hand.
