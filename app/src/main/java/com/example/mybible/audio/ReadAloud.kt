@@ -184,6 +184,22 @@ interface Speaker {
     /** Done recording for now. */
     fun doneRecording() {}
 
+    /**
+     * Says [text] into [file] rather than aloud, as a language is read — its speech engine, in [voice]
+     * (null: the language's usual one) — at its own pitch and pace, to measure how loud it is (see
+     * VoiceLoudness); [onSaid] is told whether it worked, on the main thread.
+     */
+    fun recordAsRead(text: String, telugu: Boolean, voice: String?, file: java.io.File, onSaid: (Boolean) -> Unit) = onSaid(false)
+
+    /** Done recording as read, for now. */
+    fun doneRecordingAsRead() {}
+
+    /**
+     * How much louder (+) or quieter (−) than its own the voice says what it's given from now on, in dB:
+     * so English and Telugu sound alike (see Evening). Raised with Android's loudness enhancer.
+     */
+    fun level(db: Double) {}
+
     /** The speech engines installed on the phone. */
     fun engines(): List<EngineOption> = emptyList()
 }
@@ -254,7 +270,9 @@ class ReadAloud(
     /** Plays them. */
     private val recorder: Recorder = Recorder.None,
     /** The time for a sleep timer, in milliseconds, going on while the phone sleeps. */
-    private val sleepClock: () -> Long = { android.os.SystemClock.elapsedRealtime() }
+    private val sleepClock: () -> Long = { android.os.SystemClock.elapsedRealtime() },
+    /** How loud the voices are that the languages are read in, to even them out with the other language. */
+    private val voiceLoudness: VoiceLoudness = VoiceLoudness()
 ) : Speaker.Listener, Recorder.Listener {
 
     private val _state = MutableStateFlow(ReadAloudState())
@@ -369,9 +387,45 @@ class ReadAloud(
      */
     fun measureVoices() {
         if (_state.value.status == ReadAloudState.Status.PLAYING || speaker.ready != true) return
-        depths.measure(speaker, usualVoices(telugu = false), usualVoices(telugu = true), scope) {
-            _state.value.status != ReadAloudState.Status.PLAYING
+        // How loud the voices read in are first: the two languages are evened out with it.
+        measureLoudness {
+            if (_state.value.status == ReadAloudState.Status.PLAYING) return@measureLoudness
+            depths.measure(speaker, usualVoices(telugu = false), usualVoices(telugu = true), scope) {
+                _state.value.status != ReadAloudState.Status.PLAYING
+            }
         }
+    }
+
+    // ---- English and Telugu, evened out (backlog 46) ----
+
+    // A language's voice as it's read now: its engine and voice.
+    private fun voiceInUse(telugu: Boolean) = VoiceLoudness.Voice(telugu, prefs.engine(telugu), voiceFor(telugu))
+
+    // How loud a language is as it's read now, in LUFS: its recording, when it's played from that, else its
+    // voice; null when that hasn't been measured.
+    private fun loudnessOf(telugu: Boolean): Double? =
+        if (reads(telugu)) recordings.loudness(telugu) else voiceLoudness.of(voiceInUse(telugu))
+
+    // How much to raise or lower a language's part — played from its recording, or said by its voice — in
+    // dB, so it sounds as loud as the other language (see Evening).
+    private fun levelFor(telugu: Boolean, recorded: Boolean): Double = Evening.gain(
+        Evening.meet(loudnessOf(telugu = false), loudnessOf(telugu = true)),
+        if (recorded) recordings.loudness(telugu) else voiceLoudness.of(voiceInUse(telugu))
+    )
+
+    // The voices that what's read is read in (the languages the setting reads, those not played from
+    // recordings), each measured once if it hasn't been: a few words said into a file, in the background.
+    // Then [then].
+    private fun measureLoudness(then: () -> Unit = {}) {
+        val languages = when (prefs.language) {
+            ReadLanguage.ENGLISH -> listOf(false)
+            ReadLanguage.TELUGU -> listOf(true)
+            ReadLanguage.BOTH -> listOf(false, true)
+        }
+        val voices = languages
+            .filter { telugu -> !reads(telugu) && (!telugu || (!teluguFailed && speaker.hasTelugu() == true)) }
+            .map(::voiceInUse)
+        voiceLoudness.measure(speaker, voices, scope, then)
     }
 
     /** A language's voices when it's read by the phone's usual engine, the ones measured; else none. */
@@ -385,6 +439,7 @@ class ReadAloud(
         if (_state.value.status == ReadAloudState.Status.PLAYING) pause()
         stopSample()
         utterances++
+        speaker.level(0.0)
         speaker.speak("try-$utterances", text, telugu, prefs.speed(telugu), voice, prefs.pitch(telugu))
     }
 
@@ -409,6 +464,7 @@ class ReadAloud(
         if (_state.value.status == ReadAloudState.Status.PLAYING) pause()
         stopSample()
         utterances++
+        speaker.level(0.0)
         speaker.speak("word-$utterances", spoken, telugu = false, rate = WORD_RATE, voice = voiceFor(telugu = false), pitch = prefs.pitch(telugu = false))
         return ready
     }
@@ -422,6 +478,7 @@ class ReadAloud(
         stopSample()
         utterances++
         if (!reads(telugu)) {
+            speaker.level(levelFor(telugu, recorded = false))
             speaker.speak("try-$utterances", text, telugu, prefs.speed(telugu), voiceFor(telugu), prefs.pitch(telugu))
             return
         }
@@ -432,8 +489,10 @@ class ReadAloud(
             val sample = recordings.verse(SAMPLE_VERSE, telugu, heading = false)
             if (id != plays || said != utterances || _state.value.active) return@launch
             if (sample != null) {
+                recorder.level(levelFor(telugu, recorded = true))
                 recorder.play(id, sample.file, sample.from, sample.end, prefs.speed(telugu))
             } else {
+                speaker.level(levelFor(telugu, recorded = false))
                 speaker.speak("try-$utterances", text, telugu, prefs.speed(telugu), voiceFor(telugu), prefs.pitch(telugu))
             }
         }
@@ -470,6 +529,8 @@ class ReadAloud(
         val sleep = _state.value.sleep?.takeUnless { it.atChapterEnd && next.place != ReadingPlace.READER }
         _state.value = ReadAloudState(status = ReadAloudState.Status.PLAYING, place = next.place, title = next.title, sleep = sleep)
         onPlaying()
+        // A voice read in that hasn't been measured yet is now, alongside (once): what's read after that is evened out.
+        measureLoudness()
         advance(after = null)
     }
 
@@ -961,6 +1022,7 @@ class ReadAloud(
                 wordHeard = false
                 utterances++
                 _state.update { it.copy(telugu = part.telugu, recording = false) }
+                speaker.level(levelFor(part.telugu, recorded = false))
                 speaker.speak(currentId, part.text.substring(from), part.telugu, prefs.speed(part.telugu), voiceFor(part.telugu), prefs.pitch(part.telugu))
             }
             is Recorded -> {
@@ -973,6 +1035,7 @@ class ReadAloud(
                 reached = from
                 _state.update { it.copy(telugu = part.telugu, recording = true) }
                 val to = (part.ahead.lastOrNull()?.at ?: part.at).end
+                recorder.level(levelFor(part.telugu, recorded = true))
                 recorder.play(plays, part.at.file, from, to, prefs.speed(part.telugu), part.ahead.map { it.at.start })
             }
         }

@@ -11,6 +11,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -88,8 +89,13 @@ class Recordings(context: Context, private val scope: CoroutineScope) : Recorded
 
         // Files that wouldn't play (their uris), left out until looked over again.
         val failed: MutableSet<String> = java.util.Collections.synchronizedSet(mutableSetOf())
+
+        @Volatile
         var result: Saved? = null
         var checking: Job? = null
+
+        // Its loudness being measured (see measureLoudness).
+        var measuring: Job? = null
     }
 
     // The recording a folder holds, its timings, and its files there: the timings' file names, each
@@ -132,6 +138,8 @@ class Recordings(context: Context, private val scope: CoroutineScope) : Recorded
 
     override fun ready(telugu: Boolean): Boolean = edition(telugu).found?.files?.isNotEmpty() == true
 
+    override fun loudness(telugu: Boolean): Double? = edition(telugu).takeIf { it.found != null }?.result?.loudness
+
     override suspend fun verse(verse: VerseToRead, telugu: Boolean, heading: Boolean): RecordedVerse? {
         val edition = edition(telugu)
         val found = edition.found ?: return null
@@ -152,6 +160,7 @@ class Recordings(context: Context, private val scope: CoroutineScope) : Recorded
 
     private fun check(edition: Edition, folder: Uri) {
         edition.checking?.cancel()
+        edition.measuring?.cancel()
         edition.folder = folder
         edition.checking = scope.launch(Dispatchers.IO) {
             val name = nameOf(folder)
@@ -191,6 +200,26 @@ class Recordings(context: Context, private val scope: CoroutineScope) : Recorded
             edition.failed.clear()
             edition.found = Found(recording, timings, found.mapValues { RecordingFile(it.value.uri, kindOf(it.value.kind)) })
             publish(edition, statusOf(edition))
+            measureLoudness(edition)
+        }
+    }
+
+    // How loud the folder's recording is (backlog 46): measured once, from a sample of its verses decoded
+    // here (nothing played), and kept with what was found there. Until then it plays as recorded.
+    private fun measureLoudness(edition: Edition) {
+        val found = edition.found ?: return
+        val result = edition.result ?: return
+        if (result.loudness != null) return
+        edition.measuring?.cancel()
+        edition.measuring = scope.launch(Dispatchers.IO) {
+            val lufs = RecordingLoudness.measure(RecordingLoudness.stretches(found.timings, found.files.keys)) { stretch, onPcm ->
+                val file = found.files[stretch.file]
+                isActive && file != null && PcmReader.read(app, Uri.parse(file.uri), stretch.from, stretch.to, onPcm)
+            } ?: return@launch
+            if (!isActive || edition.result !== result) return@launch
+            val measured = result.copy(loudness = lufs)
+            save(edition, measured)
+            edition.result = measured
         }
     }
 
@@ -299,7 +328,9 @@ class Recordings(context: Context, private val scope: CoroutineScope) : Recorded
         val recording: String = Recording.KJV_NARRATED.name,
         val found: Map<String, SavedFile> = emptyMap(),
         val missing: List<String> = emptyList(),
-        val unlike: List<String> = emptyList()
+        val unlike: List<String> = emptyList(),
+        // How loud the recording is, in LUFS, once measured (see measureLoudness).
+        val loudness: Double? = null
     )
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -335,6 +366,7 @@ class Recordings(context: Context, private val scope: CoroutineScope) : Recorded
         }
         edition.found = Found(recording, timings, result.found.mapValues { RecordingFile(it.value.uri, kindOf(it.value.kind)) })
         publish(edition, statusOf(edition))
+        measureLoudness(edition)
     }
 
     private suspend fun timings(recording: Recording): RecordingTimings? {

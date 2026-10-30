@@ -2,6 +2,8 @@ package com.example.mybible.audio
 
 import android.content.Context
 import android.media.AudioAttributes
+import android.media.AudioManager
+import android.media.audiofx.LoudnessEnhancer
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -10,6 +12,8 @@ import android.speech.tts.UtteranceProgressListener
 import android.speech.tts.Voice
 import java.io.File
 import java.util.Locale
+import kotlin.math.pow
+import kotlin.math.roundToInt
 
 /**
  * The phone's speech engines: its usual one (Google's, on most phones), and any other installed — an
@@ -60,7 +64,7 @@ class TtsSpeaker(context: Context, private val engineFor: (telugu: Boolean) -> S
                 override fun onStart(utteranceId: String) = Unit
 
                 override fun onDone(utteranceId: String) {
-                    main.post { if (recording) recordings.remove(utteranceId)?.invoke(true) else listener?.onDone(utteranceId) }
+                    main.post { if (recording) said(utteranceId)?.invoke(true) else listener?.onDone(utteranceId) }
                 }
 
                 @Deprecated("Deprecated in Java")
@@ -78,7 +82,7 @@ class TtsSpeaker(context: Context, private val engineFor: (telugu: Boolean) -> S
         }
 
         private fun failed(utteranceId: String) {
-            main.post { if (recording) recordings.remove(utteranceId)?.invoke(false) else listener?.onError(utteranceId) }
+            main.post { if (recording) said(utteranceId)?.invoke(false) else listener?.onError(utteranceId) }
         }
 
         fun whenReady(say: () -> Unit, fail: () -> Unit) {
@@ -96,6 +100,50 @@ class TtsSpeaker(context: Context, private val engineFor: (telugu: Boolean) -> S
             emptySet()
         }
 
+        // The voice named, else the language's usual one: below 0 when the engine has neither.
+        fun use(voice: String?, telugu: Boolean): Int {
+            val chosen = voice?.let { name -> voices().firstOrNull { it.name == name } }
+            return chosen?.let { tts.setVoice(it) }?.takeIf { it == TextToSpeech.SUCCESS }
+                ?: tts.setLanguage(if (telugu) TELUGU else english())
+        }
+
+        // Raising what it says (see Speaker.level): Android's loudness enhancer, on a sound session of its
+        // own that the engine is asked to play what it says in. Made the first time it's raised.
+        private var session = AudioManager.ERROR
+        private var enhancer: LoudnessEnhancer? = null
+
+        // How what's said next is said: turned down by [volume] (a sleep timer running out) and, below 0,
+        // [db]; raised by [db] above it. Null when it's as it is.
+        fun params(volume: Float, db: Double): Bundle? {
+            if (db > 0 && enhancer == null) raise()
+            enhancer?.let { e ->
+                try {
+                    e.setTargetGain((db.coerceAtLeast(0.0) * 100).roundToInt())
+                    e.enabled = db > 0
+                } catch (ex: Exception) {
+                    // Gone (the sound system restarted): as it is.
+                }
+            }
+            val down = volume * if (db < 0) 10.0.pow(db / 20).toFloat() else 1f
+            if (down >= 1f && session == AudioManager.ERROR) return null
+            return Bundle().apply {
+                if (down < 1f) putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, down)
+                if (session != AudioManager.ERROR) putInt(TextToSpeech.Engine.KEY_PARAM_SESSION_ID, session)
+            }
+        }
+
+        private fun raise() {
+            val id = appContext.getSystemService(AudioManager::class.java)?.generateAudioSessionId() ?: return
+            if (id == AudioManager.ERROR) return
+            enhancer = try {
+                LoudnessEnhancer(id)
+            } catch (e: Exception) {
+                // No loudness enhancer on this phone: as it is.
+                return
+            }
+            session = id
+        }
+
         fun stop() {
             waiting.clear()
             if (ready == true) tts.stop()
@@ -104,6 +152,8 @@ class TtsSpeaker(context: Context, private val engineFor: (telugu: Boolean) -> S
         fun shutdown() {
             waiting.clear()
             tts.shutdown()
+            enhancer?.release()
+            enhancer = null
         }
     }
 
@@ -113,6 +163,14 @@ class TtsSpeaker(context: Context, private val engineFor: (telugu: Boolean) -> S
     private var recorder: Connection? = null
     private val recordings = HashMap<String, (Boolean) -> Unit>()
     private var recordingCount = 0
+
+    // The engines recording samples as each language is read, to measure how loud it is (see
+    // VoiceLoudness), and what's waiting to be told each sample's done.
+    private val asRead = HashMap<String?, Connection>()
+    private val recordingsAsRead = HashMap<String, (Boolean) -> Unit>()
+
+    // Who's waiting to hear a sample [id]'s been said.
+    private fun said(id: String): ((Boolean) -> Unit)? = recordings.remove(id) ?: recordingsAsRead.remove(id)
 
     private fun usual(): Connection = speaking.getOrPut(null) { Connection(null, recording = false) }
 
@@ -137,20 +195,17 @@ class TtsSpeaker(context: Context, private val engineFor: (telugu: Boolean) -> S
 
     override fun speak(id: String, text: String, telugu: Boolean, rate: Float, voice: String?, pitch: Float) {
         val c = forLanguage(telugu)
+        val db = levelDb
         c.whenReady(say = {
             // The voice chosen for the language, else the language's usual voice.
-            val chosen = voice?.let { name -> c.voices().firstOrNull { it.name == name } }
-            val set = chosen?.let { c.tts.setVoice(it) }?.takeIf { it == TextToSpeech.SUCCESS }
-                ?: c.tts.setLanguage(if (telugu) TELUGU else english())
-            if (set < 0) {
+            if (c.use(voice, telugu) < 0) {
                 listener?.onError(id)
             } else {
                 c.tts.setSpeechRate(rate)
                 // Always set: left alone, it's the phone's own speech pitch, which may have been raised.
                 c.tts.setPitch(pitch)
-                // Quieter as a sleep timer runs out.
-                val params = loudness.takeIf { it < 1f }?.let { Bundle().apply { putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, it) } }
-                if (c.tts.speak(text, TextToSpeech.QUEUE_FLUSH, params, id) != TextToSpeech.SUCCESS) listener?.onError(id)
+                // Quieter as a sleep timer runs out; louder or quieter to sound like the other language.
+                if (c.tts.speak(text, TextToSpeech.QUEUE_FLUSH, c.params(loudness, db), id) != TextToSpeech.SUCCESS) listener?.onError(id)
             }
         }, fail = { listener?.onError(id) })
     }
@@ -164,6 +219,37 @@ class TtsSpeaker(context: Context, private val engineFor: (telugu: Boolean) -> S
 
     override fun volume(level: Float) {
         loudness = level
+    }
+
+    // How much louder or quieter than its own what's said from now on is, in dB (see Speaker.level).
+    private var levelDb = 0.0
+
+    override fun level(db: Double) {
+        levelDb = db
+    }
+
+    override fun recordAsRead(text: String, telugu: Boolean, voice: String?, file: File, onSaid: (Boolean) -> Unit) {
+        val engine = engineFor(telugu)
+        val c = asRead.getOrPut(engine) { Connection(engine, recording = true) }
+        c.whenReady(say = {
+            if (c.use(voice, telugu) < 0) {
+                onSaid(false)
+            } else {
+                c.tts.setPitch(1f)
+                c.tts.setSpeechRate(1f)
+                val id = "sample-${++recordingCount}"
+                recordingsAsRead[id] = onSaid
+                if (c.tts.synthesizeToFile(text, Bundle(), file, id) != TextToSpeech.SUCCESS) recordingsAsRead.remove(id)?.invoke(false)
+            }
+        }, fail = { onSaid(false) })
+    }
+
+    override fun doneRecordingAsRead() {
+        asRead.values.forEach { it.shutdown() }
+        asRead.clear()
+        val unanswered = recordingsAsRead.values.toList()
+        recordingsAsRead.clear()
+        unanswered.forEach { it(false) }
     }
 
     // Only the usual engine's voices are measured (see ReadAloud.measureVoices).

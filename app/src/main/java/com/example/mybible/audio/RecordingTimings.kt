@@ -28,6 +28,9 @@ class RecordingTimings(
 
     fun chapter(book: String, chapter: Int): Chapter? = chapters["$book $chapter"]
 
+    /** A chapter by its name ("Psalms 23"). */
+    fun chapter(name: String): Chapter? = chapters[name]
+
     /** Every chapter ("Genesis 1" to "Revelation 22"), in the Bible's order. */
     val chapterNames: List<String> get() = chapters.keys.toList()
 

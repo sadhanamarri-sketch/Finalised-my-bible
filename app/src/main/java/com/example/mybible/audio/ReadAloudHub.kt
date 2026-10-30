@@ -32,7 +32,14 @@ object ReadAloudHub {
                     workDir = app.cacheDir
                 ),
                 recordings = Recordings(app, scope),
-                recorder = recorderFactory(app)
+                recorder = recorderFactory(app),
+                voiceLoudness = app.getSharedPreferences(VOICE_LOUDNESS, Context.MODE_PRIVATE).let { loud ->
+                    VoiceLoudness(
+                        saved = loud.all.mapValues { it.value.toString() },
+                        save = { all -> loud.edit().clear().apply { all.forEach { (k, v) -> putString(k, v) } }.apply() },
+                        workDir = app.cacheDir
+                    )
+                }
             )
         }.also { engine = it }
     }
@@ -41,8 +48,10 @@ object ReadAloudHub {
     @VisibleForTesting
     var recorderFactory: (Context) -> Recorder = { app -> RecordingPlayer(app) }
 
-    // How deep each of the phone's voices is, once measured (see VoiceDepths).
+    // How deep each of the phone's voices is, once measured (see VoiceDepths); and how loud the voices
+    // the languages are read in are (see VoiceLoudness).
     private const val VOICE_DEPTHS = "voice_depths"
+    private const val VOICE_LOUDNESS = "voice_loudness"
 
     /** The settings, for the settings sheets. */
     fun settings(context: Context): ReadAloudSettings = get(context).prefs as ReadAloudSettings

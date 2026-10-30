@@ -23,6 +23,9 @@ interface RecordedVerses {
     /** [file] wouldn't play: its verses are read by the phone's voice instead, until the folder's looked over again. */
     fun failed(file: RecordingFile) {}
 
+    /** How loud a language's recording is, in LUFS, once it's been measured (see Loudness); null before. */
+    fun loudness(telugu: Boolean): Double? = null
+
     /** No recordings: everything is read by the phone's voice. */
     object None : RecordedVerses {
         override fun ready(telugu: Boolean) = false
@@ -64,6 +67,12 @@ interface Recorder {
 
     /** How loud it plays, from now on and what's playing: 1 as recorded, less as a sleep timer runs out. */
     fun volume(level: Float) {}
+
+    /**
+     * How much louder (+) or quieter (−) than recorded it plays, in dB, from now on and what's playing:
+     * so English and Telugu sound alike (see Evening). Raised with Android's loudness enhancer.
+     */
+    fun level(db: Double) {}
 
     /** Where in its file it's playing (or paused), in seconds; null when it isn't. */
     val position: Double?

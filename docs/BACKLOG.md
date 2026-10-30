@@ -1286,7 +1286,7 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     Matthew 2:15 lists Hosea 11:1 "Quotes" in purple, Hosea 11:1 lists Matthew 2:15 "Quoted in" in teal,
     and Psalm 110:1's eight New Testament quotations are "Quoted in" in Cross References and the links sheet.
 
-46. **Saved for later 29 Oct.** **Read aloud: English and Telugu each at its own volume.** "absolute volume/adjust the volume of
+46. **Done 30 Oct.** **Read aloud: English and Telugu each at its own volume.** "absolute volume/adjust the volume of
     telugu and english separately."
     *Today:* both play at the phone's media volume, so one can sound louder than the other (a recording
     against the phone's voice, or one narrator against the other).
@@ -1297,6 +1297,27 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     To work out while building: each recording's loudness measured once (as its folder is added) and
     each phone voice's once (a sample spoken to a file), then each played at the level that brings it
     to the same loudness, the quieter ones raised with Android's loudness enhancer.
+    *Built 30 Oct,* just so, with nothing to set. Loudness is measured as broadcasters measure it (how
+    loud it sounds to the ear, the silences between verses left out). A recording is measured once,
+    in the background, as its folder is looked over (one already chosen, the first time the app starts):
+    20 seconds of verses from each of a dozen chapters spread through it, decoded on the phone, nothing
+    played, and kept with the folder. A phone voice is measured once by having it say a few words into a
+    file, as the language is read (its speech engine, and the voice chosen or the usual one): when a
+    reading starts, when one ends, or when the reading settings open, and kept; a new voice the same.
+    Each verse then plays at the level both languages meet at: the quieter raised to the louder, by up
+    to 6 dB; further apart, the louder lowered for the rest. Within a decibel, both as they are; before
+    both are known, as they are. In Both each verse's English and Telugu, and in either alone, so
+    switching language doesn't jump. A recording is raised in a sound session of its own player, the
+    phone's voice in one the speech engine is asked to play it in. The sleep timer's fade works on top.
+    A voice heard on its own (trying one in the settings, a Greek or Hebrew word's speaker) is as it is.
+    Checked here: the measure against the standard's own test tones, the dozen places chosen, voices
+    measured once and kept, the levels in Both with two recordings and with a recording and a voice,
+    and the decoding loop run through Robolectric's stand-ins for the phone's decoder.
+    *To listen for on the phone:* Both, with a recording and the phone's voice, then two recordings:
+    the two at one loudness from a reading's second verse (its first may come before its voice is
+    measured, the first time). Not yet heard: real MP3s and videos decoded on the phone, and the phone's
+    voice raised (that needs its speech engine to play in the session it's given; if it doesn't, the
+    voice stays quieter, and the fallback is to lower the other language to it instead).
 
 47. **Done 29 Oct.** **Notes: holding Backspace stops at a checklist.** "back button long press in the keyboard is
     stopping in the middle after clearing checkmarks."

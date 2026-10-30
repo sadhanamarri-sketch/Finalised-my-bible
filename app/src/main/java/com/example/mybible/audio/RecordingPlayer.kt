@@ -1,6 +1,8 @@
 package com.example.mybible.audio
 
 import android.content.Context
+import android.media.AudioManager
+import android.media.audiofx.LoudnessEnhancer
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -18,6 +20,8 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.extractor.mp3.Mp3Extractor
 import kotlin.math.abs
+import kotlin.math.pow
+import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
 /**
@@ -98,8 +102,12 @@ class RecordingPlayer(private val context: Context) : Recorder {
             // A video's sound only (the dramatized KJV's files are videos): its pictures aren't decoded.
             it.trackSelectionParameters = it.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, true).build()
             it.addListener(events)
-            it.volume = loudness
+            // A sound session of its own, from the start, for the loudness enhancer to raise it in.
+            val session = context.getSystemService(AudioManager::class.java)?.generateAudioSessionId() ?: AudioManager.ERROR
+            if (session != AudioManager.ERROR) it.setAudioSessionId(session)
+            this.session = session
             player = it
+            sound()
         }
 
     override fun play(id: Long, file: RecordingFile, from: Double, to: Double, speed: Float, marks: List<Double>) {
@@ -158,12 +166,47 @@ class RecordingPlayer(private val context: Context) : Recorder {
         player?.playbackParameters = PlaybackParameters(speed)
     }
 
-    // How loud it plays (see Recorder.volume), kept for a player made later.
+    // How loud it plays (see Recorder.volume), and how much louder or quieter than recorded (see
+    // Recorder.level), kept for a player made later.
     private var loudness = 1f
+    private var levelDb = 0.0
+
+    // The player's sound session, and Android's loudness enhancer on it, to raise it (made the first
+    // time it's raised).
+    private var session = AudioManager.ERROR
+    private var enhancer: LoudnessEnhancer? = null
 
     override fun volume(level: Float) {
         loudness = level
-        player?.volume = level
+        sound()
+    }
+
+    override fun level(db: Double) {
+        levelDb = db
+        sound()
+    }
+
+    // The player as loud as it's told: turned down by the sleep timer's fade and a level below 0, raised
+    // by one above.
+    private fun sound() {
+        val exo = player ?: return
+        exo.volume = loudness * if (levelDb < 0) 10.0.pow(levelDb / 20).toFloat() else 1f
+        if (levelDb > 0 && enhancer == null && session != AudioManager.ERROR) {
+            enhancer = try {
+                LoudnessEnhancer(session)
+            } catch (e: Exception) {
+                // No loudness enhancer on this phone: as recorded.
+                null
+            }
+        }
+        enhancer?.let { e ->
+            try {
+                e.setTargetGain((levelDb.coerceAtLeast(0.0) * 100).roundToInt())
+                e.enabled = levelDb > 0
+            } catch (ex: Exception) {
+                // Gone (the sound system restarted): as recorded.
+            }
+        }
     }
 
     override val position: Double?
@@ -175,6 +218,8 @@ class RecordingPlayer(private val context: Context) : Recorder {
 
     override fun release() {
         stop()
+        enhancer?.release()
+        enhancer = null
         player?.release()
         player = null
     }
