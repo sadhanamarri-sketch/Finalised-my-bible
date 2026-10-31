@@ -1602,3 +1602,7 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
       (పరలోకసంబంధ మైనవి, ఆదుకొం దును), and dashes anywhere but before speech.
     *To do next:* a few of the fixes checked by hand on bible.com (John 3:3, John 13:31, Luke 15:11, John
     11:26, Matthew 5:29, Luke 15:19); then "build 56" applies them all.
+    *Looked at 31 Oct as a copy to check against:* the 1881 Telugu Bible of the British and Foreign Bible
+    Society (archive.org, holybiblecontain00madr, via originalbibles.com): not the Old Version (you
+    checked), so no use. Still open: BSI's own text, YouVersion's developer API, API.Bible, or a PDF of
+    the Old Version.
