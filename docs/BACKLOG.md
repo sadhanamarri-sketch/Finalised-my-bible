@@ -1560,7 +1560,7 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
       is far bigger); the app grows by 30 to 40 MB; a search takes a moment longer on older phones.
       Large: the biggest of the three by far.
 
-56. **Proofread 31 Oct (not built).** **The Telugu text: stray spaces in words, missing dashes and
+56. **In progress 31 Oct.** **The Telugu text: stray spaces in words, missing dashes and
     semicolons.** "is it possible for you to proof read and compare againt bible.com online version? I
     allowed bible.com in your environment. It is having unexpected space in the telugu words and missing
     long Em-dash and semi-colons. it's bsi ov version."
@@ -1618,3 +1618,16 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     *31 Oct:* YouVersion's developer platform doesn't offer the O.V. (you checked), and no scan of an O.V.
     printing (1904 on) turned up. Left: BSI itself, API.Bible on request, or your screenshots of bible.com
     a chapter at a time, proofread here as Genesis 1:1–8 was.
+    *Found 31 Oct: your screen recordings of bible.com work.* A 20-second recording of Genesis 1–5,
+    scrolled through in the Bible app: its frames read with Tesseract's Telugu model (installed here),
+    each line found in the app's Genesis by its letters, and what stands between each pair of letters
+    (nothing, a space, a dash, a semicolon) taken where 3 frames or more agree. The app's letters are
+    kept: recognition mixes up letters (ఏ and ప, డ and ద), so differing letters are listed, not changed.
+    Genesis 1–5 (138 verses, all seen): 117 differences, all seen in 3 frames or more: 32 dashes (దేవుడు—
+    వెలుగు, స్త్రీతో—ఇది), 59 spaces the app has and bible.com hasn't (జలములమధ్య, ఆప్రకారమాయెను,
+    ఫలములనుగూర్చి), 25 it lacks (జలము పైన, తిన కూడదనియు, రమ్యమై నదియునై), and a stray " - " (2:19).
+    Every one checked against the frames and your Genesis 1 screenshot was right. About one a verse, so
+    the whole Bible likely has some 25,000. Reading a recording takes about 1.5 times its length.
+    *To do:* recordings of the rest, a book or a few at a time; each book's differences applied (spaces,
+    dashes, semicolons only), with its count; then the app's Telugu tests, a commit, and an APK when asked.
+    The rules-only fixes above are superseded wherever a recording covers.
