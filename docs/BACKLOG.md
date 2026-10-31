@@ -1606,3 +1606,12 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     Society (archive.org, holybiblecontain00madr, via originalbibles.com): not the Old Version (you
     checked), so no use. Still open: BSI's own text, YouVersion's developer API, API.Bible, or a PDF of
     the Old Version.
+    *Your screenshot of bible.com, 31 Oct (Genesis 1:1–8):* the Old Version opens every quotation with an
+    em dash (1:3 "దేవుడు—వెలుగు కమ్మని", 1:6 "దేవుడు—జలములమధ్య"), so there are thousands, not the 380 the
+    rules found (those are only where the text still shows a trace). And spacing differs both ways: the
+    app's "జలముపైన" is "జలము పైన" there, "జలముల మధ్య" is "జలములమధ్య", "ఆ ప్రకారమాయెను" is "ఆప్రకారమాయెను".
+    The rules caught none of these four, so their fixes shouldn't go in as they are: some joins may undo
+    spaces BSI keeps. On hold until there's an Old Version copy to compare with by an allowed route:
+    YouVersion's own developer API (a free key from platform.youversion.com, api.youversion.com; each
+    version licensed separately, so whether the Telugu O.V., version 1787, is open to it needs checking),
+    API.Bible (has the Telugu IRV; the O.V. perhaps on request), or BSI.
