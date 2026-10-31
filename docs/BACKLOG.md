@@ -1560,7 +1560,7 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
       is far bigger); the app grows by 30 to 40 MB; a search takes a moment longer on older phones.
       Large: the biggest of the three by far.
 
-56. **Proposed 31 Oct (not built).** **The Telugu text: stray spaces in words, missing dashes and
+56. **Proofread 31 Oct (not built).** **The Telugu text: stray spaces in words, missing dashes and
     semicolons.** "is it possible for you to proof read and compare againt bible.com online version? I
     allowed bible.com in your environment. It is having unexpected space in the telugu words and missing
     long Em-dash and semi-colons. it's bsi ov version."
@@ -1586,3 +1586,19 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
       YouVersion's terms don't allow copying it by program (to confirm when the site opens), and its
       copy is BSI's, by permission.
     *Needed:* www.bible.com, wordproject.org and www.wordproject.org under Allowed domains.
+    *Proofread 31 Oct (nothing changed yet), with the sites allowed:*
+    - bible.com's terms forbid reaching it by any robot or automatic means, "for any purpose, including
+      monitoring or copying", so it wasn't read by program at all; it's for checking by hand.
+    - wordproject.org's copy (its terms allow using the text) turned out to be the same faulty
+      digitization: the same split words (పరలోకసంబంధ మైనవి, పంప లేదు). No help as a check.
+    - So the text was proofread against itself, with the spellings it uses most and BSI's habit of an em
+      dash before speech. Found: 3,062 split words (samples all right: అర్పిం చుటకై, యెరూష లేముమీద,
+      విశ్వాస ముంచు); 380 lost dashes, 185 where the words ran together (అతనితోఒకడు, ఇట్లనెనుభయపడకుము)
+      and 195 where a space took the dash's place (యేసు ఇట్లనెను ఇప్పుడు), after ఇట్లనెను, ఇట్లనిరి,
+      సెలవిచ్చునదేమనగా, ప్రార్థనచేసెను, or "-తో" before speech; 127 stray "¸"; 5,495 double spaces; 6
+      broken letters to fix by hand (ఐగుపు ్త). The list (all but the double spaces) is
+      Telugu-proofreading-31Oct.tsv, sent 31 Oct; the tool that makes it, kept with it.
+    - Not found this way: semicolons that were dropped, splits whose joined spelling the Bible never uses
+      (పరలోకసంబంధ మైనవి, ఆదుకొం దును), and dashes anywhere but before speech.
+    *To do next:* a few of the fixes checked by hand on bible.com (John 3:3, John 13:31, Luke 15:11, John
+    11:26, Matthew 5:29, Luke 15:19); then "build 56" applies them all.
