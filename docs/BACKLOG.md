@@ -1615,3 +1615,6 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     YouVersion's own developer API (a free key from platform.youversion.com, api.youversion.com; each
     version licensed separately, so whether the Telugu O.V., version 1787, is open to it needs checking),
     API.Bible (has the Telugu IRV; the O.V. perhaps on request), or BSI.
+    *31 Oct:* YouVersion's developer platform doesn't offer the O.V. (you checked), and no scan of an O.V.
+    printing (1904 on) turned up. Left: BSI itself, API.Bible on request, or your screenshots of bible.com
+    a chapter at a time, proofread here as Genesis 1:1–8 was.
