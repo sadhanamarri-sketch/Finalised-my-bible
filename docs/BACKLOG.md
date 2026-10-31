@@ -1559,3 +1559,30 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
       whatever the words ("praying for others", "worried about money"). English only (one for Telugu too
       is far bigger); the app grows by 30 to 40 MB; a search takes a moment longer on older phones.
       Large: the biggest of the three by far.
+
+56. **Proposed 31 Oct (not built).** **The Telugu text: stray spaces in words, missing dashes and
+    semicolons.** "is it possible for you to proof read and compare againt bible.com online version? I
+    allowed bible.com in your environment. It is having unexpected space in the telugu words and missing
+    long Em-dash and semi-colons. it's bsi ov version."
+    *Checked 31 Oct, on the text in the app (unchanged since the first build, from aruljohn/Bible-telugu,
+    a community copy of the BSI Old Version):*
+    - No em dashes at all. 6,245 semicolons, so some are there; which are missing needs a copy to
+      compare with.
+    - Words split by a space: at least 1,000 (the joined spelling is used elsewhere in the same Bible,
+      and the second half isn't a word on its own: జెబూ లూను, పరా క్రమశాలులు, సెల వియ్యగా). There are
+      more where both halves are words too (చని పోయినను), which only a comparison finds.
+    - 6 spaces before a vowel sign (always wrong: ఐగుపు ్త), 5,500 double spaces, and 127 stray "¸"
+      marks, nearly all before యౌవన… (¸యౌవనుడు).
+    - bible.com itself couldn't be reached: bible.com is allowed, but it sends every page on to
+      www.bible.com, which isn't.
+    *Proposed:*
+    - Fix what's surely wrong from the text itself, with a list of every change to look over: the vowel
+      sign splits, double spaces, the "¸" marks, and the split words whose joined spelling the Bible
+      uses elsewhere.
+    - For the dashes, semicolons and the other splits, a copy that may be copied: wordproject.org's,
+      which the repo already has a tool to read in (tools/scrape-telugu.js, never run; its terms allow
+      copying the text for non-commercial use). Compare it with the app's, verse by verse.
+    - Check samples of both against bible.com a chapter at a time. Not a download of all of bible.com:
+      YouVersion's terms don't allow copying it by program (to confirm when the site opens), and its
+      copy is BSI's, by permission.
+    *Needed:* www.bible.com, wordproject.org and www.wordproject.org under Allowed domains.
