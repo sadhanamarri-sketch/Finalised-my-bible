@@ -1641,11 +1641,12 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     it sent as a file (a zip, or a Drive link). The tool (proof_video.py, recordings and screenshots) is
     in the session's scratch space, not the repo.
 
-57. **Previewed 1 Nov.** **Reader: no indent, the verse number at the start of the line.** "can you show
+57. **Discarded 1 Nov.** **Reader: no indent, the verse number at the start of the line.** "can you show
     me preview with no indentation for verses other than with verse numbers?"
     *Now:* each verse number (with its † and note dot) has a column of its own, and every line of the
     verse, the Telugu under it too, starts past it, 32 dp in.
     *Previewed:* the number, small and a little raised, starts the verse's first line, its † still a tap
     to the cross references; the lines after it, and the Telugu, start at the margin. A verse takes
     fewer lines (John 3:2 seven lines down to six). John 3, before and after, in English and with Telugu,
-    sent 1 Nov. Small: VerseCard only. To build: say "build 57".
+    sent 1 Nov. Small: VerseCard only.
+    *1 Nov:* "discard it... i like the way it is". The Reader keeps the number column; nothing changed.
