@@ -12,10 +12,10 @@ build of 23 Oct (commit 4f803a1). The notes of 29 Oct were made on the Dev build
 reading button, Verse Scroll's progress bar and the new notes page, which only it has). A bug seen on the
 phone is looked for first in the code of the build it was seen on.
 
-**Sent 30 Oct:** a newer My Bible (Dev) at commit 61c9b8b, with everything marked Done up to 53 (the
-Share button). It installs over the 23 Oct Dev build and keeps its data (it's signed with the same
-checked-in debug key). Once it's installed, it's the Dev build on the phone. (An earlier one sent the same
-day, at ebba364, hadn't 53.)
+**Sent 1 Nov:** a newer My Bible (Dev) at commit b41ec88, with everything marked Done up to 55 (the new
+search: topic lines below their headings, each word on its own when nothing's found, a person's own
+words). It installs over the earlier Dev builds and keeps their data (signed with the same checked-in
+debug key). (Before it, 30 Oct: 61c9b8b, Done up to 53, the Share button.)
 
 ## Noted 9 Oct 2026
 
