@@ -88,6 +88,10 @@ object TeluguSearch {
         return out
     }
 
+    /** Where in [text] a word starts with one of [starts] (as [matchKey] spells them). */
+    fun wordStarts(text: String, starts: List<String>): List<IntRange> =
+        tokensOf(text).filter { t -> starts.any { t.key.startsWith(it) } }.map { it.start until it.end }
+
     /** [word] as matched: without zero-width joiners and soft hyphens. */
     fun matchKey(word: String): String = word.filterNot { it in INVISIBLE }
 

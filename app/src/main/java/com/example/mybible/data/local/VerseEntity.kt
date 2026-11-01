@@ -32,5 +32,6 @@ data class VerseTextRow(
     val book: String,
     val chapter: Int,
     val number: Int,
-    val text: String
+    val text: String,
+    val isRedLetter: Boolean = false
 )

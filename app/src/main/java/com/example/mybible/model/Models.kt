@@ -164,10 +164,17 @@ data class SearchOutcome(
     /** What the hits past [exactCount] are. */
     val relatedKind: RelatedKind = RelatedKind.SAME_MEANING,
     /** A sentence on why they're here, under their heading: which Hebrew word a Greek one stands for. */
-    val relatedNote: String? = null
+    val relatedNote: String? = null,
+    /** Their heading, for [RelatedKind.PERSON]: "In Paul's letters". */
+    val relatedHeading: String? = null,
+    /** Nothing found with every word: each word on its own, with how many verses it finds. */
+    val eachWord: List<WordCount> = emptyList()
 ) {
     val relatedCount: Int get() = hits.size - exactCount
 }
+
+/** A word of a search, and how many verses it finds on its own. */
+data class WordCount(val word: String, val count: Int)
 
 enum class RelatedKind {
     /** Verses that say it in other words: King James wording, the same Greek or Hebrew word. */
@@ -177,7 +184,9 @@ enum class RelatedKind {
     /** A search for a Greek word: the Old Testament verses with the Hebrew word it stands for. */
     OLD_TESTAMENT,
     /** A search for a Hebrew word: the New Testament verses with the Greek word for it. */
-    NEW_TESTAMENT
+    NEW_TESTAMENT,
+    /** A person and a subject: the subject in the person's own words ("Paul intercession": his letters' prayers). */
+    PERSON
 }
 
 /**

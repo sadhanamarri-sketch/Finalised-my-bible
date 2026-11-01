@@ -5,6 +5,7 @@ import com.example.mybible.model.MatchedWord.Kind.WORD
 import com.example.mybible.model.MatchedWord.Kind.WORDING
 import com.example.mybible.model.SearchHit
 import com.example.mybible.model.SearchOutcome
+import com.example.mybible.model.WordCount
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -111,6 +112,22 @@ class SmartSearchTest {
 
         assertTrue(search.search("xyzzy plugh").hits.isEmpty())
         assertTrue(search.search("a").hits.isEmpty())
+    }
+
+    @Test
+    fun noVerseHasBothWords() {
+        // Each word on its own instead, with how many verses it finds (backlog 54).
+        val none = search.search("shepherd beginning")
+        assertTrue(none.hits.isEmpty())
+        assertEquals(listOf(WordCount("shepherd", 1), WordCount("beginning", 1)), none.eachWord)
+        // One the Bible hasn't: only the other.
+        assertEquals(listOf(WordCount("faith", 1)), search.search("faith xyzzy").eachWord)
+        // "Did you mean" only for what finds something: "faith beginning" finds nothing either.
+        val typo = search.search("faith beginnig")
+        assertNull(typo.suggestion)
+        assertEquals(listOf(WordCount("faith", 1)), typo.eachWord)
+        // Found: none.
+        assertTrue(search.search("faith").eachWord.isEmpty())
     }
 
     @Test

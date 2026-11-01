@@ -14,6 +14,7 @@ import com.example.mybible.ui.components.BOOK_CHAPTER_COUNTS
 import com.example.mybible.search.BibleIndex
 import com.example.mybible.search.IndexedVerse
 import com.example.mybible.search.SearchLexicon
+import com.example.mybible.search.PersonSearch
 import com.example.mybible.search.SmartSearch
 import com.example.mybible.search.TopicBook
 import com.example.mybible.search.TeluguSearch
@@ -1173,8 +1174,8 @@ class BibleRepository(private val context: Context) {
     // "1 john 3:16") opens that chapter or verse instead, and a search typed in Telugu looks
     // through the Telugu text (TeluguSearch).
 
-    // Verse search and Nave's topics, sharing the index and word data.
-    private class SearchEngine(val verses: SmartSearch, val topics: TopicSearch)
+    // Verse search, Nave's topics and a person's own words, sharing the index and word data.
+    private class SearchEngine(val verses: SmartSearch, val topics: TopicSearch, val people: PersonSearch)
 
     private val searchEngineMutex = Mutex()
     @Volatile
@@ -1199,10 +1200,11 @@ class BibleRepository(private val context: Context) {
             val topics = async(Dispatchers.Default) { TopicBook.load(open) }
             val bookIndex = BIBLE_BOOKS.withIndex().associate { (i, book) -> book to i }
             val verses = bibleDao.getAllVerseTexts().mapNotNull { row ->
-                bookIndex[row.book]?.let { IndexedVerse(row.book, it, row.chapter, row.number, row.text) }
+                bookIndex[row.book]?.let { IndexedVerse(row.book, it, row.chapter, row.number, row.text, row.isRedLetter) }
             }
             val index = BibleIndex(verses)
-            SearchEngine(SmartSearch(index, lexicon.await()), TopicSearch(topics.await(), lexicon.await(), index))
+            val smart = SmartSearch(index, lexicon.await())
+            SearchEngine(smart, TopicSearch(topics.await(), lexicon.await(), index), PersonSearch(index, lexicon.await(), smart))
         }.also { searchEngineCache = it }
     }
 
@@ -1225,8 +1227,10 @@ class BibleRepository(private val context: Context) {
         if (!hasLatinLetter(q) && !hasOriginalLetter(q)) return@withContext textSearch(q, caseSensitive)
         val engine = searchEngine() ?: return@withContext textSearch(q, caseSensitive)
         val outcome = engine.verses.search(q, caseSensitive, disabledSources)
-        // Topics go by meaning, not spelling: none for a case-sensitive search, nor for a Greek or Hebrew word.
-        if (caseSensitive || outcome.originalWords.isNotEmpty()) outcome else outcome.copy(topics = engine.topics.find(q))
+        // Topics and a person's own words go by meaning, not spelling: none for a case-sensitive
+        // search, nor for a Greek or Hebrew word.
+        if (caseSensitive || outcome.originalWords.isNotEmpty()) outcome
+        else engine.people.search(q, outcome, disabledSources).copy(topics = engine.topics.find(q))
     }
 
     /**
@@ -1264,14 +1268,21 @@ class BibleRepository(private val context: Context) {
     }
 
     // A search typed in Telugu (see TeluguSearch): the verses with its longest word anywhere,
-    // then those with every word where TeluguSearch looks for it.
+    // then those with every word where TeluguSearch looks for it. One naming a person and a
+    // subject (పౌలు ప్రార్థన) also has the subject in the person's own words (see PersonSearch).
     private suspend fun teluguSearch(q: String, disabledSources: Set<String>): SearchOutcome {
         val words = TeluguSearch.wordsOf(q)
         if (words.isEmpty()) return SearchOutcome()
-        val verses = bibleDao.searchTelugu(TeluguSearch.longest(words))
-            .map { Verse(it.book, it.chapter, it.number, it.text, it.isRedLetter, it.teluguText) }
+        fun List<VerseEntity>.inOrder() = map { Verse(it.book, it.chapter, it.number, it.text, it.isRedLetter, it.teluguText) }
             .sortedWith(compareBy({ BIBLE_BOOKS.indexOf(it.book) }, { it.chapter }, { it.number }))
-        return TeluguSearch.search(q, verses, disabledSources)
+        val outcome = TeluguSearch.search(q, bibleDao.searchTelugu(TeluguSearch.longest(words)).inOrder(), disabledSources)
+        val (person, subject) = PersonSearch.teluguPerson(words) ?: return outcome
+        val readings = subject.map(PersonSearch::teluguReading)
+        // Candidates: the verses with any reading of the subject's longest word.
+        val first = readings.maxBy { r -> r.maxOf { it.length } }
+        val candidates = first.flatMap { bibleDao.searchTelugu(it) }.distinctBy { Triple(it.book, it.chapter, it.number) }.inOrder()
+        val hits = PersonSearch.teluguHits(person, readings, candidates)
+        return PersonSearch.merge(outcome, person, hits, PersonSearch.teluguNote(person, readings))
     }
 
     // Every word of the query somewhere in the English or the Telugu, letter for letter, while

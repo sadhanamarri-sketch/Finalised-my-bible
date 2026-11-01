@@ -60,6 +60,7 @@ import com.example.mybible.label
 import com.example.mybible.model.MatchedWord
 import com.example.mybible.model.OriginalWordCard
 import com.example.mybible.model.RelatedKind
+import com.example.mybible.model.WordCount
 import com.example.mybible.model.SearchHit
 import com.example.mybible.model.SearchOutcome
 import com.example.mybible.model.TopicCard
@@ -494,18 +495,22 @@ private fun SearchPage(
                 }
                 if (outcome.hits.isEmpty() && outcome.suggestion == null) {
                     item(key = "none") {
-                        Text(
-                            text = when {
-                                outcomeAll.hits.isNotEmpty() -> "None in ${place.label(readerBook, 0)}"
-                                else -> "No matching verses found"
-                            },
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontFamily = WorkSansFontFamily,
-                            letterSpacing = 0.sp,
-                            fontSize = 14.sp,
-                            modifier = Modifier.padding(top = 24.dp).fillMaxWidth(),
-                            textAlign = TextAlign.Center
-                        )
+                        if (outcomeAll.hits.isEmpty() && outcomeAll.eachWord.isNotEmpty()) {
+                            EachWord(outcomeAll.eachWord, themeMode, onSearch = { viewModel.searchFromHistory(it) })
+                        } else {
+                            Text(
+                                text = when {
+                                    outcomeAll.hits.isNotEmpty() -> "None in ${place.label(readerBook, 0)}"
+                                    else -> "No matching verses found"
+                                },
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontFamily = WorkSansFontFamily,
+                                letterSpacing = 0.sp,
+                                fontSize = 14.sp,
+                                modifier = Modifier.padding(top = 24.dp).fillMaxWidth(),
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
                 if (outcome.closeMatches) {
@@ -528,6 +533,7 @@ private fun SearchPage(
                                     RelatedKind.INSIDE_LONGER_WORDS -> "Inside longer words"
                                     RelatedKind.OLD_TESTAMENT -> "In the Old Testament"
                                     RelatedKind.NEW_TESTAMENT -> "In the New Testament"
+                                    RelatedKind.PERSON -> outcome.relatedHeading ?: "In their own words"
                                 }
                             )
                             // Which Hebrew word a Greek one stands for, and how we know.
@@ -731,6 +737,8 @@ private fun countLine(outcome: SearchOutcome): String {
         RelatedKind.INSIDE_LONGER_WORDS -> "inside longer words"
         RelatedKind.OLD_TESTAMENT -> "in the Old Testament"
         RelatedKind.NEW_TESTAMENT -> "in the New Testament"
+        // "in Paul's letters"
+        RelatedKind.PERSON -> outcome.relatedHeading?.replaceFirstChar { it.lowercase() } ?: "in their own words"
     }
     return when {
         outcome.hits.isEmpty() -> "No verses found"
@@ -982,6 +990,39 @@ private fun OriginalWordCardView(word: OriginalWordCard) {
                     letterSpacing = 0.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+        }
+    }
+}
+
+// No verse has every word: each on its own, with how many verses it finds, a tap to search for it.
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun EachWord(words: List<WordCount>, themeMode: ThemeMode, onSearch: (String) -> Unit) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp)
+            .testTag("search_each_word")
+    ) {
+        Text(
+            text = if (words.size == 2) "No verse has both words. Search for one of them:" else "No verse has all these words. Search for one of them:",
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+            fontFamily = WorkSansFontFamily,
+            letterSpacing = 0.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (word in words) {
+                SheetChip(
+                    text = word.word,
+                    selected = false,
+                    themeMode = themeMode,
+                    count = word.count,
+                    onClick = { onSearch(word.word) }
                 )
             }
         }

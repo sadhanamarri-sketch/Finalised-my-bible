@@ -61,6 +61,32 @@ class TopicSearchTest {
     }
 
     @Test
+    fun linesBelowATopicsHeadings() {
+        // "Paul intercession": no heading of Intercession names Paul, but lines under three do (backlog 54).
+        val paul = topics.find("Paul intercession").filter { it.name == "Intercession" }
+        val sections = TestBible.topics[id("Intercession")].sections.map { it.label }
+        assertEquals(
+            listOf(
+                "Instances of" to "Paul for Onesimus",
+                "Additional instances of" to "Paul, for God's people · For Paul, by the congregations",
+                "Solicited" to "By Paul, of the congregations"
+            ),
+            paul.map { sections[it.section!!] to it.sectionLabel }
+        )
+        // Moses and Abraham too; Moses's prayers for Israel are under the line "Moses".
+        val moses = topics.find("Moses intercession")
+        assertTrue(moses.joinToString { "${it.name} › ${it.sectionLabel}" }, moses.any { it.name == "Intercession" && it.sectionLabel!!.split(" · ").contains("Moses") })
+        val abraham = topics.find("Abraham intercession")
+        assertTrue(abraham.joinToString { "${it.name} › ${it.sectionLabel}" }, abraham.any { it.name == "Intercession" && it.sectionLabel == "Abraham · Abraham's servant, in behalf of his master" })
+        // A long line is cut for its card: Paul's "Visits Samothracia and Neapolis; ... a place of prayer ...".
+        val paulPrayer = topics.find("Paul prayer")
+        assertTrue(paulPrayer.joinToString(" | ") { "${it.name} › ${it.sectionLabel}" }, paulPrayer.any { it.name == "Paul" && it.sectionLabel!!.endsWith("…") })
+        assertTrue(paulPrayer.all { (it.sectionLabel?.length ?: 0) <= 2 * TopicSearch.MAX_LINE_LENGTH + 6 })
+        // A main heading still comes first, and alone: Forgiveness "Of enemies".
+        assertEquals("Of enemies", topics.find("forgive enemies").first().sectionLabel)
+    }
+
+    @Test
     fun theTopicsPage() {
         val page = topics.page(id("Care"))
         assertEquals("Care", page.name)

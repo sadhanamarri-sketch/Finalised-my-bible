@@ -68,7 +68,7 @@ interface BibleDao {
 
     // Every verse's English, once per app run, for Search's in-memory index
     // (see BibleRepository.searchEngine).
-    @Query("SELECT book, chapter, number, text FROM verses")
+    @Query("SELECT book, chapter, number, text, isRedLetter FROM verses")
     suspend fun getAllVerseTexts(): List<VerseTextRow>
 
     // ---- Greek interlinear (TAGNT) ----

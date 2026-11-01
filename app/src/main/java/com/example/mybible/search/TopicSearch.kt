@@ -12,7 +12,9 @@ import com.example.mybible.model.Verse
  * A topic matches when every word of the query (function words aside) is a word of its name, in
  * any form ("forgive": Forgiveness, "angels": Angel) or as the King James says it ("worry": Care).
  * When only some are, the rest can name one of its headings: "forgive enemies" opens Forgiveness
- * at "Of enemies". A topic that only says "see" another (Anxiety, see Care) shows as that one.
+ * at "Of enemies"; or, failing that, lines further down: "Paul intercession" opens Intercession at
+ * "Additional instances of", for its "Paul, for God's people". A topic that only says "see"
+ * another (Anxiety, see Care) shows as that one.
  */
 class TopicSearch(private val book: TopicBook, private val lexicon: SearchLexicon, private val index: BibleIndex) {
 
@@ -40,7 +42,8 @@ class TopicSearch(private val book: TopicBook, private val lexicon: SearchLexico
         }
     }
 
-    private class Found(val topic: Topic, val tier: Int, val exact: Boolean, val section: Int?, val size: Int)
+    // label: the lines further down that the search names, when it's those that found the topic.
+    private class Found(val topic: Topic, val tier: Int, val exact: Boolean, val section: Int?, val size: Int, val label: String? = null)
 
     fun find(query: String, limit: Int = MAX_TOPICS): List<TopicCard> {
         val words = wordsOf(query).filter { it.length > 1 && it !in STOPWORDS }.distinct().map(::QueryWord)
@@ -59,38 +62,75 @@ class TopicSearch(private val book: TopicBook, private val lexicon: SearchLexico
                 found += Found(topic, if (direct) 0 else 1, exact, null, size)
             } else if (strengths.any { it == DIRECT } && !topic.isRedirect) {
                 val missing = words.filterIndexed { i, _ -> strengths[i] == 0 }
-                val section = topic.sections.indexOfFirst { heading ->
-                    val headingWords = wordsOf(heading.label)
-                    missing.all { w -> headingWords.any { w.strength(it) == DIRECT } }
+                fun names(label: String): Boolean {
+                    val labelWords = wordsOf(label)
+                    return missing.all { w -> labelWords.any { w.strength(it) == DIRECT } }
                 }
-                if (section >= 0) found += Found(topic, 2, false, section, size)
+                val section = topic.sections.indexOfFirst { names(it.label) }
+                if (section >= 0) {
+                    found += Found(topic, 2, false, section, size)
+                } else {
+                    for ((under, labels) in linesNaming(topic, ::names).entries.take(MAX_LINE_CARDS)) {
+                        val shown = labels.take(2).joinToString(" · ", transform = ::shortLine)
+                        found += Found(topic, 3, false, under, size, if (labels.size > 2) "$shown · …" else shown)
+                    }
+                }
             }
         }
         found.sortWith(compareBy<Found>({ it.tier }, { !it.exact }, { -it.size }, { it.topic.name.length }))
 
         val cards = ArrayList<TopicCard>()
         val shown = HashSet<Pair<Int, Int?>>()
-        fun add(topic: Topic, section: Int?, via: String?) {
+        fun add(topic: Topic, section: Int?, via: String?, label: String? = null) {
             if (cards.size < limit && shown.add(topic.id to section) && topic.referenceCount > 0) {
-                cards += card(topic, section, via)
+                cards += card(topic, section, via, label)
             }
         }
         for (f in found) {
             if (f.topic.isRedirect) {
                 f.topic.links.take(2).forEach { add(book[it.topic], it.section, via = f.topic.name) }
             } else {
-                add(f.topic, f.section, via = null)
+                add(f.topic, f.section, via = null, label = f.label)
             }
             if (cards.size >= limit) break
         }
         return cards
     }
 
-    private fun card(topic: Topic, section: Int?, via: String?) = TopicCard(
+    /**
+     * The lines below [topic]'s main headings that [names] says the search names, by the main
+     * heading they're under (null: under none, after a "see" link): Intercession's "Paul for
+     * Onesimus" is under "Instances of"; "Paul, for God's people" and "For Paul, by the
+     * congregations" under "Additional instances of".
+     */
+    private fun linesNaming(topic: Topic, names: (String) -> Boolean): Map<Int?, List<String>> {
+        val out = LinkedHashMap<Int?, MutableList<String>>()
+        var under: Int? = null
+        var headings = -1
+        for (entry in topic.entries) {
+            if (entry.level == 0) {
+                under = if (entry is TopicEntry.Verses) ++headings else null
+                continue
+            }
+            if (entry is TopicEntry.Verses && entry.label.isNotBlank() && names(entry.label)) {
+                out.getOrPut(under) { ArrayList() } += entry.label
+            }
+        }
+        return out
+    }
+
+    // A long line cut at a word, for a card: "Paul asked that the "thorn in the flesh" be removed…".
+    private fun shortLine(label: String): String {
+        if (label.length <= MAX_LINE_LENGTH) return label
+        val cut = label.lastIndexOf(' ', MAX_LINE_LENGTH).takeIf { it > MAX_LINE_LENGTH / 2 } ?: MAX_LINE_LENGTH
+        return label.substring(0, cut).trimEnd(' ', ',', ';', ':') + "…"
+    }
+
+    private fun card(topic: Topic, section: Int?, via: String?, label: String? = null) = TopicCard(
         topicId = topic.id,
         name = topic.name,
         section = section,
-        sectionLabel = section?.let { topic.sections.getOrNull(it)?.label },
+        sectionLabel = label ?: section?.let { topic.sections.getOrNull(it)?.label?.let(::shortLine) },
         via = via,
         referenceCount = topic.referenceCount,
         summary = topic.sections.map { it.label }.filter { it.isNotBlank() }.take(3).joinToString(" · ")
@@ -173,5 +213,9 @@ class TopicSearch(private val book: TopicBook, private val lexicon: SearchLexico
         const val WORDING = 1
         /** Topic cards a search shows at most. */
         const val MAX_TOPICS = 8
+        /** Cards one topic gets at most for lines below its main headings, one per heading they're under. */
+        const val MAX_LINE_CARDS = 3
+        /** A line's length on a card at most, before it's cut. */
+        const val MAX_LINE_LENGTH = 60
     }
 }

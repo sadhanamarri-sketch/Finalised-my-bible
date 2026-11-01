@@ -1513,7 +1513,7 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     *To check on the phone:* sharing to WhatsApp (in a chat, and as Status) and to Instagram; Save to
     phone, then the picture in the gallery; a lock-screen wallpaper from the Phone shape.
 
-54. **Saved for later 30 Oct.** **Search: "Paul intercession" finds nothing.** "i just tried seraching
+54. **Done 1 Nov.** **Search: "Paul intercession" finds nothing.** "i just tried seraching
     Paul intercession and it recommended it as well and no search results? us there a way to fix it? how
     big a build is this?"
     *Checked 30 Oct, on the code the Dev build has:* no verse has both words (Paul's own prayers for the
@@ -1536,8 +1536,17 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     *Not covered:* Paul's prayers in his letters (Romans 1:9, Ephesians 1:16 and 3:14, Philippians 1:4,
     Colossians 1:9, 1 Thessalonians 1:2, 2 Thessalonians 1:11, Philemon 4) aren't in Nave's list, so they
     still wouldn't come up. A list of them could be added by hand.
+    *Built 1 Nov* (with 55; no APK):
+    - Topics: when no main heading names the rest of a search, lines further down can. "Paul
+      intercession" gives Intercession › Paul for Onesimus; › Paul, for God's people · For Paul, by
+      the congregations; › By Paul, of the congregations (one card for each heading they're under,
+      opening there). "Moses intercession" and "Abraham intercession" too. A long line is cut on its
+      card ("Visits Samothracia and Neapolis; comes to Philippi, the…").
+    - No verse with every word (and none with all but one): "No verse has both words. Search for one
+      of them:" and a chip for each, with its count ("Nicodemus 5", "shepherd 88").
+    - "Did you mean" only when what it offers finds something. "Intercessory" reads as intercession.
 
-55. **Saved for later 30 Oct.** **Search: subjects no word or topic names.** "is there a way to cover
+55. **Done 1 Nov (the first way).** **Search: subjects no word or topic names.** "is there a way to cover
     those kind of topics?" (after 54: Paul's prayers in his letters, which neither say "Paul" nor are in
     Nave's list).
     *Three ways, smallest first:*
@@ -1559,6 +1568,20 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
       whatever the words ("praying for others", "worried about money"). English only (one for Telugu too
       is far bigger); the app grows by 30 to 40 MB; a search takes a moment longer on older phones.
       Large: the biggest of the three by far.
+    *Built 1 Nov, the first way, with Telugu* ("go on"; no APK): a search naming a person and a subject
+    also has the subject in the person's own words, after the verses with every word, under its own
+    heading: "In Paul's letters" (Romans to Philemon), "In John's writings", "In Peter's letters",
+    James's and Jude's letters, "In Solomon's books", "In David's psalms" (the 73 titled his), "In
+    Jesus' own words" (the red letters), and the books of the prophets, Ezra, Nehemiah, Matthew and
+    Luke (with Acts). Not "mark", as often the word as the name. A few subjects are read widely:
+    intercession as praying for others (pray, prayer, supplication, "making mention"), those praying
+    for someone first ("for you", "of thee", "for Israel"); prayer, thanksgiving, suffering,
+    encouragement, joy. "Paul intercession" now gives the three topic cards and 46 verses in his
+    letters, Romans 1:9, 8:26, 10:1, 15:30, Ephesians 1:16, Philippians 1:4, Colossians 1:9 among the
+    first; "Paul prayed" Acts' six verses, then his letters; "David trust" 54 psalms; "Daniel prayer"
+    Daniel 6 and 9. In Telugu, by the names (పౌలు, దావీదు, యేసు, యోహాను...; not యాకోబు or యూదా, which are
+    Jacob and Judah too), prayer read as ప్రార్థన, విజ్ఞాపన, విన్నపము: "పౌలు ప్రార్థన" gives Acts 28:8, then 50
+    verses in his letters. Torrey's and search by meaning stay for later.
 
 56. **Paused 1 Nov.** **The Telugu text: stray spaces in words, missing dashes and
     semicolons.** "is it possible for you to proof read and compare againt bible.com online version? I

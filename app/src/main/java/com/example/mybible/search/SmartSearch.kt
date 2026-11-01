@@ -6,6 +6,7 @@ import com.example.mybible.model.SearchHit
 import com.example.mybible.model.SearchOutcome
 import com.example.mybible.model.SearchSource
 import com.example.mybible.model.Verse
+import com.example.mybible.model.WordCount
 import com.example.mybible.model.WordSearchPreview
 import com.example.mybible.model.WordStudy
 import java.util.BitSet
@@ -41,7 +42,11 @@ class SmartSearch(private val index: BibleIndex, private val lexicon: SearchLexi
     /** The Greek or Hebrew words a search names, for linking one to a word (see OriginalSearch.wordsNamed). */
     fun wordsNamed(query: String, hebrew: Boolean): List<OriginalWordCard> = originals.wordsNamed(query, hebrew)
 
-    fun search(query: String, caseSensitive: Boolean = false, disabled: Set<String> = emptySet()): SearchOutcome {
+    fun search(query: String, caseSensitive: Boolean = false, disabled: Set<String> = emptySet()): SearchOutcome =
+        search(query, caseSensitive, disabled, suggest = true)
+
+    // suggest: whether "Did you mean" may be offered (not when trying out a suggestion).
+    private fun search(query: String, caseSensitive: Boolean, disabled: Set<String>, suggest: Boolean): SearchOutcome {
         originals.search(query, disabled)?.let { return it }
         originals.searchTransliteration(query, disabled)?.let { return it }
         val typed = typedWordsOf(query)
@@ -99,8 +104,16 @@ class SmartSearch(private val index: BibleIndex, private val lexicon: SearchLexi
 
         if (hits.isNotEmpty()) return SearchOutcome(hits, exactHits.size, sources)
         if (caseSensitive) return SearchOutcome()
-        suggestionFor(query)?.let { return SearchOutcome(sources = sources, suggestion = it) }
-        return closeMatches(required, matching, ::exactOf, disabled, ranking, highlighter, sources)
+        // "Did you mean" only for what finds something: "intercessor prayer" didn't either.
+        if (suggest) {
+            suggestionFor(query)?.takeIf { search(it, caseSensitive = false, disabled, suggest = false).hits.isNotEmpty() }
+                ?.let { return SearchOutcome(sources = sources, suggestion = it) }
+        }
+        val close = closeMatches(required, matching, ::exactOf, disabled, ranking, highlighter, sources)
+        if (close.hits.isNotEmpty() || required.size < 2) return close
+        // No verse has them all, nor all but one: each word on its own, to search instead.
+        val each = required.mapIndexed { i, t -> WordCount(t.typed.joinToString(" "), matching[i].cardinality()) }
+        return close.copy(eachWord = each.filter { it.count > 0 })
     }
 
     // ---- query words and terms ----

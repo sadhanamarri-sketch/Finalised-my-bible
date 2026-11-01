@@ -2,8 +2,18 @@ package com.example.mybible.search
 
 import java.util.BitSet
 
-/** One verse for [BibleIndex]: its book's place in the Bible (Genesis is 0) and its English text. */
-class IndexedVerse(val book: String, val bookIndex: Int, val chapter: Int, val number: Int, val text: String)
+/**
+ * One verse for [BibleIndex]: its book's place in the Bible (Genesis is 0), its English text, and
+ * whether it has words of Jesus (the red letters).
+ */
+class IndexedVerse(
+    val book: String,
+    val bookIndex: Int,
+    val chapter: Int,
+    val number: Int,
+    val text: String,
+    val isRedLetter: Boolean = false
+)
 
 /**
  * Every English verse in memory, in Bible order, with the verses each word is in. Built once
@@ -17,11 +27,13 @@ class BibleIndex(verses: List<IndexedVerse>) {
         .toTypedArray()
     private val postings = HashMap<String, IntArray>(16_384)
     private val idByRef = HashMap<Int, Int>(this.verses.size * 2)
+    private val bookIndexByName = HashMap<String, Int>(128)
 
     init {
         val building = HashMap<String, IntList>(16_384)
         for ((id, verse) in this.verses.withIndex()) {
             idByRef[packRef(verse.bookIndex, verse.chapter, verse.number)] = id
+            bookIndexByName[verse.book] = verse.bookIndex
             forEachWord(verse.text) { word, _, _ -> building.getOrPut(word) { IntList() }.addOnce(id) }
         }
         for ((word, ids) in building) postings[word] = ids.toArray()
@@ -47,6 +59,10 @@ class BibleIndex(verses: List<IndexedVerse>) {
 
     /** The verse at a packed reference (see [packRef]), or -1 when this Bible doesn't have it. */
     fun idOf(packedRef: Int): Int = idByRef[packedRef] ?: -1
+
+    /** [book] [chapter]:[verse]'s place, or -1 when this Bible doesn't have it. */
+    fun idOf(book: String, chapter: Int, verse: Int): Int =
+        bookIndexByName[book]?.let { idOf(packRef(it, chapter, verse)) } ?: -1
 
     /** How many of [ids] each book has. */
     fun countByBook(ids: BitSet): Map<String, Int> {
