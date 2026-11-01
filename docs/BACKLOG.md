@@ -1640,6 +1640,12 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     recording's 40) but arrived shrunk to 540 pixels wide, so only 67% could be checked; full size needs
     it sent as a file (a zip, or a Drive link). The tool (proof_video.py, recordings and screenshots) is
     in the session's scratch space, not the repo.
+    *1 Nov, www.indian.bible (the Bible Society of India's own site, TELUBSI):* its robots.txt bars AI
+    tools by name (ClaudeBot, Claude-Web, ChatGPT-User, GPTBot, PerplexityBot and others) and its firewall
+    refuses this environment, even robots.txt; so it isn't read from here, and not by pretending to be a
+    browser. A download program of your own, on your phone, honestly named and following robots.txt, was
+    refused too (403), so that's a no as well. Left: ask the Bible Society of India for permission or a
+    copy, or recordings of bible.com.
 
 57. **Discarded 1 Nov.** **Reader: no indent, the verse number at the start of the line.** "can you show
     me preview with no indentation for verses other than with verse numbers?"
