@@ -1560,7 +1560,7 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
       is far bigger); the app grows by 30 to 40 MB; a search takes a moment longer on older phones.
       Large: the biggest of the three by far.
 
-56. **In progress 31 Oct.** **The Telugu text: stray spaces in words, missing dashes and
+56. **Paused 1 Nov.** **The Telugu text: stray spaces in words, missing dashes and
     semicolons.** "is it possible for you to proof read and compare againt bible.com online version? I
     allowed bible.com in your environment. It is having unexpected space in the telugu words and missing
     long Em-dash and semi-colons. it's bsi ov version."
@@ -1631,3 +1631,21 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     *To do:* recordings of the rest, a book or a few at a time; each book's differences applied (spaces,
     dashes, semicolons only), with its count; then the app's Telugu tests, a commit, and an APK when asked.
     The rules-only fixes above are superseded wherever a recording covers.
+    *Checked again 31 Oct, then left 1 Nov ("leave it"):* nothing in the app changed. bible.com has stray
+    spaces inside words of its own (Genesis 4:18 "మతూషా యేలును" beside "మతూషాయేలు", 4:20 "యా బాలును", 2:21
+    "ప్రక్క టెముకలలో"; seen in the frames), so of the 25 spaces the app lacks none go in: only the app's
+    extra spaces come out, and dashes and semicolons go in. That leaves 92 fixes for Genesis 1–5 (32
+    dashes, 59 spaces, the stray " - " of 2:19; 4:13's " —" as "—"), with 97% of its word breaks checked.
+    A long screenshot of bible.com's Genesis 1 read as truly (its 25 differences all among the
+    recording's 40) but arrived shrunk to 540 pixels wide, so only 67% could be checked; full size needs
+    it sent as a file (a zip, or a Drive link). The tool (proof_video.py, recordings and screenshots) is
+    in the session's scratch space, not the repo.
+
+57. **Previewed 1 Nov.** **Reader: no indent, the verse number at the start of the line.** "can you show
+    me preview with no indentation for verses other than with verse numbers?"
+    *Now:* each verse number (with its † and note dot) has a column of its own, and every line of the
+    verse, the Telugu under it too, starts past it, 32 dp in.
+    *Previewed:* the number, small and a little raised, starts the verse's first line, its † still a tap
+    to the cross references; the lines after it, and the Telugu, start at the margin. A verse takes
+    fewer lines (John 3:2 seven lines down to six). John 3, before and after, in English and with Telugu,
+    sent 1 Nov. Small: VerseCard only. To build: say "build 57".
