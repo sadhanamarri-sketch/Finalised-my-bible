@@ -1545,6 +1545,13 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     - No verse with every word (and none with all but one): "No verse has both words. Search for one
       of them:" and a chip for each, with its count ("Nicodemus 5", "shepherd 88").
     - "Did you mean" only when what it offers finds something. "Intercessory" reads as intercession.
+    *Fixed 4 Nov* ("I searched for paul intercession and it just showed me intercession results as paul
+    intercession 236 verses for both"): its three cards each said 236, the whole topic's count, and
+    opened all of Intercession. Now one card, "Intercession › Paul", with its lines' references alone
+    (10) and the lines under it (Paul for Onesimus · Paul, for God's people · ...); tapped, a page of
+    just those four lines and their verses (Philemon 1:10–21, Acts 20:32, Acts 14:26, 15:40, Romans
+    15:30–32, 2 Corinthians 1:11 ...), and at its end "All of Intercession (236 references)". A heading's
+    card counts that heading's references too: Forgiveness › Of enemies, 24.
 
 55. **Done 1 Nov (the first way).** **Search: subjects no word or topic names.** "is there a way to cover
     those kind of topics?" (after 54: Paul's prayers in his letters, which neither say "Paul" nor are in

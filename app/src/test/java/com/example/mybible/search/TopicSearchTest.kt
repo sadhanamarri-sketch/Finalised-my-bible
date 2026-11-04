@@ -62,28 +62,42 @@ class TopicSearchTest {
 
     @Test
     fun linesBelowATopicsHeadings() {
-        // "Paul intercession": no heading of Intercession names Paul, but lines under three do (backlog 54).
-        val paul = topics.find("Paul intercession").filter { it.name == "Intercession" }
-        val sections = TestBible.topics[id("Intercession")].sections.map { it.label }
+        // "Paul intercession": no heading of Intercession names Paul, but four lines further down do
+        // (backlog 54): one card for them, with their references alone, not the topic's 236.
+        val paul = topics.find("Paul intercession").single { it.name == "Intercession" }
+        assertEquals("Paul", paul.sectionLabel)
+        assertEquals(10, paul.referenceCount)
         assertEquals(
-            listOf(
-                "Instances of" to "Paul for Onesimus",
-                "Additional instances of" to "Paul, for God's people · For Paul, by the congregations",
-                "Solicited" to "By Paul, of the congregations"
-            ),
-            paul.map { sections[it.section!!] to it.sectionLabel }
+            "Paul for Onesimus · Paul, for God's people · For Paul, by the congregations · By Paul, of the congregations",
+            paul.summary
         )
-        // Moses and Abraham too; Moses's prayers for Israel are under the line "Moses".
-        val moses = topics.find("Moses intercession")
-        assertTrue(moses.joinToString { "${it.name} › ${it.sectionLabel}" }, moses.any { it.name == "Intercession" && it.sectionLabel!!.split(" · ").contains("Moses") })
-        val abraham = topics.find("Abraham intercession")
-        assertTrue(abraham.joinToString { "${it.name} › ${it.sectionLabel}" }, abraham.any { it.name == "Intercession" && it.sectionLabel == "Abraham · Abraham's servant, in behalf of his master" })
-        // A long line is cut for its card: Paul's "Visits Samothracia and Neapolis; ... a place of prayer ...".
+        // Opened: those lines alone, and a link to all of the topic.
+        val page = topics.page(paul.topicId, paul.lines, paul.sectionLabel)
+        assertEquals("Intercession › Paul", page.name)
+        assertEquals(
+            listOf("Paul for Onesimus", "Paul, for God's people", "For Paul, by the congregations", "By Paul, of the congregations"),
+            page.items.filterIsInstance<TopicItem.Section>().map { it.label }
+        )
+        val all = page.items.last() as TopicItem.Link
+        assertEquals("All of Intercession (236 references)", all.text)
+        assertEquals(paul.topicId, all.topicId)
+        // Moses: his line with what's under it (for Israel, for Miriam), and the others naming him.
+        val moses = topics.find("Moses intercession").single { it.name == "Intercession" }
+        assertTrue(moses.summary.split(" · ").contains("Moses"))
+        val mosesLine = topics.page(moses.topicId, moses.lines, "Moses").items.filterIsInstance<TopicItem.Section>().first { it.label == "Moses" }
+        assertEquals(listOf("For Israel", "For Miriam"), mosesLine.rows.filterIsInstance<TopicRow.Heading>().map { it.label })
+        // Abraham: his line (Sodom, Abimelech) and his servant's, three references.
+        val abraham = topics.find("Abraham intercession").single { it.name == "Intercession" }
+        assertEquals("Abraham · Abraham's servant, in behalf of his master", abraham.summary)
+        assertEquals(3, abraham.referenceCount)
+        // A long heading is cut on its card: Paul's "Visits Samothracia and Neapolis; ... a place of prayer ...".
         val paulPrayer = topics.find("Paul prayer")
-        assertTrue(paulPrayer.joinToString(" | ") { "${it.name} › ${it.sectionLabel}" }, paulPrayer.any { it.name == "Paul" && it.sectionLabel!!.endsWith("…") })
-        assertTrue(paulPrayer.all { (it.sectionLabel?.length ?: 0) <= 2 * TopicSearch.MAX_LINE_LENGTH + 6 })
-        // A main heading still comes first, and alone: Forgiveness "Of enemies".
-        assertEquals("Of enemies", topics.find("forgive enemies").first().sectionLabel)
+        assertTrue(paulPrayer.any { it.name == "Paul" && it.sectionLabel!!.endsWith("…") })
+        // A heading's card counts its references alone: Forgiveness "Of enemies".
+        val enemies = topics.find("forgive enemies").first()
+        assertEquals("Of enemies", enemies.sectionLabel)
+        assertTrue(enemies.referenceCount in 1 until TestBible.topics[id("Forgiveness")].referenceCount)
+        assertTrue(enemies.lines.isEmpty())
     }
 
     @Test

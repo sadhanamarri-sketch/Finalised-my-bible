@@ -1262,9 +1262,9 @@ class BibleRepository(private val context: Context) {
         searchEngine()?.verses?.wordsNamed(query, hebrew).orEmpty()
     }
 
-    /** A Nave's topic's page, for Search: its headings and verses (see TopicSearch.page). */
-    suspend fun topicPage(id: Int): TopicPage? = withContext(Dispatchers.Default) {
-        searchEngine()?.topics?.page(id)
+    /** A Nave's topic's page, for Search: its headings and verses, or only [lines] of it (see TopicSearch.page). */
+    suspend fun topicPage(id: Int, lines: List<Int> = emptyList(), label: String? = null): TopicPage? = withContext(Dispatchers.Default) {
+        searchEngine()?.topics?.page(id, lines, label)
     }
 
     // A search typed in Telugu (see TeluguSearch): the verses with its longest word anywhere,

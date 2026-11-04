@@ -42,8 +42,17 @@ class TopicSearch(private val book: TopicBook, private val lexicon: SearchLexico
         }
     }
 
-    // label: the lines further down that the search names, when it's those that found the topic.
-    private class Found(val topic: Topic, val tier: Int, val exact: Boolean, val section: Int?, val size: Int, val label: String? = null)
+    // lines: the lines further down that the search names, when it's those that found the topic;
+    // label, the words they're for ("Paul").
+    private class Found(
+        val topic: Topic,
+        val tier: Int,
+        val exact: Boolean,
+        val section: Int?,
+        val size: Int,
+        val label: String? = null,
+        val lines: List<Int> = emptyList()
+    )
 
     fun find(query: String, limit: Int = MAX_TOPICS): List<TopicCard> {
         val words = wordsOf(query).filter { it.length > 1 && it !in STOPWORDS }.distinct().map(::QueryWord)
@@ -70,9 +79,10 @@ class TopicSearch(private val book: TopicBook, private val lexicon: SearchLexico
                 if (section >= 0) {
                     found += Found(topic, 2, false, section, size)
                 } else {
-                    for ((under, labels) in linesNaming(topic, ::names).entries.take(MAX_LINE_CARDS)) {
-                        val shown = labels.take(2).joinToString(" · ", transform = ::shortLine)
-                        found += Found(topic, 3, false, under, size, if (labels.size > 2) "$shown · …" else shown)
+                    val lines = linesNaming(topic, ::names)
+                    if (lines.isNotEmpty()) {
+                        val label = missing.joinToString(" ") { it.word.replaceFirstChar(Char::titlecase) }
+                        found += Found(topic, 3, false, null, size, label, lines)
                     }
                 }
             }
@@ -80,17 +90,17 @@ class TopicSearch(private val book: TopicBook, private val lexicon: SearchLexico
         found.sortWith(compareBy<Found>({ it.tier }, { !it.exact }, { -it.size }, { it.topic.name.length }))
 
         val cards = ArrayList<TopicCard>()
-        val shown = HashSet<Pair<Int, Int?>>()
-        fun add(topic: Topic, section: Int?, via: String?, label: String? = null) {
-            if (cards.size < limit && shown.add(topic.id to section) && topic.referenceCount > 0) {
-                cards += card(topic, section, via, label)
+        val shown = HashSet<Triple<Int, Int?, Boolean>>()
+        fun add(topic: Topic, section: Int?, via: String?, label: String? = null, lines: List<Int> = emptyList()) {
+            if (cards.size < limit && shown.add(Triple(topic.id, section, lines.isNotEmpty())) && topic.referenceCount > 0) {
+                cards += card(topic, section, via, label, lines)
             }
         }
         for (f in found) {
             if (f.topic.isRedirect) {
                 f.topic.links.take(2).forEach { add(book[it.topic], it.section, via = f.topic.name) }
             } else {
-                add(f.topic, f.section, via = null, label = f.label)
+                add(f.topic, f.section, via = null, label = f.label, lines = f.lines)
             }
             if (cards.size >= limit) break
         }
@@ -98,23 +108,44 @@ class TopicSearch(private val book: TopicBook, private val lexicon: SearchLexico
     }
 
     /**
-     * The lines below [topic]'s main headings that [names] says the search names, by the main
-     * heading they're under (null: under none, after a "see" link): Intercession's "Paul for
-     * Onesimus" is under "Instances of"; "Paul, for God's people" and "For Paul, by the
-     * congregations" under "Additional instances of".
+     * The lines below [topic]'s main headings that [names] says the search names (their places in
+     * its entries), but not those under one of them already: Intercession's "Paul for Onesimus",
+     * "Paul, for God's people", "For Paul, by the congregations", "By Paul, of the congregations".
      */
-    private fun linesNaming(topic: Topic, names: (String) -> Boolean): Map<Int?, List<String>> {
-        val out = LinkedHashMap<Int?, MutableList<String>>()
-        var under: Int? = null
-        var headings = -1
-        for (entry in topic.entries) {
-            if (entry.level == 0) {
-                under = if (entry is TopicEntry.Verses) ++headings else null
-                continue
-            }
+    private fun linesNaming(topic: Topic, names: (String) -> Boolean): List<Int> {
+        val out = ArrayList<Int>()
+        var within = Int.MAX_VALUE // the level of the line last taken, while still under it
+        for ((i, entry) in topic.entries.withIndex()) {
+            if (entry.level <= within) within = Int.MAX_VALUE
+            if (entry.level == 0 || within != Int.MAX_VALUE) continue
             if (entry is TopicEntry.Verses && entry.label.isNotBlank() && names(entry.label)) {
-                out.getOrPut(under) { ArrayList() } += entry.label
+                out += i
+                within = entry.level
             }
+        }
+        return out
+    }
+
+    // The references of [topic]'s entry [at] and of the lines under it.
+    private fun referencesUnder(topic: Topic, at: Int): Int {
+        val level = topic.entries[at].level
+        var count = 0
+        for (i in at until topic.entries.size) {
+            val entry = topic.entries[i]
+            if (i > at && entry.level <= level) break
+            if (entry is TopicEntry.Verses) count += entry.ranges.size / 2
+        }
+        return count
+    }
+
+    // The labels of the lines right under [topic]'s entry [at].
+    private fun linesUnder(topic: Topic, at: Int): List<String> {
+        val level = topic.entries[at].level
+        val out = ArrayList<String>()
+        for (i in at + 1 until topic.entries.size) {
+            val entry = topic.entries[i]
+            if (entry.level <= level) break
+            if (entry.level == level + 1 && entry is TopicEntry.Verses && entry.label.isNotBlank()) out += entry.label
         }
         return out
     }
@@ -126,15 +157,59 @@ class TopicSearch(private val book: TopicBook, private val lexicon: SearchLexico
         return label.substring(0, cut).trimEnd(' ', ',', ';', ':') + "…"
     }
 
-    private fun card(topic: Topic, section: Int?, via: String?, label: String? = null) = TopicCard(
-        topicId = topic.id,
-        name = topic.name,
-        section = section,
-        sectionLabel = label ?: section?.let { topic.sections.getOrNull(it)?.label?.let(::shortLine) },
-        via = via,
-        referenceCount = topic.referenceCount,
-        summary = topic.sections.map { it.label }.filter { it.isNotBlank() }.take(3).joinToString(" · ")
-    )
+    // A topic's card: for a heading, or lines further down, with their references alone, and what's under the heading.
+    private fun card(topic: Topic, section: Int?, via: String?, label: String? = null, lines: List<Int> = emptyList()): TopicCard {
+        val headings = topic.sections.map { it.label }.filter { it.isNotBlank() }.take(3).joinToString(" · ")
+        val heading = section?.let { topic.sections.getOrNull(it) }?.let { topic.entries.indexOf(it) }?.takeIf { it >= 0 }
+        return TopicCard(
+            topicId = topic.id,
+            name = topic.name,
+            section = section,
+            sectionLabel = label ?: heading?.let { shortLine((topic.entries[it] as TopicEntry.Verses).label) },
+            via = via,
+            referenceCount = when {
+                lines.isNotEmpty() -> lines.sumOf { referencesUnder(topic, it) }
+                heading != null -> referencesUnder(topic, heading)
+                else -> topic.referenceCount
+            },
+            summary = when {
+                lines.isNotEmpty() -> lines.joinToString(" · ") { shortLine((topic.entries[it] as TopicEntry.Verses).label) }
+                heading != null -> linesUnder(topic, heading).take(3).joinToString(" · ").ifEmpty { headings }
+                else -> headings
+            },
+            lines = lines
+        )
+    }
+
+    /**
+     * Only [lines] of [id] (see TopicCard.lines), each with what's under it, as a section headed by
+     * it, and a link to all of the topic; its name with [label]: "Intercession › Paul".
+     */
+    fun page(id: Int, lines: List<Int>, label: String?): TopicPage {
+        if (lines.isEmpty()) return page(id)
+        val topic = book[id]
+        val items = ArrayList<TopicItem>()
+        for ((k, at) in lines.withIndex()) {
+            val line = topic.entries.getOrNull(at) as? TopicEntry.Verses ?: continue
+            val rows = SectionRows(LINE_SECTIONS + k, line.label)
+            rows.add(0, line.ranges)
+            for (i in at + 1 until topic.entries.size) {
+                val entry = topic.entries[i]
+                if (entry.level <= line.level) break
+                val level = entry.level - line.level
+                when (entry) {
+                    is TopicEntry.Verses -> {
+                        if (entry.label.isNotBlank()) rows.rows += TopicRow.Heading(level, entry.label)
+                        rows.add(level, entry.ranges)
+                    }
+                    is TopicEntry.Link -> rows.rows += TopicRow.Link(level, entry.text, entry.topic, entry.section)
+                }
+            }
+            items += rows.build()
+        }
+        items += TopicItem.Link("All of ${topic.name} (${topic.referenceCount} references)", id, null)
+        return TopicPage(id, label?.let { "${topic.name} › $it" } ?: topic.name, items, lines)
+    }
 
     /** [id]'s page: each main heading with what's under it, its verses with their text. */
     fun page(id: Int): TopicPage {
@@ -213,8 +288,8 @@ class TopicSearch(private val book: TopicBook, private val lexicon: SearchLexico
         const val WORDING = 1
         /** Topic cards a search shows at most. */
         const val MAX_TOPICS = 8
-        /** Cards one topic gets at most for lines below its main headings, one per heading they're under. */
-        const val MAX_LINE_CARDS = 3
+        /** Where a page of lines (see page) numbers its sections from, apart from a topic's own. */
+        const val LINE_SECTIONS = 100_000
         /** A line's length on a card at most, before it's cut. */
         const val MAX_LINE_LENGTH = 60
     }

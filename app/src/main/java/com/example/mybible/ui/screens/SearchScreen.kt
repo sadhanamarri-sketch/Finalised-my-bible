@@ -480,7 +480,7 @@ private fun SearchPage(
                 }
                 if (outcome.topics.isNotEmpty()) {
                     item(key = "topics") {
-                        TopicCards(outcome.topics, onOpen = { viewModel.openTopic(it.topicId, it.section) })
+                        TopicCards(outcome.topics, onOpen = { viewModel.openTopic(it.topicId, it.section, it.lines, it.sectionLabel.takeIf { _ -> it.lines.isNotEmpty() }) })
                     }
                 }
                 if (words.isNotEmpty()) {

@@ -296,13 +296,22 @@ data class TopicCard(
     val sectionLabel: String? = null,
     /** The topic the search actually named, when that one only says "see" this: Anxiety for Care. */
     val via: String? = null,
+    /** Its references; for a heading or [lines], theirs alone. */
     val referenceCount: Int,
-    /** Its first few headings: "Worldly · Remedy for · Instances of". */
-    val summary: String
+    /** Its first few headings: "Worldly · Remedy for · Instances of"; or the [lines]. */
+    val summary: String,
+    /**
+     * The lines below its main headings that the search named (their places in the topic), when
+     * it's those that found it: Intercession's four that name Paul. Opened, they're shown alone.
+     */
+    val lines: List<Int> = emptyList()
 )
 
-/** A Nave's topic as its page shows it: its sections, each a heading that can fold, and "see" links. */
-data class TopicPage(val topicId: Int, val name: String, val items: List<TopicItem>) {
+/**
+ * A Nave's topic as its page shows it: its sections, each a heading that can fold, and "see" links.
+ * With [lines], only those lines of it (see TopicCard.lines), each a section, and a link to all of it.
+ */
+data class TopicPage(val topicId: Int, val name: String, val items: List<TopicItem>, val lines: List<Int>? = null) {
     val referenceCount: Int get() = items.sumOf { (it as? TopicItem.Section)?.referenceCount ?: 0 }
 }
 

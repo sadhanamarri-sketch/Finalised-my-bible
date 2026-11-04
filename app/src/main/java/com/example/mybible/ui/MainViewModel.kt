@@ -3344,17 +3344,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { repository.prepareSearch() }
     }
 
-    fun openTopic(topicId: Int, section: Int? = null) {
-        // A link to another heading of the topic on screen ("see King, above") goes there.
-        if (_topicStack.value.lastOrNull()?.page?.topicId == topicId) {
+    // lines, label: only those lines of the topic, the ones a search named ("Paul": Intercession's
+    // four that name him), for its page "Intercession › Paul" (see TopicCard.lines).
+    fun openTopic(topicId: Int, section: Int? = null, lines: List<Int> = emptyList(), label: String? = null) {
+        // A link to another heading of the topic on screen ("see King, above") goes there; from a
+        // page of some of its lines, "All of Intercession" opens all of it.
+        val top = _topicStack.value.lastOrNull()?.page
+        if (lines.isEmpty() && top?.topicId == topicId && top.lines == null) {
             if (section != null) updateTopTopic { it.copy(expanded = it.expanded + section, focusSection = section) }
             return
         }
         viewModelScope.launch {
-            val page = repository.topicPage(topicId) ?: return@launch
+            val page = repository.topicPage(topicId, lines, label) ?: return@launch
             val sections = page.items.filterIsInstance<TopicItem.Section>().map { it.index }
-            // Sections under no heading have nothing to unfold them with.
-            val expanded = if (page.referenceCount <= TOPIC_UNFOLDED_MAX) sections.toSet()
+            // Sections under no heading have nothing to unfold them with; a page of some lines, all open.
+            val expanded = if (page.lines != null || page.referenceCount <= TOPIC_UNFOLDED_MAX) sections.toSet()
             else sections.filter { it < 0 }.toSet() + listOfNotNull(section)
             _topicStack.value = _topicStack.value + OpenTopic(page, expanded, focusSection = section)
         }
