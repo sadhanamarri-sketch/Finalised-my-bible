@@ -1590,7 +1590,7 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     Jacob and Judah too), prayer read as ప్రార్థన, విజ్ఞాపన, విన్నపము: "పౌలు ప్రార్థన" gives Acts 28:8, then 50
     verses in his letters. Torrey's and search by meaning stay for later.
 
-56. **Paused 1 Nov.** **The Telugu text: stray spaces in words, missing dashes and
+56. **Planned 4 Nov.** **The Telugu text: stray spaces in words, missing dashes and
     semicolons.** "is it possible for you to proof read and compare againt bible.com online version? I
     allowed bible.com in your environment. It is having unexpected space in the telugu words and missing
     long Em-dash and semi-colons. it's bsi ov version."
@@ -1676,6 +1676,25 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     browser. A download program of your own, on your phone, honestly named and following robots.txt, was
     refused too (403), so that's a no as well. Left: ask the Bible Society of India for permission or a
     copy, or recordings of bible.com.
+    *4 Nov: BSI's own text.* "BSI gave it": 66 files, one per book (kept out of the repository's history
+    until it goes in as the app's text, "you can directly replace it"). It merges 787 of the app's verses
+    with others, in 355 chapters (Genesis 1:17-18 as one, numbered 18; mostly pairs, some threes), and
+    numbers three chapters otherwise (Psalm 47, Numbers 7, Deuteronomy 17). Its text has a few spaces
+    inside words where a printed line once broke (వెలు గిచ్చుటకును, చీక టిని), as bible.com shows.
+    Why BSI merges: Telugu puts the main verb last, so its verse can't follow the English break; in
+    1:17-18, "God set them in the firmament" (English 17) is Telugu's last words.
+    *Your idea (4 Nov):* "if telugu is merged shall we also merge english ... if telugu is not enabled then
+    english can be as it is", and "it can be an option in settings.. how user likes it". Planned:
+    - BSI's text as the app's Telugu; the in-word spaces taken out where the app has the word whole and
+      one half is no word anywhere in BSI's text. Each merged verse kept whole, and also cut where the
+      app's verses start (found by matching letters), so either way can show.
+    - Settings › Telugu: "Verses printed together" — Together, as BSI prints them (one block, 17–18:
+      English 17 and 18, then the Telugu once), or Split, one under each English verse. English only:
+      as now.
+    - A block acts for all its verses (highlight, studied, note, share, copy); read aloud, English 17
+      and 18 then the Telugu once (with the recording, from 17's start to 18's end); Verse Scroll's card
+      and Telugu search results as 17–18.
+    *Size:* medium to large, about 600–800 lines with tests.
 
 57. **Discarded 1 Nov.** **Reader: no indent, the verse number at the start of the line.** "can you show
     me preview with no indentation for verses other than with verse numbers?"
