@@ -1695,6 +1695,15 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
       and 18 then the Telugu once (with the recording, from 17's start to 18's end); Verse Scroll's card
       and Telugu search results as 17–18.
     *Size:* medium to large, about 600–800 lines with tests.
+    *"build 56 with together as default" (4 Nov), stopped before anything changed:* BSI's files turned out
+    to be incomplete. They hold 88% of the app's Telugu letters: 6,734 of 30,314 verses are much shorter
+    than the app's (under three quarters), nearly all of Psalms (2,295 of 2,448), Proverbs (883 of 914),
+    Job, Isaiah, the Song and Lamentations, and some in every book (Acts 75, Luke 75). Mostly each verse
+    has only its first line: Psalm 1:1 is "దుష్టుల ఆలోచనచొప్పున నడువక" alone; 1 Chronicles 4:9 is "యబ్బేజు". Most
+    likely the files were made from BSI's line-by-line layout and kept a verse's first line only.
+    Replacing the app's text with them would cut those verses short, so nothing was replaced. A tool to
+    put BSI's text in (cut at the app's verses, the groups kept whole, in-word spaces taken out) is ready
+    for a complete copy: the original files BSI sent, or a new copy from BSI.
 
 57. **Discarded 1 Nov.** **Reader: no indent, the verse number at the start of the line.** "can you show
     me preview with no indentation for verses other than with verse numbers?"
