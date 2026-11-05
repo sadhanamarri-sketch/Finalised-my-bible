@@ -3,6 +3,7 @@
 package com.example.mybible.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -20,9 +21,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import com.example.mybible.ui.theme.WorkSansFontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -36,6 +42,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.filled.Share
 import com.example.mybible.model.RefRange
 import com.example.mybible.model.groupRefs
+import com.example.mybible.model.PASSAGES_SHOWN_FOLDED
+import com.example.mybible.model.foldedList
 import com.example.mybible.ui.components.bibleBookIndex
 
 /**
@@ -179,12 +187,19 @@ fun NoteReaderScreen(
                     // in the Notes list and Note editor (gold outlined
                     // rounded rectangle), rather than a comma-joined
                     // underlined line.
+                    // Many verses fold: the first three, then "+N more"; opened, all, then "Show
+                    // less". Folded each time the note opens (kept while it's open, a turn too).
+                    val ranges = remember(noteItem.refs) { groupRefs(noteItem.refs, ::bibleBookIndex) }
+                    var showAll by rememberSaveable(noteItem.id) { mutableStateOf(false) }
+                    val (shown, waiting) = foldedList(ranges, showAll)
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.padding(bottom = 12.dp)
+                        modifier = Modifier
+                            .padding(bottom = 12.dp)
+                            .animateContentSize()
                     ) {
-                        groupRefs(noteItem.refs, ::bibleBookIndex).forEach { range ->
+                        shown.forEach { range ->
                             Text(
                                 text = range.label,
                                 fontSize = 13.sp,
@@ -207,6 +222,10 @@ fun NoteReaderScreen(
                                     )
                                     .padding(horizontal = 14.dp, vertical = 8.dp)
                             )
+                        }
+                        when {
+                            waiting > 0 -> FoldPill("+$waiting more", "Show all ${ranges.size} verses") { showAll = true }
+                            ranges.size > PASSAGES_SHOWN_FOLDED -> FoldPill("Show less", "Show fewer verses") { showAll = false }
                         }
                     }
                 }
@@ -234,6 +253,22 @@ fun NoteReaderScreen(
             }
         }
     }
+}
+
+// "+5 more" / "Show less" after a note's verse pills: shaped as they are, quieter, as it isn't a verse.
+@Composable
+private fun FoldPill(text: String, description: String, onClick: () -> Unit) {
+    val quiet = MaterialTheme.colorScheme.onSurfaceVariant
+    Text(
+        text = text,
+        fontSize = 13.sp,
+        color = quiet,
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .border(width = 1.dp, color = quiet.copy(alpha = 0.45f), shape = RoundedCornerShape(10.dp))
+            .clickable(role = Role.Button, onClickLabel = description, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+    )
 }
 
 @Composable

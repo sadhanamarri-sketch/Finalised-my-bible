@@ -35,6 +35,16 @@ fun groupRefs(refs: List<NoteReference>, bookIndex: (String) -> Int): List<RefRa
     return out
 }
 
+/** How many of a note's passages show while they're folded; past this, the rest wait behind "+N more". */
+const val PASSAGES_SHOWN_FOLDED = 3
+
+/**
+ * [items] as they show: all of them when [showAll] or there are no more than [limit], else the first
+ * [limit]; and how many wait behind "+N more" (none when all show).
+ */
+fun <T> foldedList(items: List<T>, showAll: Boolean, limit: Int = PASSAGES_SHOWN_FOLDED): Pair<List<T>, Int> =
+    if (showAll || items.size <= limit) items to 0 else items.take(limit) to items.size - limit
+
 /** The longest passage taken from one mention when the chapter's length isn't known. */
 private const val LONGEST_NAMED = 176
 

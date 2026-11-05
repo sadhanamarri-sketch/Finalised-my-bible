@@ -5,6 +5,7 @@
 
 package com.example.mybible.ui.screens
 
+import androidx.compose.animation.animateContentSize
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -44,6 +45,8 @@ import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.AlertDialog
@@ -101,6 +104,8 @@ import com.example.mybible.model.RefRange
 import com.example.mybible.model.ThemeMode
 import com.example.mybible.model.chapterSizes
 import com.example.mybible.model.groupRefs
+import com.example.mybible.model.PASSAGES_SHOWN_FOLDED
+import com.example.mybible.model.foldedList
 import com.example.mybible.model.withNamed
 import com.example.mybible.ui.NoteDraft
 import com.example.mybible.ui.components.bibleBookIndex
@@ -416,10 +421,19 @@ private fun NoteDetails(
     onPickDate: () -> Unit,
     onAddTag: () -> Unit
 ) {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    // Many verses fold: the first three, then "N more"; opened, all, then "Show less". Folded each
+    // time the note opens (kept while it's open, a turn too).
+    val ranges = groupRefs(withNamed(draft.refs, named), ::bibleBookIndex)
+    var showAll by rememberSaveable(draft.id) { mutableStateOf(false) }
+    val (shown, waiting) = foldedList(ranges, showAll)
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.animateContentSize()
+    ) {
         // Verses side by side as one passage: "John 15:1–8"; × takes off those added with + Verse.
         // One named in the text has no ×: it goes when it's taken out of the text.
-        groupRefs(withNamed(draft.refs, named), ::bibleBookIndex).forEach { range ->
+        shown.forEach { range ->
             val added = draft.refs.any { range.covers(it) }
             DetailChip(
                 icon = Icons.AutoMirrored.Filled.MenuBook,
@@ -428,6 +442,10 @@ private fun NoteDetails(
                 removeLabel = if (added) "Remove ${range.label}" else null,
                 onRemove = if (added) ({ draft.refs = draft.refs.filterNot { range.covers(it) } }) else null
             )
+        }
+        when {
+            waiting > 0 -> DetailChip(icon = Icons.Default.ExpandMore, text = "$waiting more", onClick = { showAll = true }, quiet = true)
+            ranges.size > PASSAGES_SHOWN_FOLDED -> DetailChip(icon = Icons.Default.ExpandLess, text = "Show less", onClick = { showAll = false }, quiet = true)
         }
         DetailChip(icon = Icons.Default.Add, text = "Verse", onClick = onAddVerse, quiet = true)
         DetailChip(

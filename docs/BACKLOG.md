@@ -1744,8 +1744,15 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     what's saved are unchanged. Tests: NoteMarkdownTest (the sample note, links in the text as shown, edge
     cases); checked on the note page in Paper and Dark, each link tapped.
 
-59. **To discuss 5 Nov.** **Notes: many verses on a note, folded.** First asked as "when a note is created on a
+59. **Done 5 Nov.** **Notes: many verses on a note, folded.** First asked as "when a note is created on a
     verse, the verse text is automatically added to the note. Make that verse section collapsible"; built
     as a folded section with each verse's words (3c09082) and reverted the same day: "Actually this is not
     what I wanted .. all i want is if there are numerous verses linked for a noted... i should be able to
     collapse it." So: a note with many verses, its verse pills folded away.
+    *Chosen:* "first one, build it": the first three pills, then "+N more".
+    *Built:* past three passages (John 15:1–8 is one), the note page shows the first three verse pills and a
+    quieter "+5 more" pill; tapped, all of them and "Show less". The editor's strip the same: the first three
+    verse chips, "⌄ 5 more" (then all, and "⌃ Show less"), then + Verse, the date and the tags as before.
+    Folded each time a note opens, kept while it's open (rememberSaveable, a turn of the screen too); a pill
+    still opens its verse; three or fewer, nothing changes. The rule in one place (model/NoteRefs.kt,
+    foldedList); tests: NoteRefsFoldTest; checked on both pages, Paper and Dark.
