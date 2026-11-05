@@ -1768,3 +1768,13 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     as the other pages a shortcut closes, not sliding away. Every widget shortcut (Continue reading,
     Highlights, Studied, Notes, Search, Verse Scroll) does the same. Unit tests pass; the check in the
     app (a note written, then the widget) was stopped part way, so it's to try on the phone.
+
+61. **Done 5 Nov.** **Verse Scroll card: the Telugu reference bold and out of line.** "The telugu reference in
+    verse control card is bold and not aligned with english text."
+    *Cause:* on a Verse Scroll card with Telugu on, the reference line shows "ROMANS 8:28" and "రోమీయులకు 8:28"
+    side by side; the Telugu was set SemiBold, and the two were centred on each other, so the Telugu (its
+    letters stand taller) sat lower than the English.
+    *Fixed:* the two now sit on one baseline, and the Telugu is in its plain weight. The mood chips beside
+    them are unchanged; the shared picture's Telugu reference (SharePictureMaker) is unchanged too.
+    Checked on cards: Romans 8:28 in Paper at the largest text size, Psalm 23:2 in Sepia over a picture, and
+    a passage card.

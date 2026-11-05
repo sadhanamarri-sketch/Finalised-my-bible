@@ -397,6 +397,9 @@ private fun VerseStack(
                             )
                         }
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            // The reference, and its Telugu beside it on the same line: the two sit on one
+                            // baseline (Telugu letters stand taller, so centred they sat lower), the Telugu
+                            // in its plain weight.
                             Text(
                                 text = label.uppercase(),
                                 color = colors.gold,
@@ -405,17 +408,16 @@ private fun VerseStack(
                                 fontSize = 12.5.sp,
                                 letterSpacing = 0.12.em,
                                 modifier = Modifier
-                                    .align(Alignment.CenterVertically)
+                                    .alignByBaseline()
                                     .padding(end = 5.dp)
                             )
                             if (telugu.isNotEmpty() && teluguLabel != null) {
                                 Text(
                                     text = teluguLabel,
                                     color = colors.gold,
-                                    fontWeight = FontWeight.SemiBold,
                                     fontSize = 13.5.sp,
                                     modifier = Modifier
-                                        .align(Alignment.CenterVertically)
+                                        .alignByBaseline()
                                         .padding(end = 5.dp)
                                 )
                             }
