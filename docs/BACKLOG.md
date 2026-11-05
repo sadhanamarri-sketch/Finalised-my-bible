@@ -1724,3 +1724,22 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     fewer lines (John 3:2 seven lines down to six). John 3, before and after, in English and with Telugu,
     sent 1 Nov. Small: VerseCard only.
     *1 Nov:* "discard it... i like the way it is". The Reader keeps the number column; nothing changed.
+
+58. **Done 5 Nov.** **Notes: markdown shown formatted on the note page.** "the notes screen currently shows note
+    text as plain text, so markdown symbols (**bold**, *italic*, > quotes, - bullets, # headings) appear
+    literally. Add markdown rendering to the note read view."
+    *Found:* the note page (NoteReaderScreen) shows the body with RichNoteBodyView, a paragraph at a time;
+    verse references are found by findVerseMentions and linked with LinkAnnotation.Clickable (Compose UI
+    1.7.5), opening the verse preview. The editor is its own page and keeps the text as written; no markdown
+    library in the project.
+    *Built:* model/NoteMarkdown.kt, a small parser: blocks ("#"/"##"/"###" headings, "> " quote lines
+    merged, "- "/"* "/"• " items, other lines a paragraph keeping its breaks, a blank line between blocks)
+    and inline **bold**, *italic*, ***both*** and "\*". On the note page, a run of plain lines (no look or
+    character style from the editor's toolbar) with markdown in it shows formatted, in the note's own look:
+    headings as the editor's Title/Heading/Subheading, a quote with its accent bar and in italic, items with
+    its bullet. Links are found in the text after the marks are taken out, so they fall where the words
+    show, and keep their colour and what a tap does (one helper, addNoteLinks, for both kinds of text).
+    What isn't markdown stays as written: "*" or "**" not closed on its line ("5 * 3", "Matthew 5:3*"),
+    "#faith", "\*". Notes without markdown, and what the editor formatted, show as before; the editor and
+    what's saved are unchanged. Tests: NoteMarkdownTest (the sample note, links in the text as shown, edge
+    cases); checked on the note page in Paper and Dark, each link tapped.
