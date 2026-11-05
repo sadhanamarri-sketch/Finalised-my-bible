@@ -3,13 +3,11 @@
 package com.example.mybible.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -22,7 +20,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import com.example.mybible.ui.theme.WorkSansFontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -35,7 +32,7 @@ import com.example.mybible.ui.shareText
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.filled.Share
 import com.example.mybible.model.RefRange
-import com.example.mybible.model.groupRefs
+import com.example.mybible.ui.components.NoteVerseSection
 import com.example.mybible.ui.components.bibleBookIndex
 
 /**
@@ -54,16 +51,12 @@ import com.example.mybible.ui.components.bibleBookIndex
  *    Capacitor's header title is always the literal word "Note" instead —
  *    this is a deliberate deviation so it's clear which note is open at a
  *    glance, same reasoning as the full-screen note-text writer's header.
- *  - Ref line: gold outlined pill per reference (matches the same
- *    ref-chip style used in the Notes list and editor), or the note's
- *    date if it has no references, or "Note" if it has neither — matching
- *    Capacitor's `n.refs.length ? ... : (n.date ? formatDateStr(n.date) :
- *    'Note')`. Capacitor's own #noteReaderRef has no click handler at
- *    all, but each reference here is individually tappable and opens the
- *    verse-preview sheet (verse text + "Open in Reader") — same as
- *    tapping a verse mention in the body text below. A deliberate
- *    deviation kept from the pre-Capacitor version rather than a
- *    straight port.
+ *  - The note's verses (see NoteVerseSection): a gold-outlined row for
+ *    each passage the note is on, its reference and a chevron, folded at
+ *    first so the note's own words come first; a tap opens or folds the
+ *    verse's words, a tap on the reference opens the verse-preview sheet
+ *    (verse text + "Open in Reader") as it always has. Verses only named
+ *    in the body are links there, not rows here.
  *  - Body text: no separate title block — the title only appears once, in
  *    the header. Verse mentions inside the body (e.g. "See John 3:16") are
  *    still tappable (see RichNoteBodyView), opening the small verse-preview
@@ -96,6 +89,9 @@ fun NoteReaderScreen(
     onToggleCheck: ((para: Int) -> Unit)? = null,
     // One of the note's verses (or passages, "John 15:1–8") tapped at the top.
     onOpenRefs: ((RefRange) -> Unit)? = null,
+    // The words of the note's verses, the Bible's, for its verse section (with the Telugu when [showTelugu]).
+    loadVerses: (suspend (RefRange) -> List<com.example.mybible.model.Verse>)? = null,
+    showTelugu: Boolean = false,
     // Defaults to filling the screen — this is pushed inside an
     // AnimatedVisibility in MainActivity, which (unlike Scaffold on its
     // own) doesn't impose full-screen sizing on its content.
@@ -174,42 +170,20 @@ fun NoteReaderScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 24.dp)
             ) {
-                if (noteItem.refs.isNotEmpty()) {
-                    // Boxed pills — matches the same ref-chip style used
-                    // in the Notes list and Note editor (gold outlined
-                    // rounded rectangle), rather than a comma-joined
-                    // underlined line.
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    ) {
-                        groupRefs(noteItem.refs, ::bibleBookIndex).forEach { range ->
-                            Text(
-                                text = range.label,
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.tertiary,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .border(
-                                        width = 1.dp,
-                                        color = MaterialTheme.colorScheme.tertiary,
-                                        shape = RoundedCornerShape(10.dp)
-                                    )
-                                    .then(
-                                        when {
-                                            onOpenRefs != null -> Modifier.clickable { onOpenRefs(range) }
-                                            onOpenVerseMention != null -> Modifier.clickable {
-                                                onOpenVerseMention(range.book, range.chapter, range.from)
-                                            }
-                                            else -> Modifier
-                                        }
-                                    )
-                                    .padding(horizontal = 14.dp, vertical = 8.dp)
-                            )
-                        }
-                    }
-                }
+                // The verses the note is on: folded, apart from what's written (see NoteVerseSection).
+                // Verses only named in the text are links there, not here.
+                NoteVerseSection(
+                    refs = noteItem.refs,
+                    noteKey = noteItem.id,
+                    onOpen = when {
+                        onOpenRefs != null -> onOpenRefs
+                        onOpenVerseMention != null -> { range -> onOpenVerseMention(range.book, range.chapter, range.from) }
+                        else -> null
+                    },
+                    loadVerses = loadVerses,
+                    showTelugu = showTelugu,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
                 // Its date and tags.
                 val details = listOfNotNull(noteDateLabel(noteItem.noteDate)) + noteItem.tags.map { "#$it" }
                 if (details.isNotEmpty()) {
