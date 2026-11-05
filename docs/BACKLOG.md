@@ -1756,3 +1756,15 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     Folded each time a note opens, kept while it's open (rememberSaveable, a turn of the screen too); a pill
     still opens its verse; three or fewer, nothing changes. The rule in one place (model/NoteRefs.kt,
     foldedList); tests: NoteRefsFoldTest; checked on both pages, Paper and Dark.
+
+60. **Done 5 Nov.** **Widget's Verse Scroll with a note open: it stayed on the note.** "when note is opened and app
+    is backgrounded, i clicked verse scroll from widget and it stays on notes... auto save it and open verse
+    scroll instead."
+    *Cause:* a widget shortcut closes the pages over the tabs on its way in (closePagesOverTabs: the note
+    being read, Tags, Saved Words, the book picker, the word and verse previews), but left the note editor
+    open on purpose ("it may hold writing that isn't saved yet"), so Verse Scroll opened under it.
+    *Fixed:* the editor closes too, saved as it is (as Back saves it: an empty new note isn't kept); a note
+    left picking a verse with + Verse keeps the verses picked so far, and picking ends. It goes at once,
+    as the other pages a shortcut closes, not sliding away. Every widget shortcut (Continue reading,
+    Highlights, Studied, Notes, Search, Verse Scroll) does the same. Unit tests pass; the check in the
+    app (a note written, then the widget) was stopped part way, so it's to try on the phone.

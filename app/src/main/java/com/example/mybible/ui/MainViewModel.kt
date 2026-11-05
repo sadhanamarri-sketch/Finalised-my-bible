@@ -2809,12 +2809,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // A widget shortcut lands on its own destination, so the pages that
-    // slide up over the tabs close first: a note being read, Tags, Saved
-    // Words, the book picker, a word or verse-mention preview. Left open
+    // slide up over the tabs close first: a note being written or read, Tags,
+    // Saved Words, the book picker, a word or verse-mention preview. Left open
     // from before the app went to the background, they covered the very tab
-    // the shortcut had just opened. The note editor stays open — it may
-    // hold writing that isn't saved yet.
+    // the shortcut had just opened. A note being written is saved as it is
+    // (closing it saves it, as Back does), with any verses picked for it so
+    // far if + Verse had it picking in the Reader.
     fun closePagesOverTabs() {
+        if (_readerPickMode.value != ReaderPickMode.NONE) finishPicking()
+        if (_noteDraft.value != null) closeNoteEditor()
         closeNoteReader()
         closeTagsScreen()
         closeSavedWordsScreen()

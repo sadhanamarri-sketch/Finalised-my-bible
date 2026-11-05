@@ -719,10 +719,8 @@ class MainActivity : ComponentActivity() {
                             animationSpec = tween(300),
                             initialOffsetY = { fullHeight -> fullHeight }
                         ),
-                        exit = slideOutVertically(
-                            animationSpec = tween(300),
-                            targetOffsetY = { fullHeight -> fullHeight }
-                        )
+                        // Closed by a widget shortcut on its way in: just gone, as the other pages.
+                        exit = pageExit(300)
                     ) {
                         val draft = lastDraft
                         if (draft != null) {
