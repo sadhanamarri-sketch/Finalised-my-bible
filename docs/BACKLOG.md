@@ -1590,7 +1590,7 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     Jacob and Judah too), prayer read as ప్రార్థన, విజ్ఞాపన, విన్నపము: "పౌలు ప్రార్థన" gives Acts 28:8, then 50
     verses in his letters. Torrey's and search by meaning stay for later.
 
-56. **Planned 4 Nov.** **The Telugu text: stray spaces in words, missing dashes and
+56. **Parked 5 Nov, till BSI's files are whole.** **The Telugu text: stray spaces in words, missing dashes and
     semicolons.** "is it possible for you to proof read and compare againt bible.com online version? I
     allowed bible.com in your environment. It is having unexpected space in the telugu words and missing
     long Em-dash and semi-colons. it's bsi ov version."
@@ -1704,6 +1704,16 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     Replacing the app's text with them would cut those verses short, so nothing was replaced. A tool to
     put BSI's text in (cut at the app's verses, the groups kept whole, in-word spaces taken out) is ready
     for a complete copy: the original files BSI sent, or a new copy from BSI.
+    *Looked into 4–5 Nov:* the list of every verse cut short, by book, was sent as
+    Telugu-BSI-incomplete-verses.xlsx. 58 books have some (only Ruth, Nehemiah, Obadiah, Jonah, Micah,
+    Nahum, Zephaniah and Haggai are whole). Each stops where the printed page starts a new line inside the
+    verse: poetry; songs and oracles in the other books (Genesis 3:15 and 4:23, Exodus 15, Deuteronomy 32,
+    Judges 5); quotations after "ఇట్లనెను –" (73); lists (Exodus 35:6). John 12:38 and Hebrews 8:11, Old
+    Testament poetry quoted whole, are only "–". Apart from that: 193 verses BSI divides otherwise (its own
+    numbering, which the tool matches by letters), and its in-word spaces (about 600).
+    *Parked* ("let's do it when i get the proper files"). Then: tools/telugu/apply_bsi_text.py --check on
+    them (it lists any verse still cut short), and if they're whole, the tool, and the build as planned
+    above, Together as the default.
 
 57. **Discarded 1 Nov.** **Reader: no indent, the verse number at the start of the line.** "can you show
     me preview with no indentation for verses other than with verse numbers?"
