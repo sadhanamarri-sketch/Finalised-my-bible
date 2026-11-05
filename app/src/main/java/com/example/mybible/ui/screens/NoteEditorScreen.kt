@@ -101,7 +101,6 @@ import com.example.mybible.model.RefRange
 import com.example.mybible.model.ThemeMode
 import com.example.mybible.model.chapterSizes
 import com.example.mybible.model.groupRefs
-import com.example.mybible.ui.components.NoteVerseSection
 import com.example.mybible.model.withNamed
 import com.example.mybible.ui.NoteDraft
 import com.example.mybible.ui.components.bibleBookIndex
@@ -139,10 +138,7 @@ fun NoteEditorScreen(
     onPreviewReference: (RefRange) -> Unit,
     modifier: Modifier = Modifier.fillMaxSize(),
     // How many verses each chapter has, by book, to know a verse named in the note is there.
-    verseCounts: Map<String, List<Int>> = emptyMap(),
-    // The words of the note's verses, for its verse section (with the Telugu when [showTelugu]).
-    loadVerses: (suspend (RefRange) -> List<com.example.mybible.model.Verse>)? = null,
-    showTelugu: Boolean = false
+    verseCounts: Map<String, List<Int>> = emptyMap()
 ) {
     val look = rememberNoteLook(themeMode)
     val body = draft.body
@@ -271,15 +267,6 @@ fun NoteEditorScreen(
                     onPreviewReference = onPreviewReference,
                     onPickDate = { pickingDate = true },
                     onAddTag = { addingTag = true }
-                )
-                // The verses the note is on, folded, to read but not to change here (their × is above).
-                NoteVerseSection(
-                    refs = draft.refs,
-                    noteKey = draft.id,
-                    onOpen = onPreviewReference,
-                    loadVerses = loadVerses,
-                    showTelugu = showTelugu,
-                    modifier = Modifier.padding(top = 14.dp)
                 )
                 Spacer(Modifier.height(14.dp))
                 NoteBodyField(

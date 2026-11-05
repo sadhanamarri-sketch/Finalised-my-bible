@@ -284,8 +284,6 @@ class MainActivity : ComponentActivity() {
             val savedWords by viewModel.savedWords.collectAsState(initial = emptyList())
             val noteDraft by viewModel.noteDraft.collectAsState()
             val chapterVerseCounts by viewModel.chapterVerseCounts.collectAsState()
-            // A note's verses show their Telugu too when the Reader does.
-            val noteTelugu by viewModel.showTeluguInline.collectAsState()
             val allNotes by viewModel.notes.collectAsState(initial = emptyList())
             val noteToRead by viewModel.noteToRead.collectAsState()
             val readerPickMode by viewModel.readerPickMode.collectAsState()
@@ -703,9 +701,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenRefs = { range ->
                                     viewModel.openVerseMentionPreview(range.book, range.chapter, range.from, noteReturnItem = note, toVerse = range.to)
                                 },
-                                onToggleCheck = { para -> viewModel.toggleNoteCheck(note, para) },
-                                loadVerses = viewModel::noteRangeVerses,
-                                showTelugu = noteTelugu
+                                onToggleCheck = { para -> viewModel.toggleNoteCheck(note, para) }
                             )
                         }
                     }
@@ -741,9 +737,7 @@ class MainActivity : ComponentActivity() {
                                 onPreviewReference = { range ->
                                     viewModel.openVerseMentionPreview(range.book, range.chapter, range.from, toVerse = range.to, quotable = true)
                                 },
-                                verseCounts = chapterVerseCounts,
-                                loadVerses = viewModel::noteRangeVerses,
-                                showTelugu = noteTelugu
+                                verseCounts = chapterVerseCounts
                             )
                         }
                     }

@@ -1743,23 +1743,3 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     "#faith", "\*". Notes without markdown, and what the editor formatted, show as before; the editor and
     what's saved are unchanged. Tests: NoteMarkdownTest (the sample note, links in the text as shown, edge
     cases); checked on the note page in Paper and Dark, each link tapped.
-
-59. **Done 5 Nov.** **Notes: the verses a note is on, folded apart from what's written.** "when a note is
-    created on a verse, the verse text is automatically added to the note. Make that verse section
-    collapsible so the note body stays the focus."
-    *Found:* the verse's words were never put in the note's text. A note made on a verse keeps it as one of
-    its verses (NoteReference, with verseText, filled in when it's saved); the text starts empty, and the
-    markdown (58) never sees the verse. The note page showed each verse only as a gold reference pill,
-    tapped for the verse preview. So nothing stored changes, and older notes show as before.
-    *Built:* NoteVerseSection (ui/components), on the note page in place of the pills and in the editor
-    between the verses/date/tags strip and the text. A gold-outlined row for each passage the note is on,
-    in Bible order: its reference, "· 2 verses" or "· whole chapter", and a chevron; folded whenever a
-    note opens, kept folded or open per note and passage while the page is open (rememberSaveable, a turn
-    of the screen too). A tap on the row opens or folds the words (expandVertically and a fade, the
-    chevron turning); a tap on the reference opens the verse preview, as the pill did. Open: the Bible's
-    words in Source Serif 4, as the verse preview has them, numbered when there are more, with the Telugu
-    under each when the Reader shows Telugu (MainViewModel.noteRangeVerses), else the words the note keeps.
-    Verses only named in the text aren't rows: they stay links in it. A note on no verse has no section.
-    In the editor it's only to read (a verse still comes off with its × above). Tests:
-    NoteVerseSectionTest; checked on both pages in Paper and Dark (a verse, a passage, a whole chapter,
-    Esther 8:9 open, the Telugu, a note on no verse), the row folded and opened, the reference tapped.

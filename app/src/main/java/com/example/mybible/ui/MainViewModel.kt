@@ -2831,14 +2831,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // default bug. Starting a note with no specific verse in mind now always
     // goes through startNotePicking() below, matching Capacitor's
     // startNewNoteFromScratch().
-    /**
-     * A note's passage as the Bible has it, a whole chapter's verses for a chapter, with their Telugu:
-     * the words of its verse section (see NoteVerseSection).
-     */
-    suspend fun noteRangeVerses(range: com.example.mybible.model.RefRange): List<Verse> =
-        repository.getVerseRange(range.book, range.chapter, if (range.wholeChapter) 1 else range.from, if (range.wholeChapter) 999 else range.to)
-            .map { Verse(it.book, it.chapter, it.number, it.text, it.isRedLetter, it.teluguText) }
-
     fun openNoteEditor(note: NoteItem? = null, defaultVerse: Verse? = null) {
         val item = note ?: defaultVerse?.let { v ->
             NoteItem(
