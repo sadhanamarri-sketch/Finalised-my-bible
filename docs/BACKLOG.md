@@ -1790,3 +1790,12 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     tools/fonts/make_reference_fonts.py keeps its Latin and Telugu and sets its line to fit the 66 book names
     (0.96); 310 KB. The rule in one place (versescroll/Feed.kt, referenceLineOf), for the card and the
     picture; tests: SharePictureTest. Checked on cards (light, Sepia and Dark, a small phone) and in pictures.
+
+62. **Noted 6 Nov, for after 56.** **Verses as paragraphs: a setting.** "i might want to merge the text like
+    paragraphs like other bible apps do as a separate setting."
+    *Notes:* BSI's new files keep a line break ("\n") wherever its page starts a new line inside a verse:
+    poetry lines, songs, a quotation's start after "ఇట్లనెను –", lists. The old files kept only the first
+    of those lines. So they're kept as they came (not replaced), for the normal view to join (a space, or
+    nothing where a line broke inside a word) and for this setting to show poetry line by line, as other
+    Bible apps do. The English has the KJV's paragraph marks (¶) to start paragraphs on; whether BSI's
+    files mark the Telugu's paragraphs is to check when they come.
