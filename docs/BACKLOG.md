@@ -1876,3 +1876,14 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     a note's Return opened it over the wrong page if another note had been read meanwhile. Test:
     DetourTrailTest; and the app's own view model driven through thirteen chains (two-deep cross references,
     mixed kinds, the menu, Cancel, word pages, notes, Verse Scroll and Studied, a quick double Back).
+
+66. **Noted 6 Nov.** **Undo after ✕ on a "Return to …" banner.** "undo helps" — since 65's ✕ drops the whole
+    trail, a mistaken tap loses the way back. *Proposed:* ✕ shows the app's Undo message ("Way back
+    cleared", Undo, as after deleting a note); Undo brings the whole trail back as it was: its banners,
+    lists, search results and word pages. The Reader stays where it is.
+
+67. **Noted 6 Nov.** **Straight back to where the reading started.** "I am also thinking return to source kind
+    of button since we enabled trails now" *Proposed:* a small ⏮ button on every Return banner, between
+    Return and ✕: the Reader back on the verse it was on before the first detour (or Verse Scroll's card,
+    if the trail began there), and the trail dropped, as ✕ does. With 66's Undo ("Back at Isaiah 59:20",
+    Undo), which brings the trail back and puts the Reader back on the verse it left.
