@@ -35,7 +35,10 @@ class ReadAloudRecordingTest {
         var englishSpeed: Float = 1f,
         override var continueReading: Boolean = false
     ) : ReadAloudPrefs {
+        // Books read at their own speed ("Just for Genesis").
+        var bookSpeeds: Map<String, Float> = emptyMap()
         override fun speed(telugu: Boolean) = if (telugu) 1f else englishSpeed
+        override fun speed(telugu: Boolean, book: String?) = book?.let { bookSpeeds[it] } ?: speed(telugu)
         override fun voice(telugu: Boolean): String? = null
         override fun recording(telugu: Boolean) = if (telugu) this.telugu else english
     }
@@ -277,6 +280,23 @@ class ReadAloudRecordingTest {
         assertEquals(38.0, recorder.played.last().to, 1e-9)
         assertTrue(reader.state.value.telugu)
         assertEquals("Genesis 1:3", reader.state.value.verse?.label)
+    }
+
+    @Test
+    fun aBookWithItsOwnSpeedIsReadAtItAndTheNextBookAtTheUsualOne() {
+        // Backlog 64: "Just for Genesis" at 1.5x; the reading going on into Exodus, at the usual 1.25x.
+        val recorder = FakeRecorder()
+        val prefs = FakePrefs(englishSpeed = 1.25f).apply { bookSpeeds = mapOf("Genesis" to 1.5f) }
+        val reader = reader(FakeSpeaker(), prefs, FakeRecordings(), recorder)
+        val verses = listOf(
+            VerseToRead("Genesis", 50, 26, "So Joseph died, being an hundred and ten years old", null),
+            VerseToRead("Exodus", 1, 1, "Now these are the names of the children of Israel", null)
+        )
+        reader.start(Chapter(verses, from = 26))
+        assertEquals(1.5f, recorder.played.last().speed)
+        recorder.end()
+        assertEquals("Exodus 1:1", reader.state.value.verse?.label)
+        assertEquals(1.25f, recorder.played.last().speed)
     }
 
     @Test

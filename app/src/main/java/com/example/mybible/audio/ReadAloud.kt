@@ -144,6 +144,9 @@ interface ReadAloudPrefs {
     /** How fast a language is read: 1 is the voice's own pace. */
     fun speed(telugu: Boolean): Float
 
+    /** How fast a language is read in [book]: its own speed, where it has one ("Just for Psalms"), else the usual. */
+    fun speed(telugu: Boolean, book: String?): Float = speed(telugu)
+
     /** How high a language is read: 1 is the voice's own pitch; lower is deeper. */
     fun pitch(telugu: Boolean): Float = 1f
 
@@ -461,12 +464,12 @@ class ReadAloud(
     fun voicesUnmeasured(voices: List<VoiceOption>): Boolean = depths.unmeasured(voices)
 
     /** A few words in [voice], at the language's speed and pitch, to hear it: pausing a reading that's playing. */
-    fun previewVoice(text: String, telugu: Boolean, voice: String) {
+    fun previewVoice(text: String, telugu: Boolean, voice: String, book: String? = null) {
         if (_state.value.status == ReadAloudState.Status.PLAYING) pause()
         stopSample()
         utterances++
         speaker.level(0.0)
-        speaker.speak("try-$utterances", text, telugu, prefs.speed(telugu), voice, prefs.pitch(telugu))
+        speaker.speak("try-$utterances", text, telugu, prefs.speed(telugu, book), voice, prefs.pitch(telugu))
     }
 
     /** Whether the phone has a Telugu voice (null: not known yet). */
@@ -499,13 +502,13 @@ class ReadAloud(
      * A few words in the language's voice, speed and pitch, to hear them: only while nothing is being read.
      * Played from its recording, a verse of that (John 3:16) at the language's speed instead.
      */
-    fun trySpeaking(text: String, telugu: Boolean) {
+    fun trySpeaking(text: String, telugu: Boolean, book: String? = null) {
         if (_state.value.active) return
         stopSample()
         utterances++
         if (!reads(telugu)) {
             speaker.level(levelFor(telugu, recorded = false))
-            speaker.speak("try-$utterances", text, telugu, prefs.speed(telugu), voiceFor(telugu), prefs.pitch(telugu))
+            speaker.speak("try-$utterances", text, telugu, prefs.speed(telugu, book), voiceFor(telugu), prefs.pitch(telugu))
             return
         }
         speaker.stop()
@@ -516,10 +519,10 @@ class ReadAloud(
             if (id != plays || said != utterances || _state.value.active) return@launch
             if (sample != null) {
                 recorder.level(levelFor(telugu, recorded = true))
-                recorder.play(id, sample.file, sample.from, sample.end, prefs.speed(telugu))
+                recorder.play(id, sample.file, sample.from, sample.end, prefs.speed(telugu, book))
             } else {
                 speaker.level(levelFor(telugu, recorded = false))
-                speaker.speak("try-$utterances", text, telugu, prefs.speed(telugu), voiceFor(telugu), prefs.pitch(telugu))
+                speaker.speak("try-$utterances", text, telugu, prefs.speed(telugu, book), voiceFor(telugu), prefs.pitch(telugu))
             }
         }
     }
@@ -596,7 +599,7 @@ class ReadAloud(
             reached == Double.POSITIVE_INFINITY && crossing?.isActive == true -> Unit
             // A recording paused: on from where it was, at the speed now set.
             part is Recorded -> {
-                recorder.speed(prefs.speed(part.telugu))
+                recorder.speed(speedNow(part.telugu))
                 if (recorder.resume()) recordedResume = null else speakPart()
             }
             part != null -> speakPart()
@@ -706,9 +709,12 @@ class ReadAloud(
         is Spoken -> part.text.length / charsPerSecond(part.telugu)
     }
 
+    // A language's speed for the verse being read: its book's own, where it has one (backlog 64).
+    private fun speedNow(telugu: Boolean): Float = prefs.speed(telugu, _state.value.verse?.book)
+
     // The phone's voice's pace, roughly, in characters a second at the language's speed.
     private fun charsPerSecond(telugu: Boolean): Float =
-        (if (telugu) TELUGU_CHARS_PER_SECOND else ENGLISH_CHARS_PER_SECOND) * prefs.speed(telugu)
+        (if (telugu) TELUGU_CHARS_PER_SECOND else ENGLISH_CHARS_PER_SECOND) * speedNow(telugu)
 
     // Where the word [at] falls in starts.
     private fun wordStart(text: String, at: Int): Int {
@@ -868,7 +874,7 @@ class ReadAloud(
         if (_state.value.status != ReadAloudState.Status.PLAYING || parts.isEmpty() || advancing?.isActive == true) return
         val part = parts.getOrNull(partIndex)
         if (part is Recorded) {
-            recorder.speed(prefs.speed(part.telugu))
+            recorder.speed(speedNow(part.telugu))
             return
         }
         utterances++
@@ -1053,7 +1059,7 @@ class ReadAloud(
                 utterances++
                 _state.update { it.copy(telugu = part.telugu, recording = false) }
                 speaker.level(levelFor(part.telugu, recorded = false))
-                speaker.speak(currentId, part.text.substring(from), part.telugu, prefs.speed(part.telugu), voiceFor(part.telugu), prefs.pitch(part.telugu))
+                speaker.speak(currentId, part.text.substring(from), part.telugu, speedNow(part.telugu), voiceFor(part.telugu), prefs.pitch(part.telugu))
             }
             is Recorded -> {
                 // From where it was paused, should the player have let it go; else from the verse's start.
@@ -1066,7 +1072,7 @@ class ReadAloud(
                 _state.update { it.copy(telugu = part.telugu, recording = true) }
                 val to = (part.ahead.lastOrNull()?.at ?: part.at).end
                 recorder.level(levelFor(part.telugu, recorded = true))
-                recorder.play(plays, part.at.file, from, to, prefs.speed(part.telugu), part.ahead.map { it.at.start })
+                recorder.play(plays, part.at.file, from, to, speedNow(part.telugu), part.ahead.map { it.at.start })
             }
         }
     }

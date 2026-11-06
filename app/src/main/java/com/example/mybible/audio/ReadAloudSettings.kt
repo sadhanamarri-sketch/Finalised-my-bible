@@ -24,6 +24,13 @@ class ReadAloudSettings(context: Context) : ReadAloudPrefs {
     var teluguSpeed by mutableFloatStateOf(kept(KEY_TELUGU_SPEED, KEY_SPEED, DEFAULT_SPEED).coerceIn(MIN_SPEED, MAX_SPEED))
         private set
 
+    // Books read at their own speed, each language's ("Just for Psalms", backlog 64): book to speed.
+    var englishBookSpeeds by mutableStateOf(bookSpeeds(KEY_ENGLISH_BOOK_SPEEDS))
+        private set
+
+    var teluguBookSpeeds by mutableStateOf(bookSpeeds(KEY_TELUGU_BOOK_SPEEDS))
+        private set
+
     var englishPitch by mutableFloatStateOf(kept(KEY_ENGLISH_PITCH, KEY_PITCH, DEFAULT_PITCH).coerceIn(MIN_PITCH, MAX_PITCH))
         private set
 
@@ -56,6 +63,41 @@ class ReadAloudSettings(context: Context) : ReadAloudPrefs {
     private fun kept(key: String, before: String, default: Float): Float = prefs.getFloat(key, prefs.getFloat(before, default))
 
     override fun speed(telugu: Boolean): Float = if (telugu) teluguSpeed else englishSpeed
+
+    override fun speed(telugu: Boolean, book: String?): Float =
+        book?.let { (if (telugu) teluguBookSpeeds else englishBookSpeeds)[it] } ?: speed(telugu)
+
+    /** Whether [book] is read at its own speed in a language. */
+    fun hasBookSpeed(telugu: Boolean, book: String): Boolean = book in (if (telugu) teluguBookSpeeds else englishBookSpeeds)
+
+    /** [book] read at its own speed in a language, starting from the usual one; or ([own] false) at the usual again. */
+    fun setBookSpeed(telugu: Boolean, book: String, own: Boolean) {
+        val speeds = if (telugu) teluguBookSpeeds else englishBookSpeeds
+        saveBookSpeeds(telugu, if (own) speeds + (book to speed(telugu)) else speeds - book)
+    }
+
+    /** A Speed slider's value: [book]'s own speed, when it has one, else the usual one. */
+    fun updateSpeed(telugu: Boolean, value: Float, book: String?) {
+        if (book == null || !hasBookSpeed(telugu, book)) return updateSpeed(telugu, value)
+        val speeds = if (telugu) teluguBookSpeeds else englishBookSpeeds
+        saveBookSpeeds(telugu, speeds + (book to value.coerceIn(MIN_SPEED, MAX_SPEED)))
+    }
+
+    // Kept a line a book: "Psalms=0.9".
+    private fun bookSpeeds(key: String): Map<String, Float> =
+        prefs.getString(key, null).orEmpty().lines().mapNotNull { line ->
+            val at = line.lastIndexOf('=')
+            val speed = line.substring(at + 1).toFloatOrNull()?.coerceIn(MIN_SPEED, MAX_SPEED)
+            if (at <= 0 || speed == null) null else line.substring(0, at) to speed
+        }.toMap()
+
+    private fun saveBookSpeeds(telugu: Boolean, speeds: Map<String, Float>) {
+        if (telugu) teluguBookSpeeds = speeds else englishBookSpeeds = speeds
+        prefs.edit().putString(
+            if (telugu) KEY_TELUGU_BOOK_SPEEDS else KEY_ENGLISH_BOOK_SPEEDS,
+            speeds.entries.joinToString("\n") { "${it.key}=${it.value}" }
+        ).apply()
+    }
 
     override fun pitch(telugu: Boolean): Float = if (telugu) teluguPitch else englishPitch
 
@@ -157,6 +199,8 @@ class ReadAloudSettings(context: Context) : ReadAloudPrefs {
         private const val KEY_LANGUAGE = "language"
         private const val KEY_ENGLISH_SPEED = "english_speed"
         private const val KEY_TELUGU_SPEED = "telugu_speed"
+        private const val KEY_ENGLISH_BOOK_SPEEDS = "english_book_speeds"
+        private const val KEY_TELUGU_BOOK_SPEEDS = "telugu_book_speeds"
         private const val KEY_ENGLISH_PITCH = "english_pitch"
         private const val KEY_TELUGU_PITCH = "telugu_pitch"
         // Kept before each language had its own.

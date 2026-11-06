@@ -1725,7 +1725,8 @@ fun ReaderScreen(
                 readAloud = viewModel.readAloud,
                 settings = viewModel.readAloudSettings,
                 inVerseScroll = false,
-                onDismiss = { readAloudSheetOpen = false }
+                onDismiss = { readAloudSheetOpen = false },
+                book = currentBook
             )
         }
         colorToRename?.let { def ->

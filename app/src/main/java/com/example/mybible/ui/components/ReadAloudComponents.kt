@@ -34,7 +34,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.material3.Slider
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.RadioButton
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -647,10 +649,15 @@ fun ReadAloudSheet(
     readAloud: ReadAloud,
     settings: ReadAloudSettings,
     inVerseScroll: Boolean,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    // The book on screen (the Reader's, or Verse Scroll's card's): what "Just for Psalms" is for when
+    // nothing is being read; null where there's none (the app's Settings).
+    book: String? = null
 ) {
     val context = LocalContext.current
     val state by readAloud.state.collectAsState()
+    // The book a speed can be just for (backlog 64): the one being read, else the one on screen.
+    val bookNow = state.verse?.book?.takeIf { state.active } ?: book
     // The recordings on the phone (none in tests), what's been found of each, and the folder picker.
     val recordings = readAloud.recordings as? Recordings
     val noRecordings = remember { MutableStateFlow(emptyMap<Boolean, Recordings.Status>()) }
@@ -709,7 +716,7 @@ fun ReadAloudSheet(
     // it comes up); with nothing being read, a few words let you hear it.
     fun changed(telugu: Boolean) {
         when {
-            !state.active -> readAloud.trySpeaking(if (telugu) TELUGU_SAMPLE else ENGLISH_SAMPLE, telugu)
+            !state.active -> readAloud.trySpeaking(if (telugu) TELUGU_SAMPLE else ENGLISH_SAMPLE, telugu, book = bookNow)
             state.telugu == telugu -> readAloud.refresh()
         }
     }
@@ -804,6 +811,7 @@ fun ReadAloudSheet(
                         language = if (telugu) "Telugu" else "English",
                         settings = settings,
                         telugu = telugu,
+                        book = bookNow,
                         recording = recordingStatus[telugu],
                         onReadWith = { fromRecording ->
                             settings.updateRecording(telugu, fromRecording)
@@ -821,7 +829,7 @@ fun ReadAloudSheet(
                         measuring = measuring,
                         noVoice = telugu && noTeluguVoice,
                         onChanged = { changed(telugu) },
-                        onPlay = { voice -> readAloud.previewVoice(if (telugu) TELUGU_SAMPLE else ENGLISH_SAMPLE, telugu, voice = voice.name) },
+                        onPlay = { voice -> readAloud.previewVoice(if (telugu) TELUGU_SAMPLE else ENGLISH_SAMPLE, telugu, voice = voice.name, book = bookNow) },
                         onGetVoices = { openVoiceInstaller(context, engine = settings.engine(telugu)) }
                     )
                 }
@@ -1020,6 +1028,7 @@ private fun LanguageSettings(
     language: String,
     settings: ReadAloudSettings,
     telugu: Boolean,
+    book: String?,
     recording: Recordings.Status?,
     onReadWith: (Boolean) -> Unit,
     onChooseFolder: () -> Unit,
@@ -1046,7 +1055,7 @@ private fun LanguageSettings(
             modifier = Modifier.padding(bottom = 16.dp)
         )
         if (settings.recording(telugu)) {
-            RecordingSettings(language, settings, telugu, recording, onChooseFolder, onLookAgain, onChanged)
+            RecordingSettings(language, settings, telugu, book, recording, onChooseFolder, onLookAgain, onChanged)
             return
         }
     }
@@ -1073,7 +1082,7 @@ private fun LanguageSettings(
                 DsOutlineAccentButton(text = "Get a Telugu voice", onClick = onGetVoices, modifier = Modifier.padding(top = 14.dp))
             }
         } else {
-            SpeedAndPitch(language, settings, telugu, onChanged)
+            SpeedAndPitch(language, settings, telugu, book, onChanged)
             Column {
                 if (voices.isNotEmpty()) {
                     VoiceList(
@@ -1103,6 +1112,7 @@ private fun RecordingSettings(
     language: String,
     settings: ReadAloudSettings,
     telugu: Boolean,
+    book: String?,
     status: Recordings.Status,
     onChooseFolder: () -> Unit,
     onLookAgain: () -> Unit,
@@ -1150,17 +1160,46 @@ private fun RecordingSettings(
                 DsOutlineAccentButton(text = "Look over the folder again", onClick = onLookAgain)
             }
         }
-        SliderSetting(
-            label = "Speed",
-            description = "$language recording speed",
-            value = settings.speed(telugu),
-            range = ReadAloudSettings.MIN_SPEED..ReadAloudSettings.MAX_SPEED,
-            usual = ReadAloudSettings.DEFAULT_SPEED,
-            ends = "Slower" to "Faster",
-            onChange = { speed ->
-                settings.updateSpeed(telugu, speed)
+        Column {
+            SliderSetting(
+                label = "Speed",
+                description = "$language recording speed",
+                value = settings.speed(telugu, book),
+                range = ReadAloudSettings.MIN_SPEED..ReadAloudSettings.MAX_SPEED,
+                usual = ReadAloudSettings.DEFAULT_SPEED,
+                ends = "Slower" to "Faster",
+                onChange = { speed ->
+                    settings.updateSpeed(telugu, speed, book)
+                    onChanged()
+                }
+            )
+            BookSpeedCheck(settings, telugu, book, onChanged)
+        }
+    }
+}
+
+// Under a language's Speed: "Just for Psalms", the slider then setting that book's speed (all its
+// chapters) in that language; unticked, the book is read at the usual speed again (backlog 64).
+@Composable
+private fun BookSpeedCheck(settings: ReadAloudSettings, telugu: Boolean, book: String?, onChanged: () -> Unit) {
+    if (book == null) return
+    val own = settings.hasBookSpeed(telugu, book)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .toggleable(value = own, role = Role.Checkbox) { on ->
+                settings.setBookSpeed(telugu, book, on)
                 onChanged()
             }
+            .padding(end = 10.dp)
+    ) {
+        Checkbox(checked = own, onCheckedChange = null, modifier = Modifier.padding(10.dp))
+        Text(
+            text = "Just for $book",
+            color = MaterialTheme.colorScheme.onSurface,
+            fontFamily = FontFamily.SansSerif,
+            fontSize = 14.sp
         )
     }
 }
@@ -1223,19 +1262,22 @@ private fun EngineChoice(engines: List<EngineOption>, chosen: String?, onPick: (
 
 // A language's speed and pitch, each a slider.
 @Composable
-private fun SpeedAndPitch(language: String, settings: ReadAloudSettings, telugu: Boolean, onChanged: () -> Unit) {
-    SliderSetting(
-        label = "Speed",
-        description = "$language speed",
-        value = settings.speed(telugu),
-        range = ReadAloudSettings.MIN_SPEED..ReadAloudSettings.MAX_SPEED,
-        usual = ReadAloudSettings.DEFAULT_SPEED,
-        ends = "Slower" to "Faster",
-        onChange = { speed ->
-            settings.updateSpeed(telugu, speed)
-            onChanged()
-        }
-    )
+private fun SpeedAndPitch(language: String, settings: ReadAloudSettings, telugu: Boolean, book: String?, onChanged: () -> Unit) {
+    Column {
+        SliderSetting(
+            label = "Speed",
+            description = "$language speed",
+            value = settings.speed(telugu, book),
+            range = ReadAloudSettings.MIN_SPEED..ReadAloudSettings.MAX_SPEED,
+            usual = ReadAloudSettings.DEFAULT_SPEED,
+            ends = "Slower" to "Faster",
+            onChange = { speed ->
+                settings.updateSpeed(telugu, speed, book)
+                onChanged()
+            }
+        )
+        BookSpeedCheck(settings, telugu, book, onChanged)
+    }
     SliderSetting(
         label = "Pitch",
         description = "$language pitch",

@@ -1841,3 +1841,16 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     Back (the top bar's or the phone's) takes you to the Reader, which can count as that same visit (the
     Return state set by "Read" is cleared only once you're back in Verse Scroll), so it pauses instead.
     *Discarded:* "no i misunderstood... leave it as it is". Nothing changed.
+
+64. **Done 6 Nov.** **Reading speed for a whole book.** "how big a build is setting speed for each language for
+    each book?" — "without a long list in settings,is it possible to give a little setting like apply to
+    entire book when adjusting speed?" — "build it"
+    *Built:* in the reading settings, under each language's Speed (the phone's voice's, or its
+    recording's), a small check, "Just for Psalms": the book being read, else the one on screen (the
+    Reader's, or Verse Scroll's card's; none in the app's Settings). Ticked, the slider sets that book's
+    speed in that language, every chapter of it, starting from the usual speed; unticked, the book is
+    read at the usual speed again. Opened in a book with its own speed, its check shows ticked; no list.
+    Used wherever that language is read: the phone's voice and the recordings, the Reader and Verse
+    Scroll (each card at its book's speed); a reading going on into the next book changes speed at its
+    first verse. Test: ReadAloudRecordingTest (Genesis at its own speed, then Exodus at the usual).
+    Checked as a picture of the settings.

@@ -773,7 +773,8 @@ fun VerseScrollScreen(viewModel: MainViewModel) {
             readAloud = viewModel.readAloud,
             settings = viewModel.readAloudSettings,
             inVerseScroll = true,
-            onDismiss = { readAloudOpen = false }
+            onDismiss = { readAloudOpen = false },
+            book = (controller.cards.getOrNull(controller.currentIndex) as? VerseFeedCard)?.content?.ref?.book
         )
     }
 }
