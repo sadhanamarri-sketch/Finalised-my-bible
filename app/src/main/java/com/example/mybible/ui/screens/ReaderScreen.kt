@@ -58,7 +58,9 @@ import com.example.mybible.data.onVerse
 import com.example.mybible.model.CompletedVerseItem
 import com.example.mybible.model.HighlightColorDef
 import com.example.mybible.model.HighlightItem
+import com.example.mybible.model.PrintedTogetherData
 import com.example.mybible.model.NoteItem
+import com.example.mybible.model.Verse
 import com.example.mybible.ui.components.RenameHighlightColorDialog
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
@@ -143,6 +145,17 @@ fun ReaderScreen(
 
     val redLetterEnabled by viewModel.redLetterEnabled.collectAsState()
     val showTeluguInline by viewModel.showTeluguInline.collectAsState()
+    val teluguTogether by viewModel.teluguTogether.collectAsState()
+    // Verses the Telugu Bible prints together (backlog 56), shown and acted on as one: with the Telugu on
+    // and "Verses printed together" on.
+    val printedTogether = remember(currentBook, currentChapter, teluguTogether, showTeluguInline) {
+        if (teluguTogether && showTeluguInline) PrintedTogetherData.byVerse(viewModel.printedTogether(currentBook, currentChapter))
+        else emptyMap()
+    }
+    // A verse's group's verses: just the verse, when it's in none.
+    fun groupOf(verse: Verse): List<Verse> =
+        printedTogether[verse.number]?.takeIf { verse.book == currentBook && verse.chapter == currentChapter }
+            ?.of(verses) { it.number }?.takeIf { it.isNotEmpty() } ?: listOf(verse)
     val showInterlinear by viewModel.showInterlinear.collectAsState()
     val fontSizeSp by viewModel.fontSizeSp.collectAsState()
     val teluguFontSizeSp by viewModel.teluguFontSizeSp.collectAsState()
@@ -1473,6 +1486,9 @@ fun ReaderScreen(
                         // Its colors, in the order they were put on (up to three).
                         val highlightHexes = highlights.onVerse(verse.book, verse.chapter, verse.number).map { it.colorHex }
                         val hasNote = notes.any { it.matchesVerse(verse.book, verse.chapter, verse.number) }
+                        // Printed together with other verses in Telugu: one block, its Telugu once, after the last.
+                        val group = printedTogether[verse.number]
+                        val groupSelected = selectedVerse?.let { s -> s.number == verse.number || (group != null && s.number in group) } == true
 
                         // Auto-focus (bold) the vertically-centered verse — but
                         // only in Blur Mode, where that's the whole point (every
@@ -1566,7 +1582,7 @@ fun ReaderScreen(
 
                         VerseCard(
                             verse = verse,
-                            isSelected = if (readerPickMode != ReaderPickMode.NONE) isPicked else selectedVerse?.number == verse.number,
+                            isSelected = if (readerPickMode != ReaderPickMode.NONE) isPicked else groupSelected,
                             isCompleted = isCompleted,
                             highlightColorHexes = highlightHexes,
                             redLetterEnabled = redLetterEnabled,
@@ -1586,14 +1602,22 @@ fun ReaderScreen(
                             teluguFontSizeSp = teluguFontSizeSp,
                             greekFontSizeSp = greekFontSizeSp,
                             hebrewFontSizeSp = hebrewFontSizeSp,
+                            teluguText = when {
+                                group == null -> verse.teluguText
+                                verse.number == group.last -> group.telugu
+                                else -> null
+                            },
+                            teluguLabel = group?.takeIf { verse.number == it.last }?.label,
+                            joinedAbove = group != null && verse.number > group.first,
+                            joinedBelow = group != null && verse.number < group.last,
                             onVerseClick = {
                                 runUnlessBlurred {
                                     if (readerPickMode != ReaderPickMode.NONE) {
-                                        viewModel.onPickModeVerseTap(verse)
-                                    } else if (selectedVerse?.number == verse.number) {
+                                        viewModel.onPickModeVersesTap(groupOf(verse))
+                                    } else if (groupSelected) {
                                         viewModel.setSelectedVerse(null)
                                     } else {
-                                        viewModel.setSelectedVerse(verse)
+                                        viewModel.setSelectedVerse(groupOf(verse).first())
                                     }
                                 }
                             },
@@ -1601,7 +1625,7 @@ fun ReaderScreen(
                                 if (readsOnTap) {
                                     // Listening: a long press (marking studied) does nothing.
                                 } else if (readerPickMode == ReaderPickMode.NONE) {
-                                    viewModel.startStudyPickingFromLongPress(verse)
+                                    viewModel.startStudyPickingFromLongPress(groupOf(verse))
                                 } else {
                                     // Already in a picking session (note or
                                     // study) — long-press on a verse,
@@ -1611,7 +1635,7 @@ fun ReaderScreen(
                                     // so long-pressing an already-selected
                                     // verse to deselect it silently did
                                     // nothing.
-                                    viewModel.onPickModeVerseTap(verse)
+                                    viewModel.onPickModeVersesTap(groupOf(verse))
                                 }
                             },
                             onGreekWordClick = { gWord ->
@@ -1722,36 +1746,31 @@ fun ReaderScreen(
         // screen non-interactive while it's open.
         if (selectedVerse != null) {
             val verse = selectedVerse!!
-            val notesOnVerse = notes.filter { it.matchesVerse(verse.book, verse.chapter, verse.number) }
+            // A group printed together acts as one: its colors, notes and reading for all its verses.
+            val members = groupOf(verse)
+            val notesOnVerse = notes.filter { n -> members.any { n.matchesVerse(it.book, it.chapter, it.number) } }
             val currentHighlights = highlights.onVerse(verse.book, verse.chapter, verse.number)
             // A quick note goes with the color put on last.
             val currentHighlight = currentHighlights.lastOrNull()
 
             VerseActionToolbar(
                 verse = verse,
+                label = "${verse.book} ${verse.chapter}:${members.first().number}" + if (members.size > 1) "\u2013${members.last().number}" else "",
                 highlightColorDefs = highlightColorDefs,
                 currentHighlightColorHexes = currentHighlights.map { it.colorHex },
                 highlightHasLinkedNote = currentHighlight?.noteId != null,
                 existingNotes = notesOnVerse,
                 onToggleHighlight = { hex ->
-                    viewModel.toggleHighlightColor(verse.book, verse.chapter, verse.number, hex)
+                    viewModel.toggleHighlightColorOn(members, hex)
                 },
                 onClearHighlight = {
-                    viewModel.clearHighlight(verse.book, verse.chapter, verse.number)
+                    viewModel.clearHighlights(members)
                 },
                 onAddQuickNote = { noteText ->
                     val currentHex = currentHighlight?.colorHex
                     if (currentHex != null) {
                         val colorLabel = highlightColorDefs.find { it.colorHex == currentHex }?.label ?: "Highlight"
-                        viewModel.addHighlightQuickNote(
-                            book = verse.book,
-                            chapter = verse.chapter,
-                            verse = verse.number,
-                            verseText = verse.text,
-                            colorHex = currentHex,
-                            colorLabel = colorLabel,
-                            noteText = noteText
-                        )
+                        viewModel.addHighlightQuickNote(members, currentHex, colorLabel, noteText)
                     }
                 },
                 onAddNote = {
@@ -1760,7 +1779,7 @@ fun ReaderScreen(
                     // stayed open underneath the full-screen Note Editor
                     // instead of closing when the user left it.
                     viewModel.setSelectedVerse(null)
-                    viewModel.openNoteEditor(defaultVerse = verse)
+                    viewModel.openNoteEditor(defaultVerses = members)
                 },
                 onOpenNote = { note ->
                     // Matches the note-marker dot: opens straight into a

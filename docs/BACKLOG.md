@@ -1590,7 +1590,7 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     Jacob and Judah too), prayer read as ప్రార్థన, విజ్ఞాపన, విన్నపము: "పౌలు ప్రార్థన" gives Acts 28:8, then 50
     verses in his letters. Torrey's and search by meaning stay for later.
 
-56. **Step 1 done 6 Nov (BSI's text in); step 2 next: verses printed together.** **The Telugu text: stray spaces in words, missing dashes and
+56. **Done 6 Nov: BSI's text in, and its verses printed together.** **The Telugu text: stray spaces in words, missing dashes and
     semicolons.** "is it possible for you to proof read and compare againt bible.com online version? I
     allowed bible.com in your environment. It is having unexpected space in the telugu words and missing
     long Em-dash and semi-colons. it's bsi ov version."
@@ -1737,8 +1737,17 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
       for the lengths); its reports list every stretch settled, group, join and much-changed verse. The
       app reloads its Telugu once (data version 3). To follow: the Telugu recordings' verse timings
       still follow the old text's verse breaks, so the ~170 verses that moved need timing again.
-    - *Step 2, next:* Settings › Telugu "Verses printed together", Together as the default, as planned
-      above.
+    - *Step 2, built ("go ahead with step 2"):* Settings › Telugu "Verses printed together", on by default.
+      With the Telugu on, a group shows as one block: its English verses close together, then its Telugu
+      once, whole, marked "17–18". Tapped, the whole group is picked, and what's done to it is done to all
+      its verses: colors, a quick note (one note for them all), a new note (on 17–18), marking studied
+      (long press, or tapping while marking), adding to a note. Reading aloud: English 17 and 18, then the
+      Telugu once (from the recording, 17's start to 18's end). Verse Scroll, with the Telugu on: a card
+      in a group shows the group, and reads it the same way; its picture too. A Telugu search looks in a
+      group's whole text and finds it once, "GENESIS 1:17–18". Off: each English verse with its own part,
+      as in step 1. With the Telugu off, nothing changes.
+      Tests: PrintedTogetherTest, and a recording test (the group's Telugu once, from its first verse's
+      start). Checked as pictures: Paper and Dark, together, split and picked.
 
 57. **Discarded 1 Nov.** **Reader: no indent, the verse number at the start of the line.** "can you show
     me preview with no indentation for verses other than with verse numbers?"

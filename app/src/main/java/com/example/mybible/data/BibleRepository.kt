@@ -8,6 +8,8 @@ import com.example.mybible.data.local.NoteEntity
 import com.example.mybible.data.local.StudiedVerseEntity
 import com.example.mybible.data.local.UserDatabase
 import com.example.mybible.data.local.VerseEntity
+import com.example.mybible.model.PrintedTogether
+import com.example.mybible.model.PrintedTogetherData
 import com.example.mybible.model.*
 import com.example.mybible.ui.components.BIBLE_BOOKS
 import com.example.mybible.ui.components.BOOK_CHAPTER_COUNTS
@@ -160,6 +162,23 @@ class BibleRepository(private val context: Context) {
 
     fun getSavedTeluguFontSize(): Int = prefs.getInt("telugu_font_size", DEFAULT_TELUGU_FONT_SIZE).coerceIn(12, 24)
     fun saveTeluguFontSize(size: Int) = prefs.edit().putInt("telugu_font_size", size.coerceIn(12, 24)).apply()
+
+    /** "Verses printed together" (backlog 56): a group's English verses, then its Telugu once. On by default. */
+    fun getTeluguTogether(): Boolean = prefs.getBoolean("telugu_together", true)
+    fun saveTeluguTogether(on: Boolean) = prefs.edit().putBoolean("telugu_together", on).apply()
+
+    // The verses the Telugu Bible prints together, by book and chapter (assets/telugu_together.json).
+    private val printedTogetherData: Map<String, Map<Int, List<PrintedTogether>>> by lazy {
+        try {
+            PrintedTogetherData.parse(context.assets.open("telugu_together.json").bufferedReader().use { it.readText() })
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyMap()
+        }
+    }
+
+    /** The verses of [book] [chapter] the Telugu Bible prints together, in order. */
+    fun printedTogether(book: String, chapter: Int): List<PrintedTogether> = printedTogetherData[book]?.get(chapter).orEmpty()
 
     fun getSavedGreekFontSize(): Int = prefs.getInt("greek_font_size", DEFAULT_GREEK_FONT_SIZE).coerceIn(11, 22)
     fun saveGreekFontSize(size: Int) = prefs.edit().putInt("greek_font_size", size.coerceIn(11, 22)).apply()
@@ -1273,14 +1292,48 @@ class BibleRepository(private val context: Context) {
     private suspend fun teluguSearch(q: String, disabledSources: Set<String>): SearchOutcome {
         val words = TeluguSearch.wordsOf(q)
         if (words.isEmpty()) return SearchOutcome()
-        fun List<VerseEntity>.inOrder() = map { Verse(it.book, it.chapter, it.number, it.text, it.isRedLetter, it.teluguText) }
-            .sortedWith(compareBy({ BIBLE_BOOKS.indexOf(it.book) }, { it.chapter }, { it.number }))
-        val outcome = TeluguSearch.search(q, bibleDao.searchTelugu(TeluguSearch.longest(words)).inOrder(), disabledSources)
+        val together = getTeluguTogether()
+        suspend fun List<VerseEntity>.inOrder(): List<Verse> {
+            val verses = map { Verse(it.book, it.chapter, it.number, it.text, it.isRedLetter, it.teluguText) }
+            return (if (together) printedTogetherVerses(verses) else verses)
+                .sortedWith(compareBy({ BIBLE_BOOKS.indexOf(it.book) }, { it.chapter }, { it.number }))
+        }
+        val outcome = teluguSearchFound(q, words, disabledSources) { it.inOrder() }
+        return if (together) withPrintedTogether(outcome) else outcome
+    }
+
+    // Verses the Telugu Bible prints together (backlog 56), searched as one: each group one verse,
+    // numbered by its first, its English and its Telugu whole.
+    private suspend fun printedTogetherVerses(verses: List<Verse>): List<Verse> {
+        val seen = HashSet<Triple<String, Int, Int>>()
+        return verses.mapNotNull { v ->
+            val group = printedTogether(v.book, v.chapter).firstOrNull { v.number in it } ?: return@mapNotNull v
+            if (!seen.add(Triple(v.book, v.chapter, group.first))) return@mapNotNull null
+            val english = getVerseRange(v.book, v.chapter, group.first, group.last).joinToString(" ") { it.text }
+            v.copy(number = group.first, text = english.ifEmpty { v.text }, teluguText = group.telugu)
+        }
+    }
+
+    // A search's verses that are groups printed together: found as one, "Genesis 1:17–18".
+    private fun withPrintedTogether(outcome: SearchOutcome): SearchOutcome = outcome.copy(
+        hits = outcome.hits.map { hit ->
+            val group = printedTogether(hit.verse.book, hit.verse.chapter).firstOrNull { it.first == hit.verse.number }
+            if (group != null && hit.verse.teluguText == group.telugu) hit.copy(throughVerse = group.last) else hit
+        }
+    )
+
+    private suspend fun teluguSearchFound(
+        q: String,
+        words: List<String>,
+        disabledSources: Set<String>,
+        inOrder: suspend (List<VerseEntity>) -> List<Verse>
+    ): SearchOutcome {
+        val outcome = TeluguSearch.search(q, inOrder(bibleDao.searchTelugu(TeluguSearch.longest(words))), disabledSources)
         val (person, subject) = PersonSearch.teluguPerson(words) ?: return outcome
         val readings = subject.map(PersonSearch::teluguReading)
         // Candidates: the verses with any reading of the subject's longest word.
         val first = readings.maxBy { r -> r.maxOf { it.length } }
-        val candidates = first.flatMap { bibleDao.searchTelugu(it) }.distinctBy { Triple(it.book, it.chapter, it.number) }.inOrder()
+        val candidates = inOrder(first.flatMap { bibleDao.searchTelugu(it) }.distinctBy { Triple(it.book, it.chapter, it.number) })
         val hits = PersonSearch.teluguHits(person, readings, candidates)
         return PersonSearch.merge(outcome, person, hits, PersonSearch.teluguNote(person, readings))
     }

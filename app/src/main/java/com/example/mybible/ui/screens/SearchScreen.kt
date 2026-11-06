@@ -1162,7 +1162,7 @@ private fun SearchResultCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "${verse.book} ${verse.chapter}:${verse.number}".uppercase(),
+                        text = ("${verse.book} ${verse.chapter}:${verse.number}" + (hit.throughVerse?.let { "\u2013$it" } ?: "")).uppercase(),
                         fontSize = 13.sp,
                         fontFamily = com.example.mybible.ui.theme.WorkSansFontFamily,
                         fontWeight = FontWeight.SemiBold,

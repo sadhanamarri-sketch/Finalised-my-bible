@@ -138,6 +138,13 @@ fun VerseCard(
     teluguLineHeightMultiplier: Float = FIXED_LINE_HEIGHT_RATIO,
     verseSpacingDp: Int = 14,
     onEnglishWordClick: ((String) -> Unit)? = null,
+    // The Telugu under it: its own; in a group the Telugu Bible prints together (backlog 56), none under
+    // all but the group's last verse, which has the group's whole, after [teluguLabel] ("17–18").
+    teluguText: String? = verse.teluguText,
+    teluguLabel: String? = null,
+    // In such a group, joined to the verse above or below it: no gap between them, one block.
+    joinedAbove: Boolean = false,
+    joinedBelow: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     // Highlight colors are user-editable now (see model/HighlightColors.kt),
@@ -160,7 +167,7 @@ fun VerseCard(
     val redLetterColor = if (isDark) DarkRedLetter else PaperRedLetter
     val textColor = MaterialTheme.colorScheme.onBackground
     val isDimmedByBlur = isBlurModeEnabled && !isFocusedVerse && !isSelected
-    val teluguLit = isBeingRead && readingTelugu && !verse.teluguText.isNullOrEmpty()
+    val teluguLit = isBeingRead && readingTelugu && !teluguText.isNullOrEmpty()
     val englishTint by animateColorAsState(
         targetValue = if (isBeingRead && !teluguLit) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f) else Color.Transparent,
         animationSpec = tween(durationMillis = 300),
@@ -193,8 +200,15 @@ fun VerseCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = verseSpacingDp.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .padding(top = if (joinedAbove) 0.dp else verseSpacingDp.dp, bottom = if (joinedBelow) 0.dp else verseSpacingDp.dp)
+            .clip(
+                RoundedCornerShape(
+                    topStart = if (joinedAbove) 0.dp else 8.dp,
+                    topEnd = if (joinedAbove) 0.dp else 8.dp,
+                    bottomStart = if (joinedBelow) 0.dp else 8.dp,
+                    bottomEnd = if (joinedBelow) 0.dp else 8.dp
+                )
+            )
             .graphicsLayer {
                 alpha = animatedAlpha
             }
@@ -362,10 +376,17 @@ fun VerseCard(
                     // font (matching what Capacitor's explicit 'Noto Sans Telugu'
                     // stack achieves in the browser) since the Latin reading font
                     // has no Telugu glyphs to begin with.
-                    if (!verse.teluguText.isNullOrEmpty()) {
+                    if (!teluguText.isNullOrEmpty()) {
                         Spacer(modifier = Modifier.height(8.dp))
+                        val labelColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
                         Text(
-                            text = verse.teluguText,
+                            text = buildAnnotatedString {
+                                if (teluguLabel != null) {
+                                    withStyle(SpanStyle(fontSize = 12.sp, fontWeight = FontWeight.Bold, color = labelColor)) { append(teluguLabel) }
+                                    append("  ")
+                                }
+                                append(teluguText)
+                            },
                             fontSize = teluguFontSizeSp.sp,
                             lineHeight = (teluguFontSizeSp * teluguLineHeightMultiplier).sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -556,6 +577,8 @@ private fun Modifier.litBehind(color: Color): Modifier = drawBehind {
 @Composable
 fun VerseActionToolbar(
     verse: Verse,
+    // What it's on: the verse, or a group printed together, "Genesis 1:17–18".
+    label: String = "${verse.book} ${verse.chapter}:${verse.number}",
     highlightColorDefs: List<HighlightColorDef>,
     // The verse's highlight colors, in the order they were added (up to
     // MAX_VERSE_COLORS): a swatch puts its color on or takes it off, and
@@ -660,7 +683,7 @@ fun VerseActionToolbar(
                     // Greek/Hebrew interlinear toggle (see onToggleInterlinear
                     // above) — no separate button needed for it.
                     Text(
-                        text = "${verse.book} ${verse.chapter}:${verse.number}",
+                        text = label,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.tertiary,

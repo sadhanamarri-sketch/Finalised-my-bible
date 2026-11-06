@@ -1,5 +1,7 @@
 package com.example.mybible.audio
 
+import com.example.mybible.model.PrintedTogether
+import com.example.mybible.model.PrintedTogetherData
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -48,9 +50,33 @@ data class VerseToRead(
     val chapter: Int,
     val verse: Int,
     val english: String,
-    val telugu: String?
+    val telugu: String?,
+    /**
+     * Verses printed together (backlog 56): the group's first verse, when this, its last, carries the
+     * group's Telugu whole (played from the first's start in its recording).
+     */
+    val teluguFrom: Int? = null
 ) {
     val label: String get() = "$book $chapter:$verse"
+}
+
+/**
+ * [verses] (a chapter's, or a card's) read with the Telugu Bible's verses printed together: a group's
+ * Telugu once and whole, after its last verse's English, and none on its other verses. A group only partly
+ * among [verses] keeps its verses' own Telugu.
+ */
+fun withPrintedTogether(verses: List<VerseToRead>, groups: List<PrintedTogether>): List<VerseToRead> {
+    if (groups.isEmpty()) return verses
+    val byVerse = PrintedTogetherData.byVerse(groups)
+    val here = verses.mapTo(HashSet()) { it.verse }
+    return verses.map { v ->
+        val group = byVerse[v.verse] ?: return@map v
+        when {
+            (group.first..group.last).any { it !in here } -> v
+            v.verse == group.last -> v.copy(telugu = group.telugu, teluguFrom = group.first)
+            else -> v.copy(telugu = null)
+        }
+    }
 }
 
 /** Where a reading is: the Reader's chapter, or Verse Scroll's cards. */
@@ -986,11 +1012,15 @@ class ReadAloud(
         }
     }
 
-    // [verse] in a language's recording, when it's played from that and the verse is there to play.
+    // [verse] in a language's recording, when it's played from that and the verse is there to play. A
+    // group's Telugu printed together, from its first verse's start (in the same file).
     private suspend fun recorded(verse: VerseToRead, telugu: Boolean, text: String, heading: Boolean): Recorded? {
         if (!reads(telugu)) return null
         val at = recordings.verse(verse, telugu, heading) ?: return null
-        return Recorded(telugu, text, at)
+        val first = verse.teluguFrom?.takeIf { telugu && it < verse.verse }
+            ?.let { recordings.verse(verse.copy(verse = it, teluguFrom = null), telugu = true, heading) }
+        val span = if (first != null && first.file == at.file && first.start <= at.start) at.copy(from = first.from, start = first.start) else at
+        return Recorded(telugu, text, span)
     }
 
     // The verses the reading goes on to after [verse], each the next in its chapter, that its recording

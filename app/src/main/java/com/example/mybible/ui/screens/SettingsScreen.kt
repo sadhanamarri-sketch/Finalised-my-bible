@@ -104,6 +104,7 @@ fun SettingsScreen(
     val englishFontFamilyName by viewModel.englishFontFamilyName.collectAsState()
     val isRedLetterEnabled by viewModel.redLetterEnabled.collectAsState()
     val showTeluguInline by viewModel.showTeluguInline.collectAsState()
+    val teluguTogether by viewModel.teluguTogether.collectAsState()
     val showInterlinear by viewModel.showInterlinear.collectAsState()
     val isBlurModeEnabled by viewModel.isBlurModeEnabled.collectAsState()
     val remindersEnabled by viewModel.remindersEnabled.collectAsState()
@@ -230,9 +231,16 @@ fun SettingsScreen(
         DsSectionLabel("Telugu")
         DsToggleRow(
             label = "Telugu verses",
-            subLabel = "Shows a Telugu translation under each verse. Text: BSI Telugu O.V., via wordproject.org",
+            subLabel = "Shows a Telugu translation under each verse. Text: the Telugu O.V., from the Bible Society of India",
             checked = showTeluguInline,
             onCheckedChange = { viewModel.toggleTeluguInline() }
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        DsToggleRow(
+            label = "Verses printed together",
+            subLabel = "Where the Telugu Bible prints verses as one (Genesis 1:17\u201318), their English verses come first, then the Telugu once. Off: each English verse with its own part of it.",
+            checked = teluguTogether,
+            onCheckedChange = { viewModel.setTeluguTogether(it) }
         )
         Spacer(modifier = Modifier.height(10.dp))
         DsSizeAdjustRow(

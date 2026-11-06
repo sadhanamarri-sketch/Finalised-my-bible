@@ -19,6 +19,7 @@ import com.example.mybible.audio.ReadLanguage
 import com.example.mybible.audio.ReadingPlace
 import com.example.mybible.audio.ReadingSession
 import com.example.mybible.audio.VerseToRead
+import com.example.mybible.audio.withPrintedTogether
 import com.example.mybible.data.BibleRepository
 import com.example.mybible.model.MatchedWord
 import com.example.mybible.pictures.PictureShelf
@@ -645,7 +646,7 @@ class VerseScrollController(
         override suspend fun following(verse: VerseToRead): List<VerseToRead> {
             val card = cards.getOrNull(index) as? VerseFeedCard ?: return emptyList()
             if (card.uid != uid) return emptyList()
-            return (line + 1 until card.content.lines.size).map { toRead(card, it) }
+            return cardToRead(card).drop(line + 1)
         }
 
         // On to the verse card at [to], from its first verse, the screen going with it. [gentle]: going on
@@ -679,11 +680,14 @@ class VerseScrollController(
         }
     }
 
-    private suspend fun toRead(card: VerseFeedCard, line: Int): VerseToRead {
+    private suspend fun toRead(card: VerseFeedCard, line: Int): VerseToRead = cardToRead(card)[line]
+
+    // A card's verses to read: a group printed together, its English verses and then its Telugu once.
+    private suspend fun cardToRead(card: VerseFeedCard): List<VerseToRead> {
         val ref = card.content.ref
-        val verse = card.content.lines[line]
-        val telugu = verse.telugu ?: repository.getTeluguChapterVerses(ref.book, ref.chapter)[verse.number]
-        return VerseToRead(ref.book, ref.chapter, verse.number, verse.text, telugu)
+        val bundled = if (card.content.lines.any { it.telugu == null }) repository.getTeluguChapterVerses(ref.book, ref.chapter) else emptyMap()
+        val verses = card.content.lines.map { v -> VerseToRead(ref.book, ref.chapter, v.number, v.text, v.telugu ?: bundled[v.number]) }
+        return if (repository.getTeluguTogether()) withPrintedTogether(verses, repository.printedTogether(ref.book, ref.chapter)) else verses
     }
 
     // The next verse card after [from], past check-ins, dealing more if the feed hasn't got that far; null
@@ -868,19 +872,33 @@ class VerseScrollController(
         return scene.id
     }
 
-    /** The card content for [count] verses from [ref], or null if any of them isn't in the database yet. */
+    /**
+     * The card content for [count] verses from [ref], or null if any of them isn't in the database yet. With
+     * the Telugu on, a group the Telugu Bible prints together is shown whole (backlog 56): its English
+     * verses, then its Telugu once.
+     */
     suspend fun loadContent(ref: VerseRef, count: Int): VerseCardContent? {
-        val last = ref.verse + count - 1
-        val rows = repository.getVerseRange(ref.book, ref.chapter, ref.verse, last).associateBy { it.number }
-        val lines = (ref.verse..last).map { n ->
+        var first = ref.verse
+        var last = ref.verse + count - 1
+        if (showTelugu && repository.getTeluguTogether()) {
+            for (group in repository.printedTogether(ref.book, ref.chapter)) {
+                if (group.first <= last && group.last >= first) {
+                    first = minOf(first, group.first)
+                    last = maxOf(last, group.last)
+                }
+            }
+        }
+        val start = if (first == ref.verse) ref else ref.copy(verse = first)
+        val rows = repository.getVerseRange(ref.book, ref.chapter, first, last).associateBy { it.number }
+        val lines = (first..last).map { n ->
             val row = rows[n] ?: return null
             VerseLine(n, cleanVerseText(row.text), row.teluguText?.trim()?.takeIf { it.isNotEmpty() })
         }
         if (lines.any { it.text.isEmpty() }) return null
         return VerseCardContent(
-            ref = ref,
+            ref = start,
             lines = lines,
-            linkCount = repository.countCrossReferencesFrom(ref.book, ref.chapter, ref.verse)
+            linkCount = repository.countCrossReferencesFrom(start.book, start.chapter, start.verse)
         )
     }
 

@@ -11,6 +11,7 @@ import com.example.mybible.HighlightedVerseItem
 import com.example.mybible.HighlightsFilter
 import com.example.mybible.StudiedProgress
 import com.example.mybible.buildHighlightedVerseItems
+import com.example.mybible.data.onVerse
 import com.example.mybible.data.BibleDataImportWorker
 import com.example.mybible.data.BibleRepository
 import com.example.mybible.data.DriveBackupManager
@@ -28,11 +29,13 @@ import com.example.mybible.audio.ReadLanguage
 import com.example.mybible.audio.ReadUntil
 import com.example.mybible.audio.ReadingPlace
 import com.example.mybible.audio.VerseToRead
+import com.example.mybible.audio.withPrintedTogether
 import com.example.mybible.versescroll.VerseRef
 import com.example.mybible.versescroll.VerseScrollController
 import com.example.mybible.data.resolveBookName
 import com.example.mybible.data.LexiconLookupResult
 import com.example.mybible.data.linkNumber
+import com.example.mybible.model.PrintedTogether
 import com.example.mybible.model.*
 import com.example.mybible.ui.components.BIBLE_BOOKS
 import com.example.mybible.ui.components.BOOK_CHAPTER_COUNTS
@@ -47,6 +50,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
@@ -184,6 +188,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // (English size - 2) and Greek was hardcoded at 14sp, neither
     // adjustable on their own like the Capacitor app's three separate
     // sliders (--reading-size / --telugu-size / --greek-size).
+    private val _teluguTogether = MutableStateFlow(repository.getTeluguTogether())
+
+    /** "Verses printed together" (backlog 56): a group's English verses, then its Telugu once. */
+    val teluguTogether: StateFlow<Boolean> = _teluguTogether.asStateFlow()
+
+    fun setTeluguTogether(on: Boolean) {
+        _teluguTogether.value = on
+        repository.saveTeluguTogether(on)
+    }
+
+    /** The verses of [book] [chapter] the Telugu Bible prints together, in order. */
+    fun printedTogether(book: String, chapter: Int): List<PrintedTogether> = repository.printedTogether(book, chapter)
+
     private val _teluguFontSizeSp = MutableStateFlow(repository.getSavedTeluguFontSize())
     val teluguFontSizeSp: StateFlow<Int> = _teluguFontSizeSp.asStateFlow()
 
@@ -616,7 +633,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val verses = repository.getChapterVerses(b, c, includeTelugu = true)
             // The bundled Telugu text for any verse the database doesn't have it for yet.
             val telugu = if (verses.any { it.teluguText.isNullOrBlank() }) repository.getTeluguChapterVerses(b, c) else emptyMap()
-            verses.map { v -> VerseToRead(v.book, v.chapter, v.number, v.text, v.teluguText?.takeIf { it.isNotBlank() } ?: telugu[v.number]) }
+            val toRead = verses.map { v -> VerseToRead(v.book, v.chapter, v.number, v.text, v.teluguText?.takeIf { it.isNotBlank() } ?: telugu[v.number]) }
+            // A group printed together: its English verses, then its Telugu once.
+            if (_teluguTogether.value) withPrintedTogether(toRead, repository.printedTogether(b, c)) else toRead
         }
         readAloud.start(reading)
     }
@@ -3117,6 +3136,127 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     studyPickSessionVerses.add(key)
                 }
+            }
+            ReaderPickMode.NONE -> Unit
+        }
+    }
+
+    // ---- A group printed together acts as one (backlog 56): [verses] are its verses, or one verse ----
+
+    private fun rangeLabel(verses: List<Verse>): String {
+        val first = verses.first()
+        return "${first.book} ${first.chapter}:${first.number}" + if (verses.size > 1) "\u2013${verses.last().number}" else ""
+    }
+
+    private fun isStudied(v: Verse) = completedVerses.value.any { it.book == v.book && it.chapter == v.chapter && it.verse == v.number }
+
+    /** A color on all of [verses], or off them all if it's on the first. */
+    fun toggleHighlightColorOn(verses: List<Verse>, colorHex: String) {
+        val first = verses.firstOrNull() ?: return
+        if (verses.size == 1) return toggleHighlightColor(first.book, first.chapter, first.number, colorHex)
+        viewModelScope.launch {
+            val on = highlights.first().onVerse(first.book, first.chapter, first.number).any { it.colorHex.equals(colorHex, ignoreCase = true) }
+            for (v in verses) {
+                if (on) repository.removeHighlightColor(v.book, v.chapter, v.number, colorHex)
+                else repository.addHighlightColor(v.book, v.chapter, v.number, colorHex)
+            }
+        }
+    }
+
+    /** Every color off all of [verses], and the toolbar closes. */
+    fun clearHighlights(verses: List<Verse>) {
+        viewModelScope.launch {
+            for (v in verses) repository.removeHighlight(v.book, v.chapter, v.number)
+            _selectedVerse.value = null
+        }
+    }
+
+    /** A quick note on all of [verses], one note for them all, with their color. */
+    fun addHighlightQuickNote(verses: List<Verse>, colorHex: String, colorLabel: String, noteText: String) {
+        val first = verses.firstOrNull() ?: return
+        if (verses.size == 1) return addHighlightQuickNote(first.book, first.chapter, first.number, first.text, colorHex, colorLabel, noteText)
+        val trimmed = noteText.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            val noteId = System.currentTimeMillis()
+            repository.saveNote(
+                id = noteId,
+                title = "",
+                text = trimmed,
+                noteDate = "",
+                refs = verses.map { NoteReference(it.book, it.chapter, it.number, it.text) },
+                tags = listOf("Highlighted Verse", colorLabel)
+            )
+            for (v in verses) repository.addHighlightColor(v.book, v.chapter, v.number, colorHex, noteId = noteId)
+        }
+    }
+
+    /** A new note on all of [verses]. */
+    fun openNoteEditor(defaultVerses: List<Verse>) {
+        if (defaultVerses.size <= 1) return openNoteEditor(defaultVerse = defaultVerses.firstOrNull())
+        startDraft(
+            NoteItem(
+                id = 0,
+                text = "",
+                noteDate = todayDateString(),
+                refs = defaultVerses.map { NoteReference(it.book, it.chapter, it.number, it.text) },
+                tags = emptyList()
+            )
+        )
+        _showNoteEditor.value = true
+    }
+
+    /** A long press on a group: all its verses marked studied, or, if the first was, all unmarked (with an undo). */
+    fun startStudyPickingFromLongPress(verses: List<Verse>) {
+        if (verses.size <= 1) return verses.firstOrNull()?.let { startStudyPickingFromLongPress(it) } ?: Unit
+        _readerPickMode.value = ReaderPickMode.STUDY_PICK
+        _pickBannerMessage.value = "Tap verses to mark studied \u2014 tap again to unmark"
+        _isBlurModeEnabled.value = false
+        studyPickSessionVerses.clear()
+        clearVerseFocus()
+        if (isStudied(verses.first())) {
+            _readerPickMode.value = ReaderPickMode.NONE
+            val label = rangeLabel(verses)
+            viewModelScope.launch {
+                val removed = verses.filter(::isStudied).mapNotNull { repository.toggleCompletedVerse(it.book, it.chapter, it.number) }
+                if (removed.isNotEmpty()) offerChangeUndo("Unmarked $label") { repository.restoreCompletedVerses(removed) }
+            }
+        } else {
+            for (v in verses) {
+                if (!isStudied(v)) toggleCompletedVerse(v.book, v.chapter, v.number)
+                studyPickSessionVerses.add(Triple(v.book, v.chapter, v.number))
+            }
+        }
+    }
+
+    /** A tap on a group while picking verses: all its verses added (or marked), or taken off if the first was. */
+    fun onPickModeVersesTap(verses: List<Verse>) {
+        if (verses.size <= 1) return verses.firstOrNull()?.let { onPickModeVerseTap(it) } ?: Unit
+        fun NoteReference.isOneOf() = verses.any { it.book == book && it.chapter == chapter && it.number == verse }
+        when (_readerPickMode.value) {
+            ReaderPickMode.NOTE_PICK -> {
+                val draftRefs = if (pickModeResumesEditor) _noteDraft.value?.refs.orEmpty() else emptyList()
+                fun has(v: Verse) = (_pickedNoteRefs.value + draftRefs).any { it.book == v.book && it.chapter == v.chapter && it.verse == v.number }
+                val label = rangeLabel(verses)
+                val revertTo = notePickHint()
+                if (has(verses.first())) {
+                    _pickedNoteRefs.value = _pickedNoteRefs.value.filterNot { it.isOneOf() }
+                    if (pickModeResumesEditor) _noteDraft.value?.let { draft -> draft.refs = draft.refs.filterNot { it.isOneOf() } }
+                    setPickBanner("Removed $label", revertTo)
+                } else {
+                    _pickedNoteRefs.value = _pickedNoteRefs.value +
+                        verses.filterNot(::has).map { NoteReference(it.book, it.chapter, it.number, it.text) }
+                    setPickBanner("Added $label", revertTo)
+                }
+            }
+            ReaderPickMode.STUDY_PICK -> {
+                val wasStudied = isStudied(verses.first())
+                for (v in verses) {
+                    if (isStudied(v) == wasStudied) toggleCompletedVerse(v.book, v.chapter, v.number)
+                    val key = Triple(v.book, v.chapter, v.number)
+                    if (wasStudied) studyPickSessionVerses.remove(key) else studyPickSessionVerses.add(key)
+                }
+                if (wasStudied && studyPickSessionVerses.isEmpty()) _readerPickMode.value = ReaderPickMode.NONE
             }
             ReaderPickMode.NONE -> Unit
         }

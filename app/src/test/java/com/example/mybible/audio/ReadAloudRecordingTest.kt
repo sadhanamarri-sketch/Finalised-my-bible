@@ -1,5 +1,6 @@
 package com.example.mybible.audio
 
+import com.example.mybible.model.PrintedTogether
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
@@ -260,6 +261,22 @@ class ReadAloudRecordingTest {
         // Each a verse on its own: nothing played on into.
         assertTrue(recorder.played.all { it.marks.isEmpty() && it.to - it.from < 9 })
         assertEquals("John 3:17", reader.state.value.verse?.label)
+    }
+
+    @Test
+    fun versesPrintedTogetherHaveTheirTeluguOnceAfterTheirEnglish() {
+        // Backlog 56: Genesis 1:2-3 printed together in Telugu, its Telugu whole after 1:3's English.
+        val recorder = FakeRecorder()
+        val reader = reader(FakeSpeaker(), FakePrefs(ReadLanguage.BOTH), FakeRecordings(), recorder)
+        reader.start(Chapter(withPrintedTogether(genesis1, listOf(PrintedTogether(2, 3, "రెండు మూడు"))), from = 2))
+        recorder.end() // 1:2's English, with no Telugu after it
+        recorder.end() // 1:3's English
+        assertEquals(listOf("en/Genesis 1", "en/Genesis 1", "te/Genesis"), recorder.played.map { it.file.uri })
+        // The group's Telugu, played from 1:2's start to 1:3's end in its recording.
+        assertEquals(19.96, recorder.played.last().from, 1e-9)
+        assertEquals(38.0, recorder.played.last().to, 1e-9)
+        assertTrue(reader.state.value.telugu)
+        assertEquals("Genesis 1:3", reader.state.value.verse?.label)
     }
 
     @Test

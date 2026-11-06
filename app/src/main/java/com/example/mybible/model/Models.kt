@@ -108,7 +108,9 @@ data class SearchHit(
     val related: Boolean = false,
     val reasons: List<String> = emptyList(),
     /** What found it, for Verse Scroll's chips and its filter when the results are scrolled through. */
-    val matched: List<MatchedWord> = emptyList()
+    val matched: List<MatchedWord> = emptyList(),
+    /** Verses the Telugu Bible prints together, found as one (backlog 56): the last of them, [verse] the first. */
+    val throughVerse: Int? = null
 )
 
 /**
