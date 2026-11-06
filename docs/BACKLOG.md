@@ -1867,10 +1867,12 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     word tapped in a verse a word's page cited, a note's verse opened from a verse another note's banner
     is on, or a list opened again from the Reader's menu while its banner is up and a verse picked — each
     a detour of its own, the one before it kept as it was. A list opened from the menu and left without
-    picking goes back to that verse, its banner still up. Cancel (✕) ends just the newest; the one before
-    it shows. Fixed on the way: Back on a cross references list opened from a followed verse left a
+    picking goes back to that verse, its banner still up. Cancel (✕), on any banner, drops the whole trail
+    and stays where you are: no banner comes back, and a search's results and the cross references' lists
+    on it go too ("cancel was there to lose all the trail and stay there" — first built ending just the
+    newest, put right the same day). Fixed on the way: Back on a cross references list opened from a followed verse left a
     "Return to cross references" banner to a list that was gone; Cancel on the Highlights, Studied and
     note banners kept the verse to go back to, so a later visit to that list could end on an old place;
     a note's Return opened it over the wrong page if another note had been read meanwhile. Test:
-    DetourTrailTest; and the app's own view model driven through twelve chains (two-deep cross references,
+    DetourTrailTest; and the app's own view model driven through thirteen chains (two-deep cross references,
     mixed kinds, the menu, Cancel, word pages, notes, Verse Scroll and Studied, a quick double Back).

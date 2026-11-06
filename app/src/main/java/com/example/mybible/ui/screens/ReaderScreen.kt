@@ -983,7 +983,7 @@ fun ReaderScreen(
                             }
                         }
                         IconButton(
-                            onClick = { viewModel.dismissCrossReferenceReturnBanner() },
+                            onClick = { viewModel.dismissDetours() },
                             modifier = Modifier.size(24.dp)
                         ) {
                             Icon(
@@ -1049,7 +1049,7 @@ fun ReaderScreen(
                             }
                         }
                         IconButton(
-                            onClick = { viewModel.dismissSearchReturnBanner() },
+                            onClick = { viewModel.dismissDetours() },
                             modifier = Modifier.size(24.dp)
                         ) {
                             Icon(
@@ -1113,7 +1113,7 @@ fun ReaderScreen(
                             }
                         }
                         IconButton(
-                            onClick = { viewModel.dismissLexiconReturnBanner() },
+                            onClick = { viewModel.dismissDetours() },
                             modifier = Modifier.size(24.dp)
                         ) {
                             Icon(
@@ -1177,7 +1177,7 @@ fun ReaderScreen(
                             }
                         }
                         IconButton(
-                            onClick = { viewModel.dismissNoteReturnBanner() },
+                            onClick = { viewModel.dismissDetours() },
                             modifier = Modifier.size(24.dp)
                         ) {
                             Icon(
@@ -1244,7 +1244,7 @@ fun ReaderScreen(
                             }
                         }
                         IconButton(
-                            onClick = { viewModel.dismissHighlightsReturnBanner() },
+                            onClick = { viewModel.dismissDetours() },
                             modifier = Modifier.size(24.dp)
                         ) {
                             Icon(
@@ -1311,7 +1311,7 @@ fun ReaderScreen(
                             }
                         }
                         IconButton(
-                            onClick = { viewModel.dismissStudiedReturnBanner() },
+                            onClick = { viewModel.dismissDetours() },
                             modifier = Modifier.size(24.dp)
                         ) {
                             Icon(
@@ -1376,7 +1376,7 @@ fun ReaderScreen(
                             }
                         }
                         IconButton(
-                            onClick = { viewModel.dismissVerseScrollReturnBanner() },
+                            onClick = { viewModel.dismissDetours() },
                             modifier = Modifier.size(24.dp)
                         ) {
                             Icon(

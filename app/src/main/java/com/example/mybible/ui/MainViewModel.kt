@@ -546,6 +546,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * "Cancel" (✕) on any "Return to …" banner: the whole trail dropped, every detour on it over, and the
+     * Reader left where it is — no banner comes back, and Back has nothing to go back along. A search's
+     * results and the cross references' lists on it go too, as their Cancel always did: the next search
+     * starts from an empty box.
+     */
+    fun dismissDetours() {
+        if (_searchReturnAvailable.value || searchDetoursBelow.isNotEmpty()) endSearchSession()
+        crossReferenceSessionEndJob?.cancel()
+        crossReferenceSessionEndJob = null
+        crossReferenceDetoursBelow.clear()
+        endCrossReferenceSession()
+        // The word page a "Return to … word" went back to; any under it go with the rest.
+        selectGreekWord(null)
+        selectHebrewWord(null)
+        clearStaleReaderDetours(clearFocus = false)
+    }
+
     // A verse picked from [kind]'s list, [up] its banner and [source] the verse its way back ends on. With
     // its banner up, the list was opened again from the verse that banner shows on (the Reader's menu),
     // not gone back to by the banner's Return, which takes it down: this is a detour of its own, from
@@ -606,12 +624,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _studiedReturnAvailable.value = false
             _studiedSourceVerse.value?.let { jumpToVerse(it.book, it.chapter, it.verse) }
         }
-    }
-
-    // "Cancel" on the banner: this detour over, the Reader left where it is (the verse it goes back to
-    // forgotten, or a later visit to Studied would end on it); the one before it, if any, shows.
-    fun dismissStudiedReturnBanner() {
-        endDetour(Detour.STUDIED, _studiedReturnAvailable, _studiedSourceVerse, studiedDetoursBelow)
     }
 
     // System back / Studied's own back arrow when fully exiting the tab
@@ -696,14 +708,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         leaveReaderThenRestore(NavTab.HIGHLIGHTS) {
             _highlightsReturnAvailable.value = false
             _highlightsSourceVerse.value?.let { jumpToVerse(it.book, it.chapter, it.verse) }
-        }
-    }
-
-    // No Return to the list any more, so nothing left to keep its filters for — unless the detour
-    // before this one was from it too. See dismissStudiedReturnBanner.
-    fun dismissHighlightsReturnBanner() {
-        if (!endDetour(Detour.HIGHLIGHTS, _highlightsReturnAvailable, _highlightsSourceVerse, highlightsDetoursBelow)) {
-            resetHighlightsPage()
         }
     }
 
@@ -1025,10 +1029,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun dismissVerseScrollReturnBanner() {
-        endDetour(Detour.VERSE_SCROLL, _verseScrollReturnAvailable, _verseScrollSourceVerse, verseScrollDetoursBelow)
-    }
-
     // Undo for removing a highlight in Verse Scroll — restores the exact
     // items (every color it had), quick-note links included.
     fun restoreHighlights(items: List<HighlightItem>) {
@@ -1256,21 +1256,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // "Cancel" on the banner: the word page it went back to is closed, the Reader left where it is; the
-    // page below it, if its own banner was up when this one was opened over it, shows that again.
-    fun dismissLexiconReturnBanner() {
-        finishReaderRestore()
-        _lexiconReturnTab.value = null
-        _detours.update { it.left(Detour.WORD) }
-        if (_selectedGreekWord.value != null || _selectedHebrewWord.value != null) {
-            selectGreekWord(null)
-            selectHebrewWord(null)
-        } else {
-            wordPagesBelow.removeLastOrNull()
-        }
-        rearmWordPageBelow()
-    }
-
     // Which note (if any) a "return to note" banner in the Reader should
     // reopen — set when a verse mention tapped inside NoteReaderScreen is
     // opened in the Reader. Same pattern as _lexiconReturnTab, but unlike
@@ -1357,11 +1342,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _noteReturnItem.value = null
             _notesSourceVerse.value?.let { jumpToVerse(it.book, it.chapter, it.verse) }
         }
-    }
-
-    // "Cancel" on the banner: see dismissStudiedReturnBanner.
-    fun dismissNoteReturnBanner() {
-        endNoteDetour()
     }
 
     private val _showBookPicker = MutableStateFlow(false)
@@ -2861,22 +2841,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _detours.update { it.began(Detour.CROSS_REFERENCES) }
     }
 
-    // "Cancel" on the banner — end the session (mirrors
-    // dismissSearchReturnBanner()/endSearchSession()) rather than just
-    // hiding the banner and leaving a stale list around for next time. The
-    // list before it, if any, shows its banner (see endCrossReferenceSession).
-    fun dismissCrossReferenceReturnBanner() {
-        settleCrossReferences()
-        _detours.update { it.left(Detour.CROSS_REFERENCES) }
-        endCrossReferenceSession()
-    }
-
     // Ends the newest cross-reference session: list, source verse, scroll
     // position, everything reset — or, when its list was opened from a
     // verse reached by following another's, that one put back as it was,
     // banner up. Called once the user has left CrossReferenceScreen
-    // (closeCrossReferences) or dismissed the "Return to cross references"
-    // banner.
+    // (closeCrossReferences), or by a banner's Cancel (dismissDetours).
     private fun endCrossReferenceSession() {
         crossReferenceListJob?.cancel()
         crossReferenceListJob = null
@@ -3924,9 +3893,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Leaving Search for the Reader — undoes the search detour and lands
     // back on the verse reading started from (e.g. Romans 4), where the
     // detour before it, if any, shows its banner (backlog 65). Ends the
-    // session too, same reasoning as dismissSearchReturnBanner(): there's
-    // no list left to come back to once you've backed out past it — unless
-    // the detour before it was from these same results, opened again.
+    // session too, same reasoning as a banner's Cancel (dismissDetours):
+    // there's no list left to come back to once you've backed out past it —
+    // unless the detour before it was from these same results, opened again.
     fun backToSearchSourceVerse() {
         val source = _searchSourceVerse.value
         endSearchDetour()
@@ -3934,14 +3903,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             jumpToVerse(source.book, source.chapter, source.verse)
             _isBlurModeEnabled.value = false
         }
-    }
-
-    // "Cancel" on the banner — the user is choosing NOT to resume that
-    // search, so end the session (see endSearchSession) rather than just
-    // hiding the banner and leaving stale text sitting in Search for next
-    // time. See backToSearchSourceVerse for a detour before it.
-    fun dismissSearchReturnBanner() {
-        endSearchDetour()
     }
 
     // The newest search detour over: the one before it, from the same results, back with its banner;
