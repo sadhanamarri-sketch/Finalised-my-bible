@@ -1834,11 +1834,10 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     Bible apps do. The English has the KJV's paragraph marks (¶) to start paragraphs on; whether BSI's
     files mark the Telugu's paragraphs is to check when they come.
 
-63. **Noted 6 Nov.** **Verse Scroll's reading should stop on Back to the Reader.** "The verse scroll should stop
+63. **Discarded 6 Nov.** **Verse Scroll's reading should stop on Back to the Reader.** "The verse scroll should stop
     when pressed back to go to reader"
     *Today:* leaving Verse Scroll stops its reading (MainViewModel.selectTab), except on the way to the
     Reader after "Read" on a card (item 30): then it only pauses, to play on when Return brings you back.
     Back (the top bar's or the phone's) takes you to the Reader, which can count as that same visit (the
     Return state set by "Read" is cleared only once you're back in Verse Scroll), so it pauses instead.
-    *To do:* Back from Verse Scroll always stops its reading; only "Read" pauses it. To check on the phone
-    which way it keeps going today (reading on, or paused with its notification still there).
+    *Discarded:* "no i misunderstood... leave it as it is". Nothing changed.
