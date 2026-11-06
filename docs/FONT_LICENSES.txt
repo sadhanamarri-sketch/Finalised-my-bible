@@ -5,6 +5,12 @@ All fonts in this directory are licensed under the SIL Open Font License
   - DejaVu Serif (DejaVu fonts team) — merriweather_regular.ttf / _bold.ttf
   - GFS Baskerville (Greek Font Society) — playfair_display_regular.otf
   - Gelasio (The Gelasio Project Authors) — gelasio_regular.ttf / _bold.ttf
+  - Chathura Bold (The Chathura Project Authors, github.com/appajid/Chathura)
+    — chathura_bold.ttf, for the book's Telugu name in a Verse Scroll card's
+    reference. A Modified Version under the OFL: only its Latin and Telugu
+    letters are kept and its line height is set to fit the 66 book names
+    (tools/fonts/make_reference_fonts.py); the letters are unchanged. Its
+    license, with its copyright notice, is docs/OFL-Chathura.txt.
 
 The garamond/merriweather/playfair files are open-license stand-ins,
 not the exact named Google Fonts (see AppFonts.kt for why, and how to swap

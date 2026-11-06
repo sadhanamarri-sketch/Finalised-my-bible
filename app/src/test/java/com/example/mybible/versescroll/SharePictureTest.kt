@@ -4,6 +4,7 @@ import com.example.mybible.model.TeluguBooks
 import com.example.mybible.ui.components.BIBLE_BOOKS
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Backlog 53: a Verse Scroll card shared as a picture, in a choice of shapes. */
@@ -72,11 +73,32 @@ class SharePictureTest {
     }
 
     @Test
-    fun theTeluguReferenceHasTheBooksTeluguName() {
-        assertEquals("యోహాను 3:16", teluguLabelOf(listOf(VerseRef("John", 3, 16))))
-        assertEquals("యెషయా 40:29–31", teluguLabelOf((29..31).map { VerseRef("Isaiah", 40, it) }))
-        assertEquals("ప్రకటన గ్రంథము 3:20", teluguLabelOf(listOf(VerseRef("Revelation", 3, 20))))
-        assertNull(teluguLabelOf(listOf(VerseRef("Tobit", 1, 1))))
+    fun theReferenceInItsParts() {
+        assertEquals(ReferenceParts("John", "3:16", "యోహాను"), referencePartsOf(listOf(VerseRef("John", 3, 16))))
+        assertEquals(ReferenceParts("Isaiah", "40:29–31", "యెషయా"), referencePartsOf((29..31).map { VerseRef("Isaiah", 40, it) }))
+        assertEquals(ReferenceParts("1 John", "4:19", "1 యోహాను"), referencePartsOf(listOf(VerseRef("1 John", 4, 19))))
+        assertEquals(ReferenceParts("Revelation", "3:20", "ప్రకటన గ్రంథము"), referencePartsOf(listOf(VerseRef("Revelation", 3, 20))))
+        assertNull(referencePartsOf(listOf(VerseRef("Tobit", 1, 1))).teluguBook)
+    }
+
+    @Test
+    fun theReferenceOnOneLineWithItsNumbersOnce() {
+        // Backlog 61: "ROMANS · రోమీయులకు 8:28", the Telugu name between the English and the numbers.
+        val romans = referencePartsOf(listOf(VerseRef("Romans", 8, 28)))
+        assertEquals(ReferenceLine("ROMANS\u00A08:28", null), referenceLineOf(romans, withTelugu = false))
+        val line = referenceLineOf(romans, withTelugu = true)
+        assertEquals("ROMANS · రోమీయులకు 8:28", line.text.replace('\u00A0', ' '))
+        assertEquals("రోమీయులకు", line.text.substring(line.telugu!!))
+        // A book's number is part of its Telugu name, in the Telugu's type.
+        val first = referenceLineOf(referencePartsOf(listOf(VerseRef("1 Corinthians", 13, 4), VerseRef("1 Corinthians", 13, 7))), true)
+        assertEquals("1 CORINTHIANS · 1 కొరింథీయులకు 13:4–7", first.text.replace('\u00A0', ' '))
+        assertEquals("1\u00A0కొరింథీయులకు", first.text.substring(first.telugu!!))
+        // Names keep together: the only place a long one can go on to a second line is after the dot.
+        val long = referenceLineOf(referencePartsOf(listOf(VerseRef("Song of Solomon", 2, 4))), true)
+        assertEquals(1, long.text.count { it == ' ' })
+        assertTrue(long.text.substringBefore(' ').endsWith("·"))
+        // A book without a Telugu name keeps its English reference alone.
+        assertEquals(ReferenceLine("TOBIT\u00A01:1", null), referenceLineOf(referencePartsOf(listOf(VerseRef("Tobit", 1, 1))), true))
     }
 
     @Test

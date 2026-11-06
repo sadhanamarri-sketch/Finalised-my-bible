@@ -83,15 +83,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.example.mybible.ui.components.BIBLE_BOOKS
+import com.example.mybible.ui.theme.ChathuraFontFamily
 import com.example.mybible.ui.theme.FrauncesFontFamily
 import com.example.mybible.ui.theme.GelasioFontFamily
 import com.example.mybible.ui.theme.WorkSansFontFamily
 import com.example.mybible.versescroll.LONG_VERSE_WORDS
 import com.example.mybible.versescroll.LinkedFrom
+import com.example.mybible.versescroll.ReferenceLine
 import com.example.mybible.versescroll.SceneSpec
 import com.example.mybible.versescroll.VerseFeedCard
 import com.example.mybible.versescroll.VerseLine
 import com.example.mybible.versescroll.VerseRef
+import com.example.mybible.versescroll.referenceLineOf
+import com.example.mybible.versescroll.referencePartsOf
 import kotlin.math.roundToInt
 
 // Where on the card the text may sit: clear of the top bar and of the bottom bar and its counter.
@@ -311,8 +315,6 @@ internal fun VerseCardPage(
                     }
                 },
                 lines = content.lines,
-                label = content.label,
-                teluguLabel = content.teluguLabel,
                 refs = content.refs,
                 long = long,
                 colors = c,
@@ -339,14 +341,48 @@ private fun cardPadding(top: Dp = CardTopPadding): PaddingValues {
     return PaddingValues(start = 24.dp, end = 24.dp, top = top + statusBar, bottom = CardBottomPadding + bottom)
 }
 
+/**
+ * The reference's type, on a card and in a picture of it (backlog 61): its English in Work Sans SemiBold
+ * capitals, spaced out; the book's Telugu name in Chathura Bold, whose tall, narrow letters stand on the
+ * line as the capitals do, larger to match them and spaced a little.
+ */
+internal object ReferenceType {
+    const val ENGLISH_SPACING = 0.12f
+    const val TELUGU_SCALE = 1.6f
+    const val TELUGU_SPACING = 0.06f
+}
+
+private val ReferenceEnglish = SpanStyle(
+    fontFamily = WorkSansFontFamily,
+    fontWeight = FontWeight.SemiBold,
+    fontSize = 12.5.sp,
+    letterSpacing = ReferenceType.ENGLISH_SPACING.em
+)
+
+private val ReferenceTelugu = SpanStyle(
+    fontFamily = ChathuraFontFamily,
+    fontWeight = FontWeight.Bold,
+    fontSize = (12.5f * ReferenceType.TELUGU_SCALE).sp,
+    letterSpacing = ReferenceType.TELUGU_SPACING.em
+)
+
+// The line the reference always had (the theme's body text's), whatever the Telugu font's own.
+private val ReferenceLineStyle = TextStyle(
+    lineHeight = 24.sp,
+    lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None)
+)
+
+/** [line] in its type: one line of text, so the English and the Telugu stand on one baseline. */
+private fun referenceText(line: ReferenceLine): AnnotatedString = buildAnnotatedString {
+    withStyle(ReferenceEnglish) { append(line.text) }
+    line.telugu?.let { addStyle(ReferenceTelugu, it.first, it.last + 1) }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun VerseStack(
     eyebrow: @Composable () -> Unit,
     lines: List<VerseLine>,
-    label: String,
-    // The reference with the book's Telugu name, shown beside it with the Telugu.
-    teluguLabel: String?,
     refs: List<VerseRef>,
     long: Boolean,
     colors: VsColors,
@@ -397,30 +433,15 @@ private fun VerseStack(
                             )
                         }
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            // The reference, and its Telugu beside it on the same line: the two sit on one
-                            // baseline (Telugu letters stand taller, so centred they sat lower), the Telugu
-                            // in its plain weight.
+                            // The reference, "ROMANS 8:28", and with the Telugu "ROMANS · రోమీయులకు 8:28".
                             Text(
-                                text = label.uppercase(),
+                                text = remember(refs, telugu.isNotEmpty()) { referenceText(referenceLineOf(referencePartsOf(refs), telugu.isNotEmpty())) },
                                 color = colors.gold,
-                                fontFamily = WorkSansFontFamily,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 12.5.sp,
-                                letterSpacing = 0.12.em,
+                                style = ReferenceLineStyle,
                                 modifier = Modifier
-                                    .alignByBaseline()
+                                    .align(Alignment.CenterVertically)
                                     .padding(end = 5.dp)
                             )
-                            if (telugu.isNotEmpty() && teluguLabel != null) {
-                                Text(
-                                    text = teluguLabel,
-                                    color = colors.gold,
-                                    fontSize = 13.5.sp,
-                                    modifier = Modifier
-                                        .alignByBaseline()
-                                        .padding(end = 5.dp)
-                                )
-                            }
                             for (word in words) {
                                 Text(
                                     text = word.uppercase(),

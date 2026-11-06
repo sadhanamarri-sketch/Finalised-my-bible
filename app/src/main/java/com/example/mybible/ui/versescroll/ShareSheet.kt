@@ -57,6 +57,7 @@ import com.example.mybible.versescroll.ShareShape
 import com.example.mybible.versescroll.SharePictureLayout
 import com.example.mybible.versescroll.VerseFeedCard
 import com.example.mybible.versescroll.VerseScrollController
+import com.example.mybible.versescroll.referencePartsOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -79,9 +80,8 @@ internal fun ShareSheet(card: VerseFeedCard, controller: VerseScrollController, 
         SharedVerse(
             lines = content.lines,
             eyebrow = genreOf(content.ref.book),
-            label = content.label,
+            reference = referencePartsOf(content.refs),
             telugu = if (showTelugu) content.lines.mapNotNull { it.telugu }.joinToString(" ") else "",
-            teluguLabel = content.teluguLabel,
             teluguSize = controller.teluguSize
         )
     }

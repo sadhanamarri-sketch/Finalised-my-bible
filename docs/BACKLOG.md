@@ -1769,12 +1769,24 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     Highlights, Studied, Notes, Search, Verse Scroll) does the same. Unit tests pass; the check in the
     app (a note written, then the widget) was stopped part way, so it's to try on the phone.
 
-61. **Done 5 Nov.** **Verse Scroll card: the Telugu reference bold and out of line.** "The telugu reference in
+61. **Done 6 Nov.** **Verse Scroll card: the Telugu reference bold and out of line.** "The telugu reference in
     verse control card is bold and not aligned with english text."
-    *Cause:* on a Verse Scroll card with Telugu on, the reference line shows "ROMANS 8:28" and "రోమీయులకు 8:28"
-    side by side; the Telugu was set SemiBold, and the two were centred on each other, so the Telugu (its
-    letters stand taller) sat lower than the English.
-    *Fixed:* the two now sit on one baseline, and the Telugu is in its plain weight. The mood chips beside
-    them are unchanged; the shared picture's Telugu reference (SharePictureMaker) is unchanged too.
-    Checked on cards: Romans 8:28 in Paper at the largest text size, Psalm 23:2 in Sepia over a picture, and
-    a passage card.
+    *First fix (5 Nov):* "ROMANS 8:28" and "రోమీయులకు 8:28" put on one baseline, the Telugu in its plain
+    weight. Then: "Telugu reference fix doesn't look good.... the telugu text doesn't sit on same horizontal
+    line... it is slightly upwards and the english text has gaps inbetween letters but telugu doesn't ... how
+    about a font like chatura or mallana? and does it have to repeat the numbers? can it be english dot
+    telugu numbers?"
+    *Found:* measured on the screenshots, the phone's own Telugu font (Noto Sans Telugu UI) draws its letters
+    about a point above the line, and that font differs from phone to phone.
+    *Chosen:* of four previewed on real cards (the phone's font, Mallanna, Chathura, Chathura Bold), "go with
+    4... keep 1 as telugu font": Chathura Bold, and a book's number ("1 కొరింథీయులకు") in it too.
+    *Built:* the reference is one line, "ROMANS · రోమీయులకు 8:28": the numbers once, after the Telugu name;
+    the English in its spaced capitals, the Telugu name in Chathura Bold (1.6 times the size, so its letters
+    stand as tall as the capitals, on the same line), spaced a little. Names keep together, so a long one
+    goes on under the dot. Without the Telugu, "ROMANS 8:28" as before. The card's spacing is as it was. The
+    shared picture has the same line (it had the two references side by side, the Telugu bold).
+    The font comes with the app (OFL; docs/FONT_LICENSES.txt, docs/OFL-Chathura.txt): as published its line
+    is 1.6 times its size, and Android won't lay a line out shorter than its font's, so
+    tools/fonts/make_reference_fonts.py keeps its Latin and Telugu and sets its line to fit the 66 book names
+    (0.96); 310 KB. The rule in one place (versescroll/Feed.kt, referenceLineOf), for the card and the
+    picture; tests: SharePictureTest. Checked on cards (light, Sepia and Dark, a small phone) and in pictures.

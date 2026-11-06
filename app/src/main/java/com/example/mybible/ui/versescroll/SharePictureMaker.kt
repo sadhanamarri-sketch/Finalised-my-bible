@@ -16,6 +16,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.text.Layout
+import android.text.SpannableString
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.StaticLayout
@@ -32,9 +33,12 @@ import com.example.mybible.R
 import com.example.mybible.versescroll.LONG_VERSE_WORDS
 import com.example.mybible.versescroll.PictureSize
 import com.example.mybible.versescroll.PixelRect
+import com.example.mybible.versescroll.ReferenceLine
+import com.example.mybible.versescroll.ReferenceParts
 import com.example.mybible.versescroll.ShareShape
 import com.example.mybible.versescroll.SharePictureLayout
 import com.example.mybible.versescroll.VerseLine
+import com.example.mybible.versescroll.referenceLineOf
 import java.io.File
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -47,12 +51,10 @@ internal data class SharedVerse(
     val lines: List<VerseLine>,
     /** The part of the Bible it's from, over the verse: "The Gospels". */
     val eyebrow: String,
-    /** "John 3:16". */
-    val label: String,
+    /** "John 3:16" in its parts, with the book's Telugu name for beside it when the Telugu shows. */
+    val reference: ReferenceParts,
     /** The Telugu under the verse, when the card shows it; else empty. */
     val telugu: String,
-    /** "యోహాను 3:16", beside [label] when the Telugu shows. */
-    val teluguLabel: String?,
     /** The Telugu's size on the card, in sp. */
     val teluguSize: Int
 ) {
@@ -71,6 +73,7 @@ internal data class SharePalette(val dark: Boolean, val ink: Int, val soft: Int,
 internal class SharePictureMaker(context: Context) {
     private val serif = ResourcesCompat.getFont(context, R.font.gelasio_regular) ?: Typeface.SERIF
     private val sans = ResourcesCompat.getFont(context, R.font.work_sans_variable) ?: Typeface.SANS_SERIF
+    private val chathura = ResourcesCompat.getFont(context, R.font.chathura_bold) ?: Typeface.DEFAULT_BOLD
 
     /**
      * [verse] as a [shape] picture of [size]: over [photo], with the scene's own dimming ([veil], 0 to 1),
@@ -216,10 +219,11 @@ internal class SharePictureMaker(context: Context) {
             // The small type above and below grows with the verse, but shrinks less.
             val small = unit * scale.coerceIn(MIN_LABEL_SCALE, MAX_LABEL_SCALE)
             val eyebrow = Line(verse.eyebrow.uppercase(), paint(sans, 11 * small, gold, weight = 600, spacing = 0.14f))
-            val reference = Line(verse.label.uppercase(), paint(sans, 13.5f * small, gold, weight = 600, spacing = 0.12f))
-            val teluguReference = verse.teluguLabel?.takeIf { teluguLayout != null }
-                ?.let { Line(it, paint(Typeface.DEFAULT_BOLD, 15 * small, gold)) }
-            return Block(eyebrow, verseLayout, teluguLayout, reference, teluguReference, STACK_GAP * small, width)
+            val reference = referenceLayout(
+                referenceLineOf(verse.reference, withTelugu = teluguLayout != null),
+                paint(sans, 13.5f * small, gold, weight = 600, spacing = ReferenceType.ENGLISH_SPACING)
+            )
+            return Block(eyebrow, verseLayout, teluguLayout, reference, STACK_GAP * small, width)
         }
 
         // The verse, or a passage's verses each on its own line, numbered small as the card numbers them.
@@ -235,6 +239,19 @@ internal class SharePictureMaker(context: Context) {
                 text.append(line.text)
             }
             return text
+        }
+
+        // The reference as the card has it, "ROMANS · రోమీయులకు 8:28", the Telugu name in Chathura Bold; a
+        // long one goes on under the dot.
+        private fun referenceLayout(line: ReferenceLine, paint: TextPaint): StaticLayout {
+            val text = SpannableString(line.text)
+            line.telugu?.let {
+                text.setSpan(TeluguNameSpan(chathura, paint.textSize * ReferenceType.TELUGU_SCALE), it.first, it.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+            return StaticLayout.Builder.obtain(text, 0, text.length, paint, width)
+                .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+                .setIncludePad(false)
+                .build()
         }
 
         private fun layout(text: CharSequence, paint: TextPaint, lineHeight: Float, maxLines: Int): StaticLayout {
@@ -291,37 +308,24 @@ private class Line(val text: String, val paint: TextPaint) {
     val descent: Float get() = paint.fontMetrics.descent
 }
 
-/**
- * A card's words laid out, top to bottom: the eyebrow, the verse, its Telugu, and the reference, with
- * the Telugu reference beside the English one (or under it, when the two don't fit on a line).
- */
+/** A card's words laid out, top to bottom: the eyebrow, the verse, its Telugu, and the reference. */
 private class Block(
     private val eyebrow: Line,
     val verse: StaticLayout,
     val telugu: StaticLayout?,
-    private val reference: Line,
-    private val teluguReference: Line?,
+    private val reference: StaticLayout,
     private val gap: Float,
     private val maxWidth: Int
 ) {
-    private val referenceGap = gap * 0.8f
-    private val oneRow = teluguReference == null || reference.width + referenceGap + teluguReference.width <= maxWidth
-    private val referenceHeight: Float =
-        if (teluguReference == null) reference.ascent + reference.descent
-        else if (oneRow) max(reference.ascent, teluguReference.ascent) + max(reference.descent, teluguReference.descent)
-        else reference.ascent + reference.descent + gap * 0.4f + teluguReference.ascent + teluguReference.descent
-
     /** The verse's and the Telugu's height together. */
     val textHeight: Int get() = verse.height + (telugu?.height ?: 0)
 
     val height: Int
-        get() = ceil(eyebrow.ascent + eyebrow.descent + gap + textHeight + (if (telugu != null) gap else 0f) + gap + referenceHeight).toInt()
+        get() = ceil(eyebrow.ascent + eyebrow.descent + gap + textHeight + (if (telugu != null) gap else 0f) + gap + reference.height).toInt()
 
     val width: Float
-        get() = listOfNotNull(
-            widest(verse), telugu?.let(::widest), eyebrow.width, reference.width,
-            teluguReference?.let { if (oneRow) reference.width + referenceGap + it.width else it.width }
-        ).max().coerceAtMost(maxWidth.toFloat())
+        get() = listOfNotNull(widest(verse), telugu?.let(::widest), eyebrow.width, widest(reference))
+            .max().coerceAtMost(maxWidth.toFloat())
 
     fun draw(canvas: Canvas) {
         var y = eyebrow.ascent
@@ -341,16 +345,10 @@ private class Block(
             y += telugu.height
         }
         y += gap
-        val other = teluguReference
-        if (other == null || oneRow) {
-            val baseline = y + max(reference.ascent, other?.ascent ?: 0f)
-            canvas.drawText(reference.text, 0f, baseline, reference.paint)
-            other?.let { canvas.drawText(it.text, reference.width + referenceGap, baseline, it.paint) }
-        } else {
-            val baseline = y + reference.ascent
-            canvas.drawText(reference.text, 0f, baseline, reference.paint)
-            canvas.drawText(other.text, 0f, baseline + reference.descent + gap * 0.4f + other.ascent, other.paint)
-        }
+        canvas.save()
+        canvas.translate(0f, y)
+        reference.draw(canvas)
+        canvas.restore()
     }
 
     private fun widest(layout: StaticLayout): Float = (0 until layout.lineCount).maxOfOrNull(layout::getLineWidth) ?: 0f
@@ -364,6 +362,19 @@ private class FontSpan(private val typeface: Typeface, private val weight: Int) 
     private fun setOn(paint: TextPaint) {
         paint.typeface = typeface
         paint.fontVariationSettings = "'wght' $weight"
+    }
+}
+
+/** The book's Telugu name in a reference: its own typeface and size, spaced a little (see [ReferenceType]). */
+private class TeluguNameSpan(private val typeface: Typeface, private val size: Float) : MetricAffectingSpan() {
+    override fun updateDrawState(paint: TextPaint) = setOn(paint)
+    override fun updateMeasureState(paint: TextPaint) = setOn(paint)
+
+    private fun setOn(paint: TextPaint) {
+        paint.typeface = typeface
+        paint.fontVariationSettings = null
+        paint.textSize = size
+        paint.letterSpacing = ReferenceType.TELUGU_SPACING
     }
 }
 

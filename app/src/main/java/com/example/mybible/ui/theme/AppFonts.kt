@@ -128,6 +128,13 @@ val WorkSansFontFamily: FontFamily = FontFamily(
     )
 )
 
+/**
+ * Chathura Bold (SIL Open Font License), for the book's Telugu name in a Verse Scroll card's reference.
+ * Only its Latin and Telugu are kept, and its line is set to fit the 66 book names (as published it's far
+ * taller than its letters): tools/fonts/make_reference_fonts.py.
+ */
+val ChathuraFontFamily: FontFamily = FontFamily(Font(R.font.chathura_bold, FontWeight.Bold))
+
 val FrauncesFontFamily: FontFamily = FontFamily(
     Font(
         R.font.fraunces_variable,

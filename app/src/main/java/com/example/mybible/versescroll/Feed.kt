@@ -23,8 +23,6 @@ data class VerseCardContent(
     /** "Isaiah 41:10", or "Isaiah 40:29–31" for a passage. */
     val label: String get() = labelOf(refs)
 
-    /** [label] with the book's Telugu name, "యెషయా 41:10"; null for a book without one. */
-    val teluguLabel: String? get() = teluguLabelOf(refs)
 }
 
 sealed interface FeedCard {
@@ -71,10 +69,28 @@ data class ScrollRequest(val index: Int, val id: Long, val gentle: Boolean = fal
 fun labelOf(refs: List<VerseRef>): String =
     if (refs.size > 1) "${refs.first().key}\u2013${refs.last().verse}" else refs.first().key
 
-/** [labelOf] with the book's Telugu name, "\u0c2f\u0c46\u0c37\u0c2f\u0c3e 40:29\u201331"; null for a book it doesn't know. */
-fun teluguLabelOf(refs: List<VerseRef>): String? {
+/** A card's reference in its parts: "Romans", "8:28" ("40:29\u201331" for a passage), and the book's Telugu name. */
+data class ReferenceParts(val book: String, val numbers: String, val teluguBook: String?)
+
+fun referencePartsOf(refs: List<VerseRef>): ReferenceParts {
     val book = refs.first().book
-    return TeluguBooks.nameOf(book)?.let { it + labelOf(refs).removePrefix(book) }
+    return ReferenceParts(book, labelOf(refs).removePrefix(book).trim(), TeluguBooks.nameOf(book))
+}
+
+/** A reference as it reads on a card, and where in it the book's Telugu name is. */
+data class ReferenceLine(val text: String, val telugu: IntRange?)
+
+/**
+ * "ROMANS 8:28"; with the Telugu, "ROMANS \u00b7 \u0c30\u0c4b\u0c2e\u0c40\u0c2f\u0c41\u0c32\u0c15\u0c41 8:28", the numbers once, after the Telugu name (backlog 61). The
+ * names and numbers keep together, so a long one breaks onto a second line only after the dot.
+ */
+fun referenceLineOf(parts: ReferenceParts, withTelugu: Boolean): ReferenceLine {
+    fun together(text: String) = text.replace(' ', '\u00A0')
+    val english = together(parts.book.uppercase())
+    val telugu = parts.teluguBook?.takeIf { withTelugu } ?: return ReferenceLine("$english\u00A0${parts.numbers}", null)
+    val before = "$english\u00A0\u00B7 "
+    val name = together(telugu)
+    return ReferenceLine("$before$name\u00A0${parts.numbers}", before.length until before.length + name.length)
 }
 
 const val CHECK_IN_EVERY = 20
