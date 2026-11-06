@@ -317,11 +317,13 @@ class MainActivity : ComponentActivity() {
                 // lands on the verse Reader was actually showing before the
                 // search started (e.g. Romans 4), not wherever the last-
                 // viewed result happened to leave currentBook/currentChapter
-                // (e.g. Genesis 22). Mirrors cross-reference/lexicon's
-                // "system back means take me back to where I was."
-                // Same reasoning for Highlights/Studied/Notes: exiting one
-                // of those tabs entirely restores wherever Reader actually
-                // was before, rather than wherever the last jump left it.
+                // (e.g. Genesis 22). Same reasoning for Highlights/Studied/
+                // Notes: exiting one of those tabs entirely restores
+                // wherever Reader actually was before, rather than wherever
+                // the last jump left it — where the detour before it, if
+                // any, shows its banner (backlog 65). Opened again from the
+                // Reader's menu with its banner still up, back to that verse
+                // as it was.
                 when (activeTab) {
                     // Back to the word page the search came from ("Find every verse with
                     // this word"), else to the Reader by backToSearchSourceVerse, as above.
@@ -356,52 +358,22 @@ class MainActivity : ComponentActivity() {
             }
 
             // While Reader shows a "Return to X" banner (followed a cross-
-            // reference, search result, lexicon citation, or note's verse
-            // mention into the Reader), system back should act instead of
-            // falling through to the default Activity back behavior
+            // reference, search result, lexicon citation, note's verse
+            // mention, highlighted or studied verse, or Verse Scroll's Read
+            // into the Reader), system back should act instead of falling
+            // through to the default Activity back behavior
             // (backgrounding/exiting the app) — activeTab == READER
             // disables the blanket handler above.
             //
-            // What it does depends on whether the detour has a meaningful
-            // "verse reading started from" to undo back to:
-            //  - Cross-reference and lexicon citation detours both started
-            //    from a specific verse while reading (e.g. Romans 2:3,
-            //    before following a reference to Romans 11:2) — system
-            //    back's conventional meaning is "take me back to where I
-            //    was", i.e. that source verse, NOT the list/definition page
-            //    the banner's own Return button goes to (that's a
-            //    deliberate separate "let me pick another reference from
-            //    here" action, left as-is on the button).
-            //  - Search has no equivalent "origin verse" — it's opened as
-            //    its own destination from anywhere, not from a specific
-            //    verse — so its results list genuinely is the most useful
-            //    thing to go back to, same as tapping Return.
-            //  - A note's verse mention is the opposite of cross-
-            //    reference/lexicon: there's no "origin verse" at all (you
-            //    were reading the note's text, not a Bible verse), so the
-            //    note itself is the right target for both Return and
-            //    system back — no distinction needed.
-            val crossReferenceReturnAvailable by viewModel.crossReferenceReturnAvailable.collectAsState()
-            val searchReturnAvailable by viewModel.searchReturnAvailable.collectAsState()
-            val lexiconReturnTab by viewModel.lexiconReturnTab.collectAsState()
-            val noteReturnItem by viewModel.noteReturnItem.collectAsState()
-            val highlightsReturnAvailable by viewModel.highlightsReturnAvailable.collectAsState()
-            val studiedReturnAvailable by viewModel.studiedReturnAvailable.collectAsState()
-            val verseScrollReturnAvailable by viewModel.verseScrollReturnAvailable.collectAsState()
-            BackHandler(
-                enabled = activeTab == NavTab.READER &&
-                    (crossReferenceReturnAvailable || searchReturnAvailable || lexiconReturnTab != null || noteReturnItem != null || highlightsReturnAvailable || studiedReturnAvailable || verseScrollReturnAvailable)
-            ) {
-                when {
-                    crossReferenceReturnAvailable -> viewModel.backToCrossReferenceSourceVerse()
-                    searchReturnAvailable -> viewModel.returnToSearchResults()
-                    lexiconReturnTab != null -> viewModel.backToLexiconOriginVerse()
-                    noteReturnItem != null -> viewModel.returnToNote()
-                    highlightsReturnAvailable -> viewModel.returnToHighlightedVerses()
-                    studiedReturnAvailable -> viewModel.returnToStudied()
-                    // "Read" from a Verse Scroll card: back returns to the feed.
-                    else -> viewModel.returnToVerseScroll()
-                }
+            // It goes back along the trail of detours taken (backlog 65),
+            // whatever their kinds, newest first: to the list the banner's
+            // detour was picked from, as the banner's Return does; Back on
+            // that list then goes to the verse it was opened from, where the
+            // detour before it shows its banner, and so on back to where the
+            // reading started. See MainViewModel.backFromDetour.
+            val shownDetour by viewModel.shownDetour.collectAsState()
+            BackHandler(enabled = activeTab == NavTab.READER && shownDetour != null) {
+                viewModel.backFromDetour()
             }
 
             // Note editor/reader are now full pages pushed over the Notes
@@ -421,7 +393,7 @@ class MainActivity : ComponentActivity() {
                 viewModel.closeSavedWordsScreen()
             }
             BackHandler(enabled = noteToRead != null) {
-                viewModel.closeNoteReader()
+                viewModel.leaveNoteReader()
             }
 
             // Picking mode (note-verse picking or studied-verse picking)
@@ -684,7 +656,7 @@ class MainActivity : ComponentActivity() {
                             NoteReaderScreen(
                                 noteItem = note,
                                 themeMode = themeMode,
-                                onBack = { viewModel.closeNoteReader() },
+                                onBack = { viewModel.leaveNoteReader() },
                                 // Matches Capacitor's nrEditPage.onclick:
                                 // closeNoteReader(); closeNotesList();
                                 // openNoteEditor(n) — this app's Notes tab
@@ -692,7 +664,7 @@ class MainActivity : ComponentActivity() {
                                 // so just close the reader and open the
                                 // editor for this note.
                                 onEdit = {
-                                    viewModel.closeNoteReader()
+                                    viewModel.leaveNoteReader()
                                     viewModel.openNoteEditor(note)
                                 },
                                 onOpenVerseMention = { book, chapter, verse ->

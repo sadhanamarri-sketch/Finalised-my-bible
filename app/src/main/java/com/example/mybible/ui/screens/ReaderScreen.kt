@@ -62,6 +62,7 @@ import com.example.mybible.model.PrintedTogetherData
 import com.example.mybible.model.NoteItem
 import com.example.mybible.model.Verse
 import com.example.mybible.ui.components.RenameHighlightColorDialog
+import com.example.mybible.ui.Detour
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.NavTab
 import com.example.mybible.ui.ReaderPickMode
@@ -167,20 +168,16 @@ fun ReaderScreen(
     val englishFontFamilyName by viewModel.englishFontFamilyName.collectAsState()
 
     val isBlurModeEnabled by viewModel.isBlurModeEnabled.collectAsState()
-    val crossReferenceReturnAvailable by viewModel.crossReferenceReturnAvailable.collectAsState()
     val focusedVerseNumber by viewModel.focusedVerseNumber.collectAsState()
     val focusRequest by viewModel.focusRequest.collectAsState()
     val focusedVerseBlurEnabled by viewModel.focusedVerseBlurEnabled.collectAsState()
     val focusedVersePinToTop by viewModel.focusedVersePinToTop.collectAsState()
     val focusedVerseOffsetPx by viewModel.focusedVerseOffsetPx.collectAsState()
-    val searchReturnAvailable by viewModel.searchReturnAvailable.collectAsState()
     // A verse opened from a Nave's topic page returns to that page (see TopicScreen).
     val searchTopic by viewModel.openTopic.collectAsState()
     val lexiconReturnTab by viewModel.lexiconReturnTab.collectAsState()
-    val noteReturnItem by viewModel.noteReturnItem.collectAsState()
-    val highlightsReturnAvailable by viewModel.highlightsReturnAvailable.collectAsState()
-    val studiedReturnAvailable by viewModel.studiedReturnAvailable.collectAsState()
-    val verseScrollReturnAvailable by viewModel.verseScrollReturnAvailable.collectAsState()
+    // The banner up: the newest detour's, along the trail of them (backlog 65).
+    val shownDetour by viewModel.shownDetour.collectAsState()
     val readerAnchor by viewModel.readerAnchor.collectAsState()
 
     val completedVerses by viewModel.completedVerses.collectAsState(initial = emptyList())
@@ -615,7 +612,7 @@ fun ReaderScreen(
     // a cross-reference back-bar is showing, a sheet/menu is open, or a
     // verse is selected (selection already swaps the pill for the action
     // toolbar, but this also covers the moment the toolbar is dismissing).
-    val canHideBars = !crossReferenceReturnAvailable && !searchReturnAvailable && lexiconReturnTab == null && noteReturnItem == null && !highlightsReturnAvailable && !studiedReturnAvailable && !verseScrollReturnAvailable && !showReaderMenu && selectedVerse == null &&
+    val canHideBars = shownDetour == null && !showReaderMenu && selectedVerse == null &&
         readerPickMode == ReaderPickMode.NONE &&
         readerPickMode == ReaderPickMode.NONE
 
@@ -937,9 +934,11 @@ fun ReaderScreen(
             // cross-reference result, so the user can hop straight back to
             // the same list/scroll position instead of re-opening it, or
             // dismiss it to just keep reading. Mirrors the "return to
-            // search results" banner below; mutually exclusive with it,
-            // same fixed top slot.
-            if (readerPickMode == ReaderPickMode.NONE && crossReferenceReturnAvailable) {
+            // search results" banner below. One banner at a time, in the
+            // same fixed top slot: the newest detour's (backlog 65, see
+            // MainViewModel.shownDetour), each of the others shown in turn
+            // as the ones after it are gone back from.
+            if (readerPickMode == ReaderPickMode.NONE && shownDetour == Detour.CROSS_REFERENCES) {
                 Surface(
                     color = bannerContainerColor(CrossReferencesBannerColor),
                     modifier = Modifier.fillMaxWidth()
@@ -1001,9 +1000,9 @@ fun ReaderScreen(
             // "Return to search results" banner — shown after tapping a
             // search result, so the user can hop straight back to the same
             // results/scroll position instead of re-searching, or dismiss
-            // it to just keep reading. Mutually exclusive with the
-            // cross-reference banner above, same fixed top slot.
-            if (readerPickMode == ReaderPickMode.NONE && !crossReferenceReturnAvailable && searchReturnAvailable) {
+            // it to just keep reading. One at a time, as the cross-
+            // reference banner above says.
+            if (readerPickMode == ReaderPickMode.NONE && shownDetour == Detour.SEARCH) {
                 Surface(
                     color = bannerContainerColor(SearchBannerColor),
                     modifier = Modifier.fillMaxWidth()
@@ -1068,9 +1067,8 @@ fun ReaderScreen(
             // reference inside a Greek/Hebrew lexicon definition, so the
             // user can hop straight back to that word's page instead of
             // re-searching for it, or dismiss it to just keep reading.
-            // Mutually exclusive with the cross-reference/search banners
-            // above, same fixed top slot.
-            if (readerPickMode == ReaderPickMode.NONE && !crossReferenceReturnAvailable && !searchReturnAvailable && lexiconReturnTab != null) {
+            // One at a time, as the cross-reference banner above says.
+            if (readerPickMode == ReaderPickMode.NONE && shownDetour == Detour.WORD) {
                 Surface(
                     color = bannerContainerColor(LexiconBannerColor),
                     modifier = Modifier.fillMaxWidth()
@@ -1132,9 +1130,9 @@ fun ReaderScreen(
             // "Return to note" banner — shown after tapping a verse mention
             // inside a note being read, so the user can hop straight back
             // to it instead of finding it again in the list, or dismiss it
-            // to just keep reading. Mutually exclusive with the cross-
-            // reference/search/lexicon banners above, same fixed top slot.
-            if (readerPickMode == ReaderPickMode.NONE && !crossReferenceReturnAvailable && !searchReturnAvailable && lexiconReturnTab == null && noteReturnItem != null) {
+            // to just keep reading. One at a time, as the cross-reference
+            // banner above says.
+            if (readerPickMode == ReaderPickMode.NONE && shownDetour == Detour.NOTE) {
                 Surface(
                     color = bannerContainerColor(NoteBannerColor),
                     modifier = Modifier.fillMaxWidth()
@@ -1197,12 +1195,11 @@ fun ReaderScreen(
             // highlighted-verse result, same reasoning as "Return to search
             // results": Highlighted Verses has no "origin verse" to undo
             // back to, it's opened as its own destination, so both this
-            // banner and system back land back on that list. Mutually
-            // exclusive with the cross-reference/search/lexicon/note
-            // banners above, same fixed top slot. Own color identity (see
+            // banner and system back land back on that list. One at a
+            // time, as the cross-reference banner above says. Own color identity (see
             // HighlightedVersesBannerColor) — same "subtle container +
             // matching button" recipe as the four M3-role banners above.
-            if (readerPickMode == ReaderPickMode.NONE && !crossReferenceReturnAvailable && !searchReturnAvailable && lexiconReturnTab == null && noteReturnItem == null && highlightsReturnAvailable) {
+            if (readerPickMode == ReaderPickMode.NONE && shownDetour == Detour.HIGHLIGHTS) {
                 Surface(
                     color = bannerContainerColor(HighlightedVersesBannerColor),
                     modifier = Modifier.fillMaxWidth()
@@ -1265,11 +1262,11 @@ fun ReaderScreen(
             // StudiedScreen's "Recently Studied" card or its verse grid,
             // same reasoning as the highlighted-verses banner above
             // (Studied is its own destination too, no "origin verse" to
-            // undo back to). Mutually exclusive with all 5 banners above,
-            // same fixed top slot. Own color identity (see
-            // StudiedBannerColor), distinct from the highlights banner even
-            // though the two are never shown at once.
-            if (readerPickMode == ReaderPickMode.NONE && !crossReferenceReturnAvailable && !searchReturnAvailable && lexiconReturnTab == null && noteReturnItem == null && !highlightsReturnAvailable && studiedReturnAvailable) {
+            // undo back to). One at a time, as the cross-reference banner
+            // above says. Own color identity (see StudiedBannerColor),
+            // distinct from the highlights banner even though the two are
+            // never shown at once.
+            if (readerPickMode == ReaderPickMode.NONE && shownDetour == Detour.STUDIED) {
                 Surface(
                     color = bannerContainerColor(StudiedBannerColor),
                     modifier = Modifier.fillMaxWidth()
@@ -1331,10 +1328,10 @@ fun ReaderScreen(
             // "Return to Verse Scroll" banner — shown after a Verse Scroll
             // card's Read button (or a check-in's "Read <chapter>") opened
             // the verse here. Return (and system back, see MainActivity) go
-            // back to the same card in the feed. Mutually exclusive with all
-            // 6 banners above, same fixed top slot. Own color identity (see
+            // back to the same card in the feed. One at a time, as the
+            // cross-reference banner above says. Own color identity (see
             // VerseScrollBannerColor), same recipe as the others.
-            if (readerPickMode == ReaderPickMode.NONE && !crossReferenceReturnAvailable && !searchReturnAvailable && lexiconReturnTab == null && noteReturnItem == null && !highlightsReturnAvailable && !studiedReturnAvailable && verseScrollReturnAvailable) {
+            if (readerPickMode == ReaderPickMode.NONE && shownDetour == Detour.VERSE_SCROLL) {
                 Surface(
                     color = bannerContainerColor(VerseScrollBannerColor),
                     modifier = Modifier.fillMaxWidth()

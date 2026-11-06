@@ -1854,3 +1854,23 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     Scroll (each card at its book's speed); a reading going on into the next book changes speed at its
     first verse. Test: ReadAloudRecordingTest (Genesis at its own speed, then Exodus at the usual).
     Checked as a picture of the settings.
+
+65. **Done 6 Nov.** **One trail back through every "Return to …" banner.** "what happens when I press back in
+    read aloud but i into 2 layer cross reference in reader?" — "I thought app traces cross reference
+    infinitely.... when did this change?" — "what about trail for rest of the banners?" — "list first for all"
+    *Built:* the detours taken (cross references, a search's results or a topic, a Greek or Hebrew word, a
+    note's verse, Highlighted Verses, Studied, Verse Scroll's Read) make one trail, in the order taken,
+    whatever their kinds. The Reader shows the newest one's banner. The phone's Back there goes to that
+    detour's list first, as its Return does; Back on the list goes to the verse the list was opened from,
+    where the detour before it shows its banner, and so on back to where the reading started. Detours
+    nest, any number deep: a verse's cross references opened from a verse reached by following one, a
+    word tapped in a verse a word's page cited, a note's verse opened from a verse another note's banner
+    is on, or a list opened again from the Reader's menu while its banner is up and a verse picked — each
+    a detour of its own, the one before it kept as it was. A list opened from the menu and left without
+    picking goes back to that verse, its banner still up. Cancel (✕) ends just the newest; the one before
+    it shows. Fixed on the way: Back on a cross references list opened from a followed verse left a
+    "Return to cross references" banner to a list that was gone; Cancel on the Highlights, Studied and
+    note banners kept the verse to go back to, so a later visit to that list could end on an old place;
+    a note's Return opened it over the wrong page if another note had been read meanwhile. Test:
+    DetourTrailTest; and the app's own view model driven through twelve chains (two-deep cross references,
+    mixed kinds, the menu, Cancel, word pages, notes, Verse Scroll and Studied, a quick double Back).
