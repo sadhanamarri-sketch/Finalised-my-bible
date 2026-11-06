@@ -56,8 +56,9 @@ private const val CROSS_REFERENCE_DATA_VERSION_KEY = "cross_reference_data_versi
  * bundle. History:
  *  1 - original wordproject.org scrape
  *  2 - swapped to Telugu BSI XML source
+ *  3 - the Bible Society of India's own text, as it gave it for the app (backlog 56)
  */
-private const val TELUGU_DATA_VERSION = 2
+private const val TELUGU_DATA_VERSION = 3
 private const val TELUGU_DATA_VERSION_KEY = "telugu_data_version"
 
 /** Webster's 1828 dictionary has ~61.8k headwords once fully imported;

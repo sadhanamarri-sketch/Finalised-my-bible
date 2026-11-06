@@ -1590,7 +1590,7 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     Jacob and Judah too), prayer read as ప్రార్థన, విజ్ఞాపన, విన్నపము: "పౌలు ప్రార్థన" gives Acts 28:8, then 50
     verses in his letters. Torrey's and search by meaning stay for later.
 
-56. **Parked 5 Nov, till BSI's files are whole.** **The Telugu text: stray spaces in words, missing dashes and
+56. **Step 1 done 6 Nov (BSI's text in); step 2 next: verses printed together.** **The Telugu text: stray spaces in words, missing dashes and
     semicolons.** "is it possible for you to proof read and compare againt bible.com online version? I
     allowed bible.com in your environment. It is having unexpected space in the telugu words and missing
     long Em-dash and semi-colons. it's bsi ov version."
@@ -1714,6 +1714,31 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     *Parked* ("let's do it when i get the proper files"). Then: tools/telugu/apply_bsi_text.py --check on
     them (it lists any verse still cut short), and if they're whole, the tool, and the build as planned
     above, Together as the default.
+    *6 Nov: BSI's whole files* (a line break, "\n", wherever its page starts a new line inside a verse; kept
+    as they came, for backlog 62). Checked whole: 100.02% of the app's Telugu letters, no chapter under
+    95%. "why not use bsi directly instead of the current version as now we have permission?" So:
+    - *Step 1, built:* the app's Telugu is BSI's, verse by verse as BSI numbers it. Its line breaks became
+      spaces, or joined a word where the line broke inside one (1,157: ఆత్మ|ను, సంతో|షింతురు), going by how
+      BSI writes the word elsewhere; a word that stands on its own after a break (ఇకను, నా) always starts a
+      new word. 543 spaces from older printings taken out of words (వెలు గిచ్చుటకును, అబ్రా హామునకు,
+      ఎఫె సీయుల), but none where BSI uses either half on its own. 19,905 verses changed, most in spacing,
+      dashes (దేవుడు–వెలుగు) and semicolons.
+    - The app's old text was a verse off in places, and BSI's text corrects them: Acts 8:37 ("If thou
+      believest…") was missing, 1 John 5:9–19, 1 Kings 18:13–16, Isaiah 14:4, John 6:45 and others moved
+      up a verse. BSI's own numbering slips in places too (1 Chronicles 1:27–30, Deuteronomy 17, Numbers
+      7 from verse 81, Psalm 13:5–6 as "5"). Where BSI's numbers and the old text's verse breaks disagree
+      (143 stretches), the English verses' lengths settle it: BSI's numbers in 94, the old breaks in 44,
+      the stretch shown together in 5. 24 chapters whose numbers don't line up at all are placed by
+      matching letters. Known still off: 1 Chronicles 1:24–28 (both sources number it a verse ahead).
+    - 621 groups BSI prints together (Genesis 1:17–18, Joshua 12:9–24's list of kings) are kept whole in
+      telugu_together.json for step 2; until then each English verse shows its own piece, cut where the
+      old text's verses started.
+    - The tool: tools/telugu/apply_bsi_text.py (BSI's files and the King James text the app downloads,
+      for the lengths); its reports list every stretch settled, group, join and much-changed verse. The
+      app reloads its Telugu once (data version 3). To follow: the Telugu recordings' verse timings
+      still follow the old text's verse breaks, so the ~170 verses that moved need timing again.
+    - *Step 2, next:* Settings › Telugu "Verses printed together", Together as the default, as planned
+      above.
 
 57. **Discarded 1 Nov.** **Reader: no indent, the verse number at the start of the line.** "can you show
     me preview with no indentation for verses other than with verse numbers?"
