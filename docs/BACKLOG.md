@@ -1553,7 +1553,7 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     15:30–32, 2 Corinthians 1:11 ...), and at its end "All of Intercession (236 references)". A heading's
     card counts that heading's references too: Forgiveness › Of enemies, 24.
 
-55. **Done 1 Nov (the first way).** **Search: subjects no word or topic names.** "is there a way to cover
+55. **Done 1 Nov (the first way), and 15 Nov (the second: Torrey's).** **Search: subjects no word or topic names.** "is there a way to cover
     those kind of topics?" (after 54: Paul's prayers in his letters, which neither say "Paul" nor are in
     Nave's list).
     *Three ways, smallest first:*
@@ -1589,6 +1589,19 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
     Daniel 6 and 9. In Telugu, by the names (పౌలు, దావీదు, యేసు, యోహాను...; not యాకోబు or యూదా, which are
     Jacob and Judah too), prayer read as ప్రార్థన, విజ్ఞాపన, విన్నపము: "పౌలు ప్రార్థన" gives Acts 28:8, then 50
     verses in his letters. Torrey's and search by meaning stay for later.
+    *Built 15 Nov, the second way* ("can we have search done before that" — "yes"; no APK): Torrey's New
+    Topical Textbook beside Nave's in Search, from The SWORD Project's copy (www.crosswire.org, allowed in
+    the environment for it: version 1.3, public domain, the Bible Foundation's text). Its 628 topics,
+    23,702 lines and 35,833 verse ranges, each checked against the King James text the app downloads
+    (tools/search/make_torrey_data.py; three misprints to one-chapter books put right from their headings:
+    Obadiah 3 and 7, Philippians 3:2; a range from 2 Samuel into 1 Kings read as both). Its headings in
+    capitals ("IS DESCRIBED AS") read as Nave's do, and its "See PRAYER" lines are links to its own topics.
+    A search shows up to eight topics from each book, so Nave's many don't crowd Torrey's out; a card from
+    Torrey's says so ("Torrey’s · Commanded · To be offered · God hears"), and its page names the book and
+    credits it. "prayer" gives Nave's Prayer, then Torrey's Prayer, Answers to prayer, Intercessory and
+    more; "holy spirit" Torrey's Emblems, Titles and Gifts of the Holy Spirit. Long words that differ only
+    in their endings now match ("intercession": Torrey's "Prayer, intercessory"; "Paul intercession" goes
+    to its line on Paul). Search by meaning stays for later.
 
 56. **Done 6 Nov: BSI's text in, and its verses printed together.** **The Telugu text: stray spaces in words, missing dashes and
     semicolons.** "is it possible for you to proof read and compare againt bible.com online version? I

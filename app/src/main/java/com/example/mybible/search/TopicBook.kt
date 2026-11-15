@@ -1,8 +1,9 @@
 package com.example.mybible.search
 
+import com.example.mybible.model.TopicSource
 import java.io.InputStream
 
-/** One line under a Nave's topic: a heading with or without verses, or a "see" link. */
+/** One line under a topic: a heading with or without verses, or a "see" link. */
 sealed class TopicEntry(val level: Int) {
     /** [ranges] holds each range's first and last verse, packed as in [BibleIndex.packRef]. */
     class Verses(level: Int, val label: String, val ranges: IntArray) : TopicEntry(level)
@@ -11,7 +12,7 @@ sealed class TopicEntry(val level: Int) {
     class Link(level: Int, val topic: Int, val section: Int?, val text: String) : TopicEntry(level)
 }
 
-class Topic(val id: Int, val name: String, val entries: List<TopicEntry>) {
+class Topic(val id: Int, val name: String, val entries: List<TopicEntry>, val source: TopicSource = TopicSource.NAVES) {
     val referenceCount: Int = entries.sumOf { (it as? TopicEntry.Verses)?.ranges?.size?.div(2) ?: 0 }
 
     /** Its main headings, in order: what a link's section number counts. */
@@ -24,8 +25,10 @@ class Topic(val id: Int, val name: String, val entries: List<TopicEntry>) {
 }
 
 /**
- * Nave's Topical Bible, from assets/search/topics.tsv: written by tools/search/make_topics_data.py
- * from BibleData's structured copy, which describes the format.
+ * Search's topic books: Nave's Topical Bible, from assets/search/topics.tsv (written by
+ * tools/search/make_topics_data.py from BibleData's structured copy, which describes the format),
+ * then Torrey's New Topical Textbook, from torrey.tsv in the same format (make_torrey_data.py), its
+ * topics numbered on from Nave's.
  */
 class TopicBook private constructor(val topics: List<Topic>) {
 
@@ -33,11 +36,18 @@ class TopicBook private constructor(val topics: List<Topic>) {
 
     companion object {
         const val TOPICS = "topics.tsv"
+        const val TORREY = "torrey.tsv"
 
-        fun load(open: (String) -> InputStream): TopicBook =
-            parse(open(TOPICS).bufferedReader().use { it.readText() })
+        fun load(open: (String) -> InputStream): TopicBook {
+            val naves = topicsOf(open(TOPICS).bufferedReader().use { it.readText() }, TopicSource.NAVES, 0)
+            val torrey = topicsOf(open(TORREY).bufferedReader().use { it.readText() }, TopicSource.TORREY, naves.size)
+            return TopicBook(naves + torrey)
+        }
 
-        fun parse(text: String): TopicBook {
+        fun parse(text: String): TopicBook = TopicBook(topicsOf(text, TopicSource.NAVES, 0))
+
+        // A file's topics, numbered from [first], as are the topics its "see" lines name.
+        private fun topicsOf(text: String, source: TopicSource, first: Int): List<Topic> {
             val topics = ArrayList<Topic>()
             var name: String? = null
             var entries = ArrayList<TopicEntry>()
@@ -46,16 +56,16 @@ class TopicBook private constructor(val topics: List<Topic>) {
                 val cols = line.split('\t')
                 when (cols[0]) {
                     "T" -> {
-                        name?.let { topics += Topic(topics.size, it, entries) }
+                        name?.let { topics += Topic(first + topics.size, it, entries, source) }
                         name = cols[1]
                         entries = ArrayList()
                     }
                     "E" -> entries += TopicEntry.Verses(cols[1].toInt(), cols[2], decodeRanges(cols.getOrElse(3) { "" }))
-                    "S" -> entries += TopicEntry.Link(cols[1].toInt(), cols[2].toInt(), cols[3].toIntOrNull(), cols[4])
+                    "S" -> entries += TopicEntry.Link(cols[1].toInt(), first + cols[2].toInt(), cols[3].toIntOrNull(), cols[4])
                 }
             }
-            name?.let { topics += Topic(topics.size, it, entries) }
-            return TopicBook(topics)
+            name?.let { topics += Topic(first + topics.size, it, entries, source) }
+            return topics
         }
 
         /** "1iwwc,phj9-9": each range's first verse in base 36, and how far on its last is. */

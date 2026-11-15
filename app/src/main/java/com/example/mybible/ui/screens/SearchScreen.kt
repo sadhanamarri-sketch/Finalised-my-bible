@@ -64,6 +64,7 @@ import com.example.mybible.model.WordCount
 import com.example.mybible.model.SearchHit
 import com.example.mybible.model.SearchOutcome
 import com.example.mybible.model.TopicCard
+import com.example.mybible.model.TopicSource
 import com.example.mybible.model.ThemeMode
 import com.example.mybible.ui.MainViewModel
 import com.example.mybible.ui.components.BackTopBar
@@ -781,7 +782,7 @@ private fun WordChips(
     }
 }
 
-// Nave's topics the search names: the first few, the rest a tap away.
+// The topics the search names, Nave's and Torrey's: the first few, the rest a tap away.
 @Composable
 private fun TopicCards(topics: List<TopicCard>, onOpen: (TopicCard) -> Unit) {
     var showAll by remember(topics) { mutableStateOf(false) }
@@ -834,8 +835,10 @@ private fun TopicCardRow(topic: TopicCard, onClick: () -> Unit) {
                     letterSpacing = 0.sp,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                // "Anxiety: see Care" — why a search for anxiety shows Care.
-                val detail = topic.via?.let { "$it: see ${topic.name}" } ?: topic.summary
+                // "Anxiety: see Care" — why a search for anxiety shows Care. Torrey's say so, Nave's
+                // being the book the topics have always come from.
+                val about = topic.via?.let { "$it: see ${topic.name}" } ?: topic.summary
+                val detail = if (topic.source == TopicSource.TORREY) listOf(topic.source.short, about).filter { it.isNotBlank() }.joinToString(" · ") else about
                 if (detail.isNotBlank()) {
                     Text(
                         text = detail,
@@ -1077,7 +1080,7 @@ private fun SearchHelp() {
             Text(
                 text = "Type a word or a phrase (“worry”, “love one another”) or a reference (“John 3”, “John 3:16”). " +
                     "Search finds other forms of your words, how the King James says them, verses with the same Greek or Hebrew word, " +
-                    "and topics from Nave’s Topical Bible.\n\nSearch in Telugu too (“ప్రేమ”), or look up a Greek or Hebrew word itself: ἀγάπη, “agape”, or its Strong’s number, G26.",
+                    "and topics from Nave’s Topical Bible and Torrey’s New Topical Textbook.\n\nSearch in Telugu too (“ప్రేమ”), or look up a Greek or Hebrew word itself: ἀγάπη, “agape”, or its Strong’s number, G26.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontFamily = WorkSansFontFamily,
                 letterSpacing = 0.sp,
@@ -1089,7 +1092,8 @@ private fun SearchHelp() {
             text = "Greek and Hebrew meanings: STEPBible.org, Tyndale House (CC BY 4.0). " +
                 "King James renderings: Strong’s, via Open Scriptures (CC BY-SA). " +
                 "Septuagint words: Abbott-Smith’s lexicon, via STEPBible. " +
-                "Topics: Nave’s Topical Bible, structured by BibleData (CC BY 4.0).",
+                "Topics: Nave’s Topical Bible, structured by BibleData (CC BY 4.0); " +
+                "Torrey’s New Topical Textbook (public domain), from The SWORD Project.",
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
             fontFamily = WorkSansFontFamily,
             letterSpacing = 0.sp,

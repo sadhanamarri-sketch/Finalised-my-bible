@@ -2,22 +2,24 @@ package com.example.mybible.search
 
 import com.example.mybible.model.TopicItem
 import com.example.mybible.model.TopicRow
+import com.example.mybible.model.TopicSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Nave's topics, from the real bundled topics.tsv, over [TestBible]'s verses. */
+/** Nave's topics and Torrey's, from the real bundled topics.tsv and torrey.tsv, over [TestBible]'s verses. */
 class TopicSearchTest {
 
     private val topics = TopicSearch(TestBible.topics, TestBible.lexicon, TestBible.index)
     private fun id(name: String) = TestBible.topics.topics.first { it.name == name }.id
+    private fun torrey(name: String) = TestBible.topics.topics.first { it.source == TopicSource.TORREY && it.name == name }
 
     @Test
     fun theBookParses() {
         val book = TestBible.topics
-        assertEquals(5319, book.topics.size)
+        assertEquals(5319, book.topics.count { it.source == TopicSource.NAVES })
         val care = book[id("Care")]
         assertEquals(listOf("Worldly", "Remedy for", "Instances of"), care.sections.map { it.label })
         // Anxiety only says "see Care".
@@ -117,5 +119,40 @@ class TopicSearchTest {
         assertTrue(sections[2].rows.any { it is TopicRow.Heading && it.label == "Martha" })
         // Nave's "PHP 4:6,7" is one passage. (Its "1PE 5:6,7" starts at a verse TestBible hasn't.)
         assertEquals(listOf("Philippians 4:6–7"), sections[1].rows.filterIsInstance<TopicRow.Reference>().map { it.label })
+    }
+
+    @Test
+    fun torreysTopicsComeAfterNavesWithTheirOwnLinks() {
+        val book = TestBible.topics
+        assertEquals(628, book.topics.count { it.source == TopicSource.TORREY })
+        val access = torrey("Access to God")
+        assertTrue(access.id >= 5319)
+        // Its "See PRAYER" is Torrey's Prayer, not Nave's.
+        val see = access.links.first()
+        assertEquals("See Prayer", see.text)
+        assertEquals(torrey("Prayer").id, see.topic)
+    }
+
+    @Test
+    fun aSearchFindsTorreysTopicsBesideNaves() {
+        val cards = topics.find("pray")
+        assertEquals(TopicSource.NAVES, cards.first().source)
+        // Each book has its own share of the cards, so Nave's many don't leave Torrey's out.
+        assertTrue(cards.any { it.source == TopicSource.TORREY && it.name == "Prayer" })
+        assertTrue(cards.count { it.source == TopicSource.TORREY } <= TopicSearch.MAX_TOPICS)
+        assertTrue(cards.count { it.source == TopicSource.NAVES } <= TopicSearch.MAX_TOPICS)
+        // A heading of a Torrey's topic: "Should be offered up for" › "Kings" and the rest.
+        assertTrue(topics.find("intercessory prayer").any { it.source == TopicSource.TORREY && it.name == "Prayer, intercessory" })
+    }
+
+    @Test
+    fun aTorreysPageSaysWhichBookItIsFrom() {
+        val page = topics.page(torrey("Prayer").id)
+        assertEquals(TopicSource.TORREY, page.source)
+        val sections = page.items.filterIsInstance<TopicItem.Section>()
+        // "Commanded: Isa 55:6; Mt 7:7; Php 4:6", of which TestBible has Philippians 4:6.
+        assertEquals(listOf("Philippians 4:6"), sections.first { it.label == "Commanded" }.rows.filterIsInstance<TopicRow.Reference>().map { it.label })
+        // "IS DESCRIBED AS", in capitals in the book, as a heading in a sentence's case, with its lines under it.
+        assertTrue(sections.any { it.label == "Is described as" && it.rows.any { r -> r is TopicRow.Heading && r.label == "Bowing the knees" } })
     }
 }

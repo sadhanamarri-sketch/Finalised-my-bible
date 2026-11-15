@@ -289,7 +289,19 @@ data class OriginalWordCard(
     val alternative: Boolean = false
 )
 
-/** A Nave's Topical Bible topic a search found, as a card above the verses. */
+/** The topic books Search has (backlog 55): what each is called, and what its pages credit. */
+enum class TopicSource(val title: String, val short: String, val credit: String) {
+    NAVES(
+        "Nave\u2019s Topical Bible", "Nave\u2019s",
+        "Nave\u2019s Topical Bible (public domain), as structured by BibleData, Brady Stephenson (CC BY 4.0)."
+    ),
+    TORREY(
+        "Torrey\u2019s New Topical Textbook", "Torrey\u2019s",
+        "R. A. Torrey\u2019s New Topical Textbook (1897, public domain), from the Bible Foundation\u2019s text as The SWORD Project publishes it."
+    )
+}
+
+/** A topic a search found (Nave's or Torrey's: [source]), as a card above the verses. */
 data class TopicCard(
     val topicId: Int,
     val name: String,
@@ -306,14 +318,21 @@ data class TopicCard(
      * The lines below its main headings that the search named (their places in the topic), when
      * it's those that found it: Intercession's four that name Paul. Opened, they're shown alone.
      */
-    val lines: List<Int> = emptyList()
+    val lines: List<Int> = emptyList(),
+    val source: TopicSource = TopicSource.NAVES
 )
 
 /**
- * A Nave's topic as its page shows it: its sections, each a heading that can fold, and "see" links.
+ * A topic as its page shows it: its sections, each a heading that can fold, and "see" links.
  * With [lines], only those lines of it (see TopicCard.lines), each a section, and a link to all of it.
  */
-data class TopicPage(val topicId: Int, val name: String, val items: List<TopicItem>, val lines: List<Int>? = null) {
+data class TopicPage(
+    val topicId: Int,
+    val name: String,
+    val items: List<TopicItem>,
+    val lines: List<Int>? = null,
+    val source: TopicSource = TopicSource.NAVES
+) {
     val referenceCount: Int get() = items.sumOf { (it as? TopicItem.Section)?.referenceCount ?: 0 }
 }
 

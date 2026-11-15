@@ -4,10 +4,12 @@ import com.example.mybible.model.TopicCard
 import com.example.mybible.model.TopicItem
 import com.example.mybible.model.TopicPage
 import com.example.mybible.model.TopicRow
+import com.example.mybible.model.TopicSource
 import com.example.mybible.model.Verse
 
 /**
- * Finds the Nave's topics a search names, and lays one out as a page.
+ * Finds the topics a search names, in Nave's and in Torrey's (see TopicBook), and lays one out as a
+ * page.
  *
  * A topic matches when every word of the query (function words aside) is a word of its name, in
  * any form ("forgive": Forgiveness, "angels": Angel) or as the King James says it ("worry": Care).
@@ -37,9 +39,18 @@ class TopicSearch(private val book: TopicBook, private val lexicon: SearchLexico
             // forgive: Forgiveness; pray: Prayer.
             word.length >= 4 && (name.startsWith(word) || name.startsWith(stem)) && name.length - word.length <= 4 -> DIRECT
             name.length >= 4 && word.startsWith(name) && word.length - name.length <= 3 -> DIRECT
+            // Long words that differ only in how they end: intercession, Prayer, intercessory;
+            // transgression, Transgressor. (Not communion and community: too little in common.)
+            sameStem(word, name) -> DIRECT
             name in wording -> WORDING
             else -> 0
         }
+    }
+
+    private fun sameStem(a: String, b: String): Boolean {
+        if (a.length < LONG_WORD || b.length < LONG_WORD) return false
+        val common = a.commonPrefixWith(b).length
+        return common >= LONG_WORD && common >= minOf(a.length, b.length) - 3
     }
 
     // lines: the lines further down that the search names, when it's those that found the topic;
@@ -89,11 +100,14 @@ class TopicSearch(private val book: TopicBook, private val lexicon: SearchLexico
         }
         found.sortWith(compareBy<Found>({ it.tier }, { !it.exact }, { -it.size }, { it.topic.name.length }))
 
+        // Up to [limit] from each book, so Nave's many don't leave out Torrey's.
         val cards = ArrayList<TopicCard>()
+        val each = IntArray(TopicSource.entries.size)
         val shown = HashSet<Triple<Int, Int?, Boolean>>()
         fun add(topic: Topic, section: Int?, via: String?, label: String? = null, lines: List<Int> = emptyList()) {
-            if (cards.size < limit && shown.add(Triple(topic.id, section, lines.isNotEmpty())) && topic.referenceCount > 0) {
+            if (each[topic.source.ordinal] < limit && shown.add(Triple(topic.id, section, lines.isNotEmpty())) && topic.referenceCount > 0) {
                 cards += card(topic, section, via, label, lines)
+                each[topic.source.ordinal]++
             }
         }
         for (f in found) {
@@ -102,7 +116,7 @@ class TopicSearch(private val book: TopicBook, private val lexicon: SearchLexico
             } else {
                 add(f.topic, f.section, via = null, label = f.label, lines = f.lines)
             }
-            if (cards.size >= limit) break
+            if (each.all { it >= limit }) break
         }
         return cards
     }
@@ -177,7 +191,8 @@ class TopicSearch(private val book: TopicBook, private val lexicon: SearchLexico
                 heading != null -> linesUnder(topic, heading).take(3).joinToString(" · ").ifEmpty { headings }
                 else -> headings
             },
-            lines = lines
+            lines = lines,
+            source = topic.source
         )
     }
 
@@ -208,7 +223,7 @@ class TopicSearch(private val book: TopicBook, private val lexicon: SearchLexico
             items += rows.build()
         }
         items += TopicItem.Link("All of ${topic.name} (${topic.referenceCount} references)", id, null)
-        return TopicPage(id, label?.let { "${topic.name} › $it" } ?: topic.name, items, lines)
+        return TopicPage(id, label?.let { "${topic.name} › $it" } ?: topic.name, items, lines, topic.source)
     }
 
     /** [id]'s page: each main heading with what's under it, its verses with their text. */
@@ -239,7 +254,7 @@ class TopicSearch(private val book: TopicBook, private val lexicon: SearchLexico
             }
         }
         section?.let { items += it.build() }
-        return TopicPage(id, topic.name, items)
+        return TopicPage(id, topic.name, items, source = topic.source)
     }
 
     private inner class SectionRows(val index: Int, val label: String) {
@@ -286,10 +301,12 @@ class TopicSearch(private val book: TopicBook, private val lexicon: SearchLexico
     companion object {
         const val DIRECT = 2
         const val WORDING = 1
-        /** Topic cards a search shows at most. */
+        /** Topic cards a search shows at most, from each book. */
         const val MAX_TOPICS = 8
         /** Where a page of lines (see page) numbers its sections from, apart from a topic's own. */
         const val LINE_SECTIONS = 100_000
+        /** Letters two words have in common at least, when only their endings differ (see sameStem). */
+        const val LONG_WORD = 8
         /** A line's length on a card at most, before it's cut. */
         const val MAX_LINE_LENGTH = 60
     }

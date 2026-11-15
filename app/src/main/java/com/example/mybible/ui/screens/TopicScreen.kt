@@ -51,8 +51,9 @@ import com.example.mybible.ui.theme.WorkSansFontFamily
 import com.example.mybible.versescroll.VerseRef
 
 /**
- * A Nave's Topical Bible topic, opened from Search's topic cards: its main headings, each folding
- * open to its verses and subheadings, and its "see" links to other topics. A verse opens in the
+ * A topic of Nave's Topical Bible or Torrey's New Topical Textbook, opened from Search's topic
+ * cards: its main headings, each folding open to its verses and subheadings, and its "see" links
+ * to other topics. A verse opens in the
  * Reader, whose banner comes back here; back closes the topic, onto the one under it or the
  * results.
  */
@@ -105,7 +106,7 @@ fun TopicScreen(topic: OpenTopic, viewModel: MainViewModel, modifier: Modifier =
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp)
                 ) {
                     Text(
-                        text = "Nave’s Topical Bible · " +
+                        text = "${page.source.title} · " +
                             if (page.referenceCount == 1) "1 reference" else "${page.referenceCount} references",
                         fontSize = 13.sp,
                         fontFamily = WorkSansFontFamily,
@@ -121,7 +122,7 @@ fun TopicScreen(topic: OpenTopic, viewModel: MainViewModel, modifier: Modifier =
                             .distinct()
                     }
                     if (refs.isNotEmpty()) {
-                        ScrollTheseButton { viewModel.scrollVerses(page.name, "Nave\u2019s topic", refs) }
+                        ScrollTheseButton { viewModel.scrollVerses(page.name, "${page.source.short} topic", refs) }
                     }
                 }
             }
@@ -135,7 +136,7 @@ fun TopicScreen(topic: OpenTopic, viewModel: MainViewModel, modifier: Modifier =
             }
             item(key = "credit") {
                 Text(
-                    text = "Nave’s Topical Bible (public domain), as structured by BibleData, Brady Stephenson (CC BY 4.0).",
+                    text = page.source.credit,
                     fontSize = 11.5.sp,
                     lineHeight = 16.sp,
                     fontFamily = WorkSansFontFamily,
