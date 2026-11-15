@@ -179,6 +179,17 @@ chapter by chapter (book by book for Telugu), so a run that stops can be started
   (median correlation 0.98 a chapter). 56 chapters were read on from the one before with no join,
   and were split at their spoken headings. In Deuteronomy 23 every pause had been silenced in
   editing, which at first was taken for joins and put chapters 23 to 28 out of place.
+- Telugu, timed again (15 Nov 2026): BSI's own text (backlog 56) moved 132 verse boundaries in 79
+  chapters, 216 verses. 37 fell where another of the old text's boundaries had (verses numbered
+  otherwise: John 6:35–49 and 1 John 5:8–20 had been a verse off) and kept those times. The other 95
+  were placed between the boundaries either side that didn't move (`retime_moved.py`): 85 between
+  verses, and 10 inside verses BSI prints together, where the cut can fall mid-phrase. Acts 8:37, which
+  the old text hadn't, is in the recording: it had been timed as part of the verse before it in that text
+  ("Philip and the eunuch went down…", 18 s), now its own 13 s. Tried on 200 boundaries that hadn't
+  moved, whose times were checked by ear: 98% within 0.15 s (median 0.02 s). In the other 5 the readings
+  agreed on a pause up to 1.6 s off, each verse starting with a word too rare in its book for the voice
+  check. Of the 95 placed, the readings disagreed on 6, listed as unsure (Genesis 27:29, Jeremiah 48:44,
+  Mark 11:10, Proverbs 17:15, 19:3 and 27:21), and the voice check moved one start (Proverbs 27:19).
 - KJV Dramatized Audio (19–20 Oct 2026): all 1,189 chapters and 31,102 verses (76.1 hours, 66
   files), every word placed. The aligner went wrong in places where the cast's voices, music or effects
   are far from what it knows: a crowd in Revelation 6, the serpent in Genesis 3, the Song of Moses

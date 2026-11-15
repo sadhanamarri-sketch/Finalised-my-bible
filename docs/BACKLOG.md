@@ -1735,8 +1735,12 @@ Seen on My Bible (Dev), the build of 23 Oct. Noted only; nothing built yet.
       old text's verses started.
     - The tool: tools/telugu/apply_bsi_text.py (BSI's files and the King James text the app downloads,
       for the lengths); its reports list every stretch settled, group, join and much-changed verse. The
-      app reloads its Telugu once (data version 3). To follow: the Telugu recordings' verse timings
-      still follow the old text's verse breaks, so the ~170 verses that moved need timing again.
+      app reloads its Telugu once (data version 3). *Timed again 15 Nov* (from the recordings in your Drive
+      folder, which stay out of the repository): the recordings' verse timings had followed the old text's
+      breaks; 216 verses in 79 chapters were timed again (tools/audio_timing/retime_moved.py). 37 boundaries
+      kept times checked by ear (John 6:35–49 and 1 John 5:8–20 had been a verse off), 95 were placed
+      between the ones either side, 98% of 200 test boundaries landing within 0.15 s of the times checked by
+      ear. Acts 8:37, missing from the old text, is in the recording and now plays as its own verse.
     - *Step 2, built ("go ahead with step 2"):* Settings › Telugu "Verses printed together", on by default.
       With the Telugu on, a group shows as one block: its English verses close together, then its Telugu
       once, whole, marked "17–18". Tapped, the whole group is picked, and what's done to it is done to all
