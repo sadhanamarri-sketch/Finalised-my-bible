@@ -73,11 +73,13 @@ data = {
             "time warping) at the narrator's pace and a little slower and faster; each verse's start "
             "moved onto the narrator's pause, the three voting, then chosen among nearby pauses by verse "
             "length. Seconds from the start of the file.") if kind == 'kjv' else
-           ("Each chapter found where its heading is said (pocketsphinx's keyword spotting), then timed "
-            "as Faith Comes By Hearing's: espeak's reading of the app's text matched to the narration by "
-            "its sound at the narrator's pace and a little slower and faster, each verse's start on the "
-            "narrator's pause, the three voting, then chosen among nearby pauses by verse length. Seconds "
-            "from the start of the file.") if kind == 'books' else
+           ("espeak's reading of the app's text, the chapters' headings and the narrator's pauses around "
+            "them in it, matched to the narration by its sound (MFCC, dynamic time warping) a block of "
+            "chapters at a time, about ten minutes of them, at the narrator's pace and a little slower and "
+            "faster: roughly first, the reading's pace kept between half and twice the narrator's, then "
+            "finely. Each verse's start moved onto the narrator's pause, the three voting, then chosen "
+            "among nearby pauses by verse length and by how many of the three agree; verse 1 no sooner "
+            "after its heading than the narrator takes over one. Seconds from the start of the file.") if kind == 'books' else
            ("Every word of the app's text placed in the recording by a forced aligner (the Montreal "
             "Forced Aligner) trained on this narrator's own voice; a verse starts just before its first "
             "word and ends just after its last. Seconds from the start of the file.") if kind == 'te' else

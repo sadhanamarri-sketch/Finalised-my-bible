@@ -21,6 +21,9 @@ _ip = ctypes.POINTER(ctypes.c_int)
 _fp = ctypes.POINTER(ctypes.c_float)
 lib.dtw_path.argtypes = [_fp, ctypes.c_int, _fp, ctypes.c_int, ctypes.c_int, _ip, _ip, _ip, _ip, _ip]
 lib.dtw_path.restype = ctypes.c_int
+lib.dtw_path_p1.argtypes = [_fp, ctypes.c_int, _fp, ctypes.c_int, ctypes.c_int, _ip, _ip, ctypes.c_int, ctypes.c_double,
+                            _ip, _ip, _ip, _ip, ctypes.POINTER(ctypes.c_double)]
+lib.dtw_path_p1.restype = ctypes.c_int
 
 
 # ---- audio ----
@@ -135,9 +138,10 @@ def mfcc(x, sr=SR, normalise=True):
 def _escape(t):
     return t.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
 
-def synth(texts, voice, rate):
+def synth(texts, voice, rate, keep=None):
     """[texts] read by espeak; returns the reading (22050 Hz floats, each long gap cut down to
-    KEEP_GAP with a little noise in it) and where each text starts in it, in seconds."""
+    KEEP_GAP, or what [keep] gives for the text before it, with a little noise in it) and where each
+    text starts in it, in seconds."""
     ssml = '<speak>' + ''.join(_escape(t) + f'<break time="{int(GAP * 1000)}ms"/>' for t in texts) + '</speak>'
     out = subprocess.run(['espeak-ng', '-m', '-v', voice, '-s', str(rate), '--stdout', '--stdin'],
                          input=ssml.encode('utf-8'), check=True, capture_output=True).stdout
@@ -152,14 +156,14 @@ def synth(texts, voice, rate):
     if len(gaps) != len(texts):
         raise RuntimeError(f'espeak gave {len(gaps)} gaps for {len(texts)} texts')
     pieces, at, offsets, prev = [], 0, [], 0
-    keep = int(KEEP_GAP * sr)
     rng = np.random.default_rng(0)
-    for s, e in gaps:
+    for i, (s, e) in enumerate(gaps):
         seg = x[prev:s].astype(np.float32) / 32768
         offsets.append(at / sr)
         pieces.append(seg)
-        pieces.append(rng.normal(0, 3e-4, keep).astype(np.float32))
-        at += len(seg) + keep
+        kept = int((keep[i] if keep is not None else KEEP_GAP) * sr)
+        pieces.append(rng.normal(0, 3e-4, kept).astype(np.float32))
+        at += len(seg) + kept
         prev = e
     return np.concatenate(pieces), offsets, sr
 
@@ -197,6 +201,79 @@ def match_diag(A, B, width_s=None):
     for j in range(1, m):
         if first[j] < 0: first[j] = first[j - 1]
     return first, edge
+
+
+def _pool(F, k):
+    """Features [k] frames together (their mean)."""
+    n = len(F) // k * k
+    return F[:n].reshape(-1, k, F.shape[1]).mean(1) if n else F[:1].copy()
+
+def _tidy_band(lo, hi, m):
+    """A band dtw_path and dtw_path_p1 can use: both edges non-decreasing, each row's start no further than
+    the row before reaches."""
+    lo = np.clip(lo, 0, m - 1).astype(np.int64); hi = np.clip(hi, 0, m - 1).astype(np.int64)
+    lo = np.minimum.accumulate(lo[::-1])[::-1]
+    hi = np.maximum(np.maximum.accumulate(hi), lo)
+    lo[1:] = np.minimum(lo[1:], hi[:-1] + 1)
+    lo[0] = 0
+    return lo, hi
+
+def _steady_path(A, B, lo, hi, begin_rows, skip):
+    n, m = len(A), len(B)
+    pi = np.empty(n + m, np.int32); pj = np.empty(n + m, np.int32)
+    edge, end, cost = ctypes.c_int(0), ctypes.c_int(-1), ctypes.c_double(0)
+    A = np.ascontiguousarray(A, np.float32); B = np.ascontiguousarray(B, np.float32)
+    lo = np.ascontiguousarray(lo, np.int32); hi = np.ascontiguousarray(hi, np.int32)
+    L = lib.dtw_path_p1(A.ctypes.data_as(_fp), n, B.ctypes.data_as(_fp), m, A.shape[1], lo.ctypes.data_as(_ip),
+                        hi.ctypes.data_as(_ip), int(begin_rows), float(skip), pi.ctypes.data_as(_ip),
+                        pj.ctypes.data_as(_ip), ctypes.byref(edge), ctypes.byref(end), ctypes.byref(cost))
+    if L == -1: raise MemoryError('dtw')
+    if L < 0: raise ValueError('the reading has no match in the recording')
+    return pi[:L][::-1], pj[:L][::-1], edge.value, end.value, cost.value
+
+def match_within(A, B, begin_s, expected_s, coarse=5, near_s=6.0, max_cells=300_000_000):
+    """For a recording's features [A] holding a reading [B] (both every STEP seconds) that starts in
+    its first [begin_s] seconds and ends anywhere after: for each frame of B, the first frame of A
+    matched to it; the frame of A the reading ends in; how many cells of the fine path ran along its
+    band's edge; and the rough match's cost for its length. Matched roughly first, [coarse] frames
+    together, with the reading's pace kept between half and twice the recording's (dtw_path_p1), over
+    the whole grid (or, when that's too big, in a band around the line at the pace [expected_s] gives,
+    a quarter of it or 90 s either side), each frame of the recording left out costing what two frames
+    picked at random do; then finely (match_diag's steps), within [near_s] seconds of the rough path,
+    from where it starts to where it ends."""
+    n, m = len(A), len(B)
+    k = coarse
+    Ac, Bc = _pool(A, k), _pool(B, k)
+    nc, mc = len(Ac), len(Bc)
+    begin_c = min(nc - 1, int(begin_s / (STEP * k)))
+    if nc * mc <= max_cells:
+        lo, hi = np.zeros(nc, np.int64), np.full(nc, mc - 1, np.int64)
+    else:
+        rows = np.arange(nc)
+        slope = (mc - 1) / max(1.0, expected_s / (STEP * k))
+        w = max(90.0, 0.25 * expected_s) / (STEP * k) * slope
+        centre = (rows - begin_c / 2) * slope
+        lo, hi = np.floor(centre - w), np.ceil(centre + w)
+        lo[:begin_c + 1] = 0
+    lo, hi = _tidy_band(lo, hi, mc)
+    rng = np.random.default_rng(0)
+    skip = float(np.median(np.linalg.norm(Ac[rng.integers(0, nc, 4000)] - Bc[rng.integers(0, mc, 4000)], axis=1)))
+    pic, pjc, _, end_c, cost = _steady_path(Ac, Bc, lo, hi, begin_c, skip)
+    start_c = int(pic[0])
+    jmin = np.full(nc, mc, np.int64); jmax = np.full(nc, -1, np.int64)
+    np.minimum.at(jmin, pic, pjc); np.maximum.at(jmax, pic, pjc)
+    W = int(near_s / STEP)
+    r0, r1 = start_c * k, min(n, (end_c + 1) * k)
+    ic = np.clip(np.arange(r0, r1) // k, start_c, end_c)
+    lo_f, hi_f = _tidy_band(jmin[ic] * k - W, (jmax[ic] + 1) * k - 1 + W, m)
+    hi_f[-1] = m - 1
+    pi, pj, edge = _path(A[r0:r1], B, lo_f, hi_f)
+    first = np.full(m, -1, np.int64)
+    order = np.unique(pj, return_index=True)
+    first[order[0]] = pi[order[1]] + r0
+    for j in range(1, m):
+        if first[j] < 0: first[j] = first[j - 1]
+    return first, r1 - 1, edge, cost
 
 
 def time_chapter(real, texts, voice, quiet, offset=0.0, spread=(0.88, 1.0, 1.12), base=160):
@@ -244,20 +321,34 @@ def time_chapter(real, texts, voice, quiet, offset=0.0, spread=(0.88, 1.0, 1.12)
     return verses, metrics
 
 
-def time_group(real, chapters, voice, quiet, offset=0.0, spread=(0.88, 1.0, 1.12), base=160):
+def time_group(real, chapters, voice, quiet, offset=0.0, spread=(0.88, 1.0, 1.12), base=160, begin_s=None,
+               expected=None, heading_pauses=None):
     """Verse timings for a recording [real] of one or more chapters read one after another, with no
     join between them ([chapters]: each chapter's texts, its heading first). Matched as one reading,
     then split at the headings. Returns, per chapter, (start, end, [[start, end] per verse], metrics)
-    in file seconds."""
+    in file seconds. With [begin_s], the reading is found inside the recording (match_within): it
+    starts somewhere in its first [begin_s] seconds and may end before it does, [expected] seconds
+    long by a guess. [heading_pauses]: (before, after) seconds of quiet the reading keeps around each
+    heading, as long as the narrator's, so that headings meet headings."""
     texts = [t for ch in chapters for t in ch]
+    keep = None
+    if heading_pauses:
+        keep = []
+        for c, ch in enumerate(chapters):
+            keep += [heading_pauses[1]] + [KEEP_GAP] * (len(ch) - 2) + [heading_pauses[0] if c + 1 < len(chapters) else KEEP_GAP]
     A = mfcc(real)
-    syn, _, ssr = synth(texts, voice, base)
-    pace = min(max(base * (len(syn) / ssr) / (len(real) / SR), 80 / spread[0]), 400)
+    syn, _, ssr = synth(texts, voice, base, keep)
+    length = expected if expected else len(real) / SR
+    pace = min(max(base * (len(syn) / ssr) / length, 80 / spread[0]), 400)
     rates = [int(round(pace * k)) for k in spread]
-    votes, raws, edges = [], [], 0
+    votes, raws, edges, ends, costs = [], [], 0, [], []
     for rate in rates:
-        syn, starts, ssr = synth(texts, voice, rate)
-        first, edge = match_diag(A, mfcc(syn, ssr))
+        syn, starts, ssr = synth(texts, voice, rate, keep)
+        if begin_s is None:
+            first, edge = match_diag(A, mfcc(syn, ssr))
+        else:
+            first, end, edge, cost = match_within(A, mfcc(syn, ssr), begin_s, length)
+            ends.append(end * STEP); costs.append(cost)
         edges += edge
         raw = [offset + first[min(int(s / STEP), len(first) - 1)] * STEP for s in starts]
         raws.append(raw)
@@ -266,7 +357,7 @@ def time_group(real, chapters, voice, quiet, offset=0.0, spread=(0.88, 1.0, 1.12
     starts = np.median(votes, axis=0)
     raw = np.median(raws, axis=0)
     spread_ = votes.max(0) - votes.min(0)
-    end_of_real = offset + len(real) / SR
+    end_of_real = offset + (float(np.median(ends)) if ends else len(real) / SR)
 
     def end_before(k):
         """Where text k ends: where the pause before the next text begins (or the recording ends)."""
@@ -287,8 +378,10 @@ def time_group(real, chapters, voice, quiet, offset=0.0, spread=(0.88, 1.0, 1.12
         metrics = {'on_pause': round(inside / max(1, n - 1), 3), 'unsure': [k - h for k in idx if spread_[k] > 0.3],
                    'edge': edges, 'rates': rates, 'group': len(chapters),
                    'corr': None if corr is None or np.isnan(corr) else round(corr, 3),
-                   'heading': round(float(starts[h]), 2)}
-        start = offset if c == 0 else round(float(starts[h]) - 0.15, 2)
+                   'heading': round(float(starts[h]), 2),
+                   'cost': round(float(np.median(costs)), 3) if costs else None,
+                   'votes': [[round(float(v), 2) for v in votes[:, k]] for k in idx]}
+        start = offset if c == 0 and begin_s is None else round(float(starts[h]) - 0.15, 2)
         end = round(end_before(h + n - 1), 2) if c + 1 < len(chapters) else round(end_of_real, 2)
         out.append((start, end, verses, metrics))
         at += n

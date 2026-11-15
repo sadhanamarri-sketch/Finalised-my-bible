@@ -86,3 +86,84 @@ double dtw_cost(const float *a, int n, const float *b, int m, int d) {
     free(prev); free(cur);
     return r;
 }
+
+// A reading (b) somewhere in a recording (a), matched with the path's slope kept between 1/2 and 2
+// (Sakoe and Chiba's symmetric steps, P = 1: (1,1) weighted 2, and (1,2) and (2,1) through the cell
+// between, weighted 3), so that no stretch of the reading is squeezed into an instant of the recording
+// or the other way round. The reading may start in any of the first begin_rows + 1 rows (at column 0;
+// those rows' bands must start there) and end in any row whose band reaches column m-1; each row of the
+// recording left out before or after it costs [skip], so that leaving out the recording is no cheaper
+// than matching it. Writes the path (from its end back) into pi/pj and returns its length; *end_row is
+// the row it ends in, *cost its cost for its length (every path from (s, 0) to (i, j) weighs
+// (i - s) + j + 1), and *edge counts its cells on the band's edge (other than its two ends).
+int dtw_path_p1(const float *a, int n, const float *b, int m, int d, const int *lo, const int *hi,
+                int begin_rows, double skip, int *pi, int *pj, int *edge, int *end_row, double *cost) {
+    size_t total = 0;
+    size_t *off = malloc(sizeof(size_t) * (size_t)n);
+    if (!off) return -1;
+    for (int i = 0; i < n; i++) { off[i] = total; total += (size_t)(hi[i] - lo[i] + 1); }
+    unsigned char *dir = malloc(total);
+    float *D2 = malloc(sizeof(float) * (size_t)m), *D1 = malloc(sizeof(float) * (size_t)m);
+    float *D0 = malloc(sizeof(float) * (size_t)m), *cp = malloc(sizeof(float) * (size_t)m);
+    float *cc = malloc(sizeof(float) * (size_t)m);
+    int *S2 = malloc(sizeof(int) * (size_t)m), *S1 = malloc(sizeof(int) * (size_t)m), *S0 = malloc(sizeof(int) * (size_t)m);
+    if (!dir || !D2 || !D1 || !D0 || !cp || !cc || !S2 || !S1 || !S0) {
+        free(off); free(dir); free(D2); free(D1); free(D0); free(cp); free(cc); free(S2); free(S1); free(S0);
+        return -1;
+    }
+    int best_i = -1;
+    double best = 1e300;
+    for (int i = 0; i < n; i++) {
+        int L = lo[i], H = hi[i];
+        int L1 = i >= 1 ? lo[i - 1] : 1, H1 = i >= 1 ? hi[i - 1] : 0;
+        int L2 = i >= 2 ? lo[i - 2] : 1, H2 = i >= 2 ? hi[i - 2] : 0;
+        const float *ai = a + (size_t)i * d;
+        for (int j = L; j <= H; j++) {
+            const float *bj = b + (size_t)j * d;
+            float c = 0;
+            for (int k = 0; k < d; k++) { float t = ai[k] - bj[k]; c += t * t; }
+            c = sqrtf(c);
+            cc[j] = c;
+            float v_best = FLT_MAX;
+            unsigned char w = 255;
+            int s = -1;
+            if (j == 0) {
+                if (i <= begin_rows) { v_best = c + (float)(skip * i); w = 3; s = i; }
+            } else {
+                if (j - 1 >= L1 && j - 1 <= H1 && D1[j - 1] < FLT_MAX) {
+                    float v = D1[j - 1] + 2 * c; if (v < v_best) { v_best = v; w = 0; s = S1[j - 1]; }
+                }
+                if (j >= 2 && j - 1 >= L && j - 2 >= L1 && j - 2 <= H1 && D1[j - 2] < FLT_MAX) {
+                    float v = D1[j - 2] + 2 * cc[j - 1] + c; if (v < v_best) { v_best = v; w = 1; s = S1[j - 2]; }
+                }
+                if (j - 1 >= L2 && j - 1 <= H2 && j >= L1 && j <= H1 && D2[j - 1] < FLT_MAX) {
+                    float v = D2[j - 1] + 2 * cp[j] + c; if (v < v_best) { v_best = v; w = 2; s = S2[j - 1]; }
+                }
+            }
+            D0[j] = v_best; S0[j] = s;
+            dir[off[i] + (size_t)(j - L)] = w;
+        }
+        if (H == m - 1 && D0[m - 1] < FLT_MAX) {
+            double v = D0[m - 1] + skip * (n - 1 - i);
+            if (v < best) { best = v; best_i = i; *cost = (D0[m - 1] - skip * S0[m - 1]) / (double)(i - S0[m - 1] + m); }
+        }
+        float *t = D2; D2 = D1; D1 = D0; D0 = t;
+        int *u = S2; S2 = S1; S1 = S0; S0 = u;
+        t = cp; cp = cc; cc = t;
+    }
+    free(D2); free(D1); free(D0); free(cp); free(cc); free(S2); free(S1); free(S0);
+    if (best_i < 0) { free(dir); free(off); return -2; }
+    int i = best_i, j = m - 1, len = 0, e = 0;
+    while (i >= 0 && j >= 0) {
+        pi[len] = i; pj[len] = j; len++;
+        if ((j == lo[i] || j == hi[i]) && j != 0 && !(i == best_i && j == m - 1)) e++;
+        unsigned char w = dir[off[i] + (size_t)(j - lo[i])];
+        if (w == 3 || w == 255) break;
+        if (w == 0) { i--; j--; }
+        else if (w == 1) { pi[len] = i; pj[len] = j - 1; len++; i--; j -= 2; }
+        else { pi[len] = i - 1; pj[len] = j; len++; i -= 2; j--; }
+    }
+    free(dir); free(off);
+    *edge = e; *end_row = best_i;
+    return len;
+}

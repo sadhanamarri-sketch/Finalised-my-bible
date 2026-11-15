@@ -5,12 +5,14 @@ import re
 import numpy as np
 
 
-def refine(starts, unsure, lengths, quiet, end, sure_sd=0.35, unsure_sd=4.0, reach=8.0, pause_weight=2.0, head=None):
+def refine(starts, unsure, lengths, quiet, end, sure_sd=0.35, unsure_sd=4.0, reach=8.0, pause_weight=2.0, head=None,
+           votes=None, vote_weight=1.5):
     """[starts]: each verse's start (s) from the matching; [unsure]: indexes whose runs disagreed;
     [lengths]: each verse's letters; [quiet]: (start, end) quiet stretches in the same seconds;
     [end]: where the last verse ends; [head]: (where the chapter's spoken heading starts, how long it
     takes: heading_factor times its length as espeak says it), which keeps verse 1 from starting
-    inside the heading. Returns the chosen starts."""
+    inside the heading; [votes]: each verse's start as each run placed it, so a start most of them
+    agree on counts for more ([vote_weight] when all do). Returns the chosen starts."""
     n = len(starts)
     if n < 3 and head is None:
         return list(starts)
@@ -41,9 +43,14 @@ def refine(starts, unsure, lengths, quiet, end, sure_sd=0.35, unsure_sd=4.0, rea
         p = [0.0] + [plen[i] for i in pick]
         if k == 0 and head is not None:
             c.append(h + gap); p.append(0.0)
+        if votes is not None:
+            c += list(votes[k]); p += [0.0] * len(votes[k])
         c = np.array(c); p = np.array(p)
         cands.append(c)
         score = -(c - starts[k]) ** 2 / (2 * sd ** 2) + pause_weight * np.log1p(p)
+        if votes is not None:
+            agree = np.array([sum(1 for v in votes[k] if abs(v - x) <= 0.15) for x in c], float)
+            score = score + vote_weight * agree / len(votes[k])
         if k == 0 and head is not None:
             # verse 1 comes no sooner after the heading's start than the heading takes (it can come
             # later: a psalm's title is read after its heading)
