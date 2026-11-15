@@ -83,7 +83,44 @@ def boundaries(old, new):
     return out
 
 
-def place(x, quiet, F, templates, texts, w0, w1, voice=True):
+def choose(est, spread, lengths, pace, near, w0, w1, sure_sd=0.35, unsure_sd=2.0, reach=3.0, pause_weight=2.0):
+    """Each start (after the first, fixed at w0) chosen among the pauses near where the matching put it
+    (as refine.py does): held tightly where its readings agreed, a longer pause liked better (a verse
+    usually follows one), and each verse taking about as long as its letters at the narrator's [pace]
+    in this chapter, the last one ending at w1."""
+    n = len(lengths)
+    mu = [pace * l for l in lengths]
+    onsets = np.array([b - 0.08 for a, b in near], float)
+    plen = np.array([b - a for a, b in near], float)
+    cands, scores = [np.array([w0])], [np.array([0.0])]
+    for k in range(1, n):
+        doubt = spread[k] > UNSURE
+        sd, w = (unsure_sd, reach) if doubt else (sure_sd, 1.2)
+        pick = np.where((np.abs(onsets - est[k]) <= w) & (onsets > w0 + 0.4) & (onsets < w1 - 0.4))[0]
+        c = np.array([est[k]] + [onsets[i] for i in pick]); pl = np.array([0.0] + [plen[i] for i in pick])
+        cands.append(c)
+        scores.append(-(c - est[k]) ** 2 / (2 * sd ** 2) + pause_weight * np.log1p(pl))
+    best, back = [scores[0]], []
+    for k in range(1, n):
+        d = cands[k][:, None] - cands[k - 1][None, :]
+        sd = 0.2 * mu[k - 1] + 0.6
+        trans = -(d - mu[k - 1]) ** 2 / (2 * sd ** 2)
+        trans[d < 0.4] = -1e9
+        tot = best[-1][None, :] + trans
+        j = np.argmax(tot, axis=1)
+        best.append(scores[k] + tot[np.arange(len(j)), j])
+        back.append(j)
+    last = w1 - cands[-1]
+    final = best[-1] - (last - mu[-1]) ** 2 / (2 * (0.2 * mu[-1] + 0.6) ** 2) + np.where(last < 0.4, -1e9, 0.0)
+    i = int(np.argmax(final))
+    out = [0.0] * n
+    for k in range(n - 1, -1, -1):
+        out[k] = float(cands[k][i])
+        if k > 0: i = int(back[k - 1][i])
+    return out
+
+
+def place(x, quiet, F, templates, texts, w0, w1, pace, voice=True):
     """Starts for texts[1:] and ends for texts[:-1] (file seconds), the verses [texts] being read one
     after another from w0 to w1; and for each start how sure (spread of the readings, voice move)."""
     real = x[int(round(w0 * SR)):int(round(w1 * SR))]
@@ -99,8 +136,8 @@ def place(x, quiet, F, templates, texts, w0, w1, voice=True):
         raws.append(raw)
         votes.append([snap_near(t, near, within=0.6)[0] for t in raw])
     votes = np.array(votes)
-    starts = list(np.median(votes, axis=0))
     spread = list(votes.max(0) - votes.min(0))
+    starts = choose(list(np.median(votes, axis=0)), spread, [len(letters(t)) for t in texts], pace, near, w0, w1)
     moved = [0.0] * len(texts)
     if voice:
         q_ends = np.array([b for a, b in near]) if near else np.zeros(0)
@@ -131,11 +168,11 @@ def place(x, quiet, F, templates, texts, w0, w1, voice=True):
     return starts[1:], ends, sure[1:]
 
 
-def place_or_split(x, quiet, F, templates, texts, w0, w1, voice=True):
+def place_or_split(x, quiet, F, templates, texts, w0, w1, pace, voice=True):
     """place(), or where espeak or the match fails, starts spread by the texts' lengths onto the nearest
     pauses (listed as unsure)."""
     try:
-        return place(x, quiet, F, templates, texts, w0, w1, voice)
+        return place(x, quiet, F, templates, texts, w0, w1, pace, voice)
     except Exception as e:
         near = [(a, b) for a, b in quiet if b > w0 - 1 and a < w1 + 1]
         lens = np.cumsum([len(letters(t)) for t in texts]); total = float(lens[-1])
@@ -158,10 +195,12 @@ def file_job(args):
     results = []
     for c in chapters:
         timed, new = c['timed'], c['new']
+        rates = [(e - st) / max(1, len(letters(t))) for (_, t), (st, e) in zip(c['old'], timed)]
+        pace = float(np.median(rates))
         for i in c.get('try', []):
             texts = [spoken(new[i - 1][1]), spoken(new[i][1]), spoken(new[i + 1][1])]
-            s, e, sure = place_or_split(x, quiet, F, templates, texts, timed[i - 1][0], timed[i + 1][1])
-            s0, _, _ = place_or_split(x, quiet, F, templates, texts, timed[i - 1][0], timed[i + 1][1], voice=False)
+            s, e, sure = place_or_split(x, quiet, F, templates, texts, timed[i - 1][0], timed[i + 1][1], pace)
+            s0, _, _ = place_or_split(x, quiet, F, templates, texts, timed[i - 1][0], timed[i + 1][1], pace, voice=False)
             results.append({'test': True, 'chapter': c['name'], 'verse': i + 1, 'checked': timed[i][0], 'placed': s[0],
                             'before_voice': s0[0], 'spread': sure[0]['spread']})
         if not c['moved']: continue
@@ -178,7 +217,7 @@ def file_job(args):
             k = i
             while k + 1 < n - 1 and c['cuts'][k + 1] is None: k += 1
             texts = [spoken(new[v][1]) for v in range(i, k + 2)]
-            s, e, how = place_or_split(x, quiet, F, templates, texts, start[i], end[k + 1])
+            s, e, how = place_or_split(x, quiet, F, templates, texts, start[i], end[k + 1], pace)
             for d in range(len(s)):
                 start[i + 1 + d] = s[d]; sure[i + 1 + d] = how[d]
             for d in range(len(e)):
@@ -204,6 +243,10 @@ def apply(data, out, timing_path):
         for v in changed:
             report.append({'chapter': r['chapter'], 'verse': v + 1, 'was': before[v], 'now': r['verses'][v],
                            'placed': v in sure, **(sure.get(v) or {})})
+    if 'timed again' not in data['how']:
+        data['how'] += (" Verses whose boundaries the app's text then moved (BSI's own text, November 2026) were timed again"
+                        " between the boundaries that didn't move: espeak matched to the narration, his pauses, and his own"
+                        " voice saying their first words (tools/audio_timing/retime_moved.py).")
     with open(timing_path + '.tmp', 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
     os.replace(timing_path + '.tmp', timing_path)
