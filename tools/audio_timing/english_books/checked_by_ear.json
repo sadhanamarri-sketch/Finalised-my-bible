@@ -1,0 +1,49 @@
+{
+ "about": "Verses of the KJV audiobook with read-along text checked by ear on its sample page (15 Nov 2026), Ruth: each played from the book's own file, then passed (ok) or given its start (seconds into the file) a quarter second at a time. For fold_checked.py.",
+ "chapter_starts": {},
+ "chapters": {
+  "Ruth 1": {
+   "starts": {
+    "17": 165.81
+   },
+   "ok": [
+    9,
+    12,
+    18
+   ]
+  },
+  "Ruth 2": {
+   "starts": {
+    "1": 234.23
+   },
+   "ok": [
+    5,
+    9,
+    15,
+    17
+   ]
+  },
+  "Ruth 3": {
+   "starts": {},
+   "ok": [
+    1,
+    7,
+    8
+   ]
+  },
+  "Ruth 4": {
+   "starts": {
+    "19": 910.99,
+    "22": 922.91
+   },
+   "ok": [
+    3,
+    4,
+    6,
+    16,
+    18,
+    20
+   ]
+  }
+ }
+}

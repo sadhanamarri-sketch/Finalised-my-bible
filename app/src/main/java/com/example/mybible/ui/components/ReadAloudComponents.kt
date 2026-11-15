@@ -1218,13 +1218,17 @@ private fun recordingNote(telugu: Boolean, status: Recordings.Status): String =
     when (status.recording.takeIf { status.checking == null && status.chapters > 0 }) {
         Recordings.Recording.KJV_DRAMATIZED -> KJV_DRAMATIZED
         Recordings.Recording.KJV_NARRATED -> KJV_NARRATED
+        Recordings.Recording.KJV_AUDIOBOOK -> KJV_AUDIOBOOK
         else -> if (telugu) TELUGU_RECORDING else ENGLISH_RECORDINGS
     }
 
-private const val ENGLISH_RECORDINGS = "The King James Version, either of two recordings, its files kept just as they came: the KJV " +
-    "Dramatized Audio from the Internet Archive (one MP4 a book), or Faith Comes By Hearing's (one MP3 a chapter: ENGKJVO1DA and ENGKJVN1DA)."
+private const val ENGLISH_RECORDINGS = "The King James Version, any of three recordings, its files kept just as they came: the KJV " +
+    "Dramatized Audio from the Internet Archive (one MP4 a book), Faith Comes By Hearing's (one MP3 a chapter: ENGKJVO1DA and " +
+    "ENGKJVN1DA), or the KJV audiobook with read-along text (one M4A a book)."
 private const val KJV_DRAMATIZED = "The KJV Dramatized Audio from the Internet Archive: one MP4 a book, kept just as they came."
 private const val KJV_NARRATED = "The King James Version from Faith Comes By Hearing: one MP3 a chapter (ENGKJVO1DA and ENGKJVN1DA), kept just as they came."
+private const val KJV_AUDIOBOOK = "The King James Version audiobook with read-along text: one M4A a book (Hosea to Malachi, Romans to " +
+    "Hebrews and James to Jude each in one), kept just as they came, names and all."
 private const val TELUGU_RECORDING = "The Telugu Audio Bible from YGFM: one file a book (Psalms in two), kept just as they came."
 
 // The phone's speech engines to read a language with, its usual one marked so. An AI voice app's

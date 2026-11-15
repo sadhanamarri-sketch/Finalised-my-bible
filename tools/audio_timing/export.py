@@ -5,14 +5,20 @@ verses where the matching's runs disagreed are listed as unsure.
 usage: export.py kjv <results dir> <kjv.tsv> <out.json>
        export.py te <results dir> <kjv.tsv> <out.json>
        export.py drama <results dir> <kjv.tsv> <out.json>     (the dramatized KJV, english_words/)
+       export.py books <results dir> - <out.json>             (the KJV audiobook, run_kjv_books.py)
 """
 import sys, os, json, glob
 
 kind, res, kjv, out = sys.argv[1:5]
 order = []
-for line in open(kjv, encoding='utf-8'):
-    b = line.split('\t', 1)[0]
-    if b not in order: order.append(b)
+if kind == 'books':
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from run_kjv_books import BOOKS
+    order = list(BOOKS)
+else:
+    for line in open(kjv, encoding='utf-8'):
+        b = line.split('\t', 1)[0]
+        if b not in order: order.append(b)
 
 def tidy(verses):
     """A verse ends by the time the next one starts (they can overlap by a frame or two)."""
@@ -37,6 +43,11 @@ else:
         files[r['file']] = r['duration']
         for c, ch in r['chapters'].items():
             entry = {'file': r['file'], 'start': ch['start'], 'end': ch['end'], 'verses': tidy(ch['verses'])}
+            if kind == 'books':  # chapters by name, "Ruth 1"
+                if ch['unsure']: entry['unsure'] = ch['unsure']
+                book, number = c.rsplit(' ', 1)
+                chapters[(book, int(number))] = entry
+                continue
             if ch['metrics']['unsure']: entry['unsure'] = ch['metrics']['unsure']
             chapters[(r['book'], int(c))] = entry
     # a chapter ends by the time the next one in its file starts
@@ -48,7 +59,10 @@ else:
             if e['end'] > nxt['start']:
                 e['end'] = nxt['start']
                 e['verses'][-1][1] = min(e['verses'][-1][1], e['end'])
-    recording = ('Telugu Audio Bible, YGFM (Apostle Ratnaker), reading the Telugu Old Version: one file per '
+    recording = ('The King James Version audiobook with read-along text, one reader: one M4A per book (Hosea to '
+                 'Malachi, Romans to Hebrews and James to Jude each in one), the book\'s title first and each '
+                 'chapter\'s number ("Chapter two", "Psalm two").') if kind == 'books' else \
+                ('Telugu Audio Bible, YGFM (Apostle Ratnaker), reading the Telugu Old Version: one file per '
                  'book (Psalms in two), chapters read one after another.') if kind == 'te' else \
                 ('KJV Dramatized Audio (the Internet Archive): one MP4 per book, its chapters read one after '
                  "another, the book's title first and each chapter's number (\"Chapter two\", \"Psalm two\").")
@@ -59,6 +73,11 @@ data = {
             "time warping) at the narrator's pace and a little slower and faster; each verse's start "
             "moved onto the narrator's pause, the three voting, then chosen among nearby pauses by verse "
             "length. Seconds from the start of the file.") if kind == 'kjv' else
+           ("Each chapter found where its heading is said (pocketsphinx's keyword spotting), then timed "
+            "as Faith Comes By Hearing's: espeak's reading of the app's text matched to the narration by "
+            "its sound at the narrator's pace and a little slower and faster, each verse's start on the "
+            "narrator's pause, the three voting, then chosen among nearby pauses by verse length. Seconds "
+            "from the start of the file.") if kind == 'books' else
            ("Every word of the app's text placed in the recording by a forced aligner (the Montreal "
             "Forced Aligner) trained on this narrator's own voice; a verse starts just before its first "
             "word and ends just after its last. Seconds from the start of the file.") if kind == 'te' else

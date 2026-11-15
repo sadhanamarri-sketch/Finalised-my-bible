@@ -47,6 +47,12 @@ class Recordings(context: Context, private val scope: CoroutineScope) : Recorded
         /** Faith Comes By Hearing's King James Version, narrated: one MP3 a chapter. */
         KJV_NARRATED(false, "audio_timing/kjv.json"),
 
+        /**
+         * The King James Version audiobook with read-along text, one reader: one M4A a book, Hosea to
+         * Malachi, Romans to Hebrews and James to Jude each in one (New_english.zip, 15 Nov 2026).
+         */
+        KJV_AUDIOBOOK(false, "audio_timing/kjv_audiobook.json"),
+
         /** YGFM's Telugu Audio Bible: one file a book (Psalms in two). */
         TELUGU(true, "audio_timing/telugu.json")
     }
