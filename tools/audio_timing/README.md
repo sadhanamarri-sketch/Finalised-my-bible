@@ -123,6 +123,13 @@ mfa align corpus/align corpus/dict.txt te_model.zip aligned --audio_directory au
 python3 telugu_words/words_to_verses.py aligned results/te ../../app/src/main/assets/telugu results/te_words
 python3 export.py te results/te_words kjv.tsv ../../data/audio_timing/telugu.json
 
+# 15 Nov 2026: the app's Telugu became BSI's own text (backlog 56), which moved some verses' boundaries.
+# Those verses timed again between the boundaries that didn't move (retime_moved.py), from the 34 files
+# with such verses in one folder, named as they came; then written into the timings.
+python3 retime_moved.py ../../data/audio_timing/telugu.json 00623a8^ ../../app/src/main/assets/telugu \
+    recordings 3 --test=200
+python3 retime_moved.py ../../data/audio_timing/telugu.json --apply
+
 # The KJV Dramatized Audio (Kjv1-10.zip, kjv11-20.zip, kjv21-40.zip, kjv41-66.zip in zips/), with the
 # aligner above and its English models, and pocketsphinx (pip) in the Python $KWS_PYTHON names
 mfa model download acoustic english_mfa && mfa model download dictionary english_us_mfa
